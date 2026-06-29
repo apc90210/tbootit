@@ -1,0 +1,23 @@
+﻿# Python / general
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+tmp/
+temp/
