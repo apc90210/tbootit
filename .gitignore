@@ -1,4 +1,4 @@
-﻿# Python / general
+# Python / general
 __pycache__/
 *.pyc
 .venv/
@@ -21,3 +21,6 @@ Thumbs.db
 # Temp
 tmp/
 temp/
+
+# Data
+data/

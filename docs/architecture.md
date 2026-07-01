@@ -8,3 +8,4 @@
 1. Core API is the single source of truth.
 2. Direct database access from outside the Core is forbidden.
 3. Media files are served by the Core API.
+4. All future client/user modules must have a fully Russian UI.
