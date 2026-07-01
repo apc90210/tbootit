@@ -91,21 +91,22 @@
 
         async function seedData() {
             try {
-                const res = await fetch(`${CORE_API_URL}/api/admin/seed`, { method: 'POST' });
+                const res = await fetch(`/admin-api/seed`, { method: 'POST' });
                 if(res.ok) {
                     alert("Database seeded successfully!");
                     window.location.reload();
                 } else {
-                    alert("Failed to seed database.");
+                    const err = await res.json();
+                    alert(`Failed to seed database. ${err.detail || ''}`);
                 }
             } catch(e) {
-                alert("Error connecting to Core API.");
+                alert(`Error connecting to Admin Shell backend: ${e.message}`);
             }
         }
 
         async function changeStatus(productId, status) {
             try {
-                const res = await fetch(`${CORE_API_URL}/api/products/${productId}/status`, {
+                const res = await fetch(`/admin-api/products/${productId}/status`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: status })
@@ -113,10 +114,11 @@
                 if(res.ok) {
                     window.location.reload();
                 } else {
-                    alert("Failed to change status.");
+                    const err = await res.json();
+                    alert(`Failed to change status. ${err.detail || ''}`);
                 }
             } catch(e) {
-                alert("Error connecting to Core API.");
+                alert(`Error connecting to Admin Shell backend: ${e.message}`);
             }
         }
     </script>

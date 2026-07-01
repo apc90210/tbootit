@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 import os
 import httpx
 
@@ -37,3 +38,31 @@ async def dashboard(request: Request):
         "customers": customers,
         "core_url": CORE_API_URL
     })
+
+class StatusUpdate(BaseModel):
+    status: str
+
+@app.post("/admin-api/seed")
+async def proxy_seed():
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(f"{CORE_API_URL}/api/admin/seed")
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.patch("/admin-api/products/{product_id}/status")
+async def proxy_product_status(product_id: int, status_update: StatusUpdate):
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.patch(
+                f"{CORE_API_URL}/api/products/{product_id}/status",
+                json=status_update.model_dump()
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")

@@ -37,13 +37,17 @@ def get_audit_log(db: Session = Depends(get_db)):
 @router.post("/seed")
 def seed_data(db: Session = Depends(get_db)):
     # Simple seed for MVP
-    cat = models.Category(name="Laptops", slug="laptops", description="Portable computers")
-    db.add(cat)
-    db.commit()
+    cat = db.query(models.Category).filter(models.Category.slug == "laptops").first()
+    if not cat:
+        cat = models.Category(name="Laptops", slug="laptops", description="Portable computers")
+        db.add(cat)
+        db.commit()
     
-    prod = models.Product(sku="LAP001", title="Thinkpad T480", category_id=cat.id, status="in_stock")
-    db.add(prod)
-    db.commit()
+    prod = db.query(models.Product).filter(models.Product.sku == "LAP001").first()
+    if not prod:
+        prod = models.Product(sku="LAP001", title="Thinkpad T480", category_id=cat.id, status="in_stock")
+        db.add(prod)
+        db.commit()
     
     from app.routers.customers import log_audit
     log_audit(db, "system", 0, "seed", comment="Database seeded with dummy data")
