@@ -22,10 +22,11 @@ def log_product_event(db: Session, product_id: int, event_type: str, old_value=N
     db.add(ev)
     return ev
 
-@router.get("/", response_model=List[schemas.Product])
+@router.get("/", response_model=schemas.ProductListResponse)
 def get_products(
     q: Optional[str] = None,
     status: Optional[str] = None,
+    source: Optional[str] = None,
     category_id: Optional[int] = None,
     brand: Optional[str] = None,
     storage_location: Optional[str] = None,
@@ -33,7 +34,8 @@ def get_products(
     max_price: Optional[float] = None,
     avito_ready: Optional[bool] = None,
     site_ready: Optional[bool] = None,
-    limit: int = 100,
+    sort: Optional[str] = None,
+    limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
@@ -51,6 +53,8 @@ def get_products(
         )
     if status:
         query = query.filter(models.Product.status == status)
+    if source:
+        query = query.filter(models.Product.source_type == source)
     if category_id:
         query = query.filter(models.Product.category_id == category_id)
     if brand:
@@ -71,8 +75,27 @@ def get_products(
             query = query.filter(models.Product.site_title != None, models.Product.site_description != None)
         else:
             query = query.filter(or_(models.Product.site_title == None, models.Product.site_description == None))
+            
+    if sort == "price_asc":
+        query = query.order_by(models.Product.sale_price.asc())
+    elif sort == "price_desc":
+        query = query.order_by(models.Product.sale_price.desc())
+    elif sort == "created_asc":
+        query = query.order_by(models.Product.created_at.asc())
+    elif sort == "created_desc":
+        query = query.order_by(models.Product.created_at.desc())
+    else:
+        query = query.order_by(models.Product.id.desc())
         
-    return query.offset(offset).limit(limit).all()
+    total = query.count()
+    items = query.offset(offset).limit(limit).all()
+    
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
 
 @router.get("/meta")
 def get_meta(db: Session = Depends(get_db)):
@@ -173,8 +196,21 @@ def update_product(product_id: int, product: schemas.ProductUpdate, db: Session 
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
+    if product.sale_price is not None and product.sale_price < 0:
+        raise HTTPException(status_code=400, detail="Price must be non-negative")
+    if product.purchase_price is not None and product.purchase_price < 0:
+        raise HTTPException(status_code=400, detail="Price must be non-negative")
+    if product.title is not None and len(product.title.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+        
+    if product.status is not None:
+        raise HTTPException(status_code=400, detail="Use /status endpoint to update status")
+    
     old_data = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
     update_data = product.model_dump(exclude_unset=True)
+    if "status" in update_data:
+        del update_data["status"]
+        
     for key, value in update_data.items():
         setattr(db_product, key, value)
         
@@ -187,19 +223,35 @@ def update_product(product_id: int, product: schemas.ProductUpdate, db: Session 
     db.commit()
     return db_product
 
-@router.patch("/{product_id}/status", response_model=schemas.Product)
+VALID_TRANSITIONS = {
+    "draft": ["in_stock", "archived", "imported", "reserved", "sold", "written_off"],
+    "imported": ["in_stock", "archived", "reserved", "sold", "written_off"],
+    "in_stock": ["reserved", "sold", "written_off", "archived"],
+    "reserved": ["in_stock", "sold", "archived"],
+    "sold": ["archived"],
+    "written_off": ["archived"],
+    "archived": ["imported", "draft", "in_stock"]
+}
+
+@router.post("/{product_id}/status", response_model=schemas.Product)
 def update_product_status(product_id: int, status_update: schemas.ProductStatusUpdate, db: Session = Depends(get_db)):
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    old_status = db_product.status
-    db_product.status = status_update.status
+    old_status = db_product.status or "draft"
+    new_status = status_update.status
+    
+    allowed = VALID_TRANSITIONS.get(old_status, [])
+    if new_status not in allowed and old_status != new_status:
+        raise HTTPException(status_code=400, detail=f"Invalid transition from {old_status} to {new_status}")
+    
+    db_product.status = new_status
     db.commit()
     db.refresh(db_product)
     
-    log_audit(db, "product", db_product.id, "update_status", old_value={"status": old_status}, new_value={"status": status_update.status})
-    log_product_event(db, db_product.id, "update_status", old_value=old_status, new_value=status_update.status, comment="Status changed")
+    log_audit(db, "product", db_product.id, "update_status", old_value={"status": old_status}, new_value={"status": new_status})
+    log_product_event(db, db_product.id, "update_status", old_value=old_status, new_value=new_status, comment=status_update.reason or "Status changed")
     db.commit()
     return db_product
 

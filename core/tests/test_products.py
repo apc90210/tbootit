@@ -7,7 +7,8 @@ client = TestClient(app)
 def test_get_products():
     response = client.get("/api/products/")
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    assert "items" in response.json()
+    assert isinstance(response.json()["items"], list)
 
 def test_get_products_meta():
     response = client.get("/api/products/meta")
@@ -65,3 +66,64 @@ def test_publication_flags():
     assert site_resp.status_code == 200
     assert site_resp.json()["is_published_site"] == 1
     assert site_resp.json()["site_title"] == "Cool Prod"
+
+def test_patch_product_safe_fields():
+    # create a product
+    sku = f"TEST-PATCH-{uuid.uuid4().hex[:8]}"
+    payload = {
+        "source": "test", "schema_version": "1.0", "operation": "create_or_update",
+        "product": {"sku": sku, "title": "Old Title", "category_path": ["Test"]}
+    }
+    import_resp = client.post("/api/product-cards/import-json", json=payload)
+    pid = import_resp.json()["product_id"]
+    
+    # patch
+    patch_resp = client.patch(f"/api/products/{pid}", json={"title": "New Title", "sale_price": 5000})
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["title"] == "New Title"
+    assert patch_resp.json()["sale_price"] == 5000
+
+def test_patch_product_reject_unsafe():
+    # create a product
+    sku = f"TEST-REJECT-{uuid.uuid4().hex[:8]}"
+    payload = {
+        "source": "test", "schema_version": "1.0", "operation": "create_or_update",
+        "product": {"sku": sku, "title": "Test Title", "category_path": ["Test"]}
+    }
+    import_resp = client.post("/api/product-cards/import-json", json=payload)
+    pid = import_resp.json()["product_id"]
+    
+    # negative price
+    patch_resp = client.patch(f"/api/products/{pid}", json={"sale_price": -100})
+    assert patch_resp.status_code == 400
+    
+    # empty title
+    patch_resp2 = client.patch(f"/api/products/{pid}", json={"title": "   "})
+    assert patch_resp2.status_code == 400
+    
+    # attempt to patch status
+    patch_resp3 = client.patch(f"/api/products/{pid}", json={"status": "in_stock"})
+    assert patch_resp3.status_code == 400
+
+def test_post_status_valid_invalid():
+    sku = f"TEST-STATUS-{uuid.uuid4().hex[:8]}"
+    payload = {
+        "source": "test", "schema_version": "1.0", "operation": "create_or_update",
+        "product": {"sku": sku, "title": "Status Title", "category_path": ["Test"]}
+    }
+    import_resp = client.post("/api/product-cards/import-json", json=payload)
+    pid = import_resp.json()["product_id"]
+    
+    # valid: imported/draft -> in_stock
+    status_resp = client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
+    assert status_resp.status_code == 200
+    assert status_resp.json()["status"] == "in_stock"
+    
+    # invalid: in_stock -> draft
+    status_resp2 = client.post(f"/api/products/{pid}/status", json={"status": "draft"})
+    assert status_resp2.status_code == 400
+    
+    # valid: in_stock -> sold
+    status_resp3 = client.post(f"/api/products/{pid}/status", json={"status": "sold"})
+    assert status_resp3.status_code == 200
+    assert status_resp3.json()["status"] == "sold"

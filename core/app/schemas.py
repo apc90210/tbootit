@@ -78,6 +78,7 @@ class ProductUpdate(BaseModel):
 
 class ProductStatusUpdate(BaseModel):
     status: str
+    reason: Optional[str] = None
 
 class Product(ProductBase):
     id: int
@@ -85,6 +86,12 @@ class Product(ProductBase):
     updated_at: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+class ProductListResponse(BaseModel):
+    items: List[Product]
+    total: int
+    limit: int
+    offset: int
 
 # Customer Schemas
 class CustomerBase(BaseModel):
