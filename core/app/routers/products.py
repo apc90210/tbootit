@@ -10,8 +10,8 @@ import json
 router = APIRouter()
 
 def log_product_event(db: Session, product_id: int, event_type: str, old_value=None, new_value=None, comment=None):
-    old_val_str = json.dumps(old_value) if old_value else None
-    new_val_str = json.dumps(new_value) if new_value else None
+    old_val_str = json.dumps(old_value, default=str) if old_value else None
+    new_val_str = json.dumps(new_value, default=str) if new_value else None
     ev = models.ProductEvent(
         product_id=product_id,
         event_type=event_type,

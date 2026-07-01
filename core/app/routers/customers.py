@@ -12,8 +12,8 @@ def log_audit(db: Session, entity_type: str, entity_id: int, action: str, old_va
         entity_type=entity_type,
         entity_id=entity_id,
         action=action,
-        old_value=json.dumps(old_value) if old_value else None,
-        new_value=json.dumps(new_value) if new_value else None,
+        old_value=json.dumps(old_value, default=str) if old_value else None,
+        new_value=json.dumps(new_value, default=str) if new_value else None,
         comment=comment
     )
     db.add(log)
