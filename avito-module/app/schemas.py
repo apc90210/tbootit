@@ -97,3 +97,7 @@ class ProductCardImport(BaseModel):
     product: ProductSection
     avito: Optional[AvitoSection] = None
     site: Optional[SiteSection] = None
+
+class ImportRequest(BaseModel):
+    force: bool = False
+

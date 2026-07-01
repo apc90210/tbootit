@@ -23,6 +23,8 @@ def mock_parsed_ad():
 class DummyCoreClient:
     async def validate_product_card(self, card):
         return {"valid": True, "warnings": []}
+    async def import_product_card(self, card):
+        return {"status": "imported", "product_id": 999}
 
 def test_core_import_preview(mock_parsed_ad, monkeypatch):
     monkeypatch.setattr(exports, "core_client", DummyCoreClient())

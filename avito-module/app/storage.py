@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.config import settings
 from app.schemas import ParseRun, ParsedAd
 
@@ -64,9 +64,23 @@ def list_parsed_ads() -> List[ParsedAd]:
     ads = []
     ads_dir = _get_ads_dir()
     for filename in os.listdir(ads_dir):
-        if filename.endswith(".json"):
+        if filename.endswith(".json") and not filename.endswith("_import.json"):
             ad_id = filename[:-5]
             ad = get_parsed_ad(ad_id)
             if ad:
                 ads.append(ad)
     return sorted(ads, key=lambda x: x.created_at, reverse=True)
+
+def save_import_status(ad_id: str, status_data: Dict[str, Any]):
+    ads_dir = _get_ads_dir()
+    path = os.path.join(ads_dir, f"{ad_id}_import.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(status_data, f, ensure_ascii=False, indent=2)
+
+def get_import_status(ad_id: str) -> Optional[Dict[str, Any]]:
+    ads_dir = _get_ads_dir()
+    path = os.path.join(ads_dir, f"{ad_id}_import.json")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
