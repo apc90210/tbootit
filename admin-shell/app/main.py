@@ -224,3 +224,35 @@ async def proxy_avito_publication(product_id: int, request: Request):
             raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.post("/admin-api/product-cards/validate-json")
+async def proxy_validate_json(request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(f"{CORE_API_URL}/api/product-cards/validate-json", json=data)
+            return resp.json()
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.post("/admin-api/product-cards/import-json")
+async def proxy_import_json(request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(f"{CORE_API_URL}/api/product-cards/import-json", json=data)
+            return resp.json()
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.get("/admin-api/product-cards/imports")
+async def proxy_imports_list():
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{CORE_API_URL}/api/product-cards/imports")
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+

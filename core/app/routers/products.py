@@ -29,6 +29,10 @@ def get_products(
     category_id: Optional[int] = None,
     brand: Optional[str] = None,
     storage_location: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    avito_ready: Optional[bool] = None,
+    site_ready: Optional[bool] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db)
@@ -53,6 +57,20 @@ def get_products(
         query = query.filter(models.Product.brand.ilike(f"%{brand}%"))
     if storage_location:
         query = query.filter(models.Product.storage_location.ilike(f"%{storage_location}%"))
+    if min_price is not None:
+        query = query.filter(models.Product.sale_price >= min_price)
+    if max_price is not None:
+        query = query.filter(models.Product.sale_price <= max_price)
+    if avito_ready is not None:
+        if avito_ready:
+            query = query.filter(models.Product.avito_title != None, models.Product.avito_description != None)
+        else:
+            query = query.filter(or_(models.Product.avito_title == None, models.Product.avito_description == None))
+    if site_ready is not None:
+        if site_ready:
+            query = query.filter(models.Product.site_title != None, models.Product.site_description != None)
+        else:
+            query = query.filter(or_(models.Product.site_title == None, models.Product.site_description == None))
         
     return query.offset(offset).limit(limit).all()
 
@@ -134,6 +152,8 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
     p_dict["margin"] = margin
     p_dict["available_quantity"] = available
     p_dict["has_photos"] = len(photos) > 0
+    p_dict["avito_ready"] = bool(db_product.avito_title and db_product.avito_description and db_product.avito_price if hasattr(db_product, 'avito_price') else True)
+    p_dict["site_ready"] = bool(db_product.site_title and db_product.site_description)
     p_dict["photos"] = photos
     p_dict["events"] = events
     p_dict["stock_movements"] = movements

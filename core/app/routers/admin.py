@@ -36,59 +36,98 @@ def get_audit_log(db: Session = Depends(get_db)):
 
 @router.post("/seed")
 def seed_data(db: Session = Depends(get_db)):
-    # Seed Categories
-    categories_data = [
-        {"name": "Ноутбуки", "slug": "laptops", "desc": "Portable computers"},
-        {"name": "Принтеры", "slug": "printers", "desc": "Printing devices"},
-        {"name": "Мониторы", "slug": "monitors", "desc": "Displays"},
-        {"name": "Комплектующие", "slug": "components", "desc": "PC parts"},
-        {"name": "Периферия", "slug": "peripherals", "desc": "Peripherals"},
-        {"name": "Системные блоки", "slug": "desktops", "desc": "Desktops"},
-        {"name": "Оргтехника", "slug": "office_equipment", "desc": "Office"}
+    from app.routers.product_cards import import_json as do_import
+    from app.schemas import ProductCardJSONPayload
+
+    seed_cards = [
+        {
+            "source": "seed", "schema_version": "1.0", "operation": "create_or_update",
+            "product": {"sku": "LAP001", "title": "Ноутбук Lenovo ThinkPad T480", "category_path": ["Ноутбуки"],
+                        "brand": "Lenovo", "model": "ThinkPad T480", "condition": "БУ, рабочий",
+                        "description": "Надежный офисный ноутбук Lenovo ThinkPad T480. Core i5-8250U, 8GB RAM, SSD 256GB.",
+                        "purchase_price": 12000, "sale_price": 21000, "min_price": 19000,
+                        "quantity": 5, "storage_location": "Склад 1", "notes": "Проверить батарею"},
+            "avito": {"title": "Ноутбук Lenovo ThinkPad T480, Core i5, 8 ГБ, SSD",
+                      "description": "Продается надежный Lenovo ThinkPad T480. Core i5, 8 ГБ RAM, SSD 256 ГБ. БУ, рабочий.",
+                      "category_path": ["Электроника", "Ноутбуки"], "goods_type": "Ноутбук",
+                      "condition": "Б/у", "price": 21000, "seller_type": "company",
+                      "contact_name": "Техноребут",
+                      "parameters": {"Производитель": "Lenovo", "Модель": "ThinkPad T480",
+                                     "Процессор": "Intel Core i5-8250U", "RAM": "8 ГБ",
+                                     "Накопитель": "SSD 256 ГБ", "Диагональ": "14\"", "Состояние": "Б/у"}},
+            "site": {"title": "Ноутбук Lenovo ThinkPad T480", "description": "Проверенный БУ ноутбук для работы.", "publish_ready": False}
+        },
+        {
+            "source": "seed", "schema_version": "1.0", "operation": "create_or_update",
+            "product": {"sku": "PRN001", "title": "Принтер HP LaserJet 2055dn", "category_path": ["Принтеры"],
+                        "brand": "HP", "model": "LaserJet 2055dn", "condition": "БУ, рабочий",
+                        "description": "Сетевой лазерный принтер HP LaserJet 2055dn с дуплексом.",
+                        "purchase_price": 3000, "sale_price": 5500, "min_price": 5000,
+                        "quantity": 2, "storage_location": "Склад 1"},
+            "avito": {"title": "Лазерный принтер HP LaserJet 2055dn, сеть, дуплекс",
+                      "description": "Рабочий лазерный принтер HP LaserJet 2055dn с сетевым подключением и дуплексной печатью.",
+                      "goods_type": "Принтер", "condition": "Б/у", "price": 5500, "seller_type": "company",
+                      "contact_name": "Техноребут",
+                      "parameters": {"Производитель": "HP", "Модель": "LaserJet 2055dn",
+                                     "Тип": "Лазерный", "Сеть": "Да", "Дуплекс": "Да"}},
+            "site": {"title": "Принтер HP LaserJet 2055dn", "description": "Надежный сетевой принтер.", "publish_ready": False}
+        },
+        {
+            "source": "seed", "schema_version": "1.0", "operation": "create_or_update",
+            "product": {"sku": "MON001", "title": "Монитор Dell P2419H", "category_path": ["Мониторы"],
+                        "brand": "Dell", "model": "P2419H", "condition": "БУ, хорошее",
+                        "description": "24-дюймовый IPS монитор Dell P2419H, Full HD, USB-хаб.",
+                        "purchase_price": 5500, "sale_price": 9000, "min_price": 8000,
+                        "quantity": 3, "storage_location": "Витрина"},
+            "avito": {"title": "Монитор Dell P2419H, 24\", IPS, Full HD",
+                      "description": "Монитор Dell P2419H 24 дюйма IPS Full HD. С USB-хабом, в хорошем состоянии.",
+                      "goods_type": "Монитор", "condition": "Б/у", "price": 9000, "seller_type": "company",
+                      "contact_name": "Техноребут",
+                      "parameters": {"Производитель": "Dell", "Модель": "P2419H",
+                                     "Диагональ": "24\"", "Матрица": "IPS", "Разрешение": "1920x1080"}},
+            "site": {"title": "Монитор Dell P2419H 24\" IPS", "description": "IPS монитор для работы.", "publish_ready": True}
+        },
+        {
+            "source": "seed", "schema_version": "1.0", "operation": "create_or_update",
+            "product": {"sku": "CMP001", "title": "SSD Kingston 480 ГБ", "category_path": ["Комплектующие"],
+                        "brand": "Kingston", "model": "A400 480GB", "condition": "Б/у, рабочий",
+                        "description": "SSD-накопитель Kingston A400 480 ГБ, 2.5 дюйма, SATA.",
+                        "purchase_price": 1800, "sale_price": 3200, "min_price": 2800,
+                        "quantity": 10, "storage_location": "Склад 1"},
+            "avito": {"title": "SSD Kingston A400 480 ГБ",
+                      "description": "SSD накопитель Kingston A400 480 ГБ, форм-фактор 2.5\", интерфейс SATA III.",
+                      "goods_type": "SSD накопитель", "condition": "Б/у", "price": 3200, "seller_type": "company",
+                      "contact_name": "Техноребут",
+                      "parameters": {"Производитель": "Kingston", "Модель": "A400", "Объём": "480 ГБ",
+                                     "Интерфейс": "SATA III", "Форм-фактор": "2.5\""}},
+            "site": {"title": "SSD Kingston A400 480 ГБ", "description": "Проверенный SSD от Kingston.", "publish_ready": True}
+        },
+        {
+            "source": "seed", "schema_version": "1.0", "operation": "create_or_update",
+            "product": {"sku": "PER001", "title": "Клавиатура Logitech K120", "category_path": ["Периферия"],
+                        "brand": "Logitech", "model": "K120", "condition": "Новая",
+                        "description": "Проводная клавиатура Logitech K120, USB, русская раскладка.",
+                        "purchase_price": 500, "sale_price": 900, "min_price": 750,
+                        "quantity": 15, "storage_location": "Витрина"},
+            "avito": {"title": "Клавиатура Logitech K120, USB, новая",
+                      "description": "Новая проводная клавиатура Logitech K120. USB, русская раскладка.",
+                      "goods_type": "Клавиатура", "condition": "Новое", "price": 900, "seller_type": "company",
+                      "contact_name": "Техноребут",
+                      "parameters": {"Производитель": "Logitech", "Модель": "K120",
+                                     "Тип": "Проводная", "Интерфейс": "USB", "Состояние": "Новая"}},
+            "site": {"title": "Клавиатура Logitech K120", "description": "Новая проводная клавиатура Logitech K120.", "publish_ready": True}
+        }
     ]
-    categories = {}
-    for cd in categories_data:
-        cat = db.query(models.Category).filter(models.Category.slug == cd["slug"]).first()
-        if not cat:
-            cat = models.Category(name=cd["name"], slug=cd["slug"], description=cd["desc"])
-            db.add(cat)
-            db.commit()
-            db.refresh(cat)
-        categories[cd["slug"]] = cat
-    
-    # Seed Products
-    products_data = [
-        {"sku": "LAP001", "title": "Ноутбук Lenovo ThinkPad T480", "cat": "laptops", "status": "in_stock", "brand": "Lenovo", "storage_location": "Склад 1", "quantity": 5, "price": 15000.0},
-        {"sku": "LAP002", "title": "Ноутбук HP ProBook 450 G6", "cat": "laptops", "status": "reserved", "brand": "HP", "storage_location": "Витрина", "quantity": 1, "price": 20000.0},
-        {"sku": "PRN001", "title": "Принтер HP LaserJet 2055dn", "cat": "printers", "status": "in_stock", "brand": "HP", "storage_location": "Склад 1", "quantity": 2, "price": 5000.0},
-        {"sku": "PRN002", "title": "Принтер Canon i-SENSYS LBP6030B", "cat": "printers", "status": "in_repair", "brand": "Canon", "storage_location": "Сервисная зона", "quantity": 1, "price": 4000.0},
-        {"sku": "MON001", "title": "Монитор Dell P2419H", "cat": "monitors", "status": "in_stock", "brand": "Dell", "storage_location": "Витрина", "quantity": 3, "price": 8000.0},
-        {"sku": "MON002", "title": "Монитор Samsung SyncMaster", "cat": "monitors", "status": "for_parts", "brand": "Samsung", "storage_location": "Полка запчастей", "quantity": 1, "price": 1000.0},
-        {"sku": "CMP001", "title": "SSD Kingston 480 ГБ", "cat": "components", "status": "in_stock", "brand": "Kingston", "storage_location": "Склад 1", "quantity": 10, "price": 3000.0},
-        {"sku": "CMP002", "title": "Оперативная память DDR4 8 ГБ", "cat": "components", "status": "in_stock", "brand": "Crucial", "storage_location": "Склад 1", "quantity": 20, "price": 1500.0},
-        {"sku": "PER001", "title": "Клавиатура Logitech K120", "cat": "peripherals", "status": "in_stock", "brand": "Logitech", "storage_location": "Витрина", "quantity": 15, "price": 800.0},
-        {"sku": "PER002", "title": "Мышь A4Tech OP-620D", "cat": "peripherals", "status": "in_stock", "brand": "A4Tech", "storage_location": "Витрина", "quantity": 25, "price": 500.0},
-        {"sku": "DSK001", "title": "Системный блок Intel Core i5", "cat": "desktops", "status": "published_avito", "brand": "Custom", "storage_location": "Склад 1", "quantity": 2, "price": 25000.0},
-        {"sku": "OFF001", "title": "МФУ Kyocera Ecosys", "cat": "office_equipment", "status": "published_site", "brand": "Kyocera", "storage_location": "Склад 1", "quantity": 1, "price": 30000.0}
-    ]
-    products = {}
-    for pd in products_data:
-        prod = db.query(models.Product).filter(models.Product.sku == pd["sku"]).first()
-        if not prod:
-            prod = models.Product(
-                sku=pd["sku"], 
-                title=pd["title"], 
-                category_id=categories[pd["cat"]].id, 
-                status=pd["status"],
-                brand=pd["brand"],
-                storage_location=pd["storage_location"],
-                quantity=pd["quantity"],
-                sale_price=pd["price"]
-            )
-            db.add(prod)
-            db.commit()
-            db.refresh(prod)
-        products[pd["sku"]] = prod
+
+    from app.routers.customers import log_audit
+    imported = 0
+    for card_data in seed_cards:
+        try:
+            payload = ProductCardJSONPayload(**card_data)
+            do_import(payload, db)
+            imported += 1
+        except Exception as e:
+            print(f"Seed import error for {card_data['product']['sku']}: {e}")
 
     # Seed Customers
     customers_data = [
@@ -115,24 +154,23 @@ def seed_data(db: Session = Depends(get_db)):
         cust = customers.get(rd["customer_phone"])
         if cust:
             rep = db.query(models.RepairOrder).filter(
-                models.RepairOrder.customer_id == cust.id, 
+                models.RepairOrder.customer_id == cust.id,
                 models.RepairOrder.device_serial == rd["serial"]
             ).first()
             if not rep:
                 rep = models.RepairOrder(
-                    customer_id=cust.id, 
-                    device_title=rd["title"], 
+                    customer_id=cust.id,
+                    device_title=rd["title"],
                     device_serial=rd["serial"],
                     problem_description=rd["problem"],
                     status=rd["status"]
                 )
                 db.add(rep)
             db.commit()
-    
-    from app.routers.customers import log_audit
-    log_audit(db, "system", 0, "seed", comment="Database seeded with dummy data")
+
+    log_audit(db, "system", 0, "seed", comment=f"Database seeded: {imported} cards imported")
     db.commit()
-    return {"message": "Seed successful"}
+    return {"message": f"Seed successful: {imported} product cards imported"}
 
 @router.post("/backup")
 def trigger_backup():

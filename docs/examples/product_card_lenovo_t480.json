@@ -1,0 +1,49 @@
+{
+  "source": "chatgpt",
+  "schema_version": "1.0",
+  "operation": "create_or_update",
+  "product": {
+    "sku": "NB-LENOVO-T480-001",
+    "title": "Ноутбук Lenovo ThinkPad T480",
+    "category_path": ["Компьютерная техника", "Ноутбуки"],
+    "brand": "Lenovo",
+    "model": "ThinkPad T480",
+    "serial_number": "",
+    "condition": "БУ, рабочий",
+    "description": "Надежный офисный ноутбук Lenovo ThinkPad T480.",
+    "purchase_price": 15000,
+    "sale_price": 25000,
+    "min_price": 23000,
+    "market_price": 27000,
+    "quantity": 1,
+    "storage_location": "Склад 1",
+    "notes": "Проверить батарею перед продажей."
+  },
+  "avito": {
+    "title": "Ноутбук Lenovo ThinkPad T480, Core i5, 8 ГБ RAM, SSD",
+    "description": "Продается проверенный ноутбук Lenovo ThinkPad T480. Подходит для офиса, учебы и работы.",
+    "category_path": ["Электроника", "Ноутбуки"],
+    "goods_type": "Ноутбук",
+    "condition": "Б/у",
+    "price": 25000,
+    "seller_type": "company",
+    "contact_name": "Техноребут",
+    "phone": "",
+    "address": "",
+    "parameters": {
+      "Производитель": "Lenovo",
+      "Модель": "ThinkPad T480",
+      "Процессор": "Intel Core i5",
+      "Оперативная память": "8 ГБ",
+      "Накопитель": "SSD 256 ГБ",
+      "Диагональ": "14",
+      "Состояние": "Б/у"
+    },
+    "photos": []
+  },
+  "site": {
+    "title": "Ноутбук Lenovo ThinkPad T480",
+    "description": "Проверенный БУ ноутбук для работы и учебы.",
+    "publish_ready": true
+  }
+}

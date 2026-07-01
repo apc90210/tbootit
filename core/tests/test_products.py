@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from app.main import app
+import uuid
 
 client = TestClient(app)
 
@@ -18,18 +19,17 @@ def test_get_products_meta():
     assert "storage_locations" in data
 
 def test_stock_adjustment():
-    # Assume product 1 exists via seed or we create one
-    product_data = {
-        "sku": "TEST001",
-        "title": "Test Prod",
-        "category_id": 1,
-        "quantity": 5
+    # Use JSON import to reliably create a product with a unique SKU
+    sku = f"TEST001-ADJ-{uuid.uuid4().hex[:8]}"
+    payload = {
+        "source": "test", "schema_version": "1.0", "operation": "create_or_update",
+        "product": {"sku": sku, "title": "Test Prod", "category_path": ["Test"], "quantity": 5}
     }
-    create_response = client.post("/api/products/", json=product_data)
-    assert create_response.status_code == 200
-    product_id = create_response.json()["id"]
+    import_resp = client.post("/api/product-cards/import-json", json=payload)
+    assert import_resp.status_code == 200
+    product_id = import_resp.json()["product_id"]
 
-    # Check details
+    # Check initial quantity
     details_response = client.get(f"/api/products/{product_id}/details")
     assert details_response.status_code == 200
     assert details_response.json()["quantity"] == 5
@@ -44,11 +44,13 @@ def test_stock_adjustment():
     details_response2 = client.get(f"/api/products/{product_id}/details")
     movements = details_response2.json()["stock_movements"]
     assert len(movements) >= 1
+    # Movements are ordered desc; most recent (-2) should be first
     assert movements[0]["quantity_delta"] == -2
 
 def test_publication_flags():
+    sku = f"TEST002-{uuid.uuid4().hex[:8]}"
     product_data = {
-        "sku": "TEST002",
+        "sku": sku,
         "title": "Test Prod 2",
         "category_id": 1
     }

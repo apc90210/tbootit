@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
-from app.routers import health, products, categories, customers, repairs, sales, photos, admin
+from app.routers import health, products, categories, customers, repairs, sales, photos, admin, product_cards
 
 # Ensure directories exist
 os.makedirs(settings.storage_root, exist_ok=True)
@@ -32,7 +32,18 @@ def migrate_db():
             ("site_title", "VARCHAR"),
             ("site_description", "TEXT"),
             ("avito_title", "VARCHAR"),
-            ("avito_description", "TEXT")
+            ("avito_description", "TEXT"),
+            ("avito_category_path", "TEXT"),
+            ("avito_goods_type", "VARCHAR"),
+            ("avito_condition", "VARCHAR"),
+            ("avito_params_json", "TEXT"),
+            ("avito_contact_name", "VARCHAR"),
+            ("avito_phone", "VARCHAR"),
+            ("avito_address", "VARCHAR"),
+            ("avito_seller_type", "VARCHAR"),
+            ("source_json", "TEXT"),
+            ("source_type", "VARCHAR"),
+            ("last_imported_at", "DATETIME")
         ]
         
         for col_name, col_type in updates:
@@ -63,4 +74,5 @@ app.include_router(customers.router, prefix="/api/customers", tags=["customers"]
 app.include_router(repairs.router, prefix="/api/repairs", tags=["repairs"])
 app.include_router(sales.router, prefix="/api/sales", tags=["sales"])
 app.include_router(photos.router, prefix="/api/products", tags=["photos"])
+app.include_router(product_cards.router, prefix="/api/product-cards", tags=["product-cards"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])

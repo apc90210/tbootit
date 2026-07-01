@@ -43,6 +43,17 @@ class ProductBase(BaseModel):
     site_description: Optional[str] = None
     avito_title: Optional[str] = None
     avito_description: Optional[str] = None
+    avito_category_path: Optional[str] = None
+    avito_goods_type: Optional[str] = None
+    avito_condition: Optional[str] = None
+    avito_params_json: Optional[str] = None
+    avito_contact_name: Optional[str] = None
+    avito_phone: Optional[str] = None
+    avito_address: Optional[str] = None
+    avito_seller_type: Optional[str] = None
+    source_json: Optional[str] = None
+    source_type: Optional[str] = None
+    last_imported_at: Optional[datetime] = None
 
 class ProductCreate(ProductBase):
     pass
@@ -230,5 +241,66 @@ class ProductDetails(Product):
     photos: List[ProductPhoto] = []
     events: List[ProductEvent] = []
     stock_movements: List[StockMovement] = []
+    avito_ready: bool = False
+    site_ready: bool = False
     class Config:
         from_attributes = True
+
+class ProductCardImportSchema(BaseModel):
+    id: int
+    product_id: Optional[int] = None
+    source_type: str
+    source_json: str
+    normalized_json: Optional[str] = None
+    avito_json: Optional[str] = None
+    validation_status: str
+    validation_errors: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+# ChatGPT Payload Schemas
+class ImportProductSection(BaseModel):
+    sku: str
+    title: str
+    category_path: Optional[List[str]] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    condition: Optional[str] = None
+    description: Optional[str] = None
+    purchase_price: Optional[float] = None
+    sale_price: Optional[float] = None
+    min_price: Optional[float] = None
+    market_price: Optional[float] = None
+    quantity: Optional[int] = 0
+    storage_location: Optional[str] = None
+    notes: Optional[str] = None
+
+class ImportAvitoSection(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category_path: Optional[List[str]] = None
+    goods_type: Optional[str] = None
+    condition: Optional[str] = None
+    price: Optional[float] = None
+    seller_type: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    parameters: Optional[dict] = None
+    photos: Optional[List[str]] = None
+
+class ImportSiteSection(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    publish_ready: Optional[bool] = False
+
+class ProductCardJSONPayload(BaseModel):
+    source: str
+    schema_version: str
+    operation: str
+    product: ImportProductSection
+    avito: Optional[ImportAvitoSection] = None
+    site: Optional[ImportSiteSection] = None
