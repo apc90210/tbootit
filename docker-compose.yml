@@ -1,0 +1,27 @@
+services:
+  core:
+    build: ./core
+    container_name: technoreboot-core
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/db:/data/db
+      - ./data/storage:/data/storage
+      - ./data/backups:/data/backups
+    environment:
+      - APP_ENV=dev
+      - DATABASE_URL=sqlite:////data/db/technoreboot.db
+      - STORAGE_ROOT=/data/storage
+      - BACKUP_ROOT=/data/backups
+      - API_TOKEN=dev-token
+
+  admin-shell:
+    build: ./admin-shell
+    container_name: technoreboot-admin-shell
+    ports:
+      - "8011:8010"
+    environment:
+      - CORE_API_URL=http://core:8000
+      - CORE_API_TOKEN=dev-token
+    depends_on:
+      - core
