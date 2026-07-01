@@ -1,0 +1,26 @@
+[
+  {
+    "id": "mock-ad-1",
+    "run_id": "mock-run",
+    "source": "avito",
+    "source_url": "https://www.avito.ru/mock-item-111111",
+    "external_id": "111111",
+    "title": "Ноутбук Lenovo ThinkPad T480",
+    "price": 25000,
+    "currency": "RUB",
+    "description": "Отличный ноутбук для работы.",
+    "location": "Екатеринбург, ул. Ленина",
+    "seller_name": "Техноребут",
+    "published_at_text": "сегодня",
+    "category_path": ["Электроника", "Ноутбуки"],
+    "parameters": {
+      "Производитель": "Lenovo",
+      "Модель": "ThinkPad T480"
+    },
+    "photos": [],
+    "raw_html_path": null,
+    "parse_status": "parsed",
+    "parse_errors": [],
+    "created_at": "2026-07-01T12:00:00"
+  }
+]

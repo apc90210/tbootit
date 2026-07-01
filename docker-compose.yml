@@ -25,3 +25,23 @@ services:
       - CORE_API_TOKEN=dev-token
     depends_on:
       - core
+
+  avito-module:
+    build:
+      context: ./avito-module
+    container_name: technoreboot-avito-module
+    environment:
+      AVITO_MODULE_NAME: technoreboot-avito-module
+      AVITO_MODULE_MODE: parser_mvp
+      CORE_API_BASE_URL: http://core:8000
+      AVITO_STORAGE_DIR: /app/data
+      AVITO_REQUEST_DELAY_SECONDS: 3
+      AVITO_MAX_PAGES_PER_RUN: 2
+    ports:
+      - "8020:8020"
+    volumes:
+      - ./data/avito-module:/app/data
+      - ./avito-module/app:/app/app
+      - ./avito-module/tests:/app/tests
+    depends_on:
+      - core
