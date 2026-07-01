@@ -1,54 +1,23 @@
-﻿# Inventory & Sales Module UI Map
+# Inventory/Sales Module UI Map
 
-## 1. Главная / Обзор (/)
-Дашборд для оператора.
-**Данные:**
-- Товаров в наличии / зарезервировано (из GET /api/admin/stats или products API).
-- Продаж сегодня (будет браться из GET /api/sales/today).
-- Товары без фото, без ценника (поиск).
-- Последние транзакции/продажи.
-**Действия:**
-- Быстрый переход в "Товары", "Новая продажа".
+This defines the initial skeleton mappings and intended progression.
 
-## 2. Товары (/products)
-Рабочий список товаров.
-**Фильтры & Поиск:**
-- Строка поиска (артикул, название, бренд).
-- Статус (В наличии, Черновик, Резерв и т.д.).
-- Категория, Бренд, Место хранения.
-- Готово к Авито / Сайту.
-**Таблица:**
-- Артикул, Название, Статус, Цена, Остаток, Место, Фото (иконка), Авито (иконка), Сайт (иконка), Действия (Просмотр, Продать).
+## UI Endpoints
 
-## 3. Карточка товара (/products/{id})
-Подробная информация о товаре.
-**Блоки:**
-- **Основное:** Название, артикул, бренд, описание.
-- **Фото:** Галерея изображений.
-- **Цена и маржа:** Закупочная цена, цена продажи, маржа (из details).
-- **Остаток & Место хранения.**
-- **Авито & Сайт:** Статусы публикации и параметры.
-- **История:** Таблица ProductEvent и StockMovement.
-**Действия (Кнопки):**
-- Изменить цену (PATCH /api/products/{id}).
-- Изменить статус (POST /api/products/{id}/status).
-- Зарезервировать.
-- Продать (переход на экран продажи).
-- Напечатать ценник.
+- **`GET /`**
+  - **Template:** `index.html`
+  - **Purpose:** Primary hub showing status and quick links.
+  
+- **`GET /products`**
+  - **Template:** `products.html`
+  - **Purpose:** Interactive catalog index with native HTML forms supporting `?q=` and `?status=` passing query parameters upstream to Core.
+  - **Pending Hooks:** *Sale action (Stage04E)*, *Price tag generation (Stage04F)*.
 
-## 4. Продажа (/sales/new?product_id={id})
-Оформление продажи для выбранного товара (или корзины).
-**Поля:**
-- Выбранный товар (проверка статуса in_stock или eserved).
-- Выбор покупателя (поиск по клиентам или "Розничный покупатель" по умолчанию).
-- Цена продажи (возможность скидки).
-- Способ оплаты: Наличные, Карта, Перевод, Смешанная оплата, Другое.
-**Действия:**
-- Подтвердить продажу (создает Sale в Core, статус товара меняется на sold).
+- **`GET /products/{id}`**
+  - **Template:** `product_detail.html`
+  - **Purpose:** Singular inspection view detailing events, statuses, and links.
+  - **Pending Hooks:** *Sale action (Stage04E)*, *Price tag generation (Stage04F)*.
 
-## 5. Ценники (/price-tags)
-Генерация HTML/PDF для печати.
-- Форма выбора товара (по артикулу).
-- Выбор шаблона (маленький, стандартный, лист A4).
-- Предпросмотр (HTML).
-- Кнопка "Печать" (window.print()).
+- **Error States**
+  - **Template:** `error.html`
+  - **Purpose:** Shown transparently to users for 404s and 500s.

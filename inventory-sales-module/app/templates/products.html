@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Список товаров{% endblock %}
+
+{% block content %}
+    <h2>Список товаров</h2>
+    
+    <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
+        <form method="GET" action="/products">
+            <label>Поиск:</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="Название или артикул...">
+            
+            <label style="margin-left: 15px;">Статус:</label>
+            <select name="status">
+                <option value="">Все</option>
+                <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>В наличии</option>
+                <option value="reserved" {% if status == 'reserved' %}selected{% endif %}>В резерве</option>
+                <option value="sold" {% if status == 'sold' %}selected{% endif %}>Продан</option>
+                <option value="draft" {% if status == 'draft' %}selected{% endif %}>Черновик</option>
+                <option value="in_repair" {% if status == 'in_repair' %}selected{% endif %}>В ремонте</option>
+                <option value="written_off" {% if status == 'written_off' %}selected{% endif %}>Списан</option>
+            </select>
+            
+            <button type="submit" class="btn" style="margin-left: 15px;">Фильтровать</button>
+            <a href="/products" style="margin-left: 10px;">Сбросить</a>
+        </form>
+    </div>
+
+    {% if products_data %}
+        <p>Всего найдено: {{ products_data.total }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Артикул</th>
+                    <th>Название</th>
+                    <th>Статус</th>
+                    <th>Цена</th>
+                    <th>Остаток</th>
+                    <th>Место хранения</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in products_data['items'] %}
+                <tr>
+                    <td>{{ item.sku or '—' }}</td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.status }}</td>
+                    <td>{{ item.sale_price if item.sale_price else item.price }} ₽</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.storage_location or '—' }}</td>
+                    <td>
+                        <a href="/products/{{ item.id }}" class="btn" style="background: #28a745;">Открыть</a>
+                        <button class="btn" disabled title="Будет реализовано на следующем этапе (Stage04E)">Продать</button>
+                        <button class="btn" disabled title="Будет реализовано на следующем этапе (Stage04F)">Ценник</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center;">Ничего не найдено</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 15px;">
+            {% if offset > 0 %}
+                <a href="/products?q={{ q }}&status={{ status }}&limit={{ limit }}&offset={{ offset - limit }}" class="btn">Назад</a>
+            {% else %}
+                <button class="btn" disabled>Назад</button>
+            {% endif %}
+            
+            {% if (offset + limit) < products_data.total %}
+                <a href="/products?q={{ q }}&status={{ status }}&limit={{ limit }}&offset={{ offset + limit }}" class="btn" style="margin-left: 10px;">Вперед</a>
+            {% else %}
+                <button class="btn" disabled style="margin-left: 10px;">Вперед</button>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

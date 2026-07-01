@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Главная панель</h1>
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+        <h3>Статус системы</h3>
+        <p>Статус Core API: 
+            {% if core_status %}
+                <strong style="color: green;">Доступен</strong>
+            {% else %}
+                <strong style="color: red;">Недоступен</strong>
+            {% endif %}
+        </p>
+
+        <h3>Быстрые ссылки:</h3>
+        <ul>
+            <li><a href="/products">Товары</a></li>
+            <li>Продажи — <span style="color: #777;">скоро (Будет реализовано на следующем этапе)</span></li>
+            <li>Ценники — <span style="color: #777;">скоро (Будет реализовано на следующем этапе)</span></li>
+        </ul>
+    </div>
+{% endblock %}

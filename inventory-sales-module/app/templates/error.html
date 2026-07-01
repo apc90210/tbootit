@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Ошибка{% endblock %}
+
+{% block content %}
+    <div style="background: #fff0f0; padding: 30px; border: 1px solid #ffcccc; border-radius: 5px; text-align: center; margin-top: 50px;">
+        <h2 style="color: #c00;">Ошибка</h2>
+        <p style="font-size: 1.2rem;">{{ message }}</p>
+        
+        <div style="margin-top: 30px;">
+            <a href="/" class="btn">На главную</a>
+            <a href="/products" class="btn" style="margin-left: 10px;">К списку товаров</a>
+        </div>
+    </div>
+{% endblock %}

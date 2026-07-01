@@ -45,3 +45,19 @@ services:
       - ./avito-module/tests:/app/tests
     depends_on:
       - core
+
+  inventory-sales-module:
+    build:
+      context: ./inventory-sales-module
+    container_name: technoreboot-inventory-sales-module
+    environment:
+      INVENTORY_SALES_MODULE_NAME: technoreboot-inventory-sales-module
+      CORE_API_BASE_URL: http://core:8000
+      PYTHONPATH: /app
+    ports:
+      - "8030:8030"
+    volumes:
+      - ./inventory-sales-module/app:/app/app
+      - ./inventory-sales-module/tests:/app/tests
+    depends_on:
+      - core

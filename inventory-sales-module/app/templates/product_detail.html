@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.title }}{% endblock %}
+
+{% block content %}
+    <h2>Карточка товара: {{ product.title }}</h2>
+    
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; margin-bottom: 20px;">
+        <p><strong>Название:</strong> {{ product.title }}</p>
+        <p><strong>Артикул:</strong> {{ product.sku or '—' }}</p>
+        <p><strong>Статус:</strong> {{ product.status }}</p>
+        <p><strong>Цена:</strong> {{ product.sale_price if product.sale_price else product.price }} ₽</p>
+        <p><strong>Бренд:</strong> {{ product.brand or '—' }}</p>
+        <p><strong>Модель:</strong> {{ product.model or '—' }}</p>
+        <p><strong>Остаток:</strong> {{ product.quantity }}</p>
+        <p><strong>Место хранения:</strong> {{ product.storage_location or '—' }}</p>
+        
+        {% if product.avito_status %}
+        <p><strong>Avito status:</strong> {{ product.avito_status }} 
+           {% if product.avito_link %}<a href="{{ product.avito_link }}" target="_blank">Ссылка</a>{% endif %}
+        </p>
+        {% endif %}
+        
+        {% if product.site_status %}
+        <p><strong>Site status:</strong> {{ product.site_status }}</p>
+        {% endif %}
+        
+        <div style="margin-top: 15px; background: #f9f9f9; padding: 10px; border: 1px dashed #ccc;">
+            <strong>Описание:</strong><br>
+            <pre style="white-space: pre-wrap; font-family: inherit;">{{ product.description or 'Нет описания' }}</pre>
+        </div>
+        
+        {% if product.events %}
+        <div style="margin-top: 20px;">
+            <h3>История событий</h3>
+            <ul>
+            {% for event in product.events %}
+                <li>[{{ event.created_at }}] {{ event.event_type }} - {{ event.comment or '' }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="/products" class="btn">Назад к товарам</a>
+        <button class="btn" disabled title="Будет реализовано на следующем этапе">Продать</button>
+        <button class="btn" disabled title="Будет реализовано на следующем этапе">Ценник</button>
+    </div>
+{% endblock %}
