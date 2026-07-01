@@ -172,17 +172,29 @@ class SaleItem(SaleItemBase):
 class SaleBase(BaseModel):
     customer_id: Optional[int] = None
     total_amount: float
-    payment_method: Optional[str] = None
+    payment_method: Optional[str] = "cash"
     comment: Optional[str] = None
 
 class SaleCreate(SaleBase):
     items: List[SaleItemCreate]
 
+class SaleCancel(BaseModel):
+    reason: str
+
 class Sale(SaleBase):
     id: int
+    status: str
+    cancelled_at: Optional[datetime] = None
+    cancel_reason: Optional[str] = None
     created_at: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+class SaleListResponse(BaseModel):
+    items: List[Sale]
+    total: int
+    limit: int
+    offset: int
 
 # Photo Schemas
 class ProductPhoto(BaseModel):

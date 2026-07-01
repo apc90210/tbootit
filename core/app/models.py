@@ -129,6 +129,9 @@ class Sale(Base):
     total_amount = Column(Float)
     payment_method = Column(String)
     comment = Column(Text)
+    status = Column(String, default="completed", index=True)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    cancel_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class SaleItem(Base):

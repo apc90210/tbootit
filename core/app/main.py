@@ -53,6 +53,21 @@ def migrate_db():
                 except Exception as e:
                     print(f"Migration error on {col_name}: {e}")
 
+        # Migrate sales table for Stage 04C
+        res_sales = conn.execute(text("PRAGMA table_info(sales);")).fetchall()
+        sales_columns = [row[1] for row in res_sales]
+        sales_updates = [
+            ("status", "VARCHAR DEFAULT 'completed'"),
+            ("cancelled_at", "DATETIME"),
+            ("cancel_reason", "TEXT")
+        ]
+        for col_name, col_type in sales_updates:
+            if col_name not in sales_columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE sales ADD COLUMN {col_name} {col_type};"))
+                except Exception as e:
+                    print(f"Migration error on {col_name}: {e}")
+
 migrate_db()
 
 app = FastAPI(title="Technoreboot Core API", version="0.1.0")
