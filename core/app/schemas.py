@@ -32,6 +32,17 @@ class ProductBase(BaseModel):
     sale_price: Optional[float] = None
     status: Optional[str] = "draft"
     storage_location: Optional[str] = None
+    quantity: Optional[int] = 0
+    reserved_quantity: Optional[int] = 0
+    min_price: Optional[float] = None
+    market_price: Optional[float] = None
+    notes: Optional[str] = None
+    is_published_site: Optional[int] = 0
+    is_published_avito: Optional[int] = 0
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+    avito_title: Optional[str] = None
+    avito_description: Optional[str] = None
 
 class ProductCreate(ProductBase):
     pass
@@ -48,6 +59,11 @@ class ProductUpdate(BaseModel):
     sale_price: Optional[float] = None
     status: Optional[str] = None
     storage_location: Optional[str] = None
+    quantity: Optional[int] = None
+    reserved_quantity: Optional[int] = None
+    min_price: Optional[float] = None
+    market_price: Optional[float] = None
+    notes: Optional[str] = None
 
 class ProductStatusUpdate(BaseModel):
     status: str
@@ -158,5 +174,61 @@ class ProductPhoto(BaseModel):
     media_url: str
     sort_order: int
     created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class ProductEventBase(BaseModel):
+    event_type: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    comment: Optional[str] = None
+
+class ProductEventCreate(ProductEventBase):
+    pass
+
+class ProductEvent(ProductEventBase):
+    id: int
+    product_id: int
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class StockMovementBase(BaseModel):
+    movement_type: str
+    quantity_delta: int
+    old_quantity: int
+    new_quantity: int
+    reason: str
+    comment: Optional[str] = None
+
+class StockMovement(StockMovementBase):
+    id: int
+    product_id: int
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class StockAdjustment(BaseModel):
+    quantity_delta: int
+    reason: str
+    comment: Optional[str] = None
+
+class SitePublication(BaseModel):
+    is_published_site: int
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+
+class AvitoPublication(BaseModel):
+    is_published_avito: int
+    avito_title: Optional[str] = None
+    avito_description: Optional[str] = None
+
+class ProductDetails(Product):
+    margin: Optional[float] = None
+    available_quantity: int = 0
+    has_photos: bool = False
+    photos: List[ProductPhoto] = []
+    events: List[ProductEvent] = []
+    stock_movements: List[StockMovement] = []
     class Config:
         from_attributes = True

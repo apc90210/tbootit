@@ -20,10 +20,18 @@ async def dashboard(request: Request):
             stats = {"error": "Core API offline"}
             
         try:
-            products_resp = await client.get(f"{CORE_API_URL}/api/products/")
+            params = dict(request.query_params)
+            products_resp = await client.get(f"{CORE_API_URL}/api/products/", params=params)
             products = products_resp.json() if products_resp.status_code == 200 else []
         except Exception:
             products = []
+            
+        try:
+            meta_resp = await client.get(f"{CORE_API_URL}/api/products/meta")
+            product_meta = meta_resp.json() if meta_resp.status_code == 200 else {}
+        except Exception:
+            product_meta = {}
+
             
         try:
             customers_resp = await client.get(f"{CORE_API_URL}/api/customers/")
@@ -59,6 +67,8 @@ async def dashboard(request: Request):
         "request": request, 
         "stats": stats, 
         "products": products,
+        "product_meta": product_meta,
+        "current_query": dict(request.query_params),
         "customers": customers,
         "repairs": repairs,
         "sales": sales,
@@ -162,6 +172,53 @@ async def proxy_dev_reset():
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/admin/dev-reset")
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.get("/admin-api/products/{product_id}/details")
+async def proxy_product_details(product_id: int):
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"{CORE_API_URL}/api/products/{product_id}/details")
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.post("/admin-api/products/{product_id}/stock-adjustment")
+async def proxy_stock_adjustment(product_id: int, request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(f"{CORE_API_URL}/api/products/{product_id}/stock-adjustment", json=data)
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.patch("/admin-api/products/{product_id}/site-publication")
+async def proxy_site_publication(product_id: int, request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.patch(f"{CORE_API_URL}/api/products/{product_id}/site-publication", json=data)
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.patch("/admin-api/products/{product_id}/avito-publication")
+async def proxy_avito_publication(product_id: int, request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.patch(f"{CORE_API_URL}/api/products/{product_id}/avito-publication", json=data)
             if resp.status_code == 200:
                 return resp.json()
             raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")

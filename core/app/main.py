@@ -14,6 +14,36 @@ os.makedirs(os.path.dirname(settings.database_url.replace('sqlite:///', '')), ex
 # Create tables
 Base.metadata.create_all(bind=engine)
 
+# Ad-hoc migrations for Stage 02
+def migrate_db():
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        res = conn.execute(text("PRAGMA table_info(products);")).fetchall()
+        columns = [row[1] for row in res]
+        
+        updates = [
+            ("quantity", "INTEGER DEFAULT 0"),
+            ("reserved_quantity", "INTEGER DEFAULT 0"),
+            ("min_price", "FLOAT"),
+            ("market_price", "FLOAT"),
+            ("notes", "TEXT"),
+            ("is_published_site", "INTEGER DEFAULT 0"),
+            ("is_published_avito", "INTEGER DEFAULT 0"),
+            ("site_title", "VARCHAR"),
+            ("site_description", "TEXT"),
+            ("avito_title", "VARCHAR"),
+            ("avito_description", "TEXT")
+        ]
+        
+        for col_name, col_type in updates:
+            if col_name not in columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE products ADD COLUMN {col_name} {col_type};"))
+                except Exception as e:
+                    print(f"Migration error on {col_name}: {e}")
+
+migrate_db()
+
 app = FastAPI(title="Technoreboot Core API", version="0.1.0")
 
 app.add_middleware(

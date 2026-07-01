@@ -41,7 +41,10 @@ def seed_data(db: Session = Depends(get_db)):
         {"name": "Ноутбуки", "slug": "laptops", "desc": "Portable computers"},
         {"name": "Принтеры", "slug": "printers", "desc": "Printing devices"},
         {"name": "Мониторы", "slug": "monitors", "desc": "Displays"},
-        {"name": "Комплектующие", "slug": "components", "desc": "PC parts"}
+        {"name": "Комплектующие", "slug": "components", "desc": "PC parts"},
+        {"name": "Периферия", "slug": "peripherals", "desc": "Peripherals"},
+        {"name": "Системные блоки", "slug": "desktops", "desc": "Desktops"},
+        {"name": "Оргтехника", "slug": "office_equipment", "desc": "Office"}
     ]
     categories = {}
     for cd in categories_data:
@@ -55,17 +58,33 @@ def seed_data(db: Session = Depends(get_db)):
     
     # Seed Products
     products_data = [
-        {"sku": "LAP001", "title": "Ноутбук Lenovo ThinkPad T480", "cat": "laptops", "status": "in_stock"},
-        {"sku": "PRN001", "title": "Принтер HP LaserJet 2055dn", "cat": "printers", "status": "in_stock"},
-        {"sku": "MON001", "title": "Монитор Dell P2419H", "cat": "monitors", "status": "in_stock"},
-        {"sku": "CMP001", "title": "SSD Kingston 480 ГБ", "cat": "components", "status": "in_stock"},
-        {"sku": "CMP002", "title": "Клавиатура Logitech K120", "cat": "components", "status": "in_stock"}
+        {"sku": "LAP001", "title": "Ноутбук Lenovo ThinkPad T480", "cat": "laptops", "status": "in_stock", "brand": "Lenovo", "storage_location": "Склад 1", "quantity": 5, "price": 15000.0},
+        {"sku": "LAP002", "title": "Ноутбук HP ProBook 450 G6", "cat": "laptops", "status": "reserved", "brand": "HP", "storage_location": "Витрина", "quantity": 1, "price": 20000.0},
+        {"sku": "PRN001", "title": "Принтер HP LaserJet 2055dn", "cat": "printers", "status": "in_stock", "brand": "HP", "storage_location": "Склад 1", "quantity": 2, "price": 5000.0},
+        {"sku": "PRN002", "title": "Принтер Canon i-SENSYS LBP6030B", "cat": "printers", "status": "in_repair", "brand": "Canon", "storage_location": "Сервисная зона", "quantity": 1, "price": 4000.0},
+        {"sku": "MON001", "title": "Монитор Dell P2419H", "cat": "monitors", "status": "in_stock", "brand": "Dell", "storage_location": "Витрина", "quantity": 3, "price": 8000.0},
+        {"sku": "MON002", "title": "Монитор Samsung SyncMaster", "cat": "monitors", "status": "for_parts", "brand": "Samsung", "storage_location": "Полка запчастей", "quantity": 1, "price": 1000.0},
+        {"sku": "CMP001", "title": "SSD Kingston 480 ГБ", "cat": "components", "status": "in_stock", "brand": "Kingston", "storage_location": "Склад 1", "quantity": 10, "price": 3000.0},
+        {"sku": "CMP002", "title": "Оперативная память DDR4 8 ГБ", "cat": "components", "status": "in_stock", "brand": "Crucial", "storage_location": "Склад 1", "quantity": 20, "price": 1500.0},
+        {"sku": "PER001", "title": "Клавиатура Logitech K120", "cat": "peripherals", "status": "in_stock", "brand": "Logitech", "storage_location": "Витрина", "quantity": 15, "price": 800.0},
+        {"sku": "PER002", "title": "Мышь A4Tech OP-620D", "cat": "peripherals", "status": "in_stock", "brand": "A4Tech", "storage_location": "Витрина", "quantity": 25, "price": 500.0},
+        {"sku": "DSK001", "title": "Системный блок Intel Core i5", "cat": "desktops", "status": "published_avito", "brand": "Custom", "storage_location": "Склад 1", "quantity": 2, "price": 25000.0},
+        {"sku": "OFF001", "title": "МФУ Kyocera Ecosys", "cat": "office_equipment", "status": "published_site", "brand": "Kyocera", "storage_location": "Склад 1", "quantity": 1, "price": 30000.0}
     ]
     products = {}
     for pd in products_data:
         prod = db.query(models.Product).filter(models.Product.sku == pd["sku"]).first()
         if not prod:
-            prod = models.Product(sku=pd["sku"], title=pd["title"], category_id=categories[pd["cat"]].id, status=pd["status"])
+            prod = models.Product(
+                sku=pd["sku"], 
+                title=pd["title"], 
+                category_id=categories[pd["cat"]].id, 
+                status=pd["status"],
+                brand=pd["brand"],
+                storage_location=pd["storage_location"],
+                quantity=pd["quantity"],
+                sale_price=pd["price"]
+            )
             db.add(prod)
             db.commit()
             db.refresh(prod)

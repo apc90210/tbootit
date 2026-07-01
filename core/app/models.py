@@ -26,8 +26,41 @@ class Product(Base):
     sale_price = Column(Float)
     status = Column(String, default="draft", index=True)
     storage_location = Column(String)
+    quantity = Column(Integer, default=0)
+    reserved_quantity = Column(Integer, default=0)
+    min_price = Column(Float, nullable=True)
+    market_price = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
+    is_published_site = Column(Integer, default=0)  # Boolean via int for sqlite
+    is_published_avito = Column(Integer, default=0) # Boolean via int for sqlite
+    site_title = Column(String, nullable=True)
+    site_description = Column(Text, nullable=True)
+    avito_title = Column(String, nullable=True)
+    avito_description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class ProductEvent(Base):
+    __tablename__ = "product_events"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), index=True)
+    event_type = Column(String, index=True)
+    old_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), index=True)
+    movement_type = Column(String, index=True)
+    quantity_delta = Column(Integer)
+    old_quantity = Column(Integer)
+    new_quantity = Column(Integer)
+    reason = Column(String)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class ProductPhoto(Base):
     __tablename__ = "product_photos"

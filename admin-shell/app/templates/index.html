@@ -6,7 +6,7 @@
     <title>Техноребут — панель управления MVP</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #f9f9f9; }
-        h1, h2 { color: #333; }
+        h1, h2, h3 { color: #333; }
         .dashboard { display: flex; gap: 20px; margin-bottom: 30px; }
         .card { padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .section { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -19,9 +19,16 @@
         .btn-primary { background: #007bff; color: white; border-color: #0069d9; }
         .btn-primary:hover { background: #0069d9; }
         form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        input, select { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        input, select, textarea { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
         .status-select { font-size: 0.8em; }
         pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 0.85em; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; border-radius: 8px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover, .close:focus { color: black; text-decoration: none; }
+        .badge { display: inline-block; padding: 3px 7px; font-size: 0.75em; font-weight: bold; border-radius: 10px; background-color: #eee; }
+        .badge.green { background-color: #d4edda; color: #155724; }
+        .filter-form { background: #f4f4f4; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -46,14 +53,46 @@
 
     <div class="section">
         <h2>Товары</h2>
+        
+        <form class="filter-form" method="GET" action="/">
+            <strong>Фильтр:</strong>
+            <input type="text" name="q" placeholder="Поиск (название, артикул)" value="{{ current_query.q or '' }}">
+            <select name="status">
+                <option value="">Все статусы</option>
+                {% for key, val in product_meta.product_statuses.items() %}
+                <option value="{{ key }}" {% if current_query.status == key %}selected{% endif %}>{{ val }}</option>
+                {% endfor %}
+            </select>
+            <select name="brand">
+                <option value="">Все бренды</option>
+                {% for b in product_meta.brands %}
+                <option value="{{ b }}" {% if current_query.brand == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+            <select name="storage_location">
+                <option value="">Все склады</option>
+                {% for sl in product_meta.storage_locations %}
+                <option value="{{ sl }}" {% if current_query.storage_location == sl %}selected{% endif %}>{{ sl }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Применить</button>
+            <a href="/" style="text-decoration: none;"><button type="button">Сбросить</button></a>
+        </form>
+
         <div class="actions">
             <form id="productForm" onsubmit="createProduct(event)">
                 <input type="text" name="sku" placeholder="Артикул" required>
                 <input type="text" name="title" placeholder="Название" required>
-                <input type="number" name="category_id" placeholder="ID категории" required>
+                <input type="number" name="category_id" placeholder="ID кат." required>
+                <input type="text" name="brand" placeholder="Бренд">
+                <input type="number" name="quantity" placeholder="Кол-во" value="0">
+                <input type="number" name="purchase_price" placeholder="Закупка ₽" step="0.01">
+                <input type="number" name="sale_price" placeholder="Продажа ₽" step="0.01">
+                <input type="text" name="storage_location" placeholder="Место">
                 <select name="status">
-                    <option value="draft">Черновик</option>
-                    <option value="in_stock" selected>В наличии</option>
+                    {% for key, val in product_meta.product_statuses.items() %}
+                    <option value="{{ key }}" {% if key == 'in_stock' %}selected{% endif %}>{{ val }}</option>
+                    {% endfor %}
                 </select>
                 <button type="submit" class="btn-primary">Добавить товар</button>
             </form>
@@ -61,7 +100,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>ID</th><th>Артикул</th><th>Название</th><th>Статус</th><th>Действия</th>
+                    <th>ID</th><th>Артикул</th><th>Название</th><th>Бренд / Место</th><th>Остаток</th><th>Цена (Маржа)</th><th>Статус</th><th>Действия</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,42 +108,93 @@
                 <tr>
                     <td>{{ product.id }}</td>
                     <td>{{ product.sku }}</td>
-                    <td>{{ product.title }}</td>
+                    <td><a href="#" onclick="openProductDetails({{ product.id }}); return false;">{{ product.title }}</a>
+                        {% if product.is_published_site %}<span class="badge green">Сайт</span>{% endif %}
+                        {% if product.is_published_avito %}<span class="badge green">Авито</span>{% endif %}
+                    </td>
+                    <td>{{ product.brand or '-' }}<br><small>{{ product.storage_location or '-' }}</small></td>
+                    <td>{{ product.quantity }} <small>(рез: {{ product.reserved_quantity }})</small></td>
                     <td>
-                        <strong>
-                        {% if product.status == 'draft' %} Черновик
-                        {% elif product.status == 'in_stock' %} В наличии
-                        {% elif product.status == 'reserved' %} Зарезервирован
-                        {% elif product.status == 'sold' %} Продан
-                        {% elif product.status == 'in_repair' %} В ремонте
-                        {% elif product.status == 'for_parts' %} На запчасти
-                        {% elif product.status == 'written_off' %} Списан
-                        {% elif product.status == 'published_site' %} На сайте
-                        {% elif product.status == 'published_avito' %} На Авито
-                        {% else %} {{ product.status }}
-                        {% endif %}
-                        </strong>
+                        {{ product.sale_price or '-' }} ₽<br>
+                        <small style="color:gray">Зак: {{ product.purchase_price or '-' }}</small>
+                    </td>
+                    <td>
+                        <strong>{{ product_meta.product_statuses.get(product.status, product.status) }}</strong>
                     </td>
                     <td>
                         <select id="prod_status_{{ product.id }}" class="status-select">
-                            <option value="draft">Черновик</option>
-                            <option value="in_stock">В наличии</option>
-                            <option value="reserved">Зарезервировать</option>
-                            <option value="sold">Продан</option>
-                            <option value="in_repair">В ремонт</option>
-                            <option value="for_parts">На запчасти</option>
-                            <option value="written_off">Списать</option>
-                            <option value="published_site">Опубликовать на сайте</option>
-                            <option value="published_avito">Опубликовать на Авито</option>
+                            {% for key, val in product_meta.product_statuses.items() %}
+                            <option value="{{ key }}" {% if product.status == key %}selected{% endif %}>{{ val }}</option>
+                            {% endfor %}
                         </select>
-                        <button onclick="changeProductStatus({{ product.id }})">Установить</button>
+                        <button onclick="changeProductStatus({{ product.id }})">OK</button>
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5">Товары не найдены.</td></tr>
+                <tr><td colspan="8">Товары не найдены.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    <!-- Product Details Modal -->
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeProductModal()">&times;</span>
+            <h2 id="modalProductTitle">Детали товара</h2>
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                    <h3>Информация</h3>
+                    <p><strong>Артикул:</strong> <span id="modalSku"></span></p>
+                    <p><strong>Бренд:</strong> <span id="modalBrand"></span></p>
+                    <p><strong>Локация:</strong> <span id="modalLocation"></span></p>
+                    <p><strong>Статус:</strong> <span id="modalStatus"></span></p>
+                    <p><strong>Доступное количество:</strong> <span id="modalAvailable"></span></p>
+                    <p><strong>Маржа:</strong> <span id="modalMargin"></span></p>
+                    
+                    <h3>Корректировка остатков</h3>
+                    <form onsubmit="adjustStock(event)" style="display:block;">
+                        <input type="hidden" id="adjProductId">
+                        <input type="number" id="adjDelta" placeholder="Изменение (+/-)" required style="width:100px;">
+                        <input type="text" id="adjReason" placeholder="Причина (напр. инвентаризация)" required>
+                        <input type="text" id="adjComment" placeholder="Комментарий">
+                        <button type="submit">Изменить</button>
+                    </form>
+
+                    <h3>Публикации</h3>
+                    <form onsubmit="updateSitePublication(event)" style="margin-bottom:10px;">
+                        <input type="hidden" id="sitePubId">
+                        <label><input type="checkbox" id="sitePubCheck"> На сайте</label>
+                        <input type="text" id="sitePubTitle" placeholder="SEO Название">
+                        <input type="text" id="sitePubDesc" placeholder="SEO Описание">
+                        <button type="submit">Сохранить для Сайта</button>
+                    </form>
+                    <form onsubmit="updateAvitoPublication(event)">
+                        <input type="hidden" id="avitoPubId">
+                        <label><input type="checkbox" id="avitoPubCheck"> На Авито</label>
+                        <input type="text" id="avitoPubTitle" placeholder="Заголовок Авито">
+                        <input type="text" id="avitoPubDesc" placeholder="Описание Авито">
+                        <button type="submit">Сохранить для Авито</button>
+                    </form>
+                </div>
+                <div style="flex: 1;">
+                    <h3>История движений</h3>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        <table id="movementsTable">
+                            <thead><tr><th>Дата</th><th>Дельта</th><th>Новый остаток</th><th>Причина</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <h3>Журнал событий</h3>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        <table id="eventsTable">
+                            <thead><tr><th>Дата</th><th>Событие</th><th>Комментарий</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="section">
@@ -146,8 +236,9 @@
                 <input type="text" name="device_serial" placeholder="Серийный номер">
                 <input type="text" name="problem_description" placeholder="Описание неисправности" required>
                 <select name="status">
-                    <option value="new">Новая заявка</option>
-                    <option value="accepted" selected>Принято</option>
+                    {% for key, val in product_meta.repair_statuses.items() %}
+                    <option value="{{ key }}">{{ val }}</option>
+                    {% endfor %}
                 </select>
                 <button type="submit" class="btn-primary">Создать ремонт</button>
             </form>
@@ -165,29 +256,13 @@
                     <td>{{ repair.device_serial }}</td>
                     <td>{{ repair.problem_description }}</td>
                     <td>
-                        <strong>
-                        {% if repair.status == 'new' %} Новая заявка
-                        {% elif repair.status == 'accepted' %} Принято
-                        {% elif repair.status == 'diagnostics' %} Диагностика
-                        {% elif repair.status == 'waiting_parts' %} Ожидание запчастей
-                        {% elif repair.status == 'in_progress' %} В работе
-                        {% elif repair.status == 'ready' %} Готово
-                        {% elif repair.status == 'issued' %} Выдано
-                        {% elif repair.status == 'cancelled' %} Отменено
-                        {% else %} {{ repair.status }}
-                        {% endif %}
-                        </strong>
+                        <strong>{{ product_meta.repair_statuses.get(repair.status, repair.status) }}</strong>
                     </td>
                     <td>
                         <select id="rep_status_{{ repair.id }}" class="status-select">
-                            <option value="new">Новая заявка</option>
-                            <option value="accepted">Принять</option>
-                            <option value="diagnostics">Диагностика</option>
-                            <option value="waiting_parts">Ожидание запчастей</option>
-                            <option value="in_progress">В работу</option>
-                            <option value="ready">Готово</option>
-                            <option value="issued">Выдано</option>
-                            <option value="cancelled">Отменить</option>
+                            {% for key, val in product_meta.repair_statuses.items() %}
+                            <option value="{{ key }}" {% if repair.status == key %}selected{% endif %}>{{ val }}</option>
+                            {% endfor %}
                         </select>
                         <button onclick="changeRepairStatus({{ repair.id }})">Установить</button>
                     </td>
@@ -272,57 +347,71 @@
                 }
                 const res = await fetch(url, options);
                 if(res.ok) {
-                    window.location.reload();
+                    return await res.json();
                 } else {
                     const err = await res.json();
                     alert(`Не удалось выполнить действие: ${res.status}. ${err.detail || ''}`);
+                    return null;
                 }
             } catch(e) {
                 alert(`Ошибка подключения к Admin Shell backend: ${e.message}`);
+                return null;
             }
         }
 
-        function seedData() { apiCall('/admin-api/seed', 'POST'); }
-        function devReset() {
+        async function seedData() { 
+            const res = await apiCall('/admin-api/seed', 'POST'); 
+            if(res) window.location.reload();
+        }
+        async function devReset() {
             if(confirm("Вы уверены, что хотите сбросить БД и удалить все данные?")) {
-                apiCall('/admin-api/dev-reset', 'POST');
+                const res = await apiCall('/admin-api/dev-reset', 'POST');
+                if(res) window.location.reload();
             }
         }
 
-        function changeProductStatus(id) {
+        async function changeProductStatus(id) {
             const status = document.getElementById(`prod_status_${id}`).value;
-            apiCall(`/admin-api/products/${id}/status`, 'PATCH', { status });
+            const res = await apiCall(`/admin-api/products/${id}/status`, 'PATCH', { status });
+            if(res) window.location.reload();
         }
 
-        function changeRepairStatus(id) {
+        async function changeRepairStatus(id) {
             const status = document.getElementById(`rep_status_${id}`).value;
-            apiCall(`/admin-api/repairs/${id}/status`, 'PATCH', { status });
+            const res = await apiCall(`/admin-api/repairs/${id}/status`, 'PATCH', { status });
+            if(res) window.location.reload();
         }
 
-        function createProduct(e) {
+        async function createProduct(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             data.category_id = parseInt(data.category_id);
-            apiCall('/admin-api/products', 'POST', data);
+            if(data.quantity) data.quantity = parseInt(data.quantity);
+            if(data.purchase_price) data.purchase_price = parseFloat(data.purchase_price);
+            if(data.sale_price) data.sale_price = parseFloat(data.sale_price);
+            const res = await apiCall('/admin-api/products', 'POST', data);
+            if(res) window.location.reload();
         }
 
-        function createCustomer(e) {
+        async function createCustomer(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
-            apiCall('/admin-api/customers', 'POST', data);
+            const res = await apiCall('/admin-api/customers', 'POST', data);
+            if(res) window.location.reload();
         }
 
-        function createRepair(e) {
+        async function createRepair(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             data.customer_id = parseInt(data.customer_id);
-            apiCall('/admin-api/repairs', 'POST', data);
+            const res = await apiCall('/admin-api/repairs', 'POST', data);
+            if(res) window.location.reload();
         }
 
-        function createSale(e) {
+        async function createSale(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
@@ -332,7 +421,95 @@
             data.items = [{ product_id: parseInt(data.product_id), price: 0 }];
             delete data.product_id;
 
-            apiCall('/admin-api/sales', 'POST', data);
+            const res = await apiCall('/admin-api/sales', 'POST', data);
+            if(res) window.location.reload();
+        }
+
+        // Product Details Logic
+        const modal = document.getElementById('productModal');
+        function closeProductModal() { modal.style.display = "none"; }
+        window.onclick = function(event) { if (event.target == modal) closeProductModal(); }
+
+        async function openProductDetails(id) {
+            const data = await apiCall(`/admin-api/products/${id}/details`, 'GET');
+            if(!data) return;
+            
+            document.getElementById('modalProductTitle').innerText = data.title;
+            document.getElementById('modalSku').innerText = data.sku;
+            document.getElementById('modalBrand').innerText = data.brand || '-';
+            document.getElementById('modalLocation').innerText = data.storage_location || '-';
+            document.getElementById('modalStatus').innerText = data.status;
+            document.getElementById('modalAvailable').innerText = data.available_quantity;
+            document.getElementById('modalMargin').innerText = data.margin ? data.margin + ' ₽' : 'Не рассчитана';
+
+            document.getElementById('adjProductId').value = id;
+            document.getElementById('sitePubId').value = id;
+            document.getElementById('avitoPubId').value = id;
+
+            document.getElementById('sitePubCheck').checked = data.is_published_site;
+            document.getElementById('sitePubTitle').value = data.site_title || '';
+            document.getElementById('sitePubDesc').value = data.site_description || '';
+
+            document.getElementById('avitoPubCheck').checked = data.is_published_avito;
+            document.getElementById('avitoPubTitle').value = data.avito_title || '';
+            document.getElementById('avitoPubDesc').value = data.avito_description || '';
+
+            // Populate tables
+            const mtBody = document.querySelector('#movementsTable tbody');
+            mtBody.innerHTML = '';
+            data.stock_movements.forEach(m => {
+                mtBody.innerHTML += `<tr><td>${m.created_at}</td><td>${m.quantity_delta}</td><td>${m.new_quantity}</td><td>${m.reason}</td></tr>`;
+            });
+
+            const etBody = document.querySelector('#eventsTable tbody');
+            etBody.innerHTML = '';
+            data.events.forEach(e => {
+                etBody.innerHTML += `<tr><td>${e.created_at}</td><td>${e.event_type}</td><td>${e.comment || ''}</td></tr>`;
+            });
+
+            modal.style.display = "block";
+        }
+
+        async function adjustStock(e) {
+            e.preventDefault();
+            const id = document.getElementById('adjProductId').value;
+            const delta = parseInt(document.getElementById('adjDelta').value);
+            const reason = document.getElementById('adjReason').value;
+            const comment = document.getElementById('adjComment').value;
+            
+            const res = await apiCall(`/admin-api/products/${id}/stock-adjustment`, 'POST', {
+                quantity_delta: delta, reason: reason, comment: comment
+            });
+            if(res) {
+                alert("Остатки обновлены");
+                openProductDetails(id);
+                // Also optionally reload the background page if we want updated quantities shown:
+                // window.location.reload(); 
+            }
+        }
+
+        async function updateSitePublication(e) {
+            e.preventDefault();
+            const id = document.getElementById('sitePubId').value;
+            const pub = {
+                is_published_site: document.getElementById('sitePubCheck').checked ? 1 : 0,
+                site_title: document.getElementById('sitePubTitle').value,
+                site_description: document.getElementById('sitePubDesc').value
+            };
+            const res = await apiCall(`/admin-api/products/${id}/site-publication`, 'PATCH', pub);
+            if(res) alert("Данные для сайта сохранены");
+        }
+
+        async function updateAvitoPublication(e) {
+            e.preventDefault();
+            const id = document.getElementById('avitoPubId').value;
+            const pub = {
+                is_published_avito: document.getElementById('avitoPubCheck').checked ? 1 : 0,
+                avito_title: document.getElementById('avitoPubTitle').value,
+                avito_description: document.getElementById('avitoPubDesc').value
+            };
+            const res = await apiCall(`/admin-api/products/${id}/avito-publication`, 'PATCH', pub);
+            if(res) alert("Данные для Авито сохранены");
         }
     </script>
 </body>
