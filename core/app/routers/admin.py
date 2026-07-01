@@ -55,11 +55,11 @@ def seed_data(db: Session = Depends(get_db)):
     
     # Seed Products
     products_data = [
-        {"sku": "LAP001", "title": "Lenovo ThinkPad T480", "cat": "laptops", "status": "in_stock"},
-        {"sku": "PRN001", "title": "HP LaserJet 2055dn", "cat": "printers", "status": "in_stock"},
-        {"sku": "MON001", "title": "Dell P2419H", "cat": "monitors", "status": "in_stock"},
-        {"sku": "CMP001", "title": "Kingston SSD 480GB", "cat": "components", "status": "in_stock"},
-        {"sku": "CMP002", "title": "Logitech K120", "cat": "components", "status": "in_stock"}
+        {"sku": "LAP001", "title": "Ноутбук Lenovo ThinkPad T480", "cat": "laptops", "status": "in_stock"},
+        {"sku": "PRN001", "title": "Принтер HP LaserJet 2055dn", "cat": "printers", "status": "in_stock"},
+        {"sku": "MON001", "title": "Монитор Dell P2419H", "cat": "monitors", "status": "in_stock"},
+        {"sku": "CMP001", "title": "SSD Kingston 480 ГБ", "cat": "components", "status": "in_stock"},
+        {"sku": "CMP002", "title": "Клавиатура Logitech K120", "cat": "components", "status": "in_stock"}
     ]
     products = {}
     for pd in products_data:
@@ -89,8 +89,8 @@ def seed_data(db: Session = Depends(get_db)):
 
     # Seed Repairs
     repairs_data = [
-        {"customer_phone": "+7 900 000-00-01", "title": "HP LaserJet 2055dn", "serial": "SN-PRN-01", "problem": "не захватывает бумагу", "status": "diagnostics"},
-        {"customer_phone": "+7 900 000-00-02", "title": "Lenovo ThinkPad T480", "serial": "SN-LAP-02", "problem": "замена клавиатуры", "status": "waiting_parts"}
+        {"customer_phone": "+7 900 000-00-01", "title": "Принтер HP LaserJet 2055dn", "serial": "SN-PRN-01", "problem": "не захватывает бумагу", "status": "diagnostics"},
+        {"customer_phone": "+7 900 000-00-02", "title": "Ноутбук Lenovo ThinkPad T480", "serial": "SN-LAP-02", "problem": "требуется замена клавиатуры", "status": "waiting_parts"}
     ]
     for rd in repairs_data:
         cust = customers.get(rd["customer_phone"])
