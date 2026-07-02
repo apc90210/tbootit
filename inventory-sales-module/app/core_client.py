@@ -18,7 +18,7 @@ class CoreClient:
     async def get_products(self, params: dict):
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(f"{self.base_url}/api/products", params=params, timeout=10.0)
+                response = await client.get(f"{self.base_url}/api/products/", params=params, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
                 return {"error": True, "status_code": response.status_code}
