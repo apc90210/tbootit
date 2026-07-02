@@ -62,6 +62,13 @@
             </div>
 
             <div style="margin-bottom: 15px;">
+                <label for="quantity"><strong>Количество:</strong></label><br>
+                <input type="number" id="quantity" name="quantity" step="1" min="1"
+                       value="1"
+                       required style="padding: 8px; width: 100px; font-size: 1rem;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
                 <label for="payment_method"><strong>Способ оплаты:</strong></label><br>
                 <select id="payment_method" name="payment_method" required
                         style="padding: 8px; width: 260px; font-size: 1rem;">
@@ -69,6 +76,18 @@
                     <option value="{{ key }}">{{ label }}</option>
                     {% endfor %}
                 </select>
+            </div>
+
+            <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #eee; border-radius: 5px; width: fit-content;">
+                <strong>Гарантия:</strong><br>
+                <div style="margin-top: 10px;">
+                    <label for="warranty_days">Гарантия, дней:</label>
+                    <input type="number" id="warranty_days" name="warranty_days" step="1" min="0" value="30" style="padding: 5px; width: 80px; margin-left: 5px;">
+                </div>
+                <div style="margin-top: 10px;">
+                    <input type="checkbox" id="no_warranty" name="no_warranty" onchange="document.getElementById('warranty_days').disabled = this.checked;">
+                    <label for="no_warranty">Без гарантии</label>
+                </div>
             </div>
 
             <div style="margin-bottom: 15px;">

@@ -130,6 +130,8 @@ class Sale(Base):
     payment_method = Column(String)
     comment = Column(Text)
     status = Column(String, default="completed", index=True)
+    warranty_days = Column(Integer, nullable=True)
+    warranty_enabled = Column(Integer, default=1)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
     cancel_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

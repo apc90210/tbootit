@@ -58,6 +58,10 @@
         {% else %}
             <button class="btn" disabled title="Продажа недоступна для этого статуса" style="margin-left: 10px;">Продать</button>
         {% endif %}
-        <button class="btn" disabled title="Будет реализовано на этапе Stage04F" style="margin-left: 10px;">Ценник</button>
+        {% if product.status == 'in_stock' %}
+            <a href="/products/{{ product.id }}/price-tag" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Печать ценника</a>
+        {% else %}
+            <button class="btn" disabled title="Ценник доступен только для товаров в наличии" style="margin-left: 10px;">Печать ценника</button>
+        {% endif %}
     </div>
 {% endblock %}

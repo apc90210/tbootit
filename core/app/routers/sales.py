@@ -86,6 +86,8 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
     sale_data = sale.model_dump()
     items_data = sale_data.pop("items")
     
+    sale_data["warranty_enabled"] = 1 if sale_data.get("warranty_enabled") else 0
+    
     db_sale = models.Sale(**sale_data)
     db.add(db_sale)
     db.commit()

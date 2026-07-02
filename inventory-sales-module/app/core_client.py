@@ -62,19 +62,21 @@ class CoreClient:
 
     # --- Sales methods (Stage 04E) ---
 
-    async def create_sale(self, product_id: int, price: float, payment_method: str, notes: str = None):
+    async def create_sale(self, product_id: int, price: float, quantity: int, payment_method: str, notes: str = None, warranty_days: int = None, warranty_enabled: bool = True):
         """Create a sale through Core API POST /api/sales."""
         payload = {
             "customer_id": None,
-            "total_amount": price,
+            "total_amount": price * quantity,
             "payment_method": payment_method,
             "comment": notes,
+            "warranty_days": warranty_days if warranty_enabled else None,
+            "warranty_enabled": warranty_enabled,
             "items": [
                 {
                     "product_id": product_id,
                     "title": "",  # Core will use it for record; we fill from product later
                     "price": price,
-                    "quantity": 1,
+                    "quantity": quantity,
                 }
             ],
         }

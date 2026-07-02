@@ -59,7 +59,9 @@ def migrate_db():
         sales_updates = [
             ("status", "VARCHAR DEFAULT 'completed'"),
             ("cancelled_at", "DATETIME"),
-            ("cancel_reason", "TEXT")
+            ("cancel_reason", "TEXT"),
+            ("warranty_days", "INTEGER"),
+            ("warranty_enabled", "INTEGER DEFAULT 1")
         ]
         for col_name, col_type in sales_updates:
             if col_name not in sales_columns:

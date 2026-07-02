@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Ценник: {{ product.title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .tag-container {
+            background: #fff;
+            width: 300px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .sku {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .price {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #c00;
+        }
+        .actions {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .btn:hover { background: #0056b3; }
+        .alert {
+            background: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .tag-container { border: 1px solid #000; width: auto; max-width: 300px; }
+            .actions, .alert { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="alert">
+        <strong>Примечание MVP:</strong> Это тестовый шаблон ценника (placeholder). На этапе Stage04F он будет заменен на оригинальный шаблон владельца.
+    </div>
+
+    <div class="tag-container">
+        <div class="title">{{ product.title }}</div>
+        <div class="sku">Арт: {{ product.sku or '—' }}</div>
+        <div class="price">{{ product.sale_price if product.sale_price else product.price }} ₽</div>
+    </div>
+
+    <div class="actions">
+        <button class="btn" onclick="window.print()">Распечатать</button>
+        <button class="btn" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">Закрыть</button>
+    </div>
+</body>
+</html>

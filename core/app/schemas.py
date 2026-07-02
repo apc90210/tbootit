@@ -174,6 +174,8 @@ class SaleBase(BaseModel):
     total_amount: float
     payment_method: Optional[str] = "cash"
     comment: Optional[str] = None
+    warranty_days: Optional[int] = 30
+    warranty_enabled: Optional[bool] = True
 
 class SaleCreate(SaleBase):
     items: List[SaleItemCreate]

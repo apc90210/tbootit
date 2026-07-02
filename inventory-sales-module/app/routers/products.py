@@ -101,3 +101,26 @@ async def product_detail(request: Request, product_id: int):
             "product": data
         }
     )
+
+@router.get("/products/{product_id}/price-tag", response_class=HTMLResponse)
+async def price_tag_preview(request: Request, product_id: int):
+    data = await core_client.get_product_details(product_id)
+    
+    if data and isinstance(data, dict) and "error" in data:
+        if data.get("status_code") == 404:
+            return templates.TemplateResponse(
+                request=request, name="error.html", context={
+                    "message": "Товар не найден"
+                }
+            )
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={
+                "message": "Ошибка Core API"
+            }
+        )
+
+    return templates.TemplateResponse(
+        request=request, name="price_tag_preview.html", context={
+            "product": data
+        }
+    )

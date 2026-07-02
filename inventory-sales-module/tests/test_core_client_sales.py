@@ -20,7 +20,7 @@ async def test_create_sale_success(respx_mock):
         return_value=httpx.Response(200, json=mock_sale)
     )
     result = await client.create_sale(
-        product_id=1, price=25000.0, payment_method="cash", notes=None
+        product_id=1, price=25000.0, quantity=1, payment_method="cash", notes=None
     )
     assert result["id"] == 1
     assert result["status"] == "completed"
@@ -36,7 +36,7 @@ async def test_create_sale_error(respx_mock):
         )
     )
     result = await client.create_sale(
-        product_id=1, price=25000.0, payment_method="cash"
+        product_id=1, price=25000.0, quantity=1, payment_method="cash"
     )
     assert result["error"] is True
     assert result["status_code"] == 400
