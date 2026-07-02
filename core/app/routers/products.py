@@ -101,11 +101,73 @@ def get_products(
     }
 
 @router.get("/filter-options")
-def get_product_filter_options(db: Session = Depends(get_db)):
-    brands = [{"value": b, "count": c} for b, c in db.query(models.Product.brand, func.count(models.Product.id)).filter(models.Product.brand != None, models.Product.brand != "").group_by(models.Product.brand).order_by(models.Product.brand).all()]
-    models_list = [{"value": m, "count": c} for m, c in db.query(models.Product.model, func.count(models.Product.id)).filter(models.Product.model != None, models.Product.model != "").group_by(models.Product.model).order_by(models.Product.model).all()]
-    storage_locations = [{"value": loc, "count": c} for loc, c in db.query(models.Product.storage_location, func.count(models.Product.id)).filter(models.Product.storage_location != None, models.Product.storage_location != "").group_by(models.Product.storage_location).order_by(models.Product.storage_location).all()]
+def get_product_filter_options(
+    q: Optional[str] = None,
+    category_id: Optional[int] = None,
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
+    status: Optional[str] = None,
+    storage_location: Optional[str] = None,
+    avito_ready: Optional[bool] = None,
+    site_ready: Optional[bool] = None,
+    db: Session = Depends(get_db)
+):
+    # Approach A: dependent facets per level
     
+    # Base query for calculating dependent facets
+    base_query = db.query(models.Product)
+    if q:
+        base_query = base_query.filter(
+            or_(
+                models.Product.title.ilike(f"%{q}%"),
+                models.Product.sku.ilike(f"%{q}%"),
+                models.Product.brand.ilike(f"%{q}%"),
+                models.Product.model.ilike(f"%{q}%"),
+                models.Product.serial_number.ilike(f"%{q}%")
+            )
+        )
+
+    # 1. Categories - calculated without category/brand/model/status/storage/avito/site
+    cat_query = base_query
+    categories = [{"id": cid, "name": n, "count": c} for cid, n, c in 
+                  db.query(models.Category.id, models.Category.name, func.count(models.Product.id))
+                  .join(models.Product, models.Category.id == models.Product.category_id)
+                  .filter(models.Product.id.in_(cat_query.with_entities(models.Product.id)))
+                  .group_by(models.Category.id, models.Category.name)
+                  .order_by(models.Category.name).all()]
+
+    # Apply category_id for next levels
+    q_cat = base_query
+    if category_id:
+        q_cat = q_cat.filter(models.Product.category_id == category_id)
+
+    # 2. Brands - calculated with category
+    brands = [{"value": b, "count": c} for b, c in 
+              db.query(models.Product.brand, func.count(models.Product.id))
+              .filter(models.Product.brand != None, models.Product.brand != "")
+              .filter(models.Product.id.in_(q_cat.with_entities(models.Product.id)))
+              .group_by(models.Product.brand)
+              .order_by(models.Product.brand).all()]
+
+    # Apply brand for next levels
+    q_brand = q_cat
+    if brand:
+        q_brand = q_brand.filter(models.Product.brand.ilike(f"%{brand}%"))
+
+    # 3. Models - calculated with category + brand
+    models_list = [{"value": m, "count": c} for m, c in 
+                   db.query(models.Product.model, func.count(models.Product.id))
+                   .filter(models.Product.model != None, models.Product.model != "")
+                   .filter(models.Product.id.in_(q_brand.with_entities(models.Product.id)))
+                   .group_by(models.Product.model)
+                   .order_by(models.Product.model).all()]
+
+    # Apply model for next levels
+    q_model = q_brand
+    if model:
+        q_model = q_model.filter(models.Product.model.ilike(f"%{model}%"))
+
+    # 4. Statuses - calculated with category + brand + model
     status_labels = {
         "draft": "Черновик",
         "in_stock": "В наличии",
@@ -117,15 +179,56 @@ def get_product_filter_options(db: Session = Depends(get_db)):
         "published_site": "На сайте",
         "published_avito": "На Авито"
     }
-    statuses = [{"value": s, "label": status_labels.get(s, s), "count": c} for s, c in db.query(models.Product.status, func.count(models.Product.id)).filter(models.Product.status != None, models.Product.status != "").group_by(models.Product.status).order_by(models.Product.status).all()]
-    
-    categories = [{"id": cid, "name": n, "count": c} for cid, n, c in db.query(models.Category.id, models.Category.name, func.count(models.Product.id)).join(models.Product, models.Category.id == models.Product.category_id).group_by(models.Category.id, models.Category.name).order_by(models.Category.name).all()]
-    
-    total_count = db.query(models.Product).count()
-    avito_ready_count = db.query(models.Product).filter(models.Product.avito_title != None, models.Product.avito_description != None).count()
-    site_ready_count = db.query(models.Product).filter(models.Product.site_title != None, models.Product.site_description != None).count()
+    statuses = [{"value": s, "label": status_labels.get(s, s), "count": c} for s, c in 
+                db.query(models.Product.status, func.count(models.Product.id))
+                .filter(models.Product.status != None, models.Product.status != "")
+                .filter(models.Product.id.in_(q_model.with_entities(models.Product.id)))
+                .group_by(models.Product.status)
+                .order_by(models.Product.status).all()]
+
+    # Apply status for next levels
+    q_status = q_model
+    if status:
+        q_status = q_status.filter(models.Product.status == status)
+
+    # 5. Storage locations - calculated with category + brand + model + status
+    storage_locations = [{"value": loc, "count": c} for loc, c in 
+                         db.query(models.Product.storage_location, func.count(models.Product.id))
+                         .filter(models.Product.storage_location != None, models.Product.storage_location != "")
+                         .filter(models.Product.id.in_(q_status.with_entities(models.Product.id)))
+                         .group_by(models.Product.storage_location)
+                         .order_by(models.Product.storage_location).all()]
+
+    # Apply storage_location
+    q_storage = q_status
+    if storage_location:
+        q_storage = q_storage.filter(models.Product.storage_location.ilike(f"%{storage_location}%"))
+
+    # 6. Avito & Site ready - calculated with all previous filters
+    total_count = q_storage.count()
+    avito_ready_count = q_storage.filter(models.Product.avito_title != None, models.Product.avito_description != None).count()
+    site_ready_count = q_storage.filter(models.Product.site_title != None, models.Product.site_description != None).count()
     
     return {
+        "selected": {
+            "q": q,
+            "category_id": category_id,
+            "brand": brand,
+            "model": model,
+            "status": status,
+            "storage_location": storage_location,
+            "avito_ready": avito_ready,
+            "site_ready": site_ready
+        },
+        "order": [
+            "categories",
+            "brands",
+            "models",
+            "statuses",
+            "storage_locations",
+            "avito_ready",
+            "site_ready"
+        ],
         "brands": brands,
         "models": models_list,
         "statuses": statuses,
@@ -134,11 +237,11 @@ def get_product_filter_options(db: Session = Depends(get_db)):
         "avito_ready": [
             {"value": "true", "label": "Готово к Авито", "count": avito_ready_count},
             {"value": "false", "label": "Не готово к Авито", "count": total_count - avito_ready_count}
-        ],
+        ] if total_count > 0 else [],
         "site_ready": [
             {"value": "true", "label": "Готово к сайту", "count": site_ready_count},
             {"value": "false", "label": "Не готово к сайту", "count": total_count - site_ready_count}
-        ]
+        ] if total_count > 0 else []
     }
 
 @router.get("/meta")

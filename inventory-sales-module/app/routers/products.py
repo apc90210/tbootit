@@ -54,7 +54,7 @@ async def list_products(
             }
         )
         
-    filter_options_response = await core_client.get_product_filter_options()
+    filter_options_response = await core_client.get_product_filter_options(params)
     filter_options_error = False
     if filter_options_response and isinstance(filter_options_response, dict) and "error" in filter_options_response:
         filter_options_error = True

@@ -25,10 +25,10 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
-    async def get_product_filter_options(self):
+    async def get_product_filter_options(self, params: dict = None):
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(f"{self.base_url}/api/products/filter-options", timeout=10.0)
+                response = await client.get(f"{self.base_url}/api/products/filter-options", params=params or {}, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
                 return {"error": True, "status_code": response.status_code}
