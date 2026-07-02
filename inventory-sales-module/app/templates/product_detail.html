@@ -54,9 +54,14 @@
     <div style="margin-top: 20px;">
         <a href="/products" class="btn">Назад к товарам</a>
         {% if product.status in ['in_stock', 'reserved'] %}
-            <a href="/sales/new?product_id={{ product.id }}" class="btn btn-danger" style="margin-left: 10px;">Продать</a>
+            <form action="/cart/add" method="post" style="display: inline; margin-left: 10px;">
+                <input type="hidden" name="product_id" value="{{ product.id }}">
+                <input type="hidden" name="title" value="{{ product.title }}">
+                <input type="hidden" name="price" value="{{ product.sale_price if product.sale_price else product.price }}">
+                <button type="submit" class="btn btn-danger">В корзину</button>
+            </form>
         {% else %}
-            <button class="btn" disabled title="Продажа недоступна для этого статуса" style="margin-left: 10px;">Продать</button>
+            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса" style="margin-left: 10px;">В корзину</button>
         {% endif %}
         {% if product.status == 'in_stock' %}
             <a href="/products/{{ product.id }}/price-tag" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Печать ценника</a>

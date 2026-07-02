@@ -12,6 +12,7 @@
                 <tr>
                     <th>№</th>
                     <th>Дата</th>
+                    <th>Товаров</th>
                     <th>Сумма</th>
                     <th>Способ оплаты</th>
                     <th>Статус</th>
@@ -23,6 +24,7 @@
                 <tr>
                     <td>#{{ sale.id }}</td>
                     <td>{{ sale.created_at or '—' }}</td>
+                    <td>{{ sale.get('items')|length if sale.get('items') else 0 }} шт.</td>
                     <td>{{ sale.total_amount }} ₽</td>
                     <td>
                         {% if sale.payment_method in payment_methods %}
@@ -40,6 +42,7 @@
                     </td>
                     <td>
                         <a href="/sales/{{ sale.id }}" class="btn btn-success">Открыть</a>
+                        <a href="/sales/{{ sale.id }}/receipt" class="btn">Товарный чек</a>
                     </td>
                 </tr>
                 {% endfor %}

@@ -70,6 +70,22 @@ def migrate_db():
                 except Exception as e:
                     print(f"Migration error on {col_name}: {e}")
 
+        # Seed organization settings if not present
+        from app.models import OrganizationSettings
+        settings_count = conn.execute(text("SELECT COUNT(*) FROM organization_settings")).scalar()
+        if settings_count == 0:
+            conn.execute(text("""
+                INSERT INTO organization_settings (
+                    organization_name, inn, address, phone, default_customer_label
+                ) VALUES (
+                    'ИП Атанов Павел Сергеевич',
+                    '667009336901',
+                    'Свердловская обл. г. Екатеринбург, ул. Кузнецова, дом 10',
+                    '+7 343 344 88 95',
+                    'Частное лицо'
+                )
+            """))
+
 migrate_db()
 
 app = FastAPI(title="Technoreboot Core API", version="0.1.0")
@@ -84,6 +100,8 @@ app.add_middleware(
 
 app.mount("/media", StaticFiles(directory=settings.storage_root), name="media")
 
+from app.routers import settings as settings_router
+
 app.include_router(health.router)
 app.include_router(products.router, prefix="/api/products", tags=["products"])
 app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
@@ -93,3 +111,4 @@ app.include_router(sales.router, prefix="/api/sales", tags=["sales"])
 app.include_router(photos.router, prefix="/api/products", tags=["photos"])
 app.include_router(product_cards.router, prefix="/api/product-cards", tags=["product-cards"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(settings_router.router, prefix="/api", tags=["settings"])

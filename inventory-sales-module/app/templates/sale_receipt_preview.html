@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Товарный чек #{{ sale.id }}</title>
+    <title>Товарный чек № {{ sale.id }}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,10 +12,19 @@
         }
         .receipt-container {
             background: #fff;
-            width: 500px;
+            width: 800px;
             padding: 30px;
             border: 1px solid #ccc;
             margin: 0 auto;
+        }
+        .org-header {
+            text-align: center;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .org-header strong {
+            font-size: 1.3rem;
         }
         .header {
             text-align: center;
@@ -27,25 +36,20 @@
             margin: 0;
             font-size: 1.5rem;
         }
-        .info {
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-        .info div {
-            margin-bottom: 5px;
-        }
         .items {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
         .items th, .items td {
-            border-bottom: 1px solid #ccc;
-            padding: 8px 0;
+            border: 1px solid #000;
+            padding: 8px;
             text-align: left;
+            font-size: 0.95rem;
         }
         .items th {
             font-weight: bold;
+            background-color: #f9f9f9;
         }
         .items td.amount {
             text-align: right;
@@ -53,29 +57,43 @@
         .items th.amount {
             text-align: right;
         }
-        .total {
-            text-align: right;
-            font-size: 1.2rem;
-            font-weight: bold;
+        .summary {
             margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        .summary table {
+            width: 100%;
+        }
+        .summary td {
+            padding: 4px 0;
+        }
+        .summary .right-align {
+            text-align: right;
+            font-weight: bold;
         }
         .warranty {
             border: 1px solid #000;
             padding: 10px;
             font-size: 0.9rem;
             margin-bottom: 20px;
+            line-height: 1.5;
         }
-        .signature {
-            margin-top: 50px;
+        .signatures {
+            margin-top: 40px;
             display: flex;
             justify-content: space-between;
         }
-        .signature div {
-            border-top: 1px solid #000;
+        .signatures div {
             width: 45%;
-            text-align: center;
-            padding-top: 5px;
-            font-size: 0.9rem;
+        }
+        .signatures div p {
+            margin: 5px 0;
+        }
+        .signatures .line {
+            border-bottom: 1px solid #000;
+            display: inline-block;
+            width: 100%;
+            margin-top: 15px;
         }
         .actions {
             text-align: center;
@@ -92,94 +110,112 @@
             font-size: 1rem;
         }
         .btn:hover { background: #0056b3; }
-        .alert {
-            background: #fff3cd;
-            color: #856404;
-            padding: 10px;
-            border: 1px solid #ffeeba;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-        }
         @media print {
             body { background: #fff; padding: 0; }
-            .receipt-container { border: none; width: 100%; max-width: none; }
-            .actions, .alert { display: none; }
+            .receipt-container { border: none; width: 100%; max-width: none; padding: 0; }
+            .actions { display: none; }
         }
     </style>
 </head>
 <body>
-    <div class="alert">
-        <strong>Примечание MVP:</strong> Это тестовый шаблон товарного чека (placeholder). На этапе Stage04F он будет заменен на оригинальный шаблон владельца.
-    </div>
-
     <div class="receipt-container">
-        <div class="header">
-            <h1>ТОВАРНЫЙ ЧЕК</h1>
+        <div class="org-header">
+            <strong>{{ org_settings.organization_name if org_settings.organization_name else 'Организация не задана' }}</strong><br>
+            ИНН: {{ org_settings.inn if org_settings.inn else '—' }}<br>
+            Адрес: {{ org_settings.address if org_settings.address else '—' }}<br>
+            Телефон: {{ org_settings.phone if org_settings.phone else '—' }}
         </div>
-        
-        <div class="info">
-            <div><strong>Номер:</strong> {{ sale.id }}</div>
-            <div><strong>Дата:</strong> {{ sale.created_at }}</div>
-            <div><strong>Оплата:</strong> 
-                {% if sale.payment_method in payment_methods %}
-                    {{ payment_methods[sale.payment_method] }}
-                {% else %}
-                    {{ sale.payment_method }}
-                {% endif %}
-            </div>
+
+        <div class="header">
+            <h1>Товарный чек № {{ sale.id }} от {{ sale.created_at[:10] if sale.created_at else '—' }}</h1>
         </div>
 
         <table class="items">
             <thead>
                 <tr>
-                    <th>Наименование товара</th>
-                    <th>Кол-во</th>
-                    <th class="amount">Сумма</th>
+                    <th style="width: 5%;">№</th>
+                    <th style="width: 45%;">Наименование</th>
+                    <th style="width: 10%;">Код</th>
+                    <th style="width: 10%;">Ед. изм.</th>
+                    <th style="width: 10%;">Кол-во</th>
+                    <th class="amount" style="width: 10%;">Цена</th>
+                    <th class="amount" style="width: 10%;">Сумма</th>
                 </tr>
             </thead>
             <tbody>
                 {% if sale.get('items') %}
                     {% for item in sale['items'] %}
                     <tr>
+                        <td>{{ loop.index }}</td>
                         <td>{{ item.title }}</td>
-                        <td>{{ item.quantity }} шт.</td>
-                        <td class="amount">{{ item.price }} ₽</td>
+                        <td>{{ item.product_id }}</td>
+                        <td>шт</td>
+                        <td>{{ item.quantity }}</td>
+                        <td class="amount">{{ item.price }}</td>
+                        <td class="amount">{{ item.price * item.quantity }}</td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="3">Товары отсутствуют</td>
+                        <td colspan="7" style="text-align: center;">Товары отсутствуют</td>
                     </tr>
                 {% endif %}
             </tbody>
         </table>
 
-        <div class="total">
-            ИТОГО: {{ sale.total_amount }} ₽
+        <div class="summary">
+            <table>
+                <tr>
+                    <td style="width: 80%; text-align: right;">Итого:</td>
+                    <td class="right-align">{{ sale.total_amount }}</td>
+                </tr>
+                <tr>
+                    <td style="text-align: right;">Предоплата:</td>
+                    <td class="right-align">0.00</td>
+                </tr>
+                <tr>
+                    <td style="text-align: right;">К оплате:</td>
+                    <td class="right-align">{{ sale.total_amount }}</td>
+                </tr>
+            </table>
+            <p style="margin-top: 15px;">
+                Всего наименований: <strong>{{ sale.get('items')|length if sale.get('items') else 0 }}</strong><br>
+                Сумма: <strong>{{ sale.total_amount }} ₽</strong>
+            </p>
         </div>
 
-        <div class="warranty">
-            <strong>ГАРАНТИЯ:</strong><br>
+        <div class="signatures">
+            <div>
+                <p>Отпустил:</p>
+                <span class="line"></span>
+                <p style="text-align: center; font-size: 0.8rem; margin-top: 2px;">
+                    ({{ org_settings.default_cashier_name if org_settings.default_cashier_name else 'Продавец' }})
+                </p>
+            </div>
+            <div>
+                <p>Покупатель:</p>
+                <p><strong>{{ org_settings.default_customer_label if org_settings.default_customer_label else 'Частное лицо' }}</strong></p>
+            </div>
+        </div>
+
+        <div class="warranty" style="margin-top: 30px;">
+            <p style="margin-top: 0; text-align: center; font-weight: bold;">Гарантийные условия</p>
             {% if sale.warranty_enabled %}
-                Срок гарантии: <strong>{{ sale.warranty_days }} дней</strong> с момента покупки.<br>
-                Гарантия не распространяется на механические повреждения и следы попадания влаги.
+                На все Б/У товары предоставляется гарантия <strong>{{ sale.warranty_days }} дней</strong>.
             {% else %}
-                <span style="font-weight: bold; color: #c00;">ТОВАР ПРОДАН БЕЗ ГАРАНТИИ (ОСМОТРЕН ПОКУПАТЕЛЕМ).</span><br>
-                Претензии по качеству товара после покупки не принимаются.
+                <span style="font-weight: bold; color: #c00;">Товар продаётся без гарантии, в том состоянии, в котором есть.</span><br>
+                Покупатель внимательно осмотрел товар при покупке.
             {% endif %}
-        </div>
-
-        <div class="signature">
-            <div>Продавец</div>
-            <div>Покупатель</div>
+            
+            <div style="margin-top: 20px;">
+                Подпись покупателя:<br>
+                С условиями ознакомился и согласен: <span class="line" style="width: 60%; display: inline-block;"></span>
+            </div>
         </div>
     </div>
 
     <div class="actions">
-        <button class="btn" onclick="window.print()">Распечатать</button>
+        <button class="btn" onclick="window.print()">Печать</button>
         <button class="btn" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">Закрыть</button>
     </div>
 </body>

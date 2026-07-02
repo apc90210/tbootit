@@ -189,6 +189,7 @@ class Sale(SaleBase):
     cancelled_at: Optional[datetime] = None
     cancel_reason: Optional[str] = None
     created_at: Optional[datetime] = None
+    items: List[SaleItem] = []
     class Config:
         from_attributes = True
 
@@ -325,3 +326,30 @@ class ProductCardJSONPayload(BaseModel):
     product: ImportProductSection
     avito: Optional[ImportAvitoSection] = None
     site: Optional[ImportSiteSection] = None
+
+# Organization Settings Schemas
+class OrganizationSettingsBase(BaseModel):
+    organization_name: str
+    inn: str
+    address: str
+    phone: str
+    default_cashier_name: Optional[str] = None
+    default_customer_label: Optional[str] = "Частное лицо"
+
+class OrganizationSettingsCreate(OrganizationSettingsBase):
+    pass
+
+class OrganizationSettingsUpdate(BaseModel):
+    organization_name: Optional[str] = None
+    inn: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    default_cashier_name: Optional[str] = None
+    default_customer_label: Optional[str] = None
+
+class OrganizationSettingsResponse(OrganizationSettingsBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True

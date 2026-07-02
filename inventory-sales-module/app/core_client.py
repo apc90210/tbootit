@@ -62,24 +62,8 @@ class CoreClient:
 
     # --- Sales methods (Stage 04E) ---
 
-    async def create_sale(self, product_id: int, price: float, quantity: int, payment_method: str, notes: str = None, warranty_days: int = None, warranty_enabled: bool = True):
-        """Create a sale through Core API POST /api/sales."""
-        payload = {
-            "customer_id": None,
-            "total_amount": price * quantity,
-            "payment_method": payment_method,
-            "comment": notes,
-            "warranty_days": warranty_days if warranty_enabled else None,
-            "warranty_enabled": warranty_enabled,
-            "items": [
-                {
-                    "product_id": product_id,
-                    "title": "",  # Core will use it for record; we fill from product later
-                    "price": price,
-                    "quantity": quantity,
-                }
-            ],
-        }
+    async def create_sale(self, payload: dict):
+        """Create a sale through Core API POST /api/sales/."""
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
@@ -132,6 +116,26 @@ class CoreClient:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(f"{self.base_url}/api/sales/today", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def get_organization_settings(self):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{self.base_url}/settings/organization", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def update_organization_settings(self, payload: dict):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.put(f"{self.base_url}/settings/organization", json=payload, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
                 return {"error": True, "status_code": response.status_code}

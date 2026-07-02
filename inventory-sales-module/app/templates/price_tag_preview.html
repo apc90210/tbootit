@@ -6,33 +6,75 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background: #f4f4f4;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            background: #f4f4f4;
         }
         .tag-container {
             background: #fff;
-            width: 300px;
-            padding: 20px;
-            border: 2px dashed #ccc;
-            margin: 0 auto;
+            width: 58mm;
+            height: 40mm;
+            box-sizing: border-box;
+            border: 1px dashed #ccc;
+            margin: 20px auto;
             text-align: center;
+            padding: 2mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            position: relative;
+        }
+        .shop-name {
+            font-size: 8pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .category {
+            font-size: 7pt;
+            color: #444;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .title {
-            font-size: 1.2rem;
+            font-size: 9pt;
             font-weight: bold;
-            margin-bottom: 15px;
+            line-height: 1.1;
+            max-height: 20pt;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
         }
-        .sku {
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 15px;
+        .barcode-placeholder {
+            height: 8mm;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            margin: 1mm 0;
+            font-size: 6pt;
+            line-height: 8mm;
+            color: #999;
+        }
+        .price-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 1mm;
         }
         .price {
-            font-size: 2rem;
+            font-size: 14pt;
             font-weight: bold;
-            color: #c00;
+            color: #000;
+            line-height: 1;
         }
+        .code {
+            font-size: 7pt;
+            color: #333;
+            text-align: left;
+        }
+        
         .actions {
             text-align: center;
             margin-top: 30px;
@@ -48,37 +90,40 @@
             font-size: 1rem;
         }
         .btn:hover { background: #0056b3; }
-        .alert {
-            background: #fff3cd;
-            color: #856404;
-            padding: 10px;
-            border: 1px solid #ffeeba;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-        }
+        
         @media print {
-            body { background: #fff; padding: 0; }
-            .tag-container { border: 1px solid #000; width: auto; max-width: 300px; }
-            .actions, .alert { display: none; }
+            @page {
+                size: 58mm 40mm;
+                margin: 0;
+            }
+            body { 
+                background: #fff; 
+                margin: 0;
+            }
+            .tag-container { 
+                border: none; 
+                margin: 0;
+                width: 58mm;
+                height: 40mm;
+            }
+            .actions { display: none; }
         }
     </style>
 </head>
 <body>
-    <div class="alert">
-        <strong>Примечание MVP:</strong> Это тестовый шаблон ценника (placeholder). На этапе Stage04F он будет заменен на оригинальный шаблон владельца.
-    </div>
-
     <div class="tag-container">
+        <div class="shop-name">Магазин Техноребут</div>
+        <div class="category">{{ product.category_id if product.category_id else 'Товар' }}</div>
         <div class="title">{{ product.title }}</div>
-        <div class="sku">Арт: {{ product.sku or '—' }}</div>
-        <div class="price">{{ product.sale_price if product.sale_price else product.price }} ₽</div>
+        <div class="barcode-placeholder">Штрихкод (скоро)</div>
+        <div class="price-container">
+            <div class="code">Арт: {{ product.sku if product.sku else product.id }}</div>
+            <div class="price">{{ product.sale_price if product.sale_price else product.price }} ₽</div>
+        </div>
     </div>
 
     <div class="actions">
-        <button class="btn" onclick="window.print()">Распечатать</button>
+        <button class="btn" onclick="window.print()">Печать ценника</button>
         <button class="btn" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">Закрыть</button>
     </div>
 </body>

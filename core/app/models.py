@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -135,6 +136,8 @@ class Sale(Base):
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
     cancel_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    items = relationship("SaleItem", back_populates="sale")
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
@@ -146,6 +149,8 @@ class SaleItem(Base):
     quantity = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    sale = relationship("Sale", back_populates="items")
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
     id = Column(Integer, primary_key=True, index=True)
@@ -156,3 +161,15 @@ class AuditLog(Base):
     new_value = Column(Text)
     comment = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class OrganizationSettings(Base):
+    __tablename__ = "organization_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    organization_name = Column(String)
+    inn = Column(String)
+    address = Column(String)
+    phone = Column(String)
+    default_cashier_name = Column(String, nullable=True)
+    default_customer_label = Column(String, default="Частное лицо")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

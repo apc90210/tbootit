@@ -160,9 +160,14 @@
                     <td>
                         <a href="/products/{{ item.id }}" class="btn btn-success">Открыть</a>
                         {% if item.status in ['in_stock', 'reserved'] %}
-                            <a href="/sales/new?product_id={{ item.id }}" class="btn btn-danger">Продать</a>
+                            <form action="/cart/add" method="post" style="display: inline;">
+                                <input type="hidden" name="product_id" value="{{ item.id }}">
+                                <input type="hidden" name="title" value="{{ item.title }}">
+                                <input type="hidden" name="price" value="{{ item.sale_price if item.sale_price else item.price }}">
+                                <button type="submit" class="btn btn-danger">В корзину</button>
+                            </form>
                         {% else %}
-                            <button class="btn" disabled title="Продажа недоступна для этого статуса">Продать</button>
+                            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса">В корзину</button>
                         {% endif %}
                         {% if item.status == 'in_stock' %}
                             <a href="/products/{{ item.id }}/price-tag" class="btn btn-primary" target="_blank">Печать ценника</a>

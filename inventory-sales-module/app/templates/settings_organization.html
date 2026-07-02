@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки организации{% endblock %}
+
+{% block content %}
+<h2>Настройки организации</h2>
+
+<div style="background: #fff; padding: 20px; border: 1px solid #ddd; max-width: 600px;">
+    <form method="post" action="/settings/organization">
+        <div style="margin-bottom: 15px;">
+            <label for="organization_name" style="display: block; font-weight: bold; margin-bottom: 5px;">Название организации</label>
+            <input type="text" id="organization_name" name="organization_name" value="{{ settings.organization_name if settings.organization_name else '' }}" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="inn" style="display: block; font-weight: bold; margin-bottom: 5px;">ИНН</label>
+            <input type="text" id="inn" name="inn" value="{{ settings.inn if settings.inn else '' }}" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="address" style="display: block; font-weight: bold; margin-bottom: 5px;">Адрес</label>
+            <input type="text" id="address" name="address" value="{{ settings.address if settings.address else '' }}" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="phone" style="display: block; font-weight: bold; margin-bottom: 5px;">Телефон</label>
+            <input type="text" id="phone" name="phone" value="{{ settings.phone if settings.phone else '' }}" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="default_customer_label" style="display: block; font-weight: bold; margin-bottom: 5px;">Покупатель по умолчанию (для чеков)</label>
+            <input type="text" id="default_customer_label" name="default_customer_label" value="{{ settings.default_customer_label if settings.default_customer_label else 'Частное лицо' }}" style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+        <button type="submit" class="btn btn-success">Сохранить настройки</button>
+    </form>
+</div>
+{% endblock %}

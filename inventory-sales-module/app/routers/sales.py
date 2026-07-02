@@ -41,120 +41,6 @@ async def sales_list(
     )
 
 
-@router.get("/sales/new", response_class=HTMLResponse)
-async def sale_new(
-    request: Request,
-    product_id: int = Query(...),
-):
-    """Sale form — fetches product from Core and renders form."""
-    product = await core_client.get_product_details(product_id)
-
-    if product and isinstance(product, dict) and "error" in product:
-        if product.get("status_code") == 404:
-            return templates.TemplateResponse(
-                request=request,
-                name="error.html",
-                context={"message": "Товар не найден"},
-            )
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": "Ошибка Core API"},
-        )
-
-    product_status = product.get("status", "")
-    can_sell = product_status in SELLABLE_STATUSES
-
-    return templates.TemplateResponse(
-        request=request,
-        name="sales_new.html",
-        context={
-            "product": product,
-            "can_sell": can_sell,
-            "payment_methods": PAYMENT_METHODS,
-            "status_labels": STATUS_LABELS,
-        },
-    )
-
-
-@router.post("/sales/create", response_class=HTMLResponse)
-async def sale_create(
-    request: Request,
-    product_id: int = Form(...),
-    price: float = Form(...),
-    quantity: int = Form(1),
-    payment_method: str = Form(...),
-    warranty_days: int = Form(30),
-    no_warranty: bool = Form(False),
-    notes: str = Form(""),
-):
-    """Create sale via Core API."""
-    # Validate payment method
-    if payment_method not in PAYMENT_METHODS:
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": "Некорректный способ оплаты"},
-        )
-        
-    if quantity < 1:
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": "Количество должно быть больше 0"},
-        )
-        
-    if price < 0:
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": "Цена продажи не может быть отрицательной"},
-        )
-
-    # Fetch product to set title in sale item
-    product = await core_client.get_product(product_id)
-    if product and isinstance(product, dict) and "error" in product:
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": "Товар не найден"},
-        )
-
-    warranty_enabled = not no_warranty
-
-    result = await core_client.create_sale(
-        product_id=product_id,
-        price=price,
-        quantity=quantity,
-        payment_method=payment_method,
-        notes=notes or None,
-        warranty_days=warranty_days,
-        warranty_enabled=warranty_enabled,
-    )
-
-    if result and isinstance(result, dict) and "error" in result:
-        # Translate common Core errors to Russian
-        detail = result.get("detail", "")
-        if "Cannot sell product" in str(detail):
-            message = "Товар нельзя продать в текущем статусе"
-        elif "not found" in str(detail).lower():
-            message = "Товар не найден"
-        elif "Invalid payment method" in str(detail):
-            message = "Некорректный способ оплаты"
-        elif "already" in str(detail).lower():
-            message = "Товар уже продан"
-        else:
-            message = f"Ошибка Core API: {result}"
-
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": message},
-        )
-
-    sale_id = result.get("id")
-    return RedirectResponse(url=f"/sales/{sale_id}", status_code=303)
-
 
 @router.get("/sales/{sale_id}", response_class=HTMLResponse)
 async def sale_detail(request: Request, sale_id: int):
@@ -202,6 +88,13 @@ async def sale_receipt(request: Request, sale_id: int):
             context={"message": "Ошибка Core API"},
         )
 
+    # Fetch organization settings
+    try:
+        response = await core_client.get_organization_settings()
+        org_settings = response if not response.get("error") else {}
+    except:
+        org_settings = {}
+        
     # We also need the item details if we want to show product details,
     # but the sale response contains items.
     
@@ -211,5 +104,6 @@ async def sale_receipt(request: Request, sale_id: int):
         context={
             "sale": sale,
             "payment_methods": PAYMENT_METHODS,
+            "org_settings": org_settings,
         },
     )

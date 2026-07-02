@@ -1,61 +1,45 @@
 # Stage 04E-R4 R3 Recovery Note
 
 ## R3 worktree before:
-The working tree contains several uncommitted files modified or created during Stage 04E-R3, primarily related to the sales warranty features, receipt preview templates, price tag preview, and corresponding tests.
+The worktree contains numerous modified and untracked files left over from the uncommitted Stage 04E-R3.
 
 ## Uncommitted files:
-M core/app/main.py
-M core/app/models.py
-M core/app/routers/sales.py
-M core/app/schemas.py
-M inventory-sales-module/app/core_client.py
-M inventory-sales-module/app/routers/products.py
-M inventory-sales-module/app/routers/sales.py
-M inventory-sales-module/app/templates/base.html
-M inventory-sales-module/app/templates/product_detail.html
-M inventory-sales-module/app/templates/products.html
-M inventory-sales-module/app/templates/sales_detail.html
-M inventory-sales-module/app/templates/sales_new.html
-M inventory-sales-module/tests/test_core_client_sales.py
-M logs/2026-07-01.md
-M logs/2026-07-02.md
-?? .agents/received_prompts/TECHNOREBOOT_STAGE04E_R4_SALES_CART_RECEIPT_PRICE_TAG_REQUIREMENTS_PROMPT.md
-?? TECHNOREBOOT_STAGE04E_R3_REPORT.md
-?? core/tbootit.db
-?? core/tests/test_sales_warranty.py
-?? inventory-sales-module/app/templates/price_tag_preview.html
-?? inventory-sales-module/app/templates/sale_receipt_preview.html
-?? inventory-sales-module/debug.py
-?? inventory-sales-module/tests/test_sales_warranty_ui.py
-?? primer/Dx47BEtrjaqlqPvKpC844qWVYDYn6wGeoFrWmErJwVUIMp44ZCFnuFm3MzA2rYkU0yjCnRe3t7leyTxYsFMwR3Um.jpg
+Modified tracked files:
+- `core/app/main.py`
+- `core/app/models.py`
+- `core/app/schemas.py`
+- `inventory-sales-module/app/main.py`
+- `inventory-sales-module/app/routers/sales.py`
+- `inventory-sales-module/app/templates/base.html`
+- `inventory-sales-module/app/templates/price_tag_preview.html`
+- `inventory-sales-module/app/templates/product_detail.html`
+- `inventory-sales-module/app/templates/products.html`
+- `inventory-sales-module/app/templates/sale_receipt_preview.html`
+- `inventory-sales-module/app/templates/sales_detail.html`
+- `inventory-sales-module/app/templates/sales_list.html`
+- `inventory-sales-module/app/templates/sales_new.html` (deleted)
+- `inventory-sales-module/requirements.txt`
+
+Untracked files:
+- `core/app/routers/settings.py`
+- `core/tests/test_organization_settings.py`
+- `inventory-sales-module/app/routers/cart.py`
+- `inventory-sales-module/app/routers/settings.py`
+- `inventory-sales-module/app/templates/cart.html`
+- `inventory-sales-module/app/templates/settings_organization.html`
+- `docs/receipt_and_price_tag_templates_requirements.md`
+- `TECHNOREBOOT_STAGE04E_R3_REPORT.md`
+- `inventory-sales-module/debug.py`
 
 ## Valid files:
-- core/app/main.py
-- core/app/models.py
-- core/app/routers/sales.py
-- core/app/schemas.py
-- inventory-sales-module/app/core_client.py
-- inventory-sales-module/app/routers/products.py
-- inventory-sales-module/app/routers/sales.py
-- inventory-sales-module/app/templates/base.html
-- inventory-sales-module/app/templates/product_detail.html
-- inventory-sales-module/app/templates/products.html
-- inventory-sales-module/app/templates/sales_detail.html
-- inventory-sales-module/app/templates/sales_new.html
-- inventory-sales-module/tests/test_core_client_sales.py
-- core/tests/test_sales_warranty.py
-- inventory-sales-module/app/templates/price_tag_preview.html
-- inventory-sales-module/app/templates/sale_receipt_preview.html
-- inventory-sales-module/tests/test_sales_warranty_ui.py
-- logs/2026-07-01.md
-- logs/2026-07-02.md
+Most of the tracked modifications and new application/test files (`core/app/*`, `inventory-sales-module/app/*`, `core/tests/*`, `docs/*`) are valid in-progress attempts to implement Organization Settings, Cart, and Sale Receipt features which align with R4 requirements.
 
 ## Unexpected/temp files:
-- inventory-sales-module/debug.py
-- core/tbootit.db
-- primer/Dx47BEtrjaqlqPvKpC844qWVYDYn6wGeoFrWmErJwVUIMp44ZCFnuFm3MzA2rYkU0yjCnRe3t7leyTxYsFMwR3Um.jpg
-- TECHNOREBOOT_STAGE04E_R3_REPORT.md (temporary report)
-- .agents/received_prompts/TECHNOREBOOT_STAGE04E_R4_SALES_CART_RECEIPT_PRICE_TAG_REQUIREMENTS_PROMPT.md
+- `TECHNOREBOOT_STAGE04E_R3_REPORT.md` (previous run report, temp)
+- `inventory-sales-module/debug.py` (temp debug script)
+- `core/tbootit.db` (local SQLite db, should remain untracked/ignored)
 
 ## Action:
-I will commit the valid R3 changes as a normal targeted commit ("Recover and align Stage 04E-R3 sales warranty and UI preview implementation") to secure the worktree before proceeding with Stage 04E-R4. The temporary files and databases will not be committed.
+- Keep the valid changes and incorporate them into the final R4 targeted commit.
+- Do not commit the temp files (`debug.py`, old reports).
+- Refine the implementation in the valid files to strictly match the owner's specifications outlined in the R4 prompt (e.g., exact default org data, cart flow details, warranty defaults, receipt templates, and 58x40 price tag layout).
