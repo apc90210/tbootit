@@ -9,6 +9,7 @@ venv/
 # Logs
 logs/
 *.log
+*.log.tmp
 
 # IDE
 .vscode/
@@ -22,5 +23,19 @@ Thumbs.db
 tmp/
 temp/
 
-# Data
+# Data and Runtime databases
 data/
+data/db/
+data/avito-module/
+*.db
+*.sqlite
+*.sqlite3
+
+# Test caches
+.pytest_cache/
+
+# Local debug/temp artifacts
+debug.py
+task.md
+implementation_plan.md
+TECHNOREBOOT_*_REPORT.md
