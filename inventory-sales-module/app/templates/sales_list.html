@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Продажи{% endblock %}
+
+{% block content %}
+    <h2>Продажи</h2>
+
+    {% if sales_data and sales_data['items'] %}
+        <p>Всего: {{ sales_data.total }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Сумма</th>
+                    <th>Способ оплаты</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales_data['items'] %}
+                <tr>
+                    <td>#{{ sale.id }}</td>
+                    <td>{{ sale.created_at or '—' }}</td>
+                    <td>{{ sale.total_amount }} ₽</td>
+                    <td>
+                        {% if sale.payment_method in payment_methods %}
+                            {{ payment_methods[sale.payment_method] }}
+                        {% else %}
+                            {{ sale.payment_method }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if sale.status in sale_status_labels %}
+                            {{ sale_status_labels[sale.status] }}
+                        {% else %}
+                            {{ sale.status }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/sales/{{ sale.id }}" class="btn btn-success">Открыть</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 15px;">
+            {% if offset > 0 %}
+                <a href="/sales?limit={{ limit }}&offset={{ offset - limit }}" class="btn">Назад</a>
+            {% else %}
+                <button class="btn" disabled>Назад</button>
+            {% endif %}
+
+            {% if (offset + limit) < sales_data.total %}
+                <a href="/sales?limit={{ limit }}&offset={{ offset + limit }}" class="btn" style="margin-left: 10px;">Вперед</a>
+            {% else %}
+                <button class="btn" disabled style="margin-left: 10px;">Вперед</button>
+            {% endif %}
+        </div>
+    {% else %}
+        <div style="background: #fff; padding: 30px; border: 1px solid #ddd; border-radius: 5px; text-align: center;">
+            <p style="font-size: 1.1rem; color: #777;">Продаж пока нет</p>
+            <a href="/products" class="btn">Перейти к товарам</a>
+        </div>
+    {% endif %}
+{% endblock %}

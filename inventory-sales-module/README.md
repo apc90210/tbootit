@@ -2,8 +2,8 @@
 
 This module serves as the primary Russian-localized UI for inventory and sales operations in the Technoreboot platform.
 
-**Stage 04D (Current):** Skeleton and Read-Only Catalog  
-*Sales are scheduled for Stage 04E, Price Tags for Stage 04F.*
+**Stage 04E (Current):** Sales UI MVP  
+*Price Tags for Stage 04F.*
 
 ## Architecture Constraint
 - Works strictly via REST HTTP calls to `core`.

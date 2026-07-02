@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Продажа #{{ sale.id }}{% endblock %}
+
+{% block content %}
+    <div style="background: #e8f5e9; padding: 20px; border: 1px solid #a5d6a7; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+        <h2 style="color: #2e7d32; margin-top: 0;">✓ Продажа оформлена</h2>
+    </div>
+
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+        <table style="margin-top: 0;">
+            <tr>
+                <th style="width: 200px;">Номер продажи</th>
+                <td>#{{ sale.id }}</td>
+            </tr>
+            <tr>
+                <th>Дата/время</th>
+                <td>{{ sale.created_at or '—' }}</td>
+            </tr>
+            <tr>
+                <th>Сумма</th>
+                <td>{{ sale.total_amount }} ₽</td>
+            </tr>
+            <tr>
+                <th>Способ оплаты</th>
+                <td>
+                    {% if sale.payment_method in payment_methods %}
+                        {{ payment_methods[sale.payment_method] }}
+                    {% else %}
+                        {{ sale.payment_method }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Статус продажи</th>
+                <td>
+                    {% if sale.status in sale_status_labels %}
+                        {{ sale_status_labels[sale.status] }}
+                    {% else %}
+                        {{ sale.status }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% if sale.comment %}
+            <tr>
+                <th>Примечание</th>
+                <td>{{ sale.comment }}</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="/products" class="btn">Вернуться к товарам</a>
+        <a href="/sales" class="btn" style="margin-left: 10px;">Все продажи</a>
+    </div>
+{% endblock %}

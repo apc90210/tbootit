@@ -8,7 +8,16 @@
     <div style="background: #fff; padding: 20px; border: 1px solid #ddd; margin-bottom: 20px;">
         <p><strong>Название:</strong> {{ product.title }}</p>
         <p><strong>Артикул:</strong> {{ product.sku or '—' }}</p>
-        <p><strong>Статус:</strong> {{ product.status }}</p>
+        <p><strong>Статус:</strong>
+            {% if product.status == 'in_stock' %}В наличии
+            {% elif product.status == 'reserved' %}В резерве
+            {% elif product.status == 'sold' %}Продан
+            {% elif product.status == 'draft' %}Черновик
+            {% elif product.status == 'in_repair' %}В ремонте
+            {% elif product.status == 'written_off' %}Списан
+            {% else %}{{ product.status }}
+            {% endif %}
+        </p>
         <p><strong>Цена:</strong> {{ product.sale_price if product.sale_price else product.price }} ₽</p>
         <p><strong>Бренд:</strong> {{ product.brand or '—' }}</p>
         <p><strong>Модель:</strong> {{ product.model or '—' }}</p>
@@ -44,7 +53,11 @@
 
     <div style="margin-top: 20px;">
         <a href="/products" class="btn">Назад к товарам</a>
-        <button class="btn" disabled title="Будет реализовано на следующем этапе">Продать</button>
-        <button class="btn" disabled title="Будет реализовано на следующем этапе">Ценник</button>
+        {% if product.status in ['in_stock', 'reserved'] %}
+            <a href="/sales/new?product_id={{ product.id }}" class="btn btn-danger" style="margin-left: 10px;">Продать</a>
+        {% else %}
+            <button class="btn" disabled title="Продажа недоступна для этого статуса" style="margin-left: 10px;">Продать</button>
+        {% endif %}
+        <button class="btn" disabled title="Будет реализовано на этапе Stage04F" style="margin-left: 10px;">Ценник</button>
     </div>
 {% endblock %}

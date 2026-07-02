@@ -45,14 +45,27 @@
                 <tr>
                     <td>{{ item.sku or '—' }}</td>
                     <td>{{ item.title }}</td>
-                    <td>{{ item.status }}</td>
+                    <td>
+                        {% if item.status == 'in_stock' %}В наличии
+                        {% elif item.status == 'reserved' %}В резерве
+                        {% elif item.status == 'sold' %}Продан
+                        {% elif item.status == 'draft' %}Черновик
+                        {% elif item.status == 'in_repair' %}В ремонте
+                        {% elif item.status == 'written_off' %}Списан
+                        {% else %}{{ item.status }}
+                        {% endif %}
+                    </td>
                     <td>{{ item.sale_price if item.sale_price else item.price }} ₽</td>
                     <td>{{ item.quantity }}</td>
                     <td>{{ item.storage_location or '—' }}</td>
                     <td>
-                        <a href="/products/{{ item.id }}" class="btn" style="background: #28a745;">Открыть</a>
-                        <button class="btn" disabled title="Будет реализовано на следующем этапе (Stage04E)">Продать</button>
-                        <button class="btn" disabled title="Будет реализовано на следующем этапе (Stage04F)">Ценник</button>
+                        <a href="/products/{{ item.id }}" class="btn btn-success">Открыть</a>
+                        {% if item.status in ['in_stock', 'reserved'] %}
+                            <a href="/sales/new?product_id={{ item.id }}" class="btn btn-danger">Продать</a>
+                        {% else %}
+                            <button class="btn" disabled title="Продажа недоступна для этого статуса">Продать</button>
+                        {% endif %}
+                        <button class="btn" disabled title="Будет реализовано на этапе Stage04F">Ценник</button>
                     </td>
                 </tr>
                 {% else %}

@@ -11,12 +11,20 @@
         header a { color: #fff; text-decoration: none; font-weight: bold; font-size: 1.2rem; }
         nav { background: #333; color: #fff; padding: 10px 20px; }
         nav a { color: #fff; text-decoration: none; margin-right: 15px; }
+        nav a:hover { text-decoration: underline; }
+        nav .nav-disabled { color: #999; cursor: not-allowed; text-decoration: none; }
         main { padding: 20px; max-width: 1200px; margin: 0 auto; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
         th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
         th { background: #f0f0f0; }
-        .btn { padding: 5px 10px; background: #005a9c; color: #fff; text-decoration: none; border-radius: 3px; border: none; cursor: pointer; display: inline-block; }
-        .btn:disabled, .btn.disabled { background: #ccc; cursor: not-allowed; }
+        .btn { padding: 5px 10px; background: #005a9c; color: #fff; text-decoration: none; border-radius: 3px; border: none; cursor: pointer; display: inline-block; font-size: 0.9rem; }
+        .btn:hover { background: #004a80; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn:disabled, .btn.disabled { background: #ccc; cursor: not-allowed; color: #666; }
+        .btn:disabled:hover, .btn.disabled:hover { background: #ccc; }
     </style>
 </head>
 <body>
@@ -24,9 +32,10 @@
         <a href="/">Техноребут — Рабочее место магазина</a>
     </header>
     <nav>
+        <a href="/">Главная</a>
         <a href="/products">Товары</a>
-        <a href="#" class="disabled" title="Будет реализовано на следующем этапе">Продажи — скоро</a>
-        <a href="#" class="disabled" title="Будет реализовано на следующем этапе">Ценники — скоро</a>
+        <a href="/sales">Продажи</a>
+        <span class="nav-disabled" title="Будет реализовано на этапе Stage04F">Ценники — скоро</span>
     </nav>
     <main>
         {% block content %}{% endblock %}

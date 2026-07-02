@@ -7,3 +7,4 @@ pydantic-settings
 pytest
 respx
 pytest-asyncio
+python-multipart

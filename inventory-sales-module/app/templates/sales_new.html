@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Новая продажа{% endblock %}
+
+{% block content %}
+    <h2>Новая продажа</h2>
+
+    {% if not can_sell %}
+    <div style="background: #fff0f0; padding: 20px; border: 1px solid #ffcccc; border-radius: 5px; margin-bottom: 20px;">
+        <p style="color: #c00; font-size: 1.1rem; font-weight: bold;">Товар нельзя продать в текущем статусе</p>
+        <p>Текущий статус:
+            <strong>
+                {% if product.status in status_labels %}
+                    {{ status_labels[product.status] }}
+                {% else %}
+                    {{ product.status }}
+                {% endif %}
+            </strong>
+        </p>
+        <a href="/products/{{ product.id }}" class="btn">Назад к товару</a>
+        <a href="/products" class="btn" style="margin-left: 10px;">К списку товаров</a>
+    </div>
+    {% else %}
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 20px;">
+        <h3>Товар</h3>
+        <table style="margin-top: 0;">
+            <tr>
+                <th>Название</th>
+                <td>{{ product.title }}</td>
+            </tr>
+            <tr>
+                <th>Артикул</th>
+                <td>{{ product.sku or '—' }}</td>
+            </tr>
+            <tr>
+                <th>Статус</th>
+                <td>
+                    {% if product.status in status_labels %}
+                        {{ status_labels[product.status] }}
+                    {% else %}
+                        {{ product.status }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Цена (каталог)</th>
+                <td>{{ product.sale_price if product.sale_price else product.price }} ₽</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+        <h3>Оформление продажи</h3>
+        <form method="POST" action="/sales/create">
+            <input type="hidden" name="product_id" value="{{ product.id }}">
+
+            <div style="margin-bottom: 15px;">
+                <label for="price"><strong>Цена продажи (₽):</strong></label><br>
+                <input type="number" id="price" name="price" step="0.01" min="0"
+                       value="{{ product.sale_price if product.sale_price else (product.price or 0) }}"
+                       required style="padding: 8px; width: 250px; font-size: 1rem;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="payment_method"><strong>Способ оплаты:</strong></label><br>
+                <select id="payment_method" name="payment_method" required
+                        style="padding: 8px; width: 260px; font-size: 1rem;">
+                    {% for key, label in payment_methods.items() %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="notes"><strong>Примечание:</strong></label><br>
+                <textarea id="notes" name="notes" rows="3"
+                          style="padding: 8px; width: 400px; font-size: 1rem;"
+                          placeholder="Необязательно..."></textarea>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-danger" style="font-size: 1.1rem; padding: 10px 25px;">
+                    Подтвердить продажу
+                </button>
+                <a href="/products/{{ product.id }}" class="btn" style="margin-left: 15px; padding: 10px 25px; font-size: 1.1rem;">
+                    Назад
+                </a>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+{% endblock %}

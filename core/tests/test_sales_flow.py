@@ -8,10 +8,13 @@ from datetime import datetime
 
 client = TestClient(app)
 
+import uuid
+
 def test_create_product_and_sale():
+    unique_suffix = str(uuid.uuid4())[:8]
     # Create product
     response = client.post("/api/products/", json={
-        "sku": "SALE-TEST-001",
+        "sku": f"SALE-TEST-001-{unique_suffix}",
         "title": "Sale Test Product",
         "sale_price": 500.0,
         "status": "in_stock"
@@ -21,7 +24,7 @@ def test_create_product_and_sale():
     
     # Create another product
     response = client.post("/api/products/", json={
-        "sku": "SALE-TEST-002",
+        "sku": f"SALE-TEST-002-{unique_suffix}",
         "title": "Sale Test Product 2",
         "sale_price": 300.0,
         "status": "draft"
