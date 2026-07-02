@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from typing import List, Optional
 from app.database import get_db
 from app import models, schemas
@@ -29,6 +29,7 @@ def get_products(
     source: Optional[str] = None,
     category_id: Optional[int] = None,
     brand: Optional[str] = None,
+    model: Optional[str] = None,
     storage_location: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
@@ -59,6 +60,8 @@ def get_products(
         query = query.filter(models.Product.category_id == category_id)
     if brand:
         query = query.filter(models.Product.brand.ilike(f"%{brand}%"))
+    if model:
+        query = query.filter(models.Product.model.ilike(f"%{model}%"))
     if storage_location:
         query = query.filter(models.Product.storage_location.ilike(f"%{storage_location}%"))
     if min_price is not None:
@@ -95,6 +98,47 @@ def get_products(
         "total": total,
         "limit": limit,
         "offset": offset
+    }
+
+@router.get("/filter-options")
+def get_product_filter_options(db: Session = Depends(get_db)):
+    brands = [{"value": b, "count": c} for b, c in db.query(models.Product.brand, func.count(models.Product.id)).filter(models.Product.brand != None, models.Product.brand != "").group_by(models.Product.brand).order_by(models.Product.brand).all()]
+    models_list = [{"value": m, "count": c} for m, c in db.query(models.Product.model, func.count(models.Product.id)).filter(models.Product.model != None, models.Product.model != "").group_by(models.Product.model).order_by(models.Product.model).all()]
+    storage_locations = [{"value": loc, "count": c} for loc, c in db.query(models.Product.storage_location, func.count(models.Product.id)).filter(models.Product.storage_location != None, models.Product.storage_location != "").group_by(models.Product.storage_location).order_by(models.Product.storage_location).all()]
+    
+    status_labels = {
+        "draft": "Черновик",
+        "in_stock": "В наличии",
+        "reserved": "Зарезервирован",
+        "sold": "Продан",
+        "in_repair": "В ремонте",
+        "for_parts": "На запчасти",
+        "written_off": "Списан",
+        "published_site": "На сайте",
+        "published_avito": "На Авито"
+    }
+    statuses = [{"value": s, "label": status_labels.get(s, s), "count": c} for s, c in db.query(models.Product.status, func.count(models.Product.id)).filter(models.Product.status != None, models.Product.status != "").group_by(models.Product.status).order_by(models.Product.status).all()]
+    
+    categories = [{"id": cid, "name": n, "count": c} for cid, n, c in db.query(models.Category.id, models.Category.name, func.count(models.Product.id)).join(models.Product, models.Category.id == models.Product.category_id).group_by(models.Category.id, models.Category.name).order_by(models.Category.name).all()]
+    
+    total_count = db.query(models.Product).count()
+    avito_ready_count = db.query(models.Product).filter(models.Product.avito_title != None, models.Product.avito_description != None).count()
+    site_ready_count = db.query(models.Product).filter(models.Product.site_title != None, models.Product.site_description != None).count()
+    
+    return {
+        "brands": brands,
+        "models": models_list,
+        "statuses": statuses,
+        "storage_locations": storage_locations,
+        "categories": categories,
+        "avito_ready": [
+            {"value": "true", "label": "Готово к Авито", "count": avito_ready_count},
+            {"value": "false", "label": "Не готово к Авито", "count": total_count - avito_ready_count}
+        ],
+        "site_ready": [
+            {"value": "true", "label": "Готово к сайту", "count": site_ready_count},
+            {"value": "false", "label": "Не готово к сайту", "count": total_count - site_ready_count}
+        ]
     }
 
 @router.get("/meta")

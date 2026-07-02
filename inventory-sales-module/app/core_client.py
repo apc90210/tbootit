@@ -25,6 +25,16 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def get_product_filter_options(self):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/products/filter-options", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
     async def get_product(self, product_id: int):
         # Fallback to get_product_details if preferred, this just gets basic info
         async with httpx.AsyncClient() as client:

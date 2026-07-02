@@ -5,24 +5,123 @@
 {% block content %}
     <h2>Список товаров</h2>
     
+    {% if filter_options_error %}
+    <div style="background: #fff3cd; color: #856404; padding: 10px; margin-bottom: 20px; border: 1px solid #ffeeba;">
+        Не удалось загрузить список фильтров. Поиск и таблица товаров доступны.
+    </div>
+    {% endif %}
+
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
-        <form method="GET" action="/products">
-            <label>Поиск:</label>
-            <input type="text" name="q" value="{{ q }}" placeholder="Название или артикул...">
+        <h3>Фильтры</h3>
+        <form method="GET" action="/products" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Поиск:</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Название или артикул...">
+            </div>
             
-            <label style="margin-left: 15px;">Статус:</label>
-            <select name="status">
-                <option value="">Все</option>
-                <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>В наличии</option>
-                <option value="reserved" {% if status == 'reserved' %}selected{% endif %}>В резерве</option>
-                <option value="sold" {% if status == 'sold' %}selected{% endif %}>Продан</option>
-                <option value="draft" {% if status == 'draft' %}selected{% endif %}>Черновик</option>
-                <option value="in_repair" {% if status == 'in_repair' %}selected{% endif %}>В ремонте</option>
-                <option value="written_off" {% if status == 'written_off' %}selected{% endif %}>Списан</option>
-            </select>
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Тип товара:</label>
+                <select name="category_id">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.categories %}
+                        {% for cat in filter_options.categories %}
+                        <option value="{{ cat.id }}" {% if category_id | string == cat.id | string %}selected{% endif %}>{{ cat.name }} ({{ cat.count }})</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Производитель:</label>
+                <select name="brand">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.brands %}
+                        {% for b in filter_options.brands %}
+                        <option value="{{ b.value }}" {% if brand == b.value %}selected{% endif %}>{{ b.value }} ({{ b.count }})</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Модель:</label>
+                <select name="model">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.models %}
+                        {% for m in filter_options.models %}
+                        <option value="{{ m.value }}" {% if model == m.value %}selected{% endif %}>{{ m.value }} ({{ m.count }})</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Наличие:</label>
+                <select name="status">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.statuses %}
+                        {% for s in filter_options.statuses %}
+                        <option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.label }} ({{ s.count }})</option>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Fallback if error -->
+                        <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>В наличии</option>
+                        <option value="reserved" {% if status == 'reserved' %}selected{% endif %}>В резерве</option>
+                        <option value="sold" {% if status == 'sold' %}selected{% endif %}>Продан</option>
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Место хранения:</label>
+                <select name="storage_location">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.storage_locations %}
+                        {% for loc in filter_options.storage_locations %}
+                        <option value="{{ loc.value }}" {% if storage_location == loc.value %}selected{% endif %}>{{ loc.value }} ({{ loc.count }})</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Готово к Авито:</label>
+                <select name="avito_ready">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.avito_ready %}
+                        {% for ar in filter_options.avito_ready %}
+                        <option value="{{ ar.value }}" {% if avito_ready == ar.value %}selected{% endif %}>{{ ar.label }} ({{ ar.count }})</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Готово к сайту:</label>
+                <select name="site_ready">
+                    <option value="">Все</option>
+                    {% if filter_options and filter_options.site_ready %}
+                        {% for sr in filter_options.site_ready %}
+                        <option value="{{ sr.value }}" {% if site_ready == sr.value %}selected{% endif %}>{{ sr.label }} ({{ sr.count }})</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 5px;">Сортировка:</label>
+                <select name="sort">
+                    <option value="">По умолчанию (Новые)</option>
+                    <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Цена: по возрастанию</option>
+                    <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Цена: по убыванию</option>
+                    <option value="created_asc" {% if sort == 'created_asc' %}selected{% endif %}>Сначала старые</option>
+                </select>
+            </div>
             
-            <button type="submit" class="btn" style="margin-left: 15px;">Фильтровать</button>
-            <a href="/products" style="margin-left: 10px;">Сбросить</a>
+            <div style="margin-left: auto;">
+                <button type="submit" class="btn btn-primary">Применить</button>
+                <a href="/products" class="btn" style="margin-left: 10px;">Сбросить фильтры</a>
+            </div>
         </form>
     </div>
 

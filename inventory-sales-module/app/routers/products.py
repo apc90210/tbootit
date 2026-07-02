@@ -24,14 +24,26 @@ async def list_products(
     request: Request,
     q: str = Query(None),
     status: str = Query(None),
+    brand: str = Query(None),
+    model: str = Query(None),
+    category_id: int = Query(None),
+    storage_location: str = Query(None),
+    avito_ready: str = Query(None),
+    site_ready: str = Query(None),
+    sort: str = Query(None),
     limit: int = Query(50),
     offset: int = Query(0)
 ):
     params = {"limit": limit, "offset": offset}
-    if q:
-        params["q"] = q
-    if status:
-        params["status"] = status
+    if q: params["q"] = q
+    if status: params["status"] = status
+    if brand: params["brand"] = brand
+    if model: params["model"] = model
+    if category_id: params["category_id"] = category_id
+    if storage_location: params["storage_location"] = storage_location
+    if avito_ready in ("true", "false", "True", "False"): params["avito_ready"] = avito_ready.lower() == "true"
+    if site_ready in ("true", "false", "True", "False"): params["site_ready"] = site_ready.lower() == "true"
+    if sort: params["sort"] = sort
         
     data = await core_client.get_products(params)
     
@@ -42,11 +54,26 @@ async def list_products(
             }
         )
         
+    filter_options_response = await core_client.get_product_filter_options()
+    filter_options_error = False
+    if filter_options_response and isinstance(filter_options_response, dict) and "error" in filter_options_response:
+        filter_options_error = True
+        filter_options_response = {}
+        
     return templates.TemplateResponse(
         request=request, name="products.html", context={
             "products_data": data,
+            "filter_options": filter_options_response,
+            "filter_options_error": filter_options_error,
             "q": q or "",
             "status": status or "",
+            "brand": brand or "",
+            "model": model or "",
+            "category_id": category_id or "",
+            "storage_location": storage_location or "",
+            "avito_ready": avito_ready or "",
+            "site_ready": site_ready or "",
+            "sort": sort or "",
             "limit": limit,
             "offset": offset
         }
