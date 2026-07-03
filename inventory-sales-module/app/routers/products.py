@@ -26,7 +26,7 @@ async def list_products(
     status: str = Query(None),
     brand: str = Query(None),
     model: str = Query(None),
-    category_id: int = Query(None),
+    category_id: str = Query(None),
     storage_location: str = Query(None),
     avito_ready: str = Query(None),
     site_ready: str = Query(None),
@@ -35,15 +35,15 @@ async def list_products(
     offset: int = Query(0)
 ):
     params = {"limit": limit, "offset": offset}
-    if q: params["q"] = q
-    if status: params["status"] = status
-    if brand: params["brand"] = brand
-    if model: params["model"] = model
-    if category_id: params["category_id"] = category_id
-    if storage_location: params["storage_location"] = storage_location
+    if q and q.strip(): params["q"] = q
+    if status and status.strip(): params["status"] = status
+    if brand and brand.strip(): params["brand"] = brand
+    if model and model.strip(): params["model"] = model
+    if category_id and category_id.strip(): params["category_id"] = int(category_id)
+    if storage_location and storage_location.strip(): params["storage_location"] = storage_location
     if avito_ready in ("true", "false", "True", "False"): params["avito_ready"] = avito_ready.lower() == "true"
     if site_ready in ("true", "false", "True", "False"): params["site_ready"] = site_ready.lower() == "true"
-    if sort: params["sort"] = sort
+    if sort and sort.strip(): params["sort"] = sort
         
     data = await core_client.get_products(params)
     

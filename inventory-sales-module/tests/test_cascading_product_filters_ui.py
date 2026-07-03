@@ -48,3 +48,33 @@ async def test_cascading_ui_selects_rendered():
          # Check if JavaScript is present
          assert 'function cascadeReset(level)' in html
          assert "form.elements['brand'].value = '';" in html
+
+@pytest.mark.asyncio
+async def test_cascading_ui_handles_blank_category_id():
+    mock_health = AsyncMock()
+    mock_health.return_value = {"core_available": True}
+    
+    mock_get_products = AsyncMock()
+    mock_get_products.return_value = {"items": [], "total": 0}
+    
+    mock_get_filter_options = AsyncMock()
+    mock_get_filter_options.return_value = {
+        "categories": [], "brands": [], "models": [], "statuses": [], "storage_locations": [],
+        "avito_ready": [], "site_ready": [],
+        "selected": {"category_id": None},
+        "order": ["categories", "brands", "models", "statuses", "storage_locations", "avito_ready", "site_ready"]
+    }
+    
+    with patch("app.routers.products.core_client.health", mock_health), \
+         patch("app.routers.products.core_client.get_products", mock_get_products), \
+         patch("app.routers.products.core_client.get_product_filter_options", mock_get_filter_options):
+         
+         # Sending empty category_id should NOT throw 422
+         response = client.get("/products?category_id=&brand=Lenovo")
+         assert response.status_code == 200
+         
+         # Should pass parsed brand and NOT empty category_id
+         passed_params = mock_get_products.call_args[0][0]
+         assert "brand" in passed_params
+         assert passed_params["brand"] == "Lenovo"
+         assert "category_id" not in passed_params
