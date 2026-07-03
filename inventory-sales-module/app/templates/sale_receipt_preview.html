@@ -201,10 +201,10 @@
         <div class="warranty" style="margin-top: 30px;">
             <p style="margin-top: 0; text-align: center; font-weight: bold;">Гарантийные условия</p>
             {% if sale.warranty_enabled %}
-                На все Б/У товары предоставляется гарантия <strong>{{ sale.warranty_days }} дней</strong>.
+                На все Б/У товары предоставляется гарантия <strong>{{ sale.warranty_days }} дней</strong>.<br>
+                {{ org_settings.warranty_text.split('\n')[1:]|join('\n')|replace('\n', '<br>') if org_settings.warranty_text else '' }}
             {% else %}
-                <span style="font-weight: bold; color: #c00;">Товар продаётся без гарантии, в том состоянии, в котором есть.</span><br>
-                Покупатель внимательно осмотрел товар при покупке.
+                <span style="font-weight: bold; color: #c00;">{{ org_settings.no_warranty_text|replace('\n', '<br>') if org_settings.no_warranty_text else 'Товар продаётся без гарантии, в том состоянии, в котором есть.<br>Покупатель внимательно осмотрел товар при покупке.'|safe }}</span>
             {% endif %}
             
             <div style="margin-top: 20px;">

@@ -335,6 +335,8 @@ class OrganizationSettingsBase(BaseModel):
     phone: str
     default_cashier_name: Optional[str] = None
     default_customer_label: Optional[str] = "Частное лицо"
+    warranty_text: Optional[str] = None
+    no_warranty_text: Optional[str] = None
 
 class OrganizationSettingsCreate(OrganizationSettingsBase):
     pass
@@ -346,6 +348,8 @@ class OrganizationSettingsUpdate(BaseModel):
     phone: Optional[str] = None
     default_cashier_name: Optional[str] = None
     default_customer_label: Optional[str] = None
+    warranty_text: Optional[str] = None
+    no_warranty_text: Optional[str] = None
 
 class OrganizationSettingsResponse(OrganizationSettingsBase):
     id: int

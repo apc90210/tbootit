@@ -70,19 +70,34 @@ def migrate_db():
                 except Exception as e:
                     print(f"Migration error on {col_name}: {e}")
 
+        # Migrate organization_settings table
+        res_org = conn.execute(text("PRAGMA table_info(organization_settings);")).fetchall()
+        org_columns = [row[1] for row in res_org]
+        org_updates = [
+            ("warranty_text", "TEXT"),
+            ("no_warranty_text", "TEXT")
+        ]
+        for col_name, col_type in org_updates:
+            if col_name not in org_columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE organization_settings ADD COLUMN {col_name} {col_type};"))
+                except Exception as e:
+                    print(f"Migration error on {col_name}: {e}")
+
         # Seed organization settings if not present
-        from app.models import OrganizationSettings
         settings_count = conn.execute(text("SELECT COUNT(*) FROM organization_settings")).scalar()
         if settings_count == 0:
             conn.execute(text("""
                 INSERT INTO organization_settings (
-                    organization_name, inn, address, phone, default_customer_label
+                    organization_name, inn, address, phone, default_customer_label, warranty_text, no_warranty_text
                 ) VALUES (
                     'ИП Атанов Павел Сергеевич',
                     '667009336901',
                     'Свердловская обл. г. Екатеринбург, ул. Кузнецова, дом 10',
                     '+7 343 344 88 95',
-                    'Частное лицо'
+                    'Частное лицо',
+                    'На все Б/У товары предоставляется гарантия 30 дней.\nГарантийный ремонт и обмен Б/У товара возможен только в случае обнаружения дефекта товара в течении 30 дней с даты продажи.\nТовар Б/У без дефектов возврату - не подлежит, возможен обмен, но только по согласованию с менеджером магазина. В случае обнаружения дефекта товара по вине покупателя обмен и возврат товара – невозможен.\nНа программное обеспечение и расходные материалы гарантия не предоставляется.\nВ случае обнаружения неисправности – товар сдается на диагностику. По согласованию с продавцом – возможна мгновенная замена товара, без проведения диагностики.',
+                    'Товар продаётся без гарантии, в том состоянии, в котором есть.\nПокупатель внимательно осмотрел товар при покупке.'
                 )
             """))
 

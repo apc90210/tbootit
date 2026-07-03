@@ -171,5 +171,7 @@ class OrganizationSettings(Base):
     phone = Column(String)
     default_cashier_name = Column(String, nullable=True)
     default_customer_label = Column(String, default="Частное лицо")
+    warranty_text = Column(Text, nullable=True)
+    no_warranty_text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

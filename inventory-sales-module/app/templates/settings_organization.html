@@ -27,6 +27,14 @@
             <label for="default_customer_label" style="display: block; font-weight: bold; margin-bottom: 5px;">Покупатель по умолчанию (для чеков)</label>
             <input type="text" id="default_customer_label" name="default_customer_label" value="{{ settings.default_customer_label if settings.default_customer_label else 'Частное лицо' }}" style="width: 100%; padding: 8px; box-sizing: border-box;">
         </div>
+        <div style="margin-bottom: 15px;">
+            <label for="warranty_text" style="display: block; font-weight: bold; margin-bottom: 5px;">Текст гарантии (по умолчанию)</label>
+            <textarea id="warranty_text" name="warranty_text" rows="5" style="width: 100%; padding: 8px; box-sizing: border-box;">{{ settings.warranty_text if settings.warranty_text else '' }}</textarea>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="no_warranty_text" style="display: block; font-weight: bold; margin-bottom: 5px;">Текст без гарантии (по умолчанию)</label>
+            <textarea id="no_warranty_text" name="no_warranty_text" rows="3" style="width: 100%; padding: 8px; box-sizing: border-box;">{{ settings.no_warranty_text if settings.no_warranty_text else '' }}</textarea>
+        </div>
         <button type="submit" class="btn btn-success">Сохранить настройки</button>
     </form>
 </div>

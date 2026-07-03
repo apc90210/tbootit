@@ -31,14 +31,18 @@ async def update_organization_settings(
     inn: str = Form(...),
     address: str = Form(...),
     phone: str = Form(...),
-    default_customer_label: str = Form("Частное лицо")
+    default_customer_label: str = Form("Частное лицо"),
+    warranty_text: str = Form(None),
+    no_warranty_text: str = Form(None)
 ):
     payload = {
         "organization_name": organization_name,
         "inn": inn,
         "address": address,
         "phone": phone,
-        "default_customer_label": default_customer_label
+        "default_customer_label": default_customer_label,
+        "warranty_text": warranty_text,
+        "no_warranty_text": no_warranty_text
     }
     
     try:
