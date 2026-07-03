@@ -9,10 +9,12 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/organization", response_class=HTMLResponse)
 async def organization_settings_page(request: Request):
     try:
+        from app.defaults import get_effective_settings
         response = await core_client.get_organization_settings()
-        settings_data = response if not response.get("error") else {}
+        settings_data = get_effective_settings(response if not response.get("error") else {})
     except Exception as e:
-        settings_data = {}
+        from app.defaults import get_effective_settings
+        settings_data = get_effective_settings({})
 
     return templates.TemplateResponse(
         request=request,

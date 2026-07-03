@@ -53,3 +53,30 @@ async def test_post_settings_organization_sends_values():
         assert called_payload["organization_name"] == "ООО"
         assert called_payload["warranty_text"] == "Text 1"
         assert called_payload["no_warranty_text"] == "Text 2"
+
+@pytest.mark.asyncio
+async def test_get_settings_organization_ui_shows_fallback_defaults():
+    mock_health = AsyncMock()
+    mock_health.return_value = {"core_available": True}
+    
+    # Return empty values to simulate blank DB row
+    mock_get_org_settings = AsyncMock()
+    mock_get_org_settings.return_value = {
+        "organization_name": "",
+        "inn": " ",
+        "address": "",
+        "phone": "",
+        "warranty_text": "",
+        "no_warranty_text": ""
+    }
+
+    with patch("app.routers.settings.core_client.health", mock_health), \
+         patch("app.routers.settings.core_client.get_organization_settings", mock_get_org_settings):
+         
+         response = client.get("/settings/organization")
+         assert response.status_code == 200
+         
+         html = response.text
+         assert 'value="ИП Атанов Павел Сергеевич"' in html
+         assert 'value="667009336901"' in html
+         assert 'На все Б/У товары предоставляется гарантия 30 дней' in html

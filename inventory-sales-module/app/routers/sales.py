@@ -90,11 +90,12 @@ async def sale_receipt(request: Request, sale_id: int):
 
     # Fetch organization settings
     try:
+        from app.defaults import get_effective_settings
         response = await core_client.get_organization_settings()
-        org_settings = response if not response.get("error") else {}
-    except:
-        org_settings = {}
-        
+        org_settings = get_effective_settings(response if not response.get("error") else {})
+    except Exception as e:
+        from app.defaults import get_effective_settings
+        org_settings = get_effective_settings({})
     # We also need the item details if we want to show product details,
     # but the sale response contains items.
     

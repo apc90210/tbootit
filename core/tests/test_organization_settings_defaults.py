@@ -62,3 +62,43 @@ def test_put_organization_settings_changes_values(client, db_session):
     get_data = get_response.json()
     assert get_data["organization_name"] == "ООО Новая Компания"
     assert get_data["warranty_text"] == "New Warranty"
+
+def test_get_organization_settings_backfills_blank_values(client, db_session):
+    # Insert a blank row
+    db_session.execute(text("DELETE FROM organization_settings"))
+    db_session.execute(text(
+        "INSERT INTO organization_settings (organization_name, inn, address, phone, warranty_text, no_warranty_text) "
+        "VALUES ('', ' ', NULL, '', '   ', '')"
+    ))
+    db_session.commit()
+    
+    response = client.get("/api/settings/organization")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Assert it was backfilled
+    assert data["organization_name"] == "ИП Атанов Павел Сергеевич"
+    assert data["inn"] == "667009336901"
+    assert "Кузнецова" in data["address"]
+    assert "343" in data["phone"]
+    assert "Гарантийный ремонт и обмен" in data["warranty_text"]
+    assert "продаётся без гарантии" in data["no_warranty_text"]
+
+def test_get_organization_settings_partial_backfill(client, db_session):
+    db_session.execute(text("DELETE FROM organization_settings"))
+    db_session.execute(text(
+        "INSERT INTO organization_settings (organization_name, inn, address, phone, warranty_text, no_warranty_text) "
+        "VALUES ('Custom Org', '123', 'Custom Address', '999', '', '')"
+    ))
+    db_session.commit()
+    
+    response = client.get("/api/settings/organization")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["organization_name"] == "Custom Org"
+    assert data["inn"] == "123"
+    assert data["address"] == "Custom Address"
+    assert data["phone"] == "999"
+    assert "Гарантийный ремонт и обмен" in data["warranty_text"]
+    assert "продаётся без гарантии" in data["no_warranty_text"]

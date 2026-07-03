@@ -123,19 +123,20 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_organization_settings(self):
+        from app.defaults import get_effective_settings
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(f"{self.base_url}/settings/organization", timeout=10.0)
+                response = await client.get(f"{self.base_url}/api/settings/organization", timeout=10.0)
                 if response.status_code == 200:
-                    return response.json()
-                return {"error": True, "status_code": response.status_code}
+                    return get_effective_settings(response.json())
+                return get_effective_settings({"error": True, "status_code": response.status_code})
             except Exception as e:
-                return {"error": True, "details": str(e)}
+                return get_effective_settings({"error": True, "details": str(e)})
 
     async def update_organization_settings(self, payload: dict):
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.put(f"{self.base_url}/settings/organization", json=payload, timeout=10.0)
+                response = await client.put(f"{self.base_url}/api/settings/organization", json=payload, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
                 return {"error": True, "status_code": response.status_code}
