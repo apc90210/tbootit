@@ -33,21 +33,25 @@ def setup_db():
     # Products
     # Laptop 1: Lenovo, ThinkPad
     p1 = models.Product(
+        sku="TEST-SKU-1", title="Lenovo ThinkPad",
         category_id=1, brand="Lenovo", model="ThinkPad", status="in_stock", 
         storage_location="A1", avito_title="t", avito_description="d", site_title="t", site_description="d"
     )
     # Laptop 2: Apple, MacBook
     p2 = models.Product(
+        sku="TEST-SKU-2", title="Apple MacBook",
         category_id=1, brand="Apple", model="MacBook", status="draft", 
         storage_location="A2", avito_title=None, avito_description=None, site_title=None, site_description=None
     )
     # Phone 1: Apple, iPhone
     p3 = models.Product(
+        sku="TEST-SKU-3", title="Apple iPhone",
         category_id=2, brand="Apple", model="iPhone", status="sold", 
         storage_location="B1", avito_title="t", avito_description="d", site_title=None, site_description=None
     )
     # Phone 2: Samsung, Galaxy
     p4 = models.Product(
+        sku="TEST-SKU-4", title="Samsung Galaxy",
         category_id=2, brand="Samsung", model="Galaxy", status="in_stock", 
         storage_location="B2", avito_title=None, avito_description=None, site_title="t", site_description="d"
     )
