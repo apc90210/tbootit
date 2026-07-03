@@ -357,3 +357,28 @@ class OrganizationSettingsResponse(OrganizationSettingsBase):
     updated_at: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+class PaymentBreakdown(BaseModel):
+    payment_method: str
+    label: str
+    amount: float
+    sales_count: int
+
+class ReportSaleItem(BaseModel):
+    id: int
+    created_at: datetime
+    total_amount: float
+    items_count: int
+    payment_method: str
+    payment_method_label: str
+    comment: Optional[str] = None
+
+class SalesReportResponse(BaseModel):
+    period: str
+    date_from: str
+    date_to: str
+    total_amount: float
+    sales_count: int
+    items_count: int
+    payment_breakdown: List[PaymentBreakdown]
+    sales: List[ReportSaleItem]

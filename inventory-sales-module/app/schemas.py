@@ -27,8 +27,10 @@ SELLABLE_STATUSES = {"in_stock", "reserved"}
 
 PAYMENT_METHODS = {
     "cash": "Наличные",
-    "card": "Карта",
+    "card": "Карта / эквайринг",
     "transfer": "Перевод",
+    "sbp": "СБП",
+    "legal_entity_account": "Счёт юрлица",
     "mixed": "Смешанная оплата",
     "other": "Другое",
 }

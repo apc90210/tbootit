@@ -180,7 +180,8 @@
             </table>
             <p style="margin-top: 15px;">
                 Всего наименований: <strong>{{ sale.get('items')|length if sale.get('items') else 0 }}</strong><br>
-                Сумма: <strong>{{ sale.total_amount }} ₽</strong>
+                Сумма: <strong>{{ sale.total_amount }} ₽</strong><br>
+                Способ поступления денег: <strong>{{ payment_methods.get(sale.payment_method, sale.payment_method or 'Не указано') }}</strong>
             </p>
         </div>
 

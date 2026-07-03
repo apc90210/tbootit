@@ -1,4 +1,5 @@
 import httpx
+from typing import Optional
 from app.config import settings
 
 class CoreClient:
@@ -137,6 +138,21 @@ class CoreClient:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(f"{self.base_url}/api/settings/organization", json=payload, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def get_sales_report(self, period: str = "today", date_from: Optional[str] = None, date_to: Optional[str] = None) -> dict:
+        params = {"period": period}
+        if date_from:
+            params["date_from"] = date_from
+        if date_to:
+            params["date_to"] = date_to
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/reports/sales", params=params, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
                 return {"error": True, "status_code": response.status_code}

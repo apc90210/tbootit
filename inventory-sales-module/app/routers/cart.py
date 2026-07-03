@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
+from app import schemas
 
 router = APIRouter(prefix="/cart", tags=["cart"])
 templates = Jinja2Templates(directory="app/templates")
@@ -24,6 +25,7 @@ async def view_cart(request: Request):
             "request": request,
             "cart": cart,
             "total_amount": total_amount,
+            "PAYMENT_METHODS": schemas.PAYMENT_METHODS,
             "active_page": "sales"
         }
     )

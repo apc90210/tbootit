@@ -10,7 +10,7 @@ from app.routers.products import log_product_event
 
 router = APIRouter()
 
-VALID_PAYMENT_METHODS = ["cash", "card", "transfer", "mixed", "other"]
+VALID_PAYMENT_METHODS = ["cash", "card", "transfer", "sbp", "legal_entity_account", "mixed", "other"]
 
 @router.get("/", response_model=schemas.SaleListResponse)
 def get_sales(

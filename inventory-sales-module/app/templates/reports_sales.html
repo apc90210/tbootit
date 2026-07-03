@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Отчёт по продажам{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h1>Отчёт по продажам</h1>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-body">
+                <form action="/reports/sales" method="get" class="row g-3 align-items-end">
+                    <div class="col-auto">
+                        <a href="/reports/sales?period=today" class="btn btn-outline-primary {% if period == 'today' %}active{% endif %}">Сегодня</a>
+                        <a href="/reports/sales?period=week" class="btn btn-outline-primary {% if period == 'week' %}active{% endif %}">Неделя</a>
+                        <a href="/reports/sales?period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">Месяц</a>
+                        <a href="/reports/sales?period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">Год</a>
+                    </div>
+                    <div class="col-auto">
+                        <label for="date_from" class="form-label">С</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from or '' }}">
+                    </div>
+                    <div class="col-auto">
+                        <label for="date_to" class="form-label">По</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to or '' }}">
+                    </div>
+                    <div class="col-auto">
+                        <input type="hidden" name="period" value="custom">
+                        <button type="submit" class="btn btn-primary">Применить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Выручка за период</h5>
+                <p class="card-text fs-3">{{ "{:,.2f}".format(report_data.total_amount).replace(',', ' ') }} ₽</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Количество продаж</h5>
+                <p class="card-text fs-3">{{ report_data.sales_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-secondary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Количество товаров</h5>
+                <p class="card-text fs-3">{{ report_data.items_count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Способы поступления денег</div>
+            <ul class="list-group list-group-flush">
+                {% for pb in report_data.payment_breakdown %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ pb.label }} ({{ pb.sales_count }})
+                    <span class="fw-bold">{{ "{:,.2f}".format(pb.amount).replace(',', ' ') }} ₽</span>
+                </li>
+                {% else %}
+                <li class="list-group-item">Нет данных</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Детализация продаж</div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Способ поступления денег</th>
+                    <th>Кол-во товаров</th>
+                    <th>Сумма</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in report_data.sales %}
+                <tr>
+                    <td>{{ sale.id }}</td>
+                    <td>{{ sale.created_at[:19].replace('T', ' ') }}</td>
+                    <td>{{ sale.payment_method_label }}</td>
+                    <td>{{ sale.items_count }}</td>
+                    <td>{{ "{:,.2f}".format(sale.total_amount).replace(',', ' ') }} ₽</td>
+                    <td>
+                        <a href="/sales/{{ sale.id }}" class="btn btn-sm btn-outline-info">Открыть</a>
+                        <a href="/sales/{{ sale.id }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">Нет продаж за выбранный период</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

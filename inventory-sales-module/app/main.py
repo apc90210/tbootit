@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
-from app.routers import health, products, sales, settings, cart
+from app.routers import health, products, sales, settings, cart, reports
 import os
 
 app = FastAPI(title="Inventory and Sales Module")
@@ -20,6 +20,7 @@ app.include_router(products.router)
 app.include_router(sales.router)
 app.include_router(settings.router)
 app.include_router(cart.router)
+app.include_router(reports.router)
 
 @app.get("/", response_class=HTMLResponse)
 async def root():

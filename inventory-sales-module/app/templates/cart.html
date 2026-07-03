@@ -62,10 +62,9 @@
         <div style="margin-bottom: 15px;">
             <label for="payment_method" style="display: block; font-weight: bold; margin-bottom: 5px;">Способ оплаты</label>
             <select name="payment_method" id="payment_method" style="width: 100%; padding: 8px;">
-                <option value="cash">Наличные</option>
-                <option value="card">Карта</option>
-                <option value="transfer">Перевод</option>
-                <option value="credit">Кредит/Рассрочка</option>
+                {% for key, label in PAYMENT_METHODS.items() %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
             </select>
         </div>
         

@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
-from app.routers import health, products, categories, customers, repairs, sales, photos, admin, product_cards
+from app.routers import health, products, categories, customers, repairs, sales, photos, admin, product_cards, reports
 
 # Ensure directories exist
 os.makedirs(settings.storage_root, exist_ok=True)
@@ -126,4 +126,5 @@ app.include_router(sales.router, prefix="/api/sales", tags=["sales"])
 app.include_router(photos.router, prefix="/api/products", tags=["photos"])
 app.include_router(product_cards.router, prefix="/api/product-cards", tags=["product-cards"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(settings_router.router, prefix="/api", tags=["settings"])
