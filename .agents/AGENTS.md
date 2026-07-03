@@ -108,5 +108,14 @@ The next agent must:
 - inspect changed files;
 - inspect last successful checkpoint;
 - continue from the last safe checkpoint;
-- avoid repeating destructive operations;
 - preserve uncommitted user/agent work unless explicitly proven safe.
+
+## Final Chat Reports
+
+At the end of a task or audit, you must provide a detailed, human-readable summary of everything that was done directly in the chat response to the user. Do not just output status codes, raw logs, or brief final statuses. The user must clearly understand:
+- What was accomplished
+- What files were modified
+- What issues were encountered (if any)
+- What the final state is
+
+This report must be well-structured and comprehensive.
