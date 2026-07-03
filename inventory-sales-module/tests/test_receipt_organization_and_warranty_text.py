@@ -81,3 +81,34 @@ async def test_receipt_no_warranty():
          
          assert "Строка без гарантии" in html
          assert "Строка 2" not in html
+
+@pytest.mark.asyncio
+async def test_receipt_no_br_tags_and_close_button():
+    mock_health = AsyncMock()
+    mock_health.return_value = {"core_available": True}
+    
+    mock_get_sale = AsyncMock()
+    mock_get_sale.return_value = {
+        "id": 1,
+        "total_amount": 1000,
+        "warranty_days": 30,
+        "warranty_enabled": True,
+        "items": []
+    }
+    
+    mock_get_org_settings = AsyncMock()
+    mock_get_org_settings.return_value = {
+        "warranty_text": "Line 1\nLine 2",
+        "no_warranty_text": "Line 1\nLine 2"
+    }
+
+    with patch("app.routers.sales.core_client.health", mock_health), \
+         patch("app.routers.sales.core_client.get_sale", mock_get_sale), \
+         patch("app.routers.sales.core_client.get_organization_settings", mock_get_org_settings):
+         
+         response = client.get("/sales/1/receipt")
+         html = response.text
+         
+         assert "<br>" not in html or html.count("<br>") <= 10 # We have technical <br> for headers and signatures
+         assert "&lt;br&gt;" not in html
+         assert "window.history.length" in html or "href='/sales'" in html

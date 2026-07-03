@@ -80,3 +80,27 @@ async def test_get_settings_organization_ui_shows_fallback_defaults():
          assert 'value="ИП Атанов Павел Сергеевич"' in html
          assert 'value="667009336901"' in html
          assert 'На все Б/У товары предоставляется гарантия 30 дней' in html
+
+@pytest.mark.asyncio
+async def test_get_settings_organization_ui_shows_normalized_texts():
+    mock_health = AsyncMock()
+    mock_health.return_value = {"core_available": True}
+    
+    mock_get_org_settings = AsyncMock()
+    mock_get_org_settings.return_value = {
+        "organization_name": "Test",
+        "warranty_text": "Line 1<br>Line 2<br />Line 3",
+        "no_warranty_text": "Line 1&lt;br&gt;Line 2"
+    }
+
+    with patch("app.routers.settings.core_client.health", mock_health), \
+         patch("app.routers.settings.core_client.get_organization_settings", mock_get_org_settings):
+         
+         response = client.get("/settings/organization")
+         assert response.status_code == 200
+         html = response.text
+         
+         assert "Line 1\nLine 2\nLine 3" in html
+         assert "Line 1\nLine 2" in html
+         assert "<br>" not in html
+         assert "&lt;br&gt;" not in html

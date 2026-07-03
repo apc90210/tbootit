@@ -202,9 +202,9 @@
             <p style="margin-top: 0; text-align: center; font-weight: bold;">Гарантийные условия</p>
             {% if sale.warranty_enabled %}
                 На все Б/У товары предоставляется гарантия <strong>{{ sale.warranty_days }} дней</strong>.<br>
-                {{ org_settings.warranty_text.split('\n')[1:]|join('\n')|replace('\n', '<br>') if org_settings.warranty_text else '' }}
+                <div class="warranty-text" style="white-space: pre-line;">{{ org_settings.warranty_text.split('\n')[1:]|join('\n') if org_settings.warranty_text else '' }}</div>
             {% else %}
-                <span style="font-weight: bold; color: #c00;">{{ org_settings.no_warranty_text|replace('\n', '<br>') if org_settings.no_warranty_text else 'Товар продаётся без гарантии, в том состоянии, в котором есть.<br>Покупатель внимательно осмотрел товар при покупке.'|safe }}</span>
+                <div class="warranty-text" style="font-weight: bold; color: #c00; white-space: pre-line;">{{ org_settings.no_warranty_text if org_settings.no_warranty_text else 'Товар продаётся без гарантии, в том состоянии, в котором есть.\nПокупатель внимательно осмотрел товар при покупке.' }}</div>
             {% endif %}
             
             <div style="margin-top: 20px;">
@@ -216,7 +216,7 @@
 
     <div class="actions">
         <button class="btn" onclick="window.print()">Печать</button>
-        <button class="btn" onclick="window.close()" style="background: #6c757d; margin-left: 10px;">Закрыть</button>
+        <button class="btn" onclick="window.history.length > 1 ? window.history.back() : window.location.href='/sales'" style="background: #6c757d; margin-left: 10px;">Закрыть</button>
     </div>
 </body>
 </html>

@@ -1,3 +1,15 @@
+import re
+
+def normalize_multiline_text(value: str | None) -> str:
+    if value is None:
+        return ""
+    text = str(value)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"(?i)&lt;\s*br\s*/?\s*&gt;", "\n", text)
+    text = re.sub(r"(?i)<\s*br\s*/?\s*>", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
 def default_organization_settings_payload() -> dict:
     return {
         "organization_name": "ИП Атанов Павел Сергеевич",

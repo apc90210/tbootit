@@ -102,3 +102,20 @@ def test_get_organization_settings_partial_backfill(client, db_session):
     assert data["phone"] == "999"
     assert "Гарантийный ремонт и обмен" in data["warranty_text"]
     assert "продаётся без гарантии" in data["no_warranty_text"]
+
+def test_put_organization_settings_normalizes_br(client, db_session):
+    payload = {
+        "organization_name": "ООО Новая Компания",
+        "inn": "1234567890",
+        "address": "г. Москва",
+        "phone": "+7 999 000 11 22",
+        "warranty_text": "First line<br>Second line<br />Third line",
+        "no_warranty_text": "No warranty &lt;br&gt; ever"
+    }
+    response = client.put("/api/settings/organization", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "First line\nSecond line\nThird line" in data["warranty_text"]
+    assert "No warranty \n ever" in data["no_warranty_text"]
+    assert "<br>" not in data["warranty_text"]
+    assert "&lt;br&gt;" not in data["no_warranty_text"]
