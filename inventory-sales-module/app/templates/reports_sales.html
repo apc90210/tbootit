@@ -38,12 +38,65 @@
     </div>
 </div>
 
+{% if error_message %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> {{ error_message }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Compact money summary table #}
+{% set ms = report_data.get('money_summary', {}) if report_data is mapping else {} %}
+{% set pl = report_data.get('payment_labels', {}) if report_data is mapping else {} %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header fw-bold">Сводка денег за период</div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0 text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th>{{ pl.get('cash', 'Наличные') }}</th>
+                            <th>{{ pl.get('card', 'Безнал / карта') }}</th>
+                            <th>{{ pl.get('transfer', 'Перевод') }}</th>
+                            <th>{{ pl.get('sbp', 'СБП') }}</th>
+                            <th>{{ pl.get('legal_entity_account', 'Счёт юрлица') }}</th>
+                            <th>{{ pl.get('other', 'Другое') }}</th>
+                            <th>{{ pl.get('unspecified', 'Не указано') }}</th>
+                            <th class="table-success fw-bold">Итого</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ "{:,.2f}".format(ms.get('cash', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format(ms.get('card', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format(ms.get('transfer', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format(ms.get('sbp', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format(ms.get('legal_entity_account', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format(ms.get('other', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format(ms.get('unspecified', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td class="table-success fw-bold">{{ "{:,.2f}".format(ms.get('total', 0)|float).replace(',', ' ') }} ₽</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card text-white bg-success mb-3">
             <div class="card-body">
                 <h5 class="card-title">Выручка за период</h5>
+                {% if report_data is mapping %}
+                <p class="card-text fs-3">{{ "{:,.2f}".format(report_data.get('total_amount', 0)|float).replace(',', ' ') }} ₽</p>
+                {% else %}
                 <p class="card-text fs-3">{{ "{:,.2f}".format(report_data.total_amount).replace(',', ' ') }} ₽</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -51,7 +104,11 @@
         <div class="card text-white bg-info mb-3">
             <div class="card-body">
                 <h5 class="card-title">Количество продаж</h5>
+                {% if report_data is mapping %}
+                <p class="card-text fs-3">{{ report_data.get('sales_count', 0) }}</p>
+                {% else %}
                 <p class="card-text fs-3">{{ report_data.sales_count }}</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -59,7 +116,11 @@
         <div class="card text-white bg-secondary mb-3">
             <div class="card-body">
                 <h5 class="card-title">Количество товаров</h5>
+                {% if report_data is mapping %}
+                <p class="card-text fs-3">{{ report_data.get('items_count', 0) }}</p>
+                {% else %}
                 <p class="card-text fs-3">{{ report_data.items_count }}</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -70,11 +131,19 @@
         <div class="card">
             <div class="card-header">Способы поступления денег</div>
             <ul class="list-group list-group-flush">
-                {% for pb in report_data.payment_breakdown %}
+                {% set breakdown = report_data.get('payment_breakdown', []) if report_data is mapping else report_data.payment_breakdown %}
+                {% for pb in breakdown %}
+                {% if pb is mapping %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ pb.get('label', pb.get('payment_method', '')) }} ({{ pb.get('sales_count', 0) }})
+                    <span class="fw-bold">{{ "{:,.2f}".format(pb.get('amount', 0)|float).replace(',', ' ') }} ₽</span>
+                </li>
+                {% else %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     {{ pb.label }} ({{ pb.sales_count }})
                     <span class="fw-bold">{{ "{:,.2f}".format(pb.amount).replace(',', ' ') }} ₽</span>
                 </li>
+                {% endif %}
                 {% else %}
                 <li class="list-group-item">Нет данных</li>
                 {% endfor %}
@@ -98,8 +167,20 @@
                 </tr>
             </thead>
             <tbody>
-                {% for sale in report_data.sales %}
+                {% set sales = report_data.get('sales', []) if report_data is mapping else report_data.sales %}
+                {% for sale in sales %}
                 <tr>
+                    {% if sale is mapping %}
+                    <td>{{ sale.get('id', '') }}</td>
+                    <td>{{ sale.get('created_at', '')[:19].replace('T', ' ') }}</td>
+                    <td>{{ sale.get('payment_method_label', sale.get('payment_method', '')) }}</td>
+                    <td>{{ sale.get('items_count', 0) }}</td>
+                    <td>{{ "{:,.2f}".format(sale.get('total_amount', 0)|float).replace(',', ' ') }} ₽</td>
+                    <td>
+                        <a href="/sales/{{ sale.get('id', '') }}" class="btn btn-sm btn-outline-info">Открыть</a>
+                        <a href="/sales/{{ sale.get('id', '') }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
+                    </td>
+                    {% else %}
                     <td>{{ sale.id }}</td>
                     <td>{{ sale.created_at[:19].replace('T', ' ') }}</td>
                     <td>{{ sale.payment_method_label }}</td>
@@ -109,6 +190,7 @@
                         <a href="/sales/{{ sale.id }}" class="btn btn-sm btn-outline-info">Открыть</a>
                         <a href="/sales/{{ sale.id }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
                     </td>
+                    {% endif %}
                 </tr>
                 {% else %}
                 <tr>

@@ -5,38 +5,119 @@ from app.main import app
 
 client = TestClient(app)
 
+# Full mock report data with money_summary and payment_labels
+MOCK_REPORT_DATA = {
+    "period": "today",
+    "date_from": "2026-07-10",
+    "date_to": "2026-07-10",
+    "total_amount": 6500.0,
+    "sales_count": 4,
+    "items_count": 7,
+    "payment_breakdown": [
+        {
+            "payment_method": "legal_entity_account",
+            "label": "Счёт юрлица",
+            "amount": 3000.0,
+            "sales_count": 1
+        },
+        {
+            "payment_method": "cash",
+            "label": "Наличные",
+            "amount": 1000.0,
+            "sales_count": 1
+        },
+        {
+            "payment_method": "card",
+            "label": "Безнал / карта",
+            "amount": 2000.0,
+            "sales_count": 1
+        },
+        {
+            "payment_method": "sbp",
+            "label": "СБП",
+            "amount": 500.0,
+            "sales_count": 1
+        }
+    ],
+    "money_summary": {
+        "cash": 1000.0,
+        "card": 2000.0,
+        "transfer": 0.0,
+        "sbp": 500.0,
+        "legal_entity_account": 3000.0,
+        "other": 0.0,
+        "unspecified": 0.0,
+        "total": 6500.0
+    },
+    "payment_labels": {
+        "cash": "Наличные",
+        "card": "Безнал / карта",
+        "transfer": "Перевод",
+        "sbp": "СБП",
+        "legal_entity_account": "Счёт юрлица",
+        "other": "Другое",
+        "unspecified": "Не указано"
+    },
+    "sales": [
+        {
+            "id": 1,
+            "created_at": "2026-07-10T10:00:00",
+            "total_amount": 3000.0,
+            "items_count": 2,
+            "payment_method": "legal_entity_account",
+            "payment_method_label": "Счёт юрлица",
+            "comment": None
+        },
+        {
+            "id": 2,
+            "created_at": "2026-07-10T11:00:00",
+            "total_amount": 1000.0,
+            "items_count": 1,
+            "payment_method": "cash",
+            "payment_method_label": "Наличные",
+            "comment": None
+        }
+    ]
+}
+
+MOCK_EMPTY_REPORT = {
+    "period": "today",
+    "date_from": "2026-07-10",
+    "date_to": "2026-07-10",
+    "total_amount": 0.0,
+    "sales_count": 0,
+    "items_count": 0,
+    "payment_breakdown": [],
+    "money_summary": {
+        "cash": 0.0,
+        "card": 0.0,
+        "transfer": 0.0,
+        "sbp": 0.0,
+        "legal_entity_account": 0.0,
+        "other": 0.0,
+        "unspecified": 0.0,
+        "total": 0.0
+    },
+    "payment_labels": {
+        "cash": "Наличные",
+        "card": "Безнал / карта",
+        "transfer": "Перевод",
+        "sbp": "СБП",
+        "legal_entity_account": "Счёт юрлица",
+        "other": "Другое",
+        "unspecified": "Не указано"
+    },
+    "sales": []
+}
+
+
+def _patch_report(mock_data):
+    return patch("app.routers.reports.core_client.get_sales_report", AsyncMock(return_value=mock_data))
+
 
 @pytest.mark.asyncio
 async def test_reports_sales_ui_renders():
-    mock_get_report = AsyncMock(return_value={
-        "period": "today",
-        "date_from": "2026-07-03",
-        "date_to": "2026-07-03",
-        "total_amount": 10000.0,
-        "sales_count": 2,
-        "items_count": 5,
-        "payment_breakdown": [
-            {
-                "payment_method": "legal_entity_account",
-                "label": "Счёт юрлица",
-                "amount": 10000.0,
-                "sales_count": 2
-            }
-        ],
-        "sales": [
-            {
-                "id": 1,
-                "created_at": "2026-07-03T10:00:00",
-                "total_amount": 10000.0,
-                "items_count": 5,
-                "payment_method": "legal_entity_account",
-                "payment_method_label": "Счёт юрлица",
-                "customer_label": None
-            }
-        ]
-    })
-
-    with patch("app.routers.reports.core_client.get_sales_report", mock_get_report):
+    with _patch_report(MOCK_REPORT_DATA):
         response = client.get("/reports/sales?period=today")
         assert response.status_code == 200
         html = response.text
@@ -51,18 +132,7 @@ async def test_reports_sales_ui_renders():
 
 def test_reports_sales_ui_period_links():
     """All quick-period links are present and point to correct URLs."""
-    mock_get_report = AsyncMock(return_value={
-        "period": "today",
-        "date_from": "2026-07-03",
-        "date_to": "2026-07-03",
-        "total_amount": 0.0,
-        "sales_count": 0,
-        "items_count": 0,
-        "payment_breakdown": [],
-        "sales": []
-    })
-
-    with patch("app.routers.reports.core_client.get_sales_report", mock_get_report):
+    with _patch_report(MOCK_EMPTY_REPORT):
         response = client.get("/reports/sales")
         assert response.status_code == 200
         html = response.text
@@ -70,3 +140,122 @@ def test_reports_sales_ui_period_links():
         assert "period=week" in html
         assert "period=month" in html
         assert "period=year" in html
+
+
+# === Stage 04G-R new tests ===
+
+def test_reports_sales_default_200():
+    """/reports/sales opens 200."""
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response = client.get("/reports/sales")
+        assert response.status_code == 200
+
+
+def test_reports_sales_today_200():
+    """/reports/sales?period=today opens 200."""
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response = client.get("/reports/sales?period=today")
+        assert response.status_code == 200
+
+
+def test_reports_sales_week_200():
+    """/reports/sales?period=week opens 200."""
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response = client.get("/reports/sales?period=week")
+        assert response.status_code == 200
+
+
+def test_reports_sales_year_200():
+    """/reports/sales?period=year opens 200."""
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response = client.get("/reports/sales?period=year")
+        assert response.status_code == 200
+
+
+def test_reports_sales_empty_dates_200():
+    """/reports/sales?date_from=&date_to= opens 200, no Internal Server Error."""
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response = client.get("/reports/sales?date_from=&date_to=")
+        assert response.status_code == 200
+        assert "Internal Server Error" not in response.text
+
+
+def test_reports_sales_custom_dates_200():
+    """/reports/sales?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD opens 200."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales?date_from=2026-07-01&date_to=2026-07-10")
+        assert response.status_code == 200
+
+
+def test_reports_sales_contains_summary_title():
+    """Page contains 'Сводка денег за период'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert response.status_code == 200
+        assert "Сводка денег за период" in response.text
+
+
+def test_reports_sales_contains_cash():
+    """Page contains 'Наличные'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "Наличные" in response.text
+
+
+def test_reports_sales_contains_card():
+    """Page contains 'Безнал / карта'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "Безнал / карта" in response.text
+
+
+def test_reports_sales_contains_transfer():
+    """Page contains 'Перевод'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "Перевод" in response.text
+
+
+def test_reports_sales_contains_sbp():
+    """Page contains 'СБП'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "СБП" in response.text
+
+
+def test_reports_sales_contains_legal_entity():
+    """Page contains 'Счёт юрлица'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "Счёт юрлица" in response.text
+
+
+def test_reports_sales_contains_total():
+    """Page contains 'Итого'."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "Итого" in response.text
+
+
+def test_summary_table_before_sales_table():
+    """Summary table is before detailed sales table in the HTML."""
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        html = response.text
+        summary_pos = html.find("Сводка денег за период")
+        detail_pos = html.find("Детализация продаж")
+        assert summary_pos != -1
+        assert detail_pos != -1
+        assert summary_pos < detail_pos
+
+
+def test_core_error_does_not_crash_template():
+    """Invalid Core response does not crash template; shows safe empty state."""
+    mock_error = AsyncMock(return_value={"error": True, "status_code": 500, "detail": "Test error"})
+    with patch("app.routers.reports.core_client.get_sales_report", mock_error):
+        response = client.get("/reports/sales")
+        assert response.status_code == 200
+        html = response.text
+        # Should still render the page, not crash
+        assert "Отчёт по продажам" in html
+        assert "Сводка денег за период" in html

@@ -10,7 +10,9 @@ router = APIRouter()
 
 PAYMENT_METHODS_LABELS = {
     "cash": "Наличные",
-    "card": "Карта / эквайринг",
+    "card": "Безнал / карта",
+    "bank_card": "Безнал / карта",
+    "acquiring": "Безнал / карта",
     "transfer": "Перевод",
     "sbp": "СБП",
     "legal_entity_account": "Счёт юрлица",
@@ -19,12 +21,66 @@ PAYMENT_METHODS_LABELS = {
     "unspecified": "Не указано"
 }
 
+# Mapping from raw payment_method to money_summary key
+PAYMENT_TO_SUMMARY_KEY = {
+    "cash": "cash",
+    "card": "card",
+    "bank_card": "card",
+    "acquiring": "card",
+    "transfer": "transfer",
+    "sbp": "sbp",
+    "legal_entity_account": "legal_entity_account",
+    "mixed": "other",
+    "other": "other",
+    "unspecified": "unspecified",
+}
+
+# Labels for money_summary keys (for the compact summary table)
+SUMMARY_LABELS = {
+    "cash": "Наличные",
+    "card": "Безнал / карта",
+    "transfer": "Перевод",
+    "sbp": "СБП",
+    "legal_entity_account": "Счёт юрлица",
+    "other": "Другое",
+    "unspecified": "Не указано",
+}
+
+
+def clean_param(value):
+    """Treat empty strings as None."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def parse_date_or_none(value):
+    """Parse a date string or return None. Raises HTTPException on invalid format."""
+    value = clean_param(value)
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Некорректная дата. Используйте формат YYYY-MM-DD")
+
+
 def get_date_range(period: str, date_from: Optional[str] = None, date_to: Optional[str] = None):
     now = datetime.now()
     today = now.date()
     
+    # Clean params
+    period = clean_param(period) or "today"
+    date_from = clean_param(date_from)
+    date_to = clean_param(date_to)
+    
     start_dt = None
     end_dt = None
+    
+    # If custom period but dates are empty, fall back to today
+    if period == "custom" and not date_from and not date_to:
+        period = "today"
     
     if period == "today":
         start_dt = datetime.combine(today, time.min)
@@ -47,19 +103,31 @@ def get_date_range(period: str, date_from: Optional[str] = None, date_to: Option
         start_dt = datetime.combine(start_of_year, time.min)
         end_dt = datetime.combine(end_of_year, time.max)
     elif period == "custom":
-        if not date_from or not date_to:
-            raise HTTPException(status_code=400, detail="date_from and date_to are required for custom period")
-        try:
-            start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-            end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-            start_dt = datetime.combine(start_date, time.min)
-            end_dt = datetime.combine(end_date, time.max)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    else:
-        raise HTTPException(status_code=400, detail="Invalid period")
+        parsed_from = parse_date_or_none(date_from)
+        parsed_to = parse_date_or_none(date_to)
         
-    return start_dt, end_dt
+        if not parsed_from and not parsed_to:
+            # Both empty — fall back to today (shouldn't reach here, caught above)
+            start_dt = datetime.combine(today, time.min)
+            end_dt = datetime.combine(today, time.max)
+        elif parsed_from and not parsed_to:
+            # Only start date — use same date as end
+            start_dt = datetime.combine(parsed_from, time.min)
+            end_dt = datetime.combine(parsed_from, time.max)
+        elif not parsed_from and parsed_to:
+            # Only end date — use same date as start
+            start_dt = datetime.combine(parsed_to, time.min)
+            end_dt = datetime.combine(parsed_to, time.max)
+        else:
+            start_dt = datetime.combine(parsed_from, time.min)
+            end_dt = datetime.combine(parsed_to, time.max)
+    else:
+        # Unknown period — fall back to today rather than 400
+        start_dt = datetime.combine(today, time.min)
+        end_dt = datetime.combine(today, time.max)
+        period = "today"
+        
+    return start_dt, end_dt, period
 
 @router.get("/sales", response_model=schemas.SalesReportResponse)
 def get_sales_report(
@@ -68,7 +136,7 @@ def get_sales_report(
     date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    start_dt, end_dt = get_date_range(period, date_from, date_to)
+    start_dt, end_dt, effective_period = get_date_range(period, date_from, date_to)
     
     sales_query = db.query(models.Sale).filter(
         models.Sale.created_at >= start_dt,
@@ -84,23 +152,43 @@ def get_sales_report(
     payment_breakdown_dict = {}
     report_sales = []
     
+    # Initialize money summary with all zeros
+    money_summary_dict = {
+        "cash": 0.0,
+        "card": 0.0,
+        "transfer": 0.0,
+        "sbp": 0.0,
+        "legal_entity_account": 0.0,
+        "other": 0.0,
+        "unspecified": 0.0,
+    }
+    
     for sale in sales_list:
         total_amount += sale.total_amount
         sale_items_count = len(sale.items)
         items_count += sale_items_count
         
-        pm = sale.payment_method if sale.payment_method else "unspecified"
-        pm_label = PAYMENT_METHODS_LABELS.get(pm, pm)
+        # Normalize payment method
+        raw_pm = sale.payment_method if sale.payment_method else "unspecified"
+        raw_pm = raw_pm.strip() if raw_pm else "unspecified"
+        if not raw_pm:
+            raw_pm = "unspecified"
         
-        if pm not in payment_breakdown_dict:
-            payment_breakdown_dict[pm] = {
-                "payment_method": pm,
+        pm_label = PAYMENT_METHODS_LABELS.get(raw_pm, PAYMENT_METHODS_LABELS.get("other", raw_pm))
+        summary_key = PAYMENT_TO_SUMMARY_KEY.get(raw_pm, "other")
+        
+        if raw_pm not in payment_breakdown_dict:
+            payment_breakdown_dict[raw_pm] = {
+                "payment_method": raw_pm,
                 "label": pm_label,
                 "amount": 0.0,
                 "sales_count": 0
             }
-        payment_breakdown_dict[pm]["amount"] += sale.total_amount
-        payment_breakdown_dict[pm]["sales_count"] += 1
+        payment_breakdown_dict[raw_pm]["amount"] += sale.total_amount
+        payment_breakdown_dict[raw_pm]["sales_count"] += 1
+        
+        # Accumulate money summary
+        money_summary_dict[summary_key] += sale.total_amount
         
         report_sales.append(
             schemas.ReportSaleItem(
@@ -108,7 +196,7 @@ def get_sales_report(
                 created_at=sale.created_at,
                 total_amount=sale.total_amount,
                 items_count=sale_items_count,
-                payment_method=pm,
+                payment_method=raw_pm,
                 payment_method_label=pm_label,
                 comment=sale.comment
             )
@@ -119,13 +207,19 @@ def get_sales_report(
     # Sort breakdown by amount descending
     payment_breakdown.sort(key=lambda x: x["amount"], reverse=True)
     
+    # Build money summary
+    money_summary_dict["total"] = total_amount
+    money_summary = schemas.MoneySummary(**money_summary_dict)
+    
     return schemas.SalesReportResponse(
-        period=period,
+        period=effective_period,
         date_from=start_dt.date().isoformat(),
         date_to=end_dt.date().isoformat(),
         total_amount=total_amount,
         sales_count=sales_count,
         items_count=items_count,
         payment_breakdown=[schemas.PaymentBreakdown(**pb) for pb in payment_breakdown],
+        money_summary=money_summary,
+        payment_labels=SUMMARY_LABELS,
         sales=report_sales
     )

@@ -8,6 +8,47 @@ router = APIRouter()
 
 templates = Jinja2Templates(directory="app/templates")
 
+
+def clean_param(value):
+    """Treat empty strings as None."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+# Default empty report data structure used when Core returns an error
+DEFAULT_REPORT_DATA = {
+    "period": "today",
+    "date_from": "",
+    "date_to": "",
+    "total_amount": 0.0,
+    "sales_count": 0,
+    "items_count": 0,
+    "payment_breakdown": [],
+    "money_summary": {
+        "cash": 0.0,
+        "card": 0.0,
+        "transfer": 0.0,
+        "sbp": 0.0,
+        "legal_entity_account": 0.0,
+        "other": 0.0,
+        "unspecified": 0.0,
+        "total": 0.0,
+    },
+    "payment_labels": {
+        "cash": "Наличные",
+        "card": "Безнал / карта",
+        "transfer": "Перевод",
+        "sbp": "СБП",
+        "legal_entity_account": "Счёт юрлица",
+        "other": "Другое",
+        "unspecified": "Не указано",
+    },
+    "sales": []
+}
+
+
 @router.get("/reports/sales", response_class=HTMLResponse)
 async def sales_report(
     request: Request,
@@ -15,7 +56,29 @@ async def sales_report(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None
 ):
+    # Sanitize parameters
+    period = clean_param(period) or "today"
+    date_from = clean_param(date_from)
+    date_to = clean_param(date_to)
+    
+    # If custom period with empty dates, fall back to today
+    if period == "custom" and not date_from and not date_to:
+        period = "today"
+    
+    error_message = None
     report_data = await core_client.get_sales_report(period=period, date_from=date_from, date_to=date_to)
+    
+    # Handle Core API errors gracefully
+    if isinstance(report_data, dict) and report_data.get("error"):
+        error_message = report_data.get("detail") or report_data.get("details") or "Ошибка получения данных от сервера"
+        report_data = dict(DEFAULT_REPORT_DATA)
+        report_data["period"] = period
+    
+    # Ensure money_summary exists even if old API version didn't return it
+    if "money_summary" not in report_data:
+        report_data["money_summary"] = dict(DEFAULT_REPORT_DATA["money_summary"])
+    if "payment_labels" not in report_data:
+        report_data["payment_labels"] = dict(DEFAULT_REPORT_DATA["payment_labels"])
     
     return templates.TemplateResponse(
         request,
@@ -23,7 +86,8 @@ async def sales_report(
         {
             "report_data": report_data,
             "period": period,
-            "date_from": date_from,
-            "date_to": date_to
+            "date_from": date_from or "",
+            "date_to": date_to or "",
+            "error_message": error_message
         }
     )

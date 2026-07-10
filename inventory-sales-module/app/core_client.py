@@ -146,17 +146,25 @@ class CoreClient:
 
     async def get_sales_report(self, period: str = "today", date_from: Optional[str] = None, date_to: Optional[str] = None) -> dict:
         params = {"period": period}
-        if date_from:
+        # Only include date params if they have actual values (not empty strings)
+        if date_from and str(date_from).strip():
             params["date_from"] = date_from
-        if date_to:
+        if date_to and str(date_to).strip():
             params["date_to"] = date_to
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(f"{self.base_url}/api/reports/sales", params=params, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
-                return {"error": True, "status_code": response.status_code}
+                # Extract error detail from Core response
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
 core_client = CoreClient()
+

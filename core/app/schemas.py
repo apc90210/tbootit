@@ -373,6 +373,16 @@ class ReportSaleItem(BaseModel):
     payment_method_label: str
     comment: Optional[str] = None
 
+class MoneySummary(BaseModel):
+    cash: float = 0.0
+    card: float = 0.0
+    transfer: float = 0.0
+    sbp: float = 0.0
+    legal_entity_account: float = 0.0
+    other: float = 0.0
+    unspecified: float = 0.0
+    total: float = 0.0
+
 class SalesReportResponse(BaseModel):
     period: str
     date_from: str
@@ -381,4 +391,6 @@ class SalesReportResponse(BaseModel):
     sales_count: int
     items_count: int
     payment_breakdown: List[PaymentBreakdown]
+    money_summary: MoneySummary = MoneySummary()
+    payment_labels: dict = {}
     sales: List[ReportSaleItem]
