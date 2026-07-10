@@ -24,6 +24,28 @@
         <p><strong>Остаток:</strong> {{ product.quantity }}</p>
         <p><strong>Место хранения:</strong> {{ product.storage_location or '—' }}</p>
         
+        <div style="margin-top: 15px; margin-bottom: 15px; background: #eef9f1; padding: 15px; border: 1px solid #c3e6cb;">
+            <h3 style="margin-top: 0;">Изменить местонахождение и остаток</h3>
+            <form action="/products/{{ product.id }}/update" method="POST" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div>
+                    <label style="display: block; margin-bottom: 5px;">Локация</label>
+                    <select name="storage_location" style="padding: 5px;">
+                        <option value="store" {% if product.storage_location == 'store' %}selected{% endif %}>Магазин</option>
+                        <option value="workshop" {% if product.storage_location == 'workshop' %}selected{% endif %}>Мастерская</option>
+                        <option value="archive" {% if product.storage_location == 'archive' %}selected{% endif %}>Архив</option>
+                        <option value="draft" {% if product.storage_location == 'draft' %}selected{% endif %}>Черновик</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 5px;">Количество</label>
+                    <input type="number" name="quantity" value="{{ product.quantity }}" min="0" style="width: 100px; padding: 5px;">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+        
         {% if product.avito_status %}
         <p><strong>Avito status:</strong> {{ product.avito_status }} 
            {% if product.avito_link %}<a href="{{ product.avito_link }}" target="_blank">Ссылка</a>{% endif %}
@@ -53,7 +75,7 @@
 
     <div style="margin-top: 20px;">
         <a href="/products" class="btn">Назад к товарам</a>
-        {% if product.status in ['in_stock', 'reserved'] %}
+        {% if product.status in ['in_stock', 'reserved'] and product.storage_location == 'store' and product.quantity > 0 %}
             <form action="/cart/add" method="post" style="display: inline; margin-left: 10px;">
                 <input type="hidden" name="product_id" value="{{ product.id }}">
                 <input type="hidden" name="title" value="{{ product.title }}">
@@ -61,7 +83,7 @@
                 <button type="submit" class="btn btn-danger">В корзину</button>
             </form>
         {% else %}
-            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса" style="margin-left: 10px;">В корзину</button>
+            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">В корзину</button>
         {% endif %}
         {% if product.status == 'in_stock' %}
             <a href="/products/{{ product.id }}/price-tag" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Печать ценника</a>

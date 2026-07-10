@@ -11,6 +11,14 @@
     </div>
     {% endif %}
 
+    <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/products?location=all" class="btn {% if location == 'all' %}btn-primary{% endif %}" style="{% if location != 'all' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Все</a>
+        <a href="/products?location=store" class="btn {% if location == 'store' %}btn-primary{% endif %}" style="{% if location != 'store' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Магазин</a>
+        <a href="/products?location=workshop" class="btn {% if location == 'workshop' %}btn-primary{% endif %}" style="{% if location != 'workshop' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Мастерская</a>
+        <a href="/products?location=archive" class="btn {% if location == 'archive' %}btn-primary{% endif %}" style="{% if location != 'archive' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Архив</a>
+        <a href="/products?location=draft" class="btn {% if location == 'draft' %}btn-primary{% endif %}" style="{% if location != 'draft' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Черновики</a>
+    </div>
+
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
         <h3>Фильтры</h3>
         <script>
@@ -173,7 +181,7 @@
                     <td>{{ item.storage_location or '—' }}</td>
                     <td>
                         <a href="/products/{{ item.id }}" class="btn btn-success">Открыть</a>
-                        {% if item.status in ['in_stock', 'reserved'] %}
+                        {% if item.status in ['in_stock', 'reserved'] and item.storage_location == 'store' and item.quantity > 0 %}
                             <form action="/cart/add" method="post" style="display: inline;">
                                 <input type="hidden" name="product_id" value="{{ item.id }}">
                                 <input type="hidden" name="title" value="{{ item.title }}">
@@ -181,7 +189,7 @@
                                 <button type="submit" class="btn btn-danger">В корзину</button>
                             </form>
                         {% else %}
-                            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса">В корзину</button>
+                            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка">В корзину</button>
                         {% endif %}
                         {% if item.status == 'in_stock' %}
                             <a href="/products/{{ item.id }}/price-tag" class="btn btn-primary" target="_blank">Печать ценника</a>

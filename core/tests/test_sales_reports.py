@@ -13,9 +13,11 @@ def create_product(suffix=None):
         "sku": f"RPT-{suffix}",
         "title": f"Report Test Product {suffix}",
         "sale_price": 1000.0,
-        "status": "in_stock"
+        "status": "in_stock",
+        "quantity": 100,
+        "storage_location": "store"
     })
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     return response.json()["id"]
 
 
@@ -26,7 +28,9 @@ def create_sale(product_id, amount, payment_method):
         "customer_label": "Test Customer",
         "items": [{"product_id": product_id, "title": "Test Item", "price": amount, "quantity": 1}]
     })
-    assert response.status_code == 200
+    if response.status_code != 200:
+        print("FAIL", response.text)
+    assert response.status_code == 200, response.text
     return response.json()
 
 
@@ -341,4 +345,25 @@ def test_reports_old_money_summary_total_is_compatible():
     assert response.status_code == 200
     data = response.json()
     assert data["money_summary"]["total"] == data["money_summary_total"]["total"]
+
+
+def test_reports_exclude_canceled_and_superseded():
+    """Reports exclude sales with status 'canceled' or 'superseded'."""
+    p1 = create_product()
+    sale = create_sale(p1, 500.0, "cash")
+    
+    # Check it's in the report
+    resp1 = client.get("/api/reports/sales?period=today")
+    assert resp1.status_code == 200
+    assert any(s["id"] == sale["id"] for s in resp1.json()["sales"])
+    
+    # Cancel the sale
+    resp_cancel = client.post(f"/api/sales/{sale['id']}/cancel", json={"reason": "test cancel"})
+    assert resp_cancel.status_code == 200
+    
+    # Check it's no longer in the report
+    resp2 = client.get("/api/reports/sales?period=today")
+    assert resp2.status_code == 200
+    assert not any(s["id"] == sale["id"] for s in resp2.json()["sales"])
+
 

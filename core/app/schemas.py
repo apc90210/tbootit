@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -31,7 +31,7 @@ class ProductBase(BaseModel):
     purchase_price: Optional[float] = None
     sale_price: Optional[float] = None
     status: Optional[str] = "draft"
-    storage_location: Optional[str] = None
+    storage_location: Optional[str] = "store"
     quantity: Optional[int] = 0
     reserved_quantity: Optional[int] = 0
     min_price: Optional[float] = None
@@ -54,6 +54,10 @@ class ProductBase(BaseModel):
     source_json: Optional[str] = None
     source_type: Optional[str] = None
     last_imported_at: Optional[datetime] = None
+    
+    @field_validator("storage_location", mode="before")
+    def set_default_location(cls, v):
+        return v if v else "store"
 
 class ProductCreate(ProductBase):
     pass
@@ -188,10 +192,17 @@ class Sale(SaleBase):
     status: str
     cancelled_at: Optional[datetime] = None
     cancel_reason: Optional[str] = None
+    original_sale_id: Optional[int] = None
+    replaced_by_sale_id: Optional[int] = None
     created_at: Optional[datetime] = None
     items: List[SaleItem] = []
     class Config:
         from_attributes = True
+
+class SaleReissue(BaseModel):
+    reason: str
+    payment_method: Optional[str] = "cash"
+    items: List[SaleItemCreate]
 
 class SaleListResponse(BaseModel):
     items: List[Sale]

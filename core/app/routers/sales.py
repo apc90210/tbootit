@@ -82,6 +82,10 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         if db_product.status not in ["in_stock", "reserved"]:
             raise HTTPException(status_code=400, detail=f"Cannot sell product {item.product_id} in status '{db_product.status}'")
+        if db_product.storage_location != "store":
+            raise HTTPException(status_code=400, detail=f"Product {item.product_id} must be in 'store' location to be sold")
+        if (db_product.quantity or 0) < item.quantity:
+            raise HTTPException(status_code=400, detail=f"Insufficient quantity for product {item.product_id}. Available: {db_product.quantity or 0}")
 
     sale_data = sale.model_dump()
     items_data = sale_data.pop("items")
@@ -99,9 +103,24 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
         
         db_product = db.query(models.Product).filter(models.Product.id == item["product_id"]).first()
         old_status = db_product.status
-        db_product.status = "sold"
+        old_quantity = db_product.quantity or 0
+        db_product.quantity = old_quantity - item["quantity"]
         
-        log_product_event(db, db_product.id, "sale_completed", old_value={"status": old_status}, new_value={"status": "sold"}, comment=f"Sold in sale {db_sale.id}. Price: {item['price']}")
+        mov = models.StockMovement(
+            product_id=db_product.id,
+            movement_type="sale",
+            quantity_delta=-item["quantity"],
+            old_quantity=old_quantity,
+            new_quantity=db_product.quantity,
+            reason="sale",
+            comment=f"Sale {db_sale.id}"
+        )
+        db.add(mov)
+
+        if db_product.quantity == 0:
+            db_product.status = "sold"
+        
+        log_product_event(db, db_product.id, "sale_completed", old_value={"status": old_status, "quantity": old_quantity}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Sold {item['quantity']} items in sale {db_sale.id}. Price: {item['price']}")
 
     db.commit()
     db.refresh(db_sale)
@@ -123,21 +142,131 @@ def cancel_sale(sale_id: int, cancel_data: schemas.SaleCancel, db: Session = Dep
     db_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
     if not db_sale:
         raise HTTPException(status_code=404, detail="Sale not found")
-    if db_sale.status == "cancelled":
-        raise HTTPException(status_code=400, detail="Sale is already cancelled")
+    if db_sale.status in ["canceled", "cancelled", "superseded"]:
+        raise HTTPException(status_code=400, detail=f"Sale cannot be canceled (status: {db_sale.status})")
         
-    db_sale.status = "cancelled"
+    db_sale.status = "canceled"
     db_sale.cancelled_at = datetime.utcnow()
     db_sale.cancel_reason = cancel_data.reason
     
     sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
     for item in sale_items:
         db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-        if db_product and db_product.status == "sold":
-            db_product.status = "in_stock"
-            log_product_event(db, db_product.id, "sale_cancelled", old_value={"status": "sold"}, new_value={"status": "in_stock"}, comment=f"Sale {sale_id} cancelled: {cancel_data.reason}")
+        if db_product:
+            old_quantity = db_product.quantity or 0
+            db_product.quantity = old_quantity + item.quantity
             
-    log_audit(db, "sale", db_sale.id, "cancel", new_value={"status": "cancelled", "reason": cancel_data.reason})
+            mov = models.StockMovement(
+                product_id=db_product.id,
+                movement_type="sale_cancel",
+                quantity_delta=item.quantity,
+                old_quantity=old_quantity,
+                new_quantity=db_product.quantity,
+                reason="sale_cancel",
+                comment=f"Sale {db_sale.id} canceled"
+            )
+            db.add(mov)
+
+            old_status = db_product.status
+            if db_product.status == "sold" and db_product.quantity > 0:
+                db_product.status = "in_stock"
+                
+            log_product_event(db, db_product.id, "sale_canceled", old_value={"status": old_status, "quantity": old_quantity}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Sale {sale_id} canceled: {cancel_data.reason}")
+            
+    log_audit(db, "sale", db_sale.id, "cancel", new_value={"status": "canceled", "reason": cancel_data.reason})
     db.commit()
     db.refresh(db_sale)
     return db_sale
+
+@router.post("/{sale_id}/reissue", response_model=schemas.Sale)
+def reissue_sale(sale_id: int, reissue_data: schemas.SaleReissue, db: Session = Depends(get_db)):
+    db_old_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not db_old_sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    if db_old_sale.status != "completed" and db_old_sale.status is not None:
+        raise HTTPException(status_code=400, detail="Only completed sales can be reissued")
+        
+    if reissue_data.payment_method not in VALID_PAYMENT_METHODS:
+        raise HTTPException(status_code=400, detail=f"Invalid payment method. Allowed: {', '.join(VALID_PAYMENT_METHODS)}")
+    
+    old_sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
+    for item in old_sale_items:
+        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        if db_product:
+            old_q = db_product.quantity or 0
+            db_product.quantity = old_q + item.quantity
+            
+            mov = models.StockMovement(
+                product_id=db_product.id,
+                movement_type="sale_reissue_return",
+                quantity_delta=item.quantity,
+                old_quantity=old_q,
+                new_quantity=db_product.quantity,
+                reason="sale_reissue_return",
+                comment=f"Stock return for sale {sale_id} reissue"
+            )
+            db.add(mov)
+            
+            old_s = db_product.status
+            if db_product.status == "sold" and db_product.quantity > 0:
+                db_product.status = "in_stock"
+            log_product_event(db, db_product.id, "sale_reissue_return", old_value={"status": old_s, "quantity": old_q}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Returned from sale {sale_id}")
+
+    db_old_sale.status = "superseded"
+    db_old_sale.cancelled_at = datetime.utcnow()
+    db_old_sale.cancel_reason = reissue_data.reason
+
+    total_amount = sum(item.price * item.quantity for item in reissue_data.items)
+    
+    for item in reissue_data.items:
+        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        if not db_product:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+        if (db_product.quantity or 0) < item.quantity:
+            raise HTTPException(status_code=400, detail=f"Insufficient quantity for product {item.product_id}. Available: {db_product.quantity}")
+
+    new_sale = models.Sale(
+        customer_id=db_old_sale.customer_id,
+        total_amount=total_amount,
+        payment_method=reissue_data.payment_method,
+        comment=db_old_sale.comment,
+        status="completed",
+        warranty_days=db_old_sale.warranty_days,
+        warranty_enabled=db_old_sale.warranty_enabled,
+        original_sale_id=sale_id
+    )
+    db.add(new_sale)
+    db.commit()
+    db.refresh(new_sale)
+    
+    db_old_sale.replaced_by_sale_id = new_sale.id
+    
+    for item in reissue_data.items:
+        db_item = models.SaleItem(**item.model_dump(), sale_id=new_sale.id)
+        db.add(db_item)
+        
+        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        old_q = db_product.quantity or 0
+        db_product.quantity = old_q - item.quantity
+        
+        mov = models.StockMovement(
+            product_id=db_product.id,
+            movement_type="sale_reissue_deduct",
+            quantity_delta=-item.quantity,
+            old_quantity=old_q,
+            new_quantity=db_product.quantity,
+            reason="sale_reissue_deduct",
+            comment=f"Stock deduct for sale {new_sale.id} reissue"
+        )
+        db.add(mov)
+        
+        old_s = db_product.status
+        if db_product.quantity == 0:
+            db_product.status = "sold"
+            
+        log_product_event(db, db_product.id, "sale_reissue_deduct", old_value={"status": old_s, "quantity": old_q}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Deducted for sale {new_sale.id}")
+
+    log_audit(db, "sale", db_old_sale.id, "reissue", old_value={"status": "completed"}, new_value={"status": "superseded", "replaced_by_sale_id": new_sale.id})
+    db.commit()
+    db.refresh(new_sale)
+    return new_sale

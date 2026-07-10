@@ -15,7 +15,8 @@ def test_create_sale_warranty_fields():
     
     # Status to in_stock
     client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
-    
+    client.patch(f"/api/products/{pid}", json={"quantity": 10, "storage_location": "store"})
+
     # Sell it
     sale_data = {
         "total_amount": 1000,
@@ -52,7 +53,8 @@ def test_create_sale_no_warranty():
     pid = import_resp.json()["product_id"]
     
     client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
-    
+    client.patch(f"/api/products/{pid}", json={"quantity": 10, "storage_location": "store"})
+
     sale_data = {
         "total_amount": 1000,
         "payment_method": "cash",
@@ -68,6 +70,6 @@ def test_create_sale_no_warranty():
         ]
     }
     sale_resp = client.post("/api/sales/", json=sale_data)
-    assert sale_resp.status_code == 200
+    assert sale_resp.status_code == 200, sale_resp.text
     assert sale_resp.json()["warranty_days"] is None
     assert sale_resp.json()["warranty_enabled"] == False

@@ -81,4 +81,23 @@
         <a href="/products" class="btn">Вернуться к товарам</a>
         <a href="/sales" class="btn" style="margin-left: 10px;">Все продажи</a>
     </div>
+
+    {% if sale.status == 'completed' %}
+    <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div style="background: #fff; padding: 20px; border: 1px solid #f5c6cb; border-radius: 5px; flex: 1; min-width: 300px;">
+            <h3 style="color: #721c24; margin-top: 0;">Отменить продажу</h3>
+            <p>Отмена вернет товары на склад.</p>
+            <form action="/sales/{{ sale.id }}/cancel" method="POST">
+                <input type="text" name="reason" placeholder="Причина отмены" required style="width: 100%; margin-bottom: 10px; padding: 5px; box-sizing: border-box;">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите отменить эту продажу?');">Отменить продажу</button>
+            </form>
+        </div>
+        <div style="background: #fff; padding: 20px; border: 1px solid #ffeeba; border-radius: 5px; flex: 1; min-width: 300px;">
+            <h3 style="color: #856404; margin-top: 0;">Переоформить продажу</h3>
+            <p>Старая продажа будет отменена, и создана новая.</p>
+            <a href="/sales/{{ sale.id }}/reissue" class="btn" style="background: #ffc107; color: #212529; border: 1px solid #d39e00;">Переоформить</a>
+        </div>
+    </div>
+    {% endif %}
 {% endblock %}

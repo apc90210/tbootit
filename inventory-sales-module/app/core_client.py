@@ -61,6 +61,16 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def update_product(self, product_id: int, payload: dict):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.patch(f"{self.base_url}/api/products/{product_id}", json=payload, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
     # --- Sales methods (Stage 04E) ---
 
     async def create_sale(self, payload: dict):
@@ -120,6 +130,32 @@ class CoreClient:
                 if response.status_code == 200:
                     return response.json()
                 return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def cancel_sale(self, sale_id: int, reason: str):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/sales/{sale_id}/cancel", json={"reason": reason}, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                err = response.text
+                try: err = response.json().get("detail", err)
+                except: pass
+                return {"error": True, "status_code": response.status_code, "detail": err}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def reissue_sale(self, sale_id: int, payload: dict):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/sales/{sale_id}/reissue", json=payload, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                err = response.text
+                try: err = response.json().get("detail", err)
+                except: pass
+                return {"error": True, "status_code": response.status_code, "detail": err}
             except Exception as e:
                 return {"error": True, "details": str(e)}
 

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Request, Query
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Request, Query, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
 import os
@@ -22,6 +22,7 @@ async def index(request: Request):
 @router.get("/products", response_class=HTMLResponse)
 async def list_products(
     request: Request,
+    location: str = Query(None),
     q: str = Query(None),
     status: str = Query(None),
     brand: str = Query(None),
@@ -40,7 +41,8 @@ async def list_products(
     if brand and brand.strip(): params["brand"] = brand
     if model and model.strip(): params["model"] = model
     if category_id and category_id.strip(): params["category_id"] = int(category_id)
-    if storage_location and storage_location.strip(): params["storage_location"] = storage_location
+    if location and location.strip() and location != "all": params["storage_location"] = location
+    elif storage_location and storage_location.strip(): params["storage_location"] = storage_location
     if avito_ready in ("true", "false", "True", "False"): params["avito_ready"] = avito_ready.lower() == "true"
     if site_ready in ("true", "false", "True", "False"): params["site_ready"] = site_ready.lower() == "true"
     if sort and sort.strip(): params["sort"] = sort
@@ -70,6 +72,7 @@ async def list_products(
             "brand": brand or "",
             "model": model or "",
             "category_id": category_id or "",
+            "location": location or "all",
             "storage_location": storage_location or "",
             "avito_ready": avito_ready or "",
             "site_ready": site_ready or "",
@@ -101,6 +104,21 @@ async def product_detail(request: Request, product_id: int):
             "product": data
         }
     )
+
+@router.post("/products/{product_id}/update")
+async def update_product_endpoint(request: Request, product_id: int, storage_location: str = Form(None), quantity: int = Form(None)):
+    payload = {}
+    if storage_location is not None:
+        payload["storage_location"] = storage_location
+    if quantity is not None:
+        payload["quantity"] = quantity
+        
+    res = await core_client.update_product(product_id, payload)
+    if res and isinstance(res, dict) and "error" in res:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Ошибка обновления товара"}
+        )
+    return RedirectResponse(url=f"/products/{product_id}", status_code=303)
 
 @router.get("/products/{product_id}/price-tag", response_class=HTMLResponse)
 async def price_tag_preview(request: Request, product_id: int):

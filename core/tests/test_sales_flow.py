@@ -14,20 +14,24 @@ def test_create_product_and_sale():
     unique_suffix = str(uuid.uuid4())[:8]
     # Create product
     response = client.post("/api/products/", json={
-        "sku": f"SALE-TEST-001-{unique_suffix}",
-        "title": "Sale Test Product",
-        "sale_price": 500.0,
-        "status": "in_stock"
+        "sku": f"SALE-FLOW-{uuid.uuid4().hex[:8]}",
+        "title": "Sale Flow Product",
+        "sale_price": 5000.0,
+        "status": "in_stock",
+        "quantity": 1,
+        "storage_location": "store"
     })
     assert response.status_code == 200
     p1_id = response.json()["id"]
     
     # Create another product
     response = client.post("/api/products/", json={
-        "sku": f"SALE-TEST-002-{unique_suffix}",
-        "title": "Sale Test Product 2",
-        "sale_price": 300.0,
-        "status": "draft"
+        "sku": f"SALE-INVALID-{uuid.uuid4().hex[:8]}",
+        "title": "Sale Flow Product 2",
+        "sale_price": 1000.0,
+        "status": "draft",
+        "quantity": 10,
+        "storage_location": "store"
     })
     p2_id = response.json()["id"]
 
@@ -73,7 +77,7 @@ def test_create_product_and_sale():
     # Test cancel sale
     response = client.post(f"/api/sales/{sale_id}/cancel", json={"reason": "Customer changed mind"})
     assert response.status_code == 200
-    assert response.json()["status"] == "cancelled"
+    assert response.json()["status"] == "canceled"
     
     # Verify product is in_stock
     response = client.get(f"/api/products/{p1_id}")
@@ -82,7 +86,7 @@ def test_create_product_and_sale():
     # Verify event created
     response = client.get(f"/api/products/{p1_id}/details")
     events = response.json()["events"]
-    assert any(e["event_type"] == "sale_cancelled" for e in events)
+    assert any(e["event_type"] == "sale_canceled" for e in events)
 
 def test_invalid_payment_method():
     response = client.post("/api/sales/", json={
