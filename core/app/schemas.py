@@ -383,6 +383,10 @@ class MoneySummary(BaseModel):
     unspecified: float = 0.0
     total: float = 0.0
 
+class MoneySummaryRow(MoneySummary):
+    period_key: str
+    label: str
+
 class SalesReportResponse(BaseModel):
     period: str
     date_from: str
@@ -392,5 +396,8 @@ class SalesReportResponse(BaseModel):
     items_count: int
     payment_breakdown: List[PaymentBreakdown]
     money_summary: MoneySummary = MoneySummary()
+    money_summary_rows: List[MoneySummaryRow] = []
+    money_summary_total: MoneySummary = MoneySummary()
+    money_summary_granularity: str = "day"
     payment_labels: dict = {}
     sales: List[ReportSaleItem]

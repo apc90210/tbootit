@@ -39,6 +39,31 @@ MOCK_REPORT_DATA = {
             "sales_count": 1
         }
     ],
+    "money_summary_rows": [
+        {
+            "period_key": "2026-07-10",
+            "label": "10.07.2026",
+            "cash": 1000.0,
+            "card": 2000.0,
+            "transfer": 0.0,
+            "sbp": 500.0,
+            "legal_entity_account": 3000.0,
+            "other": 0.0,
+            "unspecified": 0.0,
+            "total": 6500.0
+        }
+    ],
+    "money_summary_total": {
+        "cash": 1000.0,
+        "card": 2000.0,
+        "transfer": 0.0,
+        "sbp": 500.0,
+        "legal_entity_account": 3000.0,
+        "other": 0.0,
+        "unspecified": 0.0,
+        "total": 6500.0
+    },
+    "money_summary_granularity": "day",
     "money_summary": {
         "cash": 1000.0,
         "card": 2000.0,
@@ -88,6 +113,18 @@ MOCK_EMPTY_REPORT = {
     "sales_count": 0,
     "items_count": 0,
     "payment_breakdown": [],
+    "money_summary_rows": [],
+    "money_summary_total": {
+        "cash": 0.0,
+        "card": 0.0,
+        "transfer": 0.0,
+        "sbp": 0.0,
+        "legal_entity_account": 0.0,
+        "other": 0.0,
+        "unspecified": 0.0,
+        "total": 0.0
+    },
+    "money_summary_granularity": "day",
     "money_summary": {
         "cash": 0.0,
         "card": 0.0,
@@ -141,8 +178,6 @@ def test_reports_sales_ui_period_links():
         assert "period=month" in html
         assert "period=year" in html
 
-
-# === Stage 04G-R new tests ===
 
 def test_reports_sales_default_200():
     """/reports/sales opens 200."""
@@ -259,3 +294,65 @@ def test_core_error_does_not_crash_template():
         # Should still render the page, not crash
         assert "Отчёт по продажам" in html
         assert "Сводка денег за период" in html
+
+
+# === Stage 04G-S new tests ===
+
+def test_reports_today_renders_at_least_one_row():
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales?period=today")
+        assert response.status_code == 200
+        # Check for row label '10.07.2026'
+        assert "10.07.2026" in response.text
+
+
+def test_reports_week_renders_multiple_rows():
+    mock_data = MOCK_REPORT_DATA.copy()
+    mock_data["period"] = "week"
+    mock_data["money_summary_rows"] = [{"label": f"day{i}", "cash": 0, "card": 0, "transfer": 0, "sbp": 0, "legal_entity_account": 0, "other": 0, "unspecified": 0, "total": 0} for i in range(7)]
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=week")
+        assert response.status_code == 200
+        for i in range(7):
+            assert f"day{i}" in response.text
+
+
+def test_reports_month_renders_multiple_rows():
+    mock_data = MOCK_REPORT_DATA.copy()
+    mock_data["period"] = "month"
+    mock_data["money_summary_rows"] = [{"label": f"mday{i}", "cash": 0, "card": 0, "transfer": 0, "sbp": 0, "legal_entity_account": 0, "other": 0, "unspecified": 0, "total": 0} for i in range(28)]
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=month")
+        assert response.status_code == 200
+        for i in range(28):
+            assert f"mday{i}" in response.text
+
+
+def test_reports_year_renders_multiple_rows():
+    mock_data = MOCK_REPORT_DATA.copy()
+    mock_data["period"] = "year"
+    mock_data["money_summary_rows"] = [{"label": f"month{i}", "cash": 0, "card": 0, "transfer": 0, "sbp": 0, "legal_entity_account": 0, "other": 0, "unspecified": 0, "total": 0} for i in range(12)]
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=year")
+        assert response.status_code == 200
+        for i in range(12):
+            assert f"month{i}" in response.text
+
+
+def test_reports_table_contains_columns():
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        text = response.text
+        assert "Дата / Период" in text
+        assert "Наличные" in text
+        assert "Безнал / карта" in text
+        assert "Перевод" in text
+        assert "СБП" in text
+        assert "Счёт юрлица" in text
+        assert "Итого" in text
+
+
+def test_reports_table_contains_itogo_za_period():
+    with _patch_report(MOCK_REPORT_DATA):
+        response = client.get("/reports/sales")
+        assert "Итого за период" in response.text

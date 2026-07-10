@@ -163,6 +163,56 @@ def get_sales_report(
         "unspecified": 0.0,
     }
     
+    granularity = "month" if effective_period == "year" else "day"
+    rows_dict = {}
+    
+    if granularity == "day":
+        current_dt = start_dt.date()
+        end_date = end_dt.date()
+        while current_dt <= end_date:
+            key = current_dt.isoformat()
+            label = current_dt.strftime("%d.%m.%Y")
+            rows_dict[key] = {
+                "period_key": key,
+                "label": label,
+                "cash": 0.0,
+                "card": 0.0,
+                "transfer": 0.0,
+                "sbp": 0.0,
+                "legal_entity_account": 0.0,
+                "other": 0.0,
+                "unspecified": 0.0,
+                "total": 0.0
+            }
+            current_dt += timedelta(days=1)
+    else:
+        current_dt = start_dt.date().replace(day=1)
+        end_date = end_dt.date().replace(day=1)
+        month_names = {
+            1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
+            5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
+            9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
+        }
+        while current_dt <= end_date:
+            key = current_dt.strftime("%Y-%m")
+            label = f"{month_names[current_dt.month]} {current_dt.year}"
+            rows_dict[key] = {
+                "period_key": key,
+                "label": label,
+                "cash": 0.0,
+                "card": 0.0,
+                "transfer": 0.0,
+                "sbp": 0.0,
+                "legal_entity_account": 0.0,
+                "other": 0.0,
+                "unspecified": 0.0,
+                "total": 0.0
+            }
+            if current_dt.month == 12:
+                current_dt = current_dt.replace(year=current_dt.year + 1, month=1)
+            else:
+                current_dt = current_dt.replace(month=current_dt.month + 1)
+    
     for sale in sales_list:
         total_amount += sale.total_amount
         sale_items_count = len(sale.items)
@@ -190,6 +240,12 @@ def get_sales_report(
         # Accumulate money summary
         money_summary_dict[summary_key] += sale.total_amount
         
+        # Accumulate to row
+        row_key = sale.created_at.date().isoformat() if granularity == "day" else sale.created_at.strftime("%Y-%m")
+        if row_key in rows_dict:
+            rows_dict[row_key][summary_key] += sale.total_amount
+            rows_dict[row_key]["total"] += sale.total_amount
+        
         report_sales.append(
             schemas.ReportSaleItem(
                 id=sale.id,
@@ -209,7 +265,9 @@ def get_sales_report(
     
     # Build money summary
     money_summary_dict["total"] = total_amount
-    money_summary = schemas.MoneySummary(**money_summary_dict)
+    money_summary_total = schemas.MoneySummary(**money_summary_dict)
+    
+    money_summary_rows = [schemas.MoneySummaryRow(**row) for row in rows_dict.values()]
     
     return schemas.SalesReportResponse(
         period=effective_period,
@@ -219,7 +277,10 @@ def get_sales_report(
         sales_count=sales_count,
         items_count=items_count,
         payment_breakdown=[schemas.PaymentBreakdown(**pb) for pb in payment_breakdown],
-        money_summary=money_summary,
+        money_summary=money_summary_total,
+        money_summary_rows=money_summary_rows,
+        money_summary_total=money_summary_total,
+        money_summary_granularity=granularity,
         payment_labels=SUMMARY_LABELS,
         sales=report_sales
     )

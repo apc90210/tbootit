@@ -49,36 +49,64 @@
 {% endif %}
 
 {# Compact money summary table #}
-{% set ms = report_data.get('money_summary', {}) if report_data is mapping else {} %}
-{% set pl = report_data.get('payment_labels', {}) if report_data is mapping else {} %}
+{% set ms = report_data.get('money_summary_total', report_data.get('money_summary', {})) if report_data is mapping else getattr(report_data, 'money_summary_total', getattr(report_data, 'money_summary', {})) %}
+{% set rows = report_data.get('money_summary_rows', []) if report_data is mapping else getattr(report_data, 'money_summary_rows', []) %}
+{% set pl = report_data.get('payment_labels', {}) if report_data is mapping else getattr(report_data, 'payment_labels', {}) %}
 <div class="row mb-4">
     <div class="col">
         <div class="card">
-            <div class="card-header fw-bold">Сводка денег за период</div>
+            <div class="card-header fw-bold">
+                Сводка денег за период
+                <span class="text-muted fw-normal ms-2" style="font-size: 0.9em;">
+                {% if period == 'today' %}Сегодня: по дням
+                {% elif period == 'week' %}Неделя: по дням
+                {% elif period == 'month' %}Месяц: по дням
+                {% elif period == 'year' %}Год: по месяцам
+                {% else %}Произвольный период: по дням
+                {% endif %}
+                </span>
+            </div>
             <div class="table-responsive">
-                <table class="table table-bordered table-sm mb-0 text-center">
+                <table class="table table-bordered table-sm mb-0 text-center table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th>{{ pl.get('cash', 'Наличные') }}</th>
-                            <th>{{ pl.get('card', 'Безнал / карта') }}</th>
-                            <th>{{ pl.get('transfer', 'Перевод') }}</th>
-                            <th>{{ pl.get('sbp', 'СБП') }}</th>
-                            <th>{{ pl.get('legal_entity_account', 'Счёт юрлица') }}</th>
-                            <th>{{ pl.get('other', 'Другое') }}</th>
-                            <th>{{ pl.get('unspecified', 'Не указано') }}</th>
+                            <th>Дата / Период</th>
+                            <th>{{ pl.get('cash', 'Наличные') if pl is mapping else pl.cash | default('Наличные', true) }}</th>
+                            <th>{{ pl.get('card', 'Безнал / карта') if pl is mapping else pl.card | default('Безнал / карта', true) }}</th>
+                            <th>{{ pl.get('transfer', 'Перевод') if pl is mapping else pl.transfer | default('Перевод', true) }}</th>
+                            <th>{{ pl.get('sbp', 'СБП') if pl is mapping else pl.sbp | default('СБП', true) }}</th>
+                            <th>{{ pl.get('legal_entity_account', 'Счёт юрлица') if pl is mapping else pl.legal_entity_account | default('Счёт юрлица', true) }}</th>
+                            <th>{{ pl.get('other', 'Другое') if pl is mapping else pl.other | default('Другое', true) }}</th>
+                            <th>{{ pl.get('unspecified', 'Не указано') if pl is mapping else pl.unspecified | default('Не указано', true) }}</th>
                             <th class="table-success fw-bold">Итого</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {% for row in rows %}
                         <tr>
-                            <td>{{ "{:,.2f}".format(ms.get('cash', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td>{{ "{:,.2f}".format(ms.get('card', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td>{{ "{:,.2f}".format(ms.get('transfer', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td>{{ "{:,.2f}".format(ms.get('sbp', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td>{{ "{:,.2f}".format(ms.get('legal_entity_account', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td>{{ "{:,.2f}".format(ms.get('other', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td>{{ "{:,.2f}".format(ms.get('unspecified', 0)|float).replace(',', ' ') }} ₽</td>
-                            <td class="table-success fw-bold">{{ "{:,.2f}".format(ms.get('total', 0)|float).replace(',', ' ') }} ₽</td>
+                            <td class="text-start">{{ row.get('label', '') if row is mapping else row.label }}</td>
+                            <td>{{ "{:,.2f}".format((row.get('cash', 0) if row is mapping else row.cash)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((row.get('card', 0) if row is mapping else row.card)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((row.get('transfer', 0) if row is mapping else row.transfer)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((row.get('sbp', 0) if row is mapping else row.sbp)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((row.get('legal_entity_account', 0) if row is mapping else row.legal_entity_account)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((row.get('other', 0) if row is mapping else row.other)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((row.get('unspecified', 0) if row is mapping else row.unspecified)|float).replace(',', ' ') }} ₽</td>
+                            <td class="table-success fw-bold">{{ "{:,.2f}".format((row.get('total', 0) if row is mapping else row.total)|float).replace(',', ' ') }} ₽</td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {# Total row #}
+                        <tr class="table-light fw-bold">
+                            <td class="text-start">Итого за период</td>
+                            <td>{{ "{:,.2f}".format((ms.get('cash', 0) if ms is mapping else ms.cash)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((ms.get('card', 0) if ms is mapping else ms.card)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((ms.get('transfer', 0) if ms is mapping else ms.transfer)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((ms.get('sbp', 0) if ms is mapping else ms.sbp)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((ms.get('legal_entity_account', 0) if ms is mapping else ms.legal_entity_account)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((ms.get('other', 0) if ms is mapping else ms.other)|float).replace(',', ' ') }} ₽</td>
+                            <td>{{ "{:,.2f}".format((ms.get('unspecified', 0) if ms is mapping else ms.unspecified)|float).replace(',', ' ') }} ₽</td>
+                            <td class="table-success">{{ "{:,.2f}".format((ms.get('total', 0) if ms is mapping else ms.total)|float).replace(',', ' ') }} ₽</td>
                         </tr>
                     </tbody>
                 </table>

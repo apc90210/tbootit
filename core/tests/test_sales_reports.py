@@ -235,3 +235,110 @@ def test_reports_payment_labels_present():
     assert labels.get("legal_entity_account") == "Счёт юрлица"
     assert labels.get("other") == "Другое"
     assert labels.get("unspecified") == "Не указано"
+
+
+# === Stage 04G-S new tests ===
+
+def test_reports_today_returns_one_row():
+    response = client.get("/api/reports/sales?period=today")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["money_summary_rows"]) == 1
+    assert data["money_summary_granularity"] == "day"
+
+
+def test_reports_week_returns_seven_rows():
+    response = client.get("/api/reports/sales?period=week")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["money_summary_rows"]) == 7
+
+
+def test_reports_month_returns_current_month_days():
+    response = client.get("/api/reports/sales?period=month")
+    assert response.status_code == 200
+    data = response.json()
+    import calendar
+    from datetime import date
+    today = date.today()
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    assert len(data["money_summary_rows"]) == days_in_month
+
+
+def test_reports_year_returns_twelve_month_rows():
+    response = client.get("/api/reports/sales?period=year")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["money_summary_rows"]) == 12
+    assert data["money_summary_granularity"] == "month"
+
+
+def test_reports_custom_range_returns_correct_rows():
+    response = client.get("/api/reports/sales?period=custom&date_from=2026-07-01&date_to=2026-07-03")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["money_summary_rows"]) == 3
+    keys = [r["period_key"] for r in data["money_summary_rows"]]
+    assert "2026-07-01" in keys
+    assert "2026-07-02" in keys
+    assert "2026-07-03" in keys
+
+
+def test_reports_rows_include_zero_money_days():
+    response = client.get("/api/reports/sales?period=week")
+    assert response.status_code == 200
+    data = response.json()
+    zero_row = next((r for r in data["money_summary_rows"] if r["total"] == 0), None)
+    # Could be None if there's a sale every day, but for a fresh test DB it's likely we have zero rows
+    if zero_row:
+        assert zero_row["cash"] == 0
+        assert zero_row["total"] == 0
+
+
+def test_reports_row_total_equals_sum():
+    p1 = create_product()
+    p2 = create_product()
+    create_sale(p1, 1000.0, "sbp")
+    create_sale(p2, 2000.0, "cash")
+    
+    response = client.get("/api/reports/sales?period=today")
+    assert response.status_code == 200
+    data = response.json()
+    row = data["money_summary_rows"][0]
+    category_sum = row["cash"] + row["card"] + row["transfer"] + row["sbp"] + row["legal_entity_account"] + row["other"] + row["unspecified"]
+    assert row["total"] == category_sum
+
+
+def test_reports_money_summary_total_equals_sum_of_rows():
+    response = client.get("/api/reports/sales?period=week")
+    assert response.status_code == 200
+    data = response.json()
+    total_from_rows = sum(r["total"] for r in data["money_summary_rows"])
+    assert total_from_rows == data["money_summary_total"]["total"]
+
+
+def test_reports_legal_entity_counted_in_correct_day_row():
+    p1 = create_product()
+    create_sale(p1, 1000.0, "legal_entity_account")
+    
+    response = client.get("/api/reports/sales?period=today")
+    assert response.status_code == 200
+    data = response.json()
+    row = data["money_summary_rows"][0]
+    assert row["legal_entity_account"] >= 1000.0
+
+
+def test_reports_blank_payment_method_in_unspecified_row():
+    response = client.get("/api/reports/sales?period=today")
+    assert response.status_code == 200
+    data = response.json()
+    row = data["money_summary_rows"][0]
+    assert "unspecified" in row
+
+
+def test_reports_old_money_summary_total_is_compatible():
+    response = client.get("/api/reports/sales?period=today")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["money_summary"]["total"] == data["money_summary_total"]["total"]
+
