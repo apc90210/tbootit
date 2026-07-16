@@ -356,3 +356,35 @@ def test_reports_table_contains_itogo_za_period():
     with _patch_report(MOCK_REPORT_DATA):
         response = client.get("/reports/sales")
         assert "Итого за период" in response.text
+# === Stage 04G-R2 new tests ===
+
+def test_reports_sales_default_calls_core_with_ytd():
+    from datetime import date
+    today = date.today()
+    mock_client = AsyncMock(return_value=MOCK_EMPTY_REPORT)
+    with patch("app.routers.reports.core_client.get_sales_report", mock_client):
+        response = client.get("/reports/sales")
+        assert response.status_code == 200
+        mock_client.assert_called_once()
+        _, kwargs = mock_client.call_args
+        assert kwargs.get("period") == "custom"
+        assert kwargs.get("date_from") == date(today.year, 1, 1).isoformat()
+        assert kwargs.get("date_to") == today.isoformat()
+
+def test_reports_sales_default_html_inputs_contain_ytd():
+    from datetime import date
+    today = date.today()
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response = client.get("/reports/sales")
+        assert response.status_code == 200
+        text = response.text
+        assert f'value="{date(today.year, 1, 1).isoformat()}"' in text
+        assert f'value="{today.isoformat()}"' in text
+
+def test_reports_sales_one_sided_dates_200():
+    with _patch_report(MOCK_EMPTY_REPORT):
+        response1 = client.get("/reports/sales?date_from=2026-06-01&date_to=")
+        assert response1.status_code == 200
+        response2 = client.get("/reports/sales?date_from=&date_to=2026-06-01")
+        assert response2.status_code == 200
+

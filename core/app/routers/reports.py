@@ -71,16 +71,24 @@ def get_date_range(period: str, date_from: Optional[str] = None, date_to: Option
     today = now.date()
     
     # Clean params
-    period = clean_param(period) or "today"
+    period = clean_param(period)
     date_from = clean_param(date_from)
     date_to = clean_param(date_to)
     
     start_dt = None
     end_dt = None
     
-    # If custom period but dates are empty, fall back to today
+    if date_from or date_to:
+        period = "custom"
+    elif not period:
+        period = "custom"
+        date_from = date(today.year, 1, 1).isoformat()
+        date_to = today.isoformat()
+    
+    # If custom period but dates are empty, fall back to year-to-date
     if period == "custom" and not date_from and not date_to:
-        period = "today"
+        date_from = date(today.year, 1, 1).isoformat()
+        date_to = today.isoformat()
     
     if period == "today":
         start_dt = datetime.combine(today, time.min)
@@ -107,16 +115,16 @@ def get_date_range(period: str, date_from: Optional[str] = None, date_to: Option
         parsed_to = parse_date_or_none(date_to)
         
         if not parsed_from and not parsed_to:
-            # Both empty — fall back to today (shouldn't reach here, caught above)
-            start_dt = datetime.combine(today, time.min)
+            # Both empty — fall back to year-to-date (handled above, but just in case)
+            start_dt = datetime.combine(date(today.year, 1, 1), time.min)
             end_dt = datetime.combine(today, time.max)
         elif parsed_from and not parsed_to:
-            # Only start date — use same date as end
+            # Only start date — use today as end date
             start_dt = datetime.combine(parsed_from, time.min)
-            end_dt = datetime.combine(parsed_from, time.max)
+            end_dt = datetime.combine(today, time.max)
         elif not parsed_from and parsed_to:
-            # Only end date — use same date as start
-            start_dt = datetime.combine(parsed_to, time.min)
+            # Only end date — use Jan 1 of end date's year
+            start_dt = datetime.combine(date(parsed_to.year, 1, 1), time.min)
             end_dt = datetime.combine(parsed_to, time.max)
         else:
             start_dt = datetime.combine(parsed_from, time.min)
@@ -131,7 +139,7 @@ def get_date_range(period: str, date_from: Optional[str] = None, date_to: Option
 
 @router.get("/sales", response_model=schemas.SalesReportResponse)
 def get_sales_report(
-    period: str = Query("today", description="today, week, month, year, custom"),
+    period: Optional[str] = Query(None, description="today, week, month, year, custom"),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db)

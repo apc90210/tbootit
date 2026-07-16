@@ -161,12 +161,14 @@ def test_reports_empty_date_from_date_to_no_500():
 
 
 def test_reports_custom_empty_dates_falls_back():
-    """Custom period with empty dates falls back to today, not 500."""
+    """Custom period with empty dates falls back to custom year-to-date."""
     response = client.get("/api/reports/sales?period=custom&date_from=&date_to=")
     assert response.status_code == 200
     data = response.json()
-    # Should fall back to today
-    assert data["period"] == "today"
+    assert data["period"] == "custom"
+    today = date.today()
+    assert data["date_from"] == date(today.year, 1, 1).isoformat()
+    assert data["date_to"] == today.isoformat()
 
 
 def test_reports_invalid_date_returns_400():
@@ -366,4 +368,47 @@ def test_reports_exclude_canceled_and_superseded():
     assert resp2.status_code == 200
     assert not any(s["id"] == sale["id"] for s in resp2.json()["sales"])
 
+
+# === Stage 04G-R2 new tests ===
+
+def test_reports_default_no_params_returns_200():
+    response = client.get("/api/reports/sales")
+    assert response.status_code == 200
+
+def test_reports_default_date_from_is_jan_1():
+    response = client.get("/api/reports/sales")
+    data = response.json()
+    today = date.today()
+    expected_start = date(today.year, 1, 1).isoformat()
+    assert data["date_from"] == expected_start
+
+def test_reports_default_date_to_is_today():
+    response = client.get("/api/reports/sales")
+    data = response.json()
+    today = date.today().isoformat()
+    assert data["date_to"] == today
+
+def test_reports_default_includes_sales_year_to_date():
+    response = client.get("/api/reports/sales")
+    data = response.json()
+    assert data["period"] == "custom"
+
+def test_reports_empty_dates_returns_default():
+    response = client.get("/api/reports/sales?date_from=&date_to=")
+    data = response.json()
+    today = date.today()
+    assert data["date_from"] == date(today.year, 1, 1).isoformat()
+    assert data["date_to"] == today.isoformat()
+
+def test_reports_date_from_only_uses_today_for_date_to():
+    response = client.get("/api/reports/sales?date_from=2026-06-01&date_to=")
+    data = response.json()
+    assert data["date_from"] == "2026-06-01"
+    assert data["date_to"] == date.today().isoformat()
+
+def test_reports_date_to_only_uses_jan_1_for_date_from():
+    response = client.get("/api/reports/sales?date_from=&date_to=2026-06-01")
+    data = response.json()
+    assert data["date_from"] == "2026-01-01"
+    assert data["date_to"] == "2026-06-01"
 

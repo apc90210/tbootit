@@ -52,18 +52,29 @@ DEFAULT_REPORT_DATA = {
 @router.get("/reports/sales", response_class=HTMLResponse)
 async def sales_report(
     request: Request,
-    period: str = Query("today"),
+    period: Optional[str] = Query(None),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None
 ):
     # Sanitize parameters
-    period = clean_param(period) or "today"
+    period = clean_param(period)
     date_from = clean_param(date_from)
     date_to = clean_param(date_to)
     
-    # If custom period with empty dates, fall back to today
+    from datetime import date
+    today = date.today()
+
+    if date_from or date_to:
+        period = "custom"
+    elif not period:
+        period = "custom"
+        date_from = date(today.year, 1, 1).isoformat()
+        date_to = today.isoformat()
+
+    # If custom period with empty dates, fall back to year-to-date
     if period == "custom" and not date_from and not date_to:
-        period = "today"
+        date_from = date(today.year, 1, 1).isoformat()
+        date_to = today.isoformat()
     
     error_message = None
     report_data = await core_client.get_sales_report(period=period, date_from=date_from, date_to=date_to)
