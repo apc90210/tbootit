@@ -95,21 +95,16 @@ def get_date_range(period: str, date_from: Optional[str] = None, date_to: Option
         end_dt = datetime.combine(today, time.max)
     elif period == "week":
         start_of_week = today - timedelta(days=today.weekday())
-        end_of_week = start_of_week + timedelta(days=6)
         start_dt = datetime.combine(start_of_week, time.min)
-        end_dt = datetime.combine(end_of_week, time.max)
+        end_dt = datetime.combine(today, time.max)
     elif period == "month":
         start_of_month = today.replace(day=1)
-        # next month first day minus 1 day
-        next_month = start_of_month.replace(day=28) + timedelta(days=4)
-        end_of_month = next_month - timedelta(days=next_month.day)
         start_dt = datetime.combine(start_of_month, time.min)
-        end_dt = datetime.combine(end_of_month, time.max)
+        end_dt = datetime.combine(today, time.max)
     elif period == "year":
         start_of_year = today.replace(month=1, day=1)
-        end_of_year = today.replace(month=12, day=31)
         start_dt = datetime.combine(start_of_year, time.min)
-        end_dt = datetime.combine(end_of_year, time.max)
+        end_dt = datetime.combine(today, time.max)
     elif period == "custom":
         parsed_from = parse_date_or_none(date_from)
         parsed_to = parse_date_or_none(date_to)

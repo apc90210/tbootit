@@ -389,57 +389,97 @@ def test_reports_sales_one_sided_dates_200():
         assert response2.status_code == 200
 
 
-# === Stage 04G-R3 quick filter date sync tests ===
+# === Stage 04G-R4 quick filter date sync tests ===
 
 def test_reports_sales_quick_filter_today_syncs_date_inputs():
+    from datetime import date
+    today = date.today().isoformat()
     mock_data = MOCK_EMPTY_REPORT.copy()
     mock_data["period"] = "today"
-    mock_data["date_from"] = "2026-07-22"
-    mock_data["date_to"] = "2026-07-22"
+    mock_data["date_from"] = today
+    mock_data["date_to"] = today
     with _patch_report(mock_data):
         response = client.get("/reports/sales?period=today")
         assert response.status_code == 200
         text = response.text
-        assert 'id="date_from" name="date_from" value="2026-07-22"' in text
-        assert 'id="date_to" name="date_to" value="2026-07-22"' in text
+        assert f'id="date_from" name="date_from" value="{today}"' in text
+        assert f'id="date_to" name="date_to" value="{today}"' in text
 
 
 def test_reports_sales_quick_filter_week_syncs_date_inputs():
+    from datetime import date, timedelta
+    today = date.today()
+    monday = (today - timedelta(days=today.weekday())).isoformat()
+    today_str = today.isoformat()
     mock_data = MOCK_EMPTY_REPORT.copy()
     mock_data["period"] = "week"
-    mock_data["date_from"] = "2026-07-20"
-    mock_data["date_to"] = "2026-07-26"
+    mock_data["date_from"] = monday
+    mock_data["date_to"] = today_str
     with _patch_report(mock_data):
         response = client.get("/reports/sales?period=week")
         assert response.status_code == 200
         text = response.text
-        assert 'id="date_from" name="date_from" value="2026-07-20"' in text
-        assert 'id="date_to" name="date_to" value="2026-07-26"' in text
+        assert f'id="date_from" name="date_from" value="{monday}"' in text
+        assert f'id="date_to" name="date_to" value="{today_str}"' in text
 
 
 def test_reports_sales_quick_filter_month_syncs_date_inputs():
+    from datetime import date
+    today = date.today()
+    first_month = today.replace(day=1).isoformat()
+    today_str = today.isoformat()
     mock_data = MOCK_EMPTY_REPORT.copy()
     mock_data["period"] = "month"
-    mock_data["date_from"] = "2026-07-01"
-    mock_data["date_to"] = "2026-07-31"
+    mock_data["date_from"] = first_month
+    mock_data["date_to"] = today_str
     with _patch_report(mock_data):
         response = client.get("/reports/sales?period=month")
         assert response.status_code == 200
         text = response.text
-        assert 'id="date_from" name="date_from" value="2026-07-01"' in text
-        assert 'id="date_to" name="date_to" value="2026-07-31"' in text
+        assert f'id="date_from" name="date_from" value="{first_month}"' in text
+        assert f'id="date_to" name="date_to" value="{today_str}"' in text
 
 
 def test_reports_sales_quick_filter_year_syncs_date_inputs():
+    from datetime import date
+    today = date.today()
+    jan_first = today.replace(month=1, day=1).isoformat()
+    today_str = today.isoformat()
     mock_data = MOCK_EMPTY_REPORT.copy()
     mock_data["period"] = "year"
-    mock_data["date_from"] = "2026-01-01"
-    mock_data["date_to"] = "2026-12-31"
+    mock_data["date_from"] = jan_first
+    mock_data["date_to"] = today_str
     with _patch_report(mock_data):
         response = client.get("/reports/sales?period=year")
         assert response.status_code == 200
         text = response.text
-        assert 'id="date_from" name="date_from" value="2026-01-01"' in text
-        assert 'id="date_to" name="date_to" value="2026-12-31"' in text
+        assert f'id="date_from" name="date_from" value="{jan_first}"' in text
+        assert f'id="date_to" name="date_to" value="{today_str}"' in text
+
+
+def test_reports_sales_quick_filter_end_date_never_in_future():
+    from datetime import date, timedelta
+    today = date.today()
+    for period in ["today", "week", "month", "year"]:
+        mock_data = MOCK_EMPTY_REPORT.copy()
+        mock_data["period"] = period
+        monday = today - timedelta(days=today.weekday())
+        first_month = today.replace(day=1)
+        jan_first = today.replace(month=1, day=1)
+        if period == "today":
+            mock_data["date_from"] = today.isoformat()
+        elif period == "week":
+            mock_data["date_from"] = monday.isoformat()
+        elif period == "month":
+            mock_data["date_from"] = first_month.isoformat()
+        elif period == "year":
+            mock_data["date_from"] = jan_first.isoformat()
+        mock_data["date_to"] = today.isoformat()
+        
+        with _patch_report(mock_data):
+            response = client.get(f"/reports/sales?period={period}")
+            assert response.status_code == 200
+            assert date.fromisoformat(mock_data["date_to"]) <= today
+
 
 

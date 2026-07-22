@@ -101,6 +101,12 @@ def test_reports_week():
     data = response.json()
     assert data["period"] == "week"
     assert data["sales_count"] >= 0
+    today = date.today()
+    from datetime import timedelta
+    monday = today - timedelta(days=today.weekday())
+    assert data["date_from"] == monday.isoformat()
+    assert data["date_to"] == today.isoformat()
+    assert date.fromisoformat(data["date_to"]) <= date.today()
 
 
 def test_reports_month():
@@ -108,6 +114,11 @@ def test_reports_month():
     assert response.status_code == 200
     data = response.json()
     assert data["period"] == "month"
+    today = date.today()
+    first_day = today.replace(day=1)
+    assert data["date_from"] == first_day.isoformat()
+    assert data["date_to"] == today.isoformat()
+    assert date.fromisoformat(data["date_to"]) <= date.today()
 
 
 def test_reports_year():
@@ -115,6 +126,11 @@ def test_reports_year():
     assert response.status_code == 200
     data = response.json()
     assert data["period"] == "year"
+    today = date.today()
+    jan_first = today.replace(month=1, day=1)
+    assert data["date_from"] == jan_first.isoformat()
+    assert data["date_to"] == today.isoformat()
+    assert date.fromisoformat(data["date_to"]) <= date.today()
 
 
 def test_reports_invalid_payment_method_rejected():
@@ -257,25 +273,28 @@ def test_reports_week_returns_seven_rows():
     response = client.get("/api/reports/sales?period=week")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["money_summary_rows"]) == 7
+    from datetime import date
+    today = date.today()
+    expected_days = today.weekday() + 1
+    assert len(data["money_summary_rows"]) == expected_days
 
 
 def test_reports_month_returns_current_month_days():
     response = client.get("/api/reports/sales?period=month")
     assert response.status_code == 200
     data = response.json()
-    import calendar
     from datetime import date
     today = date.today()
-    days_in_month = calendar.monthrange(today.year, today.month)[1]
-    assert len(data["money_summary_rows"]) == days_in_month
+    assert len(data["money_summary_rows"]) == today.day
 
 
 def test_reports_year_returns_twelve_month_rows():
     response = client.get("/api/reports/sales?period=year")
     assert response.status_code == 200
     data = response.json()
-    assert len(data["money_summary_rows"]) == 12
+    from datetime import date
+    today = date.today()
+    assert len(data["money_summary_rows"]) == today.month
     assert data["money_summary_granularity"] == "month"
 
 
