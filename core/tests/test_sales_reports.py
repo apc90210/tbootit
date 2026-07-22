@@ -431,3 +431,33 @@ def test_reports_date_to_only_uses_jan_1_for_date_from():
     assert data["date_from"] == "2026-01-01"
     assert data["date_to"] == "2026-06-01"
 
+def test_reports_excludes_canceled_and_superseded_sales():
+    pid = create_product()
+    # Create active sale
+    s1 = create_sale(pid, 1000.0, "cash")
+    # Create sale to cancel
+    s2 = create_sale(pid, 2000.0, "card")
+    # Cancel s2
+    client.post(f"/api/sales/{s2['id']}/cancel", json={"reason": "Отмена для теста отчёта"})
+
+    # Get report
+    rep1 = client.get("/api/reports/sales?period=today").json()
+    # s2 (2000.0) must be excluded from totals
+    assert not any(s["id"] == s2["id"] for s in rep1["sales"])
+
+    # Now reissue s2 -> s2 becomes superseded, new sale s3 (reissued) is created
+    reissue_res = client.post(f"/api/sales/{s2['id']}/reissue", json={
+        "reason": "Переоформление для отчёта",
+        "payment_method": "sbp",
+        "items": [{"product_id": pid, "title": "Test Item", "price": 2500.0, "quantity": 1}]
+    })
+    assert reissue_res.status_code == 200
+    s3 = reissue_res.json()
+
+    rep2 = client.get("/api/reports/sales?period=today").json()
+    # s2 (superseded) must be excluded
+    assert not any(s["id"] == s2["id"] for s in rep2["sales"])
+    # s3 (reissued) must be included
+    assert any(s["id"] == s3["id"] for s in rep2["sales"])
+
+

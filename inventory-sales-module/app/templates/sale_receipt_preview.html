@@ -127,6 +127,20 @@
         </div>
 
         <div class="header">
+            {% set st = sale.status or 'completed' %}
+            {% if st == 'canceled' or st == 'cancelled' %}
+                <div style="background: #dc3545; color: #fff; padding: 5px 10px; margin-bottom: 10px; font-weight: bold; border-radius: 4px;">
+                    АРХИВНЫЙ ЧЕК — ПРОДАЖА №{{ sale.id }} ОТМЕНЕНА ({{ sale.cancelled_at[:10] if sale.cancelled_at else '' }})
+                </div>
+            {% elif st == 'superseded' %}
+                <div style="background: #6c757d; color: #fff; padding: 5px 10px; margin-bottom: 10px; font-weight: bold; border-radius: 4px;">
+                    АРХИВНЫЙ ЧЕК — ПРОДАЖА №{{ sale.id }} ЗАМЕНЕНА (ПОВТОРНАЯ ПРОДАЖА №{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }})
+                </div>
+            {% elif st == 'reissued' %}
+                <div style="background: #007bff; color: #fff; padding: 5px 10px; margin-bottom: 10px; font-weight: bold; border-radius: 4px;">
+                    ПОВТОРНО ОФОРМЛЕННАЯ ПРОДАЖА (НА ОСНОВЕ ПРОДАЖИ №{{ sale.source_sale_id or sale.original_sale_id }})
+                </div>
+            {% endif %}
             <h1>Товарный чек № {{ sale.id }} от {{ sale.created_at[:10] if sale.created_at else '—' }}</h1>
         </div>
 

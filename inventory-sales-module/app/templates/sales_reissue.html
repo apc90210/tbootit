@@ -1,46 +1,50 @@
 {% extends "base.html" %}
 
-{% block title %}Переоформление продажи #{{ sale.id }}{% endblock %}
+{% block title %}Повторное оформление продажи #{{ sale.id }}{% endblock %}
 
 {% block content %}
-    <h2>Переоформление продажи #{{ sale.id }}</h2>
+    <h2>Повторное оформление продажи #{{ sale.id }}</h2>
     
-    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 700px;">
+        <p style="color: #555; margin-top: 0;">
+            Исходная отменённая продажа <strong>№{{ sale.id }}</strong> получит статус <em>Заменена (superseded)</em>, и будет создана новая продажа.
+        </p>
+
         <form action="/sales/{{ sale.id }}/reissue" method="POST">
             <div style="margin-bottom: 15px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 5px;">Причина переоформления:</label>
-                <input type="text" name="reason" required value="Замена/изменение" style="width: 100%; max-width: 400px; padding: 5px; box-sizing: border-box;">
+                <input type="text" name="reason" required value="Повторное оформление" style="width: 100%; max-width: 400px; padding: 6px; box-sizing: border-box;">
             </div>
             
             <div style="margin-bottom: 15px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 5px;">Способ оплаты:</label>
-                <select name="payment_method" style="padding: 5px;">
+                <select name="payment_method" style="padding: 6px;">
                     {% for pm_key, pm_label in payment_methods.items() %}
                         <option value="{{ pm_key }}" {% if sale.payment_method == pm_key %}selected{% endif %}>{{ pm_label }}</option>
                     {% endfor %}
                 </select>
             </div>
             
-            <h3 style="margin-top: 20px;">Товары:</h3>
+            <h3 style="margin-top: 20px;">Товары в новой продаже:</h3>
             <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
                 <thead>
                     <tr>
-                        <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">Название</th>
-                        <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">Цена (₽)</th>
-                        <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">Количество</th>
+                        <th style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">Название</th>
+                        <th style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">Цена (₽)</th>
+                        <th style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">Количество</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in sale.items %}
+                    {% for item in sale.get('items') %}
                     <tr>
-                        <td style="padding: 5px;">
+                        <td style="padding: 6px;">
                             <input type="hidden" name="item_product_id_{{ loop.index }}" value="{{ item.product_id }}">
                             <input type="text" name="item_title_{{ loop.index }}" value="{{ item.title }}" style="width: 100%; padding: 5px; box-sizing: border-box;" readonly>
                         </td>
-                        <td style="padding: 5px;">
-                            <input type="number" step="0.01" name="item_price_{{ loop.index }}" value="{{ item.price }}" style="width: 100px; padding: 5px;" required>
+                        <td style="padding: 6px;">
+                            <input type="number" step="0.01" name="item_price_{{ loop.index }}" value="{{ item.price }}" style="width: 110px; padding: 5px;" required>
                         </td>
-                        <td style="padding: 5px;">
+                        <td style="padding: 6px;">
                             <input type="number" name="item_quantity_{{ loop.index }}" value="{{ item.quantity }}" style="width: 80px; padding: 5px;" required>
                         </td>
                     </tr>
@@ -48,8 +52,8 @@
                 </tbody>
             </table>
             
-            <button type="submit" class="btn btn-primary" onclick="return confirm('Вы уверены? Старая продажа будет отменена.');">Оформить новую продажу</button>
-            <a href="/sales/{{ sale.id }}" class="btn" style="margin-left: 10px;">Отмена</a>
+            <button type="submit" class="btn btn-primary" onclick="return confirm('Подтверждаете создание новой повторной продажи?');">Оформить повторную продажу</button>
+            <a href="/sales/{{ sale.id }}" class="btn" style="margin-left: 10px;">Назад</a>
         </form>
     </div>
 {% endblock %}

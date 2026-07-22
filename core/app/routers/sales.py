@@ -16,6 +16,7 @@ VALID_PAYMENT_METHODS = ["cash", "card", "transfer", "sbp", "legal_entity_accoun
 def get_sales(
     limit: int = 50,
     offset: int = 0,
+    status: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     payment_method: Optional[str] = None,
@@ -24,6 +25,8 @@ def get_sales(
 ):
     query = db.query(models.Sale)
     
+    if status:
+        query = query.filter(models.Sale.status == status)
     if date_from:
         query = query.filter(models.Sale.created_at >= date_from)
     if date_to:
@@ -91,6 +94,7 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
     items_data = sale_data.pop("items")
     
     sale_data["warranty_enabled"] = 1 if sale_data.get("warranty_enabled") else 0
+    sale_data["status"] = "completed"
     
     db_sale = models.Sale(**sale_data)
     db.add(db_sale)
@@ -143,11 +147,12 @@ def cancel_sale(sale_id: int, cancel_data: schemas.SaleCancel, db: Session = Dep
     if not db_sale:
         raise HTTPException(status_code=404, detail="Sale not found")
     if db_sale.status in ["canceled", "cancelled", "superseded"]:
-        raise HTTPException(status_code=400, detail=f"Sale cannot be canceled (status: {db_sale.status})")
+        raise HTTPException(status_code=409, detail=f"Sale cannot be canceled (status: {db_sale.status})")
         
     db_sale.status = "canceled"
     db_sale.cancelled_at = datetime.utcnow()
     db_sale.cancel_reason = cancel_data.reason
+    db_sale.canceled_by = cancel_data.canceled_by or "Администратор"
     
     sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
     for item in sale_items:
@@ -173,7 +178,7 @@ def cancel_sale(sale_id: int, cancel_data: schemas.SaleCancel, db: Session = Dep
                 
             log_product_event(db, db_product.id, "sale_canceled", old_value={"status": old_status, "quantity": old_quantity}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Sale {sale_id} canceled: {cancel_data.reason}")
             
-    log_audit(db, "sale", db_sale.id, "cancel", new_value={"status": "canceled", "reason": cancel_data.reason})
+    log_audit(db, "sale", db_sale.id, "cancel", new_value={"status": "canceled", "reason": cancel_data.reason, "canceled_by": db_sale.canceled_by})
     db.commit()
     db.refresh(db_sale)
     return db_sale
@@ -183,62 +188,60 @@ def reissue_sale(sale_id: int, reissue_data: schemas.SaleReissue, db: Session = 
     db_old_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
     if not db_old_sale:
         raise HTTPException(status_code=404, detail="Sale not found")
-    if db_old_sale.status != "completed" and db_old_sale.status is not None:
-        raise HTTPException(status_code=400, detail="Only completed sales can be reissued")
+        
+    if db_old_sale.status == "superseded" or db_old_sale.superseded_by_sale_id is not None or db_old_sale.replaced_by_sale_id is not None:
+        raise HTTPException(status_code=409, detail="Original sale was already superseded")
+        
+    if db_old_sale.status not in ["canceled", "cancelled"]:
+        raise HTTPException(status_code=400, detail="Only canceled sales can be reissued")
         
     if reissue_data.payment_method not in VALID_PAYMENT_METHODS:
         raise HTTPException(status_code=400, detail=f"Invalid payment method. Allowed: {', '.join(VALID_PAYMENT_METHODS)}")
-    
-    old_sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
-    for item in old_sale_items:
-        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-        if db_product:
-            old_q = db_product.quantity or 0
-            db_product.quantity = old_q + item.quantity
-            
-            mov = models.StockMovement(
-                product_id=db_product.id,
-                movement_type="sale_reissue_return",
-                quantity_delta=item.quantity,
-                old_quantity=old_q,
-                new_quantity=db_product.quantity,
-                reason="sale_reissue_return",
-                comment=f"Stock return for sale {sale_id} reissue"
-            )
-            db.add(mov)
-            
-            old_s = db_product.status
-            if db_product.status == "sold" and db_product.quantity > 0:
-                db_product.status = "in_stock"
-            log_product_event(db, db_product.id, "sale_reissue_return", old_value={"status": old_s, "quantity": old_q}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Returned from sale {sale_id}")
+        
+    if not reissue_data.items:
+        raise HTTPException(status_code=400, detail="Sale must contain at least one item")
 
-    db_old_sale.status = "superseded"
-    db_old_sale.cancelled_at = datetime.utcnow()
-    db_old_sale.cancel_reason = reissue_data.reason
-
-    total_amount = sum(item.price * item.quantity for item in reissue_data.items)
-    
+    # Validate items before processing
+    product_ids = set()
     for item in reissue_data.items:
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail="Item quantity must be > 0")
+        if item.price < 0:
+            raise HTTPException(status_code=400, detail="Item price must be >= 0")
+        if item.product_id in product_ids:
+            raise HTTPException(status_code=400, detail=f"Duplicate product_id {item.product_id} in sale")
+        product_ids.add(item.product_id)
+        
         db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
         if not db_product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+        if db_product.status not in ["in_stock", "reserved"]:
+            raise HTTPException(status_code=400, detail=f"Cannot sell product {item.product_id} in status '{db_product.status}'")
+        if db_product.storage_location != "store":
+            raise HTTPException(status_code=400, detail=f"Product {item.product_id} must be in 'store' location to be sold")
         if (db_product.quantity or 0) < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Insufficient quantity for product {item.product_id}. Available: {db_product.quantity}")
+            raise HTTPException(status_code=400, detail=f"Insufficient quantity for product {item.product_id}. Available: {db_product.quantity or 0}")
+
+    total_amount = sum(item.price * item.quantity for item in reissue_data.items)
 
     new_sale = models.Sale(
         customer_id=db_old_sale.customer_id,
         total_amount=total_amount,
         payment_method=reissue_data.payment_method,
-        comment=db_old_sale.comment,
-        status="completed",
+        comment=f"Reissue of sale #{sale_id}",
+        status="reissued",
         warranty_days=db_old_sale.warranty_days,
         warranty_enabled=db_old_sale.warranty_enabled,
-        original_sale_id=sale_id
+        source_sale_id=sale_id,
+        original_sale_id=sale_id,
+        reissued_at=datetime.utcnow()
     )
     db.add(new_sale)
     db.commit()
     db.refresh(new_sale)
     
+    db_old_sale.status = "superseded"
+    db_old_sale.superseded_by_sale_id = new_sale.id
     db_old_sale.replaced_by_sale_id = new_sale.id
     
     for item in reissue_data.items:
@@ -266,7 +269,8 @@ def reissue_sale(sale_id: int, reissue_data: schemas.SaleReissue, db: Session = 
             
         log_product_event(db, db_product.id, "sale_reissue_deduct", old_value={"status": old_s, "quantity": old_q}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Deducted for sale {new_sale.id}")
 
-    log_audit(db, "sale", db_old_sale.id, "reissue", old_value={"status": "completed"}, new_value={"status": "superseded", "replaced_by_sale_id": new_sale.id})
+    log_audit(db, "sale", db_old_sale.id, "superseded", old_value={"status": "canceled"}, new_value={"status": "superseded", "superseded_by_sale_id": new_sale.id})
+    log_audit(db, "sale", new_sale.id, "reissued", new_value={"status": "reissued", "source_sale_id": sale_id})
     db.commit()
     db.refresh(new_sale)
     return new_sale

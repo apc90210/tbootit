@@ -186,14 +186,19 @@ class SaleCreate(SaleBase):
 
 class SaleCancel(BaseModel):
     reason: str
+    canceled_by: Optional[str] = "Администратор"
 
 class Sale(SaleBase):
     id: int
     status: str
     cancelled_at: Optional[datetime] = None
     cancel_reason: Optional[str] = None
+    canceled_by: Optional[str] = None
     original_sale_id: Optional[int] = None
     replaced_by_sale_id: Optional[int] = None
+    source_sale_id: Optional[int] = None
+    superseded_by_sale_id: Optional[int] = None
+    reissued_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     items: List[SaleItem] = []
     class Config:

@@ -144,7 +144,7 @@ def get_sales_report(
     sales_query = db.query(models.Sale).filter(
         models.Sale.created_at >= start_dt,
         models.Sale.created_at <= end_dt,
-        or_(models.Sale.status == "completed", models.Sale.status == None)
+        or_(models.Sale.status == "completed", models.Sale.status == "reissued", models.Sale.status == None)
     ).order_by(models.Sale.created_at.desc())
     
     sales_list = sales_query.all()

@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -16,9 +17,13 @@ async def sales_list(
     request: Request,
     limit: int = Query(50),
     offset: int = Query(0),
+    status: Optional[str] = Query(None),
 ):
-    """List of recent sales (MVP)."""
+    """List of recent sales."""
     params = {"limit": limit, "offset": offset}
+    if status and status.strip():
+        params["status"] = status.strip()
+
     data = await core_client.get_sales(params)
 
     if data and isinstance(data, dict) and "error" in data:
@@ -35,6 +40,7 @@ async def sales_list(
             "sales_data": data,
             "limit": limit,
             "offset": offset,
+            "selected_status": status or "",
             "payment_methods": PAYMENT_METHODS,
             "sale_status_labels": SALE_STATUS_LABELS,
         },
@@ -96,8 +102,6 @@ async def sale_receipt(request: Request, sale_id: int):
     except Exception as e:
         from app.defaults import get_effective_settings
         org_settings = get_effective_settings({})
-    # We also need the item details if we want to show product details,
-    # but the sale response contains items.
     
     return templates.TemplateResponse(
         request=request,
@@ -109,9 +113,37 @@ async def sale_receipt(request: Request, sale_id: int):
         },
     )
 
+@router.get("/sales/{sale_id}/cancel", response_class=HTMLResponse)
+async def cancel_sale_form(request: Request, sale_id: int):
+    sale = await core_client.get_sale(sale_id)
+    if sale and isinstance(sale, dict) and "error" in sale:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Продажа не найдена"}
+        )
+    if sale.get("status") in ["canceled", "cancelled", "superseded"]:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": f"Продажа №{sale_id} не может быть отменена (статус: {sale.get('status')})"}
+        )
+        
+    return templates.TemplateResponse(
+        request=request, name="sale_cancel.html", context={
+            "sale": sale,
+            "payment_methods": PAYMENT_METHODS
+        }
+    )
+
 @router.post("/sales/{sale_id}/cancel")
-async def cancel_sale_endpoint(request: Request, sale_id: int, reason: str = Form(...)):
-    res = await core_client.cancel_sale(sale_id, reason)
+async def cancel_sale_endpoint(
+    request: Request,
+    sale_id: int,
+    reason: str = Form(...),
+    canceled_by: str = Form("Администратор")
+):
+    if not reason or not reason.strip():
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Причина отмены обязательна"}
+        )
+    res = await core_client.cancel_sale(sale_id, reason.strip(), canceled_by.strip() if canceled_by else "Администратор")
     if res and isinstance(res, dict) and "error" in res:
         return templates.TemplateResponse(
             request=request, name="error.html", context={"message": res.get("detail", "Ошибка отмены продажи")}
@@ -125,9 +157,13 @@ async def reissue_sale_form(request: Request, sale_id: int):
         return templates.TemplateResponse(
             request=request, name="error.html", context={"message": "Продажа не найдена"}
         )
-    if sale.get("status") != "completed":
+    if sale.get("status") == "superseded" or sale.get("superseded_by_sale_id") or sale.get("replaced_by_sale_id"):
         return templates.TemplateResponse(
-            request=request, name="error.html", context={"message": "Переоформить можно только завершенную продажу"}
+            request=request, name="error.html", context={"message": "Исходная продажа уже была заменена"}
+        )
+    if sale.get("status") not in ["canceled", "cancelled"]:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Повторно оформить можно только отменённую продажу"}
         )
         
     return templates.TemplateResponse(

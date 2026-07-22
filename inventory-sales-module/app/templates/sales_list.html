@@ -5,8 +5,17 @@
 {% block content %}
     <h2>Продажи</h2>
 
+    <div style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+        <strong>Статус:</strong>
+        <a href="/sales" class="btn {% if not selected_status %}btn-success{% endif %}">Все</a>
+        <a href="/sales?status=completed" class="btn {% if selected_status == 'completed' %}btn-success{% endif %}">Завершённые</a>
+        <a href="/sales?status=canceled" class="btn {% if selected_status == 'canceled' or selected_status == 'cancelled' %}btn-success{% endif %}">Отменённые</a>
+        <a href="/sales?status=superseded" class="btn {% if selected_status == 'superseded' %}btn-success{% endif %}">Заменённые</a>
+        <a href="/sales?status=reissued" class="btn {% if selected_status == 'reissued' %}btn-success{% endif %}">Повторно оформленные</a>
+    </div>
+
     {% if sales_data and sales_data['items'] %}
-        <p>Всего: {{ sales_data.total }}</p>
+        <p>Всего найдено: {{ sales_data.total }}</p>
         <table>
             <thead>
                 <tr>
@@ -34,10 +43,17 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if sale.status in sale_status_labels %}
-                            {{ sale_status_labels[sale.status] }}
+                        {% set st = sale.status or 'completed' %}
+                        {% if st == 'completed' %}
+                            <span style="background: #28a745; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Завершена</span>
+                        {% elif st == 'canceled' or st == 'cancelled' %}
+                            <span style="background: #dc3545; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Отменена</span>
+                        {% elif st == 'superseded' %}
+                            <span style="background: #6c757d; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Заменена</span>
+                        {% elif st == 'reissued' %}
+                            <span style="background: #007bff; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Повторно оформлена</span>
                         {% else %}
-                            {{ sale.status }}
+                            <span style="background: #e2e3e5; color: #383d41; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">{{ st }}</span>
                         {% endif %}
                     </td>
                     <td>
@@ -50,14 +66,15 @@
         </table>
 
         <div style="margin-top: 15px;">
+            {% set status_param = '&status=' + selected_status if selected_status else '' %}
             {% if offset > 0 %}
-                <a href="/sales?limit={{ limit }}&offset={{ offset - limit }}" class="btn">Назад</a>
+                <a href="/sales?limit={{ limit }}&offset={{ offset - limit }}{{ status_param }}" class="btn">Назад</a>
             {% else %}
                 <button class="btn" disabled>Назад</button>
             {% endif %}
 
             {% if (offset + limit) < sales_data.total %}
-                <a href="/sales?limit={{ limit }}&offset={{ offset + limit }}" class="btn" style="margin-left: 10px;">Вперед</a>
+                <a href="/sales?limit={{ limit }}&offset={{ offset + limit }}{{ status_param }}" class="btn" style="margin-left: 10px;">Вперед</a>
             {% else %}
                 <button class="btn" disabled style="margin-left: 10px;">Вперед</button>
             {% endif %}

@@ -3,9 +3,38 @@
 {% block title %}Продажа #{{ sale.id }}{% endblock %}
 
 {% block content %}
-    <div style="background: #e8f5e9; padding: 20px; border: 1px solid #a5d6a7; border-radius: 5px; margin-bottom: 20px; text-align: center;">
-        <h2 style="color: #2e7d32; margin-top: 0;">✓ Продажа оформлена</h2>
-    </div>
+    {% set st = sale.status or 'completed' %}
+
+    {% if st == 'completed' %}
+        <div style="background: #e8f5e9; padding: 20px; border: 1px solid #a5d6a7; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+            <h2 style="color: #2e7d32; margin-top: 0; margin-bottom: 0;">✓ Продажа оформлена (Действующая)</h2>
+        </div>
+    {% elif st == 'reissued' %}
+        <div style="background: #e3f2fd; padding: 20px; border: 1px solid #90caf9; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+            <h2 style="color: #1565c0; margin-top: 0; margin-bottom: 5px;">✓ Повторно оформленная продажа</h2>
+            {% if sale.source_sale_id or sale.original_sale_id %}
+                <p style="margin: 0; color: #1976d2;">
+                    Создана на основе отменённой продажи 
+                    <a href="/sales/{{ sale.source_sale_id or sale.original_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.source_sale_id or sale.original_sale_id }}</a>
+                </p>
+            {% endif %}
+        </div>
+    {% elif st == 'canceled' or st == 'cancelled' %}
+        <div style="background: #ffebee; padding: 20px; border: 1px solid #ef9a9a; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+            <h2 style="color: #c62828; margin-top: 0; margin-bottom: 5px;">✕ Продажа отменена</h2>
+            <p style="margin: 0; color: #b71c1c;">Товары из этой продажи возвращены в остатки магазина</p>
+        </div>
+    {% elif st == 'superseded' %}
+        <div style="background: #f5f5f5; padding: 20px; border: 1px solid #cccccc; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+            <h2 style="color: #424242; margin-top: 0; margin-bottom: 5px;">ⓘ Продажа заменена</h2>
+            {% if sale.superseded_by_sale_id or sale.replaced_by_sale_id %}
+                <p style="margin: 0; color: #616161;">
+                    Заменена новой продажей 
+                    <a href="/sales/{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}</a>
+                </p>
+            {% endif %}
+        </div>
+    {% endif %}
 
     <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
         <table style="margin-top: 0;">
@@ -14,7 +43,7 @@
                 <td>#{{ sale.id }}</td>
             </tr>
             <tr>
-                <th>Дата/время</th>
+                <th>Дата/время продажи</th>
                 <td>{{ sale.created_at or '—' }}</td>
             </tr>
             <tr>
@@ -34,10 +63,16 @@
             <tr>
                 <th>Статус продажи</th>
                 <td>
-                    {% if sale.status in sale_status_labels %}
-                        {{ sale_status_labels[sale.status] }}
+                    {% if st == 'completed' %}
+                        <span style="background: #28a745; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Завершена</span>
+                    {% elif st == 'canceled' or st == 'cancelled' %}
+                        <span style="background: #dc3545; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Отменена</span>
+                    {% elif st == 'superseded' %}
+                        <span style="background: #6c757d; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Заменена</span>
+                    {% elif st == 'reissued' %}
+                        <span style="background: #007bff; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">Повторно оформлена</span>
                     {% else %}
-                        {{ sale.status }}
+                        <span style="background: #e2e3e5; color: #383d41; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem;">{{ st }}</span>
                     {% endif %}
                 </td>
             </tr>
@@ -45,6 +80,37 @@
             <tr>
                 <th>Примечание</th>
                 <td>{{ sale.comment }}</td>
+            </tr>
+            {% endif %}
+
+            {% if st == 'canceled' or st == 'cancelled' or st == 'superseded' %}
+            <tr>
+                <th>Дата отмены</th>
+                <td>{{ sale.cancelled_at or '—' }}</td>
+            </tr>
+            <tr>
+                <th>Причина отмены</th>
+                <td>{{ sale.cancel_reason or '—' }}</td>
+            </tr>
+            {% if sale.canceled_by %}
+            <tr>
+                <th>Кто отменил</th>
+                <td>{{ sale.canceled_by }}</td>
+            </tr>
+            {% endif %}
+            {% endif %}
+
+            {% if sale.superseded_by_sale_id or sale.replaced_by_sale_id %}
+            <tr>
+                <th>Новая продажа (Reissue)</th>
+                <td><a href="/sales/{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}</a></td>
+            </tr>
+            {% endif %}
+
+            {% if sale.source_sale_id or sale.original_sale_id %}
+            <tr>
+                <th>Исходная продажа</th>
+                <td><a href="/sales/{{ sale.source_sale_id or sale.original_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.source_sale_id or sale.original_sale_id }}</a></td>
             </tr>
             {% endif %}
         </table>
@@ -82,22 +148,29 @@
         <a href="/sales" class="btn" style="margin-left: 10px;">Все продажи</a>
     </div>
 
-    {% if sale.status == 'completed' %}
+    {% if st == 'completed' or st == 'reissued' %}
     <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">
-    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-        <div style="background: #fff; padding: 20px; border: 1px solid #f5c6cb; border-radius: 5px; flex: 1; min-width: 300px;">
-            <h3 style="color: #721c24; margin-top: 0;">Отменить продажу</h3>
-            <p>Отмена вернет товары на склад.</p>
-            <form action="/sales/{{ sale.id }}/cancel" method="POST">
-                <input type="text" name="reason" placeholder="Причина отмены" required style="width: 100%; margin-bottom: 10px; padding: 5px; box-sizing: border-box;">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите отменить эту продажу?');">Отменить продажу</button>
-            </form>
-        </div>
-        <div style="background: #fff; padding: 20px; border: 1px solid #ffeeba; border-radius: 5px; flex: 1; min-width: 300px;">
-            <h3 style="color: #856404; margin-top: 0;">Переоформить продажу</h3>
-            <p>Старая продажа будет отменена, и создана новая.</p>
-            <a href="/sales/{{ sale.id }}/reissue" class="btn" style="background: #ffc107; color: #212529; border: 1px solid #d39e00;">Переоформить</a>
-        </div>
+    <div style="background: #fff; padding: 20px; border: 1px solid #f5c6cb; border-radius: 5px; max-width: 600px;">
+        <h3 style="color: #721c24; margin-top: 0;">Отменить продажу</h3>
+        <p style="color: #555; font-size: 0.95rem;">Отмена вернет товары из чека обратно в остатки на склад.</p>
+        <form action="/sales/{{ sale.id }}/cancel" method="POST">
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Причина отмены *</label>
+                <input type="text" name="reason" placeholder="Укажите причину отмены" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Кто отменяет</label>
+                <input type="text" name="canceled_by" value="Администратор" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Подтверждаете отмену продажи? Товары будут возвращены в остатки.');">Отменить продажу</button>
+        </form>
+    </div>
+    {% elif (st == 'canceled' or st == 'cancelled') and not (sale.superseded_by_sale_id or sale.replaced_by_sale_id) %}
+    <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">
+    <div style="background: #fff; padding: 20px; border: 1px solid #ffeeba; border-radius: 5px; max-width: 600px;">
+        <h3 style="color: #856404; margin-top: 0;">Повторное оформление продажи</h3>
+        <p style="color: #555; font-size: 0.95rem;">Вы можете оформить новую продажу на основе этой отменённой продажи.</p>
+        <a href="/sales/{{ sale.id }}/reissue" class="btn" style="background: #ffc107; color: #212529; border: 1px solid #d39e00;">Оформить повторно</a>
     </div>
     {% endif %}
 {% endblock %}

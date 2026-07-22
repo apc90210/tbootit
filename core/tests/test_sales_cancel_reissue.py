@@ -24,7 +24,11 @@ def test_sale_cancel_and_reissue():
     prod = client.get(f"/api/products/{pid}").json()
     assert prod["quantity"] == 8
     
-    # 4. reissue sale
+    # 4. cancel sale first
+    cancel_resp = client.post(f"/api/sales/{sale_id}/cancel", json={"reason": "Wrong item"})
+    assert cancel_resp.status_code == 200
+
+    # 5. reissue sale
     resp = client.post(f"/api/sales/{sale_id}/reissue", json={
         "reason": "Wrong item",
         "payment_method": "card",

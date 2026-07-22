@@ -60,6 +60,12 @@ def migrate_db():
             ("status", "VARCHAR DEFAULT 'completed'"),
             ("cancelled_at", "DATETIME"),
             ("cancel_reason", "TEXT"),
+            ("canceled_by", "VARCHAR"),
+            ("original_sale_id", "INTEGER"),
+            ("replaced_by_sale_id", "INTEGER"),
+            ("source_sale_id", "INTEGER"),
+            ("superseded_by_sale_id", "INTEGER"),
+            ("reissued_at", "DATETIME"),
             ("warranty_days", "INTEGER"),
             ("warranty_enabled", "INTEGER DEFAULT 1")
         ]

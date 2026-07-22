@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Отмена продажи #{{ sale.id }}{% endblock %}
+
+{% block content %}
+    <h2>Отмена продажи #{{ sale.id }}</h2>
+
+    <div style="background: #fff; padding: 25px; border: 1px solid #f5c6cb; border-radius: 5px; max-width: 600px;">
+        <h3 style="color: #721c24; margin-top: 0;">Подтверждение отмены продажи</h3>
+        <p style="color: #721c24; font-weight: bold;">
+            Товар из этой продажи будет автоматически возвращён в остатки на склад!
+        </p>
+
+        <table style="margin-bottom: 20px;">
+            <tr>
+                <th>Номер продажи</th>
+                <td>#{{ sale.id }}</td>
+            </tr>
+            <tr>
+                <th>Дата</th>
+                <td>{{ sale.created_at or '—' }}</td>
+            </tr>
+            <tr>
+                <th>Сумма</th>
+                <td>{{ sale.total_amount }} ₽</td>
+            </tr>
+        </table>
+
+        <form action="/sales/{{ sale.id }}/cancel" method="POST">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Причина отмены *</label>
+                <input type="text" name="reason" placeholder="Укажите причину отмены продажи" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Кто отменяет</label>
+                <input type="text" name="canceled_by" value="Администратор" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите отменить эту продажу?');">Подтвердить отмену</button>
+                <a href="/sales/{{ sale.id }}" class="btn">Назад</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

@@ -133,10 +133,14 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
-    async def cancel_sale(self, sale_id: int, reason: str):
+    async def cancel_sale(self, sale_id: int, reason: str, canceled_by: str = "Администратор"):
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(f"{self.base_url}/api/sales/{sale_id}/cancel", json={"reason": reason}, timeout=10.0)
+                response = await client.post(
+                    f"{self.base_url}/api/sales/{sale_id}/cancel",
+                    json={"reason": reason, "canceled_by": canceled_by},
+                    timeout=10.0
+                )
                 if response.status_code == 200:
                     return response.json()
                 err = response.text

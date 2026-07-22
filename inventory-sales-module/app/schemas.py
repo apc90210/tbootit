@@ -46,7 +46,10 @@ STATUS_LABELS = {
 
 SALE_STATUS_LABELS = {
     "completed": "Завершена",
+    "canceled": "Отменена",
     "cancelled": "Отменена",
+    "superseded": "Заменена",
+    "reissued": "Повторно оформлена",
 }
 
 

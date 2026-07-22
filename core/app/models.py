@@ -135,8 +135,12 @@ class Sale(Base):
     warranty_enabled = Column(Integer, default=1)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
     cancel_reason = Column(Text, nullable=True)
+    canceled_by = Column(String, nullable=True)
     original_sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
     replaced_by_sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
+    source_sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
+    superseded_by_sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
+    reissued_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     items = relationship("SaleItem", back_populates="sale")
