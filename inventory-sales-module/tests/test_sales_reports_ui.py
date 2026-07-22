@@ -388,3 +388,58 @@ def test_reports_sales_one_sided_dates_200():
         response2 = client.get("/reports/sales?date_from=&date_to=2026-06-01")
         assert response2.status_code == 200
 
+
+# === Stage 04G-R3 quick filter date sync tests ===
+
+def test_reports_sales_quick_filter_today_syncs_date_inputs():
+    mock_data = MOCK_EMPTY_REPORT.copy()
+    mock_data["period"] = "today"
+    mock_data["date_from"] = "2026-07-22"
+    mock_data["date_to"] = "2026-07-22"
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=today")
+        assert response.status_code == 200
+        text = response.text
+        assert 'id="date_from" name="date_from" value="2026-07-22"' in text
+        assert 'id="date_to" name="date_to" value="2026-07-22"' in text
+
+
+def test_reports_sales_quick_filter_week_syncs_date_inputs():
+    mock_data = MOCK_EMPTY_REPORT.copy()
+    mock_data["period"] = "week"
+    mock_data["date_from"] = "2026-07-20"
+    mock_data["date_to"] = "2026-07-26"
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=week")
+        assert response.status_code == 200
+        text = response.text
+        assert 'id="date_from" name="date_from" value="2026-07-20"' in text
+        assert 'id="date_to" name="date_to" value="2026-07-26"' in text
+
+
+def test_reports_sales_quick_filter_month_syncs_date_inputs():
+    mock_data = MOCK_EMPTY_REPORT.copy()
+    mock_data["period"] = "month"
+    mock_data["date_from"] = "2026-07-01"
+    mock_data["date_to"] = "2026-07-31"
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=month")
+        assert response.status_code == 200
+        text = response.text
+        assert 'id="date_from" name="date_from" value="2026-07-01"' in text
+        assert 'id="date_to" name="date_to" value="2026-07-31"' in text
+
+
+def test_reports_sales_quick_filter_year_syncs_date_inputs():
+    mock_data = MOCK_EMPTY_REPORT.copy()
+    mock_data["period"] = "year"
+    mock_data["date_from"] = "2026-01-01"
+    mock_data["date_to"] = "2026-12-31"
+    with _patch_report(mock_data):
+        response = client.get("/reports/sales?period=year")
+        assert response.status_code == 200
+        text = response.text
+        assert 'id="date_from" name="date_from" value="2026-01-01"' in text
+        assert 'id="date_to" name="date_to" value="2026-12-31"' in text
+
+

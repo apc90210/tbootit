@@ -91,14 +91,21 @@ async def sales_report(
     if "payment_labels" not in report_data:
         report_data["payment_labels"] = dict(DEFAULT_REPORT_DATA["payment_labels"])
     
+    # Synchronize date_from and date_to template values with effective dates from report_data (e.g. for quick filters)
+    rep_date_from = report_data.get("date_from") if isinstance(report_data, dict) else getattr(report_data, "date_from", "")
+    rep_date_to = report_data.get("date_to") if isinstance(report_data, dict) else getattr(report_data, "date_to", "")
+
+    effective_date_from = date_from or rep_date_from or ""
+    effective_date_to = date_to or rep_date_to or ""
+
     return templates.TemplateResponse(
         request,
         "reports_sales.html",
         {
             "report_data": report_data,
             "period": period,
-            "date_from": date_from or "",
-            "date_to": date_to or "",
+            "date_from": effective_date_from,
+            "date_to": effective_date_to,
             "error_message": error_message
         }
     )
