@@ -48,6 +48,92 @@ async def sales_list(
 
 
 
+@router.get("/sales/new", response_class=HTMLResponse)
+async def new_sale_form(request: Request, product_id: Optional[int] = Query(None)):
+    """Form for single product direct sale."""
+    product = None
+    if product_id:
+        product = await core_client.get_product(product_id)
+        if product and isinstance(product, dict) and "error" in product:
+            product = None
+
+    return templates.TemplateResponse(
+        request=request,
+        name="sales_new.html",
+        context={
+            "product": product,
+            "payment_methods": PAYMENT_METHODS,
+        },
+    )
+
+
+@router.post("/sales/create")
+async def create_sale_endpoint(
+    request: Request,
+    product_id: int = Form(...),
+    price: float = Form(...),
+    quantity: int = Form(1),
+    payment_method: str = Form(...),
+    warranty_days: Optional[int] = Form(30),
+    no_warranty: Optional[str] = Form(None),
+    notes: Optional[str] = Form(""),
+):
+    """Process single product sale creation."""
+    if price <= 0:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": "Цена продажи должна быть больше 0"},
+        )
+    if quantity < 1:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": "Количество товара должно быть не менее 1"},
+        )
+
+    prod = await core_client.get_product(product_id)
+    if not prod or (isinstance(prod, dict) and "error" in prod):
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": "Товар не найден"},
+        )
+
+    title = prod.get("title", f"Товар #{product_id}")
+
+    is_no_warranty = no_warranty is not None
+    final_warranty_enabled = not is_no_warranty
+    final_warranty_days = None if is_no_warranty else (warranty_days if warranty_days is not None else 30)
+
+    payload = {
+        "customer_id": None,
+        "payment_method": payment_method,
+        "comment": notes or "",
+        "warranty_days": final_warranty_days,
+        "warranty_enabled": final_warranty_enabled,
+        "items": [
+            {
+                "product_id": product_id,
+                "title": title,
+                "price": price,
+                "quantity": quantity,
+            }
+        ],
+    }
+
+    res = await core_client.create_sale(payload)
+    if res and isinstance(res, dict) and "error" in res:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": res.get("detail", "Ошибка оформления продажи")},
+        )
+
+    sale_id = res.get("id")
+    return RedirectResponse(url=f"/sales/{sale_id}", status_code=303)
+
+
 @router.get("/sales/{sale_id}", response_class=HTMLResponse)
 async def sale_detail(request: Request, sale_id: int):
     """Sale detail / success page."""

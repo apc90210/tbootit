@@ -180,7 +180,12 @@
                     <td>{{ item.quantity }}</td>
                     <td>{{ item.storage_location or '—' }}</td>
                     <td>
-                        <a href="/products/{{ item.id }}" class="btn btn-success">Открыть</a>
+                        <a href="/products/{{ item.id }}" class="btn">Открыть</a>
+                        {% if item.status == 'in_stock' and item.storage_location == 'store' and item.quantity > 0 %}
+                            <a href="/sales/new?product_id={{ item.id }}" class="btn btn-success">Продать</a>
+                        {% else %}
+                            <button class="btn" disabled title="Продажа недоступна для этого статуса, локации или нулевого остатка">Продать</button>
+                        {% endif %}
                         {% if item.status in ['in_stock', 'reserved'] and item.storage_location == 'store' and item.quantity > 0 %}
                             <form action="/cart/add" method="post" style="display: inline;">
                                 <input type="hidden" name="product_id" value="{{ item.id }}">
