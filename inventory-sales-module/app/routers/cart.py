@@ -37,40 +37,36 @@ async def scan_barcode_to_cart(request: Request, barcode: str = Form(...)):
     if not barcode_clean:
         return await view_cart(request, scanner_error="Пожалуйста, введите или отсканируйте штрихкод.")
 
-    # Query core API for product
+    # Strictly query Core API by barcode ONLY (no fallback to SKU/ID search)
     res = await core_client.get_product_by_barcode(barcode_clean)
     
-    product = None
-    if res and isinstance(res, dict) and not res.get("error"):
-        product = res
-    else:
-        # Fallback to general search query
-        search_res = await core_client.get_products({"q": barcode_clean, "limit": 1})
-        if search_res and isinstance(search_res, dict) and not search_res.get("error") and search_res.get("items"):
-            product = search_res["items"][0]
+    if not res or not isinstance(res, dict) or res.get("error"):
+        return await view_cart(request, scanner_error=f"Товар с таким штрихкодом не найден ({barcode_clean}).")
 
-    if not product:
-        return await view_cart(request, scanner_error=f"Товар со штрихкодом '{barcode_clean}' не найден.")
-
-    # Check product status and location
+    product = res
     prod_status = product.get("status")
     prod_qty = product.get("quantity", 0)
+    storage_loc = product.get("storage_location")
     title = product.get("title", f"Товар #{product.get('id')}")
     price = float(product.get("sale_price") or product.get("price") or 0.0)
 
-    if prod_status not in ["in_stock", "reserved"] or prod_qty <= 0:
-        status_labels = {
-            "sold": "Продан",
-            "reserved": "В резерве",
-            "draft": "Черновик",
-            "in_repair": "В ремонте",
-            "written_off": "Списан"
-        }
-        st_lbl = status_labels.get(prod_status, prod_status)
-        return await view_cart(
-            request,
-            scanner_error=f"Товар '{title}' найден (ID #{product.get('id')}), но сейчас недоступен для продажи (статус: {st_lbl}, остаток: {prod_qty} шт.)."
-        )
+    # Check status sellability
+    if prod_status == "reserved":
+        return await view_cart(request, scanner_error="Товар найден, но зарезервирован и недоступен для продажи.")
+    if prod_status == "sold":
+        return await view_cart(request, scanner_error="Товар уже продан и недоступен для продажи.")
+    if prod_status == "draft":
+        return await view_cart(request, scanner_error="Товар ещё не готов к продаже.")
+    if prod_status not in ["in_stock", "available"]:
+        return await view_cart(request, scanner_error=f"Товар '{title}' недоступен для продажи (статус: {prod_status}).")
+
+    # Check quantity
+    if prod_qty <= 0:
+        return await view_cart(request, scanner_error="Товар найден, но отсутствует в остатках.")
+
+    # Check location
+    if storage_loc and storage_loc not in ["store", "склад", "магазин", "витрина"]:
+        return await view_cart(request, scanner_error=f"Товар находится в локации '{storage_loc}' и недоступен для продажи из магазина.")
 
     # Product is valid and available -> add to cart
     cart = get_cart(request)
@@ -88,7 +84,7 @@ async def scan_barcode_to_cart(request: Request, barcode: str = Form(...)):
         })
         
     set_cart(request, cart)
-    return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/cart", status_code=303)
 
 @router.post("/add")
 async def add_to_cart(

@@ -508,13 +508,9 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
 @router.get("/by-barcode/{barcode}", response_model=schemas.Product)
 def get_product_by_barcode(barcode: str, db: Session = Depends(get_db)):
     barcode_clean = barcode.strip()
-    product = db.query(models.Product).filter(
-        or_(models.Product.barcode == barcode_clean, models.Product.sku == barcode_clean)
-    ).first()
-    if not product and barcode_clean.isdigit():
-        product = db.query(models.Product).filter(models.Product.id == int(barcode_clean)).first()
+    product = db.query(models.Product).filter(models.Product.barcode == barcode_clean).first()
     if not product:
-        raise HTTPException(status_code=404, detail=f"Товар со штрихкодом '{barcode_clean}' не найден")
+        raise HTTPException(status_code=404, detail=f"Товар с таким штрихкодом не найден ({barcode_clean}).")
     return product
 
 @router.post("/barcodes/generate-missing", response_model=schemas.BarcodeBulkGenerateResponse)

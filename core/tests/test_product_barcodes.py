@@ -61,6 +61,19 @@ def test_unknown_barcode_returns_404():
     assert res.status_code == 404
     assert "не найден" in res.json()["detail"]
 
+def test_sku_and_id_not_found_by_barcode():
+    prod = create_test_product(sku_prefix="NOBCMATCH")
+    sku = prod["sku"]
+    prod_id = prod["id"]
+    
+    # Searching SKU via /by-barcode must return 404
+    sku_res = client.get(f"/api/products/by-barcode/{sku}")
+    assert sku_res.status_code == 404
+    
+    # Searching product ID via /by-barcode must return 404
+    id_res = client.get(f"/api/products/by-barcode/{prod_id}")
+    assert id_res.status_code == 404
+
 def test_bulk_generate_missing_only():
     p1 = create_test_product(sku_prefix="BULK1")
     p2 = create_test_product(sku_prefix="BULK2")
