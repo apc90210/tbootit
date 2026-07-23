@@ -21,6 +21,7 @@ class Category(CategoryBase):
 # Product Schemas
 class ProductBase(BaseModel):
     sku: str
+    barcode: Optional[str] = None
     title: str
     category_id: Optional[int] = None
     brand: Optional[str] = None
@@ -64,6 +65,7 @@ class ProductCreate(ProductBase):
 
 class ProductUpdate(BaseModel):
     title: Optional[str] = None
+    barcode: Optional[str] = None
     category_id: Optional[int] = None
     brand: Optional[str] = None
     model: Optional[str] = None
@@ -96,6 +98,17 @@ class ProductListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+class BarcodeGenerateResponse(BaseModel):
+    product_id: int
+    barcode: str
+    generated: bool
+
+class BarcodeBulkGenerateResponse(BaseModel):
+    processed: int
+    generated: int
+    skipped_existing: int
+    errors: List[str] = []
 
 # Customer Schemas
 class CustomerBase(BaseModel):

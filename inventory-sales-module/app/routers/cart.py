@@ -14,7 +14,7 @@ def set_cart(request: Request, cart: list):
     request.session["cart"] = cart
 
 @router.get("", response_class=HTMLResponse)
-async def view_cart(request: Request):
+async def view_cart(request: Request, scanner_error: str = None):
     cart = get_cart(request)
     total_amount = sum(item["price"] * item["quantity"] for item in cart)
     
@@ -26,9 +26,69 @@ async def view_cart(request: Request):
             "cart": cart,
             "total_amount": total_amount,
             "PAYMENT_METHODS": schemas.PAYMENT_METHODS,
-            "active_page": "sales"
+            "active_page": "sales",
+            "scanner_error": scanner_error or ""
         }
     )
+
+@router.post("/scan")
+async def scan_barcode_to_cart(request: Request, barcode: str = Form(...)):
+    barcode_clean = barcode.strip()
+    if not barcode_clean:
+        return await view_cart(request, scanner_error="Пожалуйста, введите или отсканируйте штрихкод.")
+
+    # Query core API for product
+    res = await core_client.get_product_by_barcode(barcode_clean)
+    
+    product = None
+    if res and isinstance(res, dict) and not res.get("error"):
+        product = res
+    else:
+        # Fallback to general search query
+        search_res = await core_client.get_products({"q": barcode_clean, "limit": 1})
+        if search_res and isinstance(search_res, dict) and not search_res.get("error") and search_res.get("items"):
+            product = search_res["items"][0]
+
+    if not product:
+        return await view_cart(request, scanner_error=f"Товар со штрихкодом '{barcode_clean}' не найден.")
+
+    # Check product status and location
+    prod_status = product.get("status")
+    prod_qty = product.get("quantity", 0)
+    title = product.get("title", f"Товар #{product.get('id')}")
+    price = float(product.get("sale_price") or product.get("price") or 0.0)
+
+    if prod_status not in ["in_stock", "reserved"] or prod_qty <= 0:
+        status_labels = {
+            "sold": "Продан",
+            "reserved": "В резерве",
+            "draft": "Черновик",
+            "in_repair": "В ремонте",
+            "written_off": "Списан"
+        }
+        st_lbl = status_labels.get(prod_status, prod_status)
+        return await view_cart(
+            request,
+            scanner_error=f"Товар '{title}' найден (ID #{product.get('id')}), но сейчас недоступен для продажи (статус: {st_lbl}, остаток: {prod_qty} шт.)."
+        )
+
+    # Product is valid and available -> add to cart
+    cart = get_cart(request)
+    product_id = product["id"]
+    for item in cart:
+        if item["product_id"] == product_id:
+            item["quantity"] += 1
+            break
+    else:
+        cart.append({
+            "product_id": product_id,
+            "title": title,
+            "price": price,
+            "quantity": 1
+        })
+        
+    set_cart(request, cart)
+    return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.post("/add")
 async def add_to_cart(

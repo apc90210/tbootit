@@ -43,7 +43,8 @@ def migrate_db():
             ("avito_seller_type", "VARCHAR"),
             ("source_json", "TEXT"),
             ("source_type", "VARCHAR"),
-            ("last_imported_at", "DATETIME")
+            ("last_imported_at", "DATETIME"),
+            ("barcode", "VARCHAR")
         ]
         
         for col_name, col_type in updates:
@@ -52,6 +53,12 @@ def migrate_db():
                     conn.execute(text(f"ALTER TABLE products ADD COLUMN {col_name} {col_type};"))
                 except Exception as e:
                     print(f"Migration error on {col_name}: {e}")
+
+        # Ensure index for barcode
+        try:
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_products_barcode ON products(barcode) WHERE barcode IS NOT NULL AND barcode != '';"))
+        except Exception as e:
+            print(f"Index creation warning: {e}")
 
         # Migrate sales table for Stage 04C
         res_sales = conn.execute(text("PRAGMA table_info(sales);")).fetchall()

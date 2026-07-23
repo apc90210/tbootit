@@ -3,7 +3,18 @@
 {% block title %}Список товаров{% endblock %}
 
 {% block content %}
-    <h2>Список товаров</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Список товаров</h2>
+        <form action="/products/barcodes/generate-missing" method="post" style="display:inline;" onsubmit="return confirm('Будут созданы штрихкоды только товарам, у которых они отсутствуют. Существующие штрихкоды не изменятся. Продолжить?');">
+            <button type="submit" class="btn btn-secondary" style="background:#6c757d; color:#fff; padding: 8px 15px; border-radius: 4px; border:none;">Сгенерировать отсутствующие штрихкоды</button>
+        </form>
+    </div>
+
+    {% if msg %}
+    <div style="background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #c3e6cb;">
+        ✓ {{ msg }}
+    </div>
+    {% endif %}
     
     {% if filter_options_error %}
     <div style="background: #fff3cd; color: #856404; padding: 10px; margin-bottom: 20px; border: 1px solid #ffeeba;">
@@ -38,7 +49,7 @@
         <form id="filters-form" method="GET" action="/products" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
             <div>
                 <label style="display: block; margin-bottom: 5px;">Поиск:</label>
-                <input type="text" name="q" value="{{ q }}" placeholder="Название или артикул...">
+                <input type="text" name="q" value="{{ q }}" placeholder="Название, ID, артикул или штрихкод..." style="width: 280px; padding: 6px;">
             </div>
             
             <div>
@@ -153,6 +164,7 @@
             <thead>
                 <tr>
                     <th>Артикул</th>
+                    <th>Штрихкод</th>
                     <th>Название</th>
                     <th>Статус</th>
                     <th>Цена</th>
@@ -165,6 +177,7 @@
                 {% for item in products_data['items'] %}
                 <tr>
                     <td>{{ item.sku or '—' }}</td>
+                    <td><code>{{ item.barcode or '—' }}</code></td>
                     <td>{{ item.title }}</td>
                     <td>
                         {% if item.status == 'in_stock' %}В наличии
@@ -197,15 +210,15 @@
                             <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка">В корзину</button>
                         {% endif %}
                         {% if item.status == 'in_stock' %}
-                            <a href="/products/{{ item.id }}/price-tag" class="btn btn-primary" target="_blank">Печать ценника</a>
+                            <a href="/products/{{ item.id }}/price-tag/58x40" class="btn btn-primary" target="_blank">Ценник 58×40</a>
                         {% else %}
-                            <button class="btn" disabled title="Ценник доступен только для товаров в наличии">Печать ценника</button>
+                            <button class="btn" disabled title="Ценник доступен только для товаров в наличии">Ценник 58×40</button>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" style="text-align: center;">Ничего не найдено</td>
+                    <td colspan="8" style="text-align: center;">Ничего не найдено</td>
                 </tr>
                 {% endfor %}
             </tbody>

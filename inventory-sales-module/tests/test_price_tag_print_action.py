@@ -13,7 +13,7 @@ def test_price_tag_print_action_preview(mock_core):
     assert response.status_code == 200
     assert "SKU-PRINT-123" in response.text
     assert "Принтер HP" in response.text
-    assert "Печать ценника" in response.text
+    assert "Печать" in response.text
     assert "Предварительная форма ценника" in response.text
 
 def test_products_list_has_price_tag_button():
@@ -30,4 +30,4 @@ def test_products_list_has_price_tag_button():
         mock_get_opts.return_value = {}
         response = client.get("/products")
         assert response.status_code == 200
-        assert "Печать ценника" in response.text
+        assert "Ценник 58×40" in response.text

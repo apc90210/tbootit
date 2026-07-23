@@ -8,6 +8,13 @@
     <div style="background: #fff; padding: 20px; border: 1px solid #ddd; margin-bottom: 20px;">
         <p><strong>Название:</strong> {{ product.title }}</p>
         <p><strong>Артикул:</strong> {{ product.sku or '—' }}</p>
+        <p><strong>Штрихкод:</strong> <code>{{ product.barcode or 'Не задан' }}</code>
+            {% if not product.barcode %}
+            <form action="/products/{{ product.id }}/barcode/generate" method="post" style="display: inline; margin-left: 10px;">
+                <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.9rem;">Сгенерировать штрихкод</button>
+            </form>
+            {% endif %}
+        </p>
         <p><strong>Статус:</strong>
             {% if product.status == 'in_stock' %}В наличии
             {% elif product.status == 'reserved' %}В резерве
@@ -91,9 +98,9 @@
             <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">В корзину</button>
         {% endif %}
         {% if product.status == 'in_stock' %}
-            <a href="/products/{{ product.id }}/price-tag" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Печать ценника</a>
+            <a href="/products/{{ product.id }}/price-tag/58x40" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Ценник 58×40</a>
         {% else %}
-            <button class="btn" disabled title="Ценник доступен только для товаров в наличии" style="margin-left: 10px;">Печать ценника</button>
+            <button class="btn" disabled title="Ценник доступен только для товаров в наличии" style="margin-left: 10px;">Ценник 58×40</button>
         {% endif %}
     </div>
 {% endblock %}

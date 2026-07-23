@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, case
 from typing import List, Optional
 from app.database import get_db
 from app import models, schemas
 from app.routers.customers import log_audit
+from app.services.barcodes import generate_barcode_for_product, generate_missing_barcodes
 import json
 
 router = APIRouter()
@@ -43,15 +44,18 @@ def get_products(
     query = db.query(models.Product)
     
     if q:
-        query = query.filter(
-            or_(
-                models.Product.title.ilike(f"%{q}%"),
-                models.Product.sku.ilike(f"%{q}%"),
-                models.Product.brand.ilike(f"%{q}%"),
-                models.Product.model.ilike(f"%{q}%"),
-                models.Product.serial_number.ilike(f"%{q}%")
-            )
-        )
+        q_clean = q.strip()
+        conditions = [
+            models.Product.title.ilike(f"%{q_clean}%"),
+            models.Product.sku.ilike(f"%{q_clean}%"),
+            models.Product.barcode.ilike(f"%{q_clean}%"),
+            models.Product.brand.ilike(f"%{q_clean}%"),
+            models.Product.model.ilike(f"%{q_clean}%"),
+            models.Product.serial_number.ilike(f"%{q_clean}%")
+        ]
+        if q_clean.isdigit():
+            conditions.append(models.Product.id == int(q_clean))
+        query = query.filter(or_(*conditions))
     if status:
         query = query.filter(models.Product.status == status)
     if source:
@@ -79,6 +83,12 @@ def get_products(
         else:
             query = query.filter(or_(models.Product.site_title == None, models.Product.site_description == None))
             
+    if q:
+        q_clean = q.strip()
+        query = query.order_by(
+            case((models.Product.barcode == q_clean, 0), (models.Product.sku == q_clean, 1), else_=2)
+        )
+
     if sort == "price_asc":
         query = query.order_by(models.Product.sale_price.asc())
     elif sort == "price_desc":
@@ -279,6 +289,11 @@ def get_meta(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.Product)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+    if product.barcode and product.barcode.strip():
+        existing = db.query(models.Product).filter(models.Product.barcode == product.barcode.strip()).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Barcode already exists")
+            
     db_product = models.Product(**product.model_dump())
     db.add(db_product)
     db.commit()
@@ -489,3 +504,28 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     log_product_event(db, product_id, "delete_soft", old_value=old_status, new_value="written_off", comment="Product softly deleted (written_off)")
     db.commit()
     return {"message": "Product softly deleted (written_off)"}
+
+@router.get("/by-barcode/{barcode}", response_model=schemas.Product)
+def get_product_by_barcode(barcode: str, db: Session = Depends(get_db)):
+    barcode_clean = barcode.strip()
+    product = db.query(models.Product).filter(
+        or_(models.Product.barcode == barcode_clean, models.Product.sku == barcode_clean)
+    ).first()
+    if not product and barcode_clean.isdigit():
+        product = db.query(models.Product).filter(models.Product.id == int(barcode_clean)).first()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Товар со штрихкодом '{barcode_clean}' не найден")
+    return product
+
+@router.post("/barcodes/generate-missing", response_model=schemas.BarcodeBulkGenerateResponse)
+def generate_missing_barcodes_endpoint(db: Session = Depends(get_db)):
+    res = generate_missing_barcodes(db, actor="operator")
+    return res
+
+@router.post("/{product_id}/barcode/generate", response_model=schemas.BarcodeGenerateResponse)
+def generate_barcode_endpoint(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    res = generate_barcode_for_product(db, product, actor="operator")
+    return res

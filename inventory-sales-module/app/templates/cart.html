@@ -13,6 +13,28 @@
     </div>
 </div>
 
+<div style="background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+    <h3 style="margin-top: 0; margin-bottom: 10px;">Сканировать штрихкод</h3>
+    {% if scanner_error %}
+    <div style="background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 10px 15px; border-radius: 4px; margin-bottom: 12px; font-weight: bold;">
+        ✕ {{ scanner_error }}
+    </div>
+    {% endif %}
+    <form action="/cart/scan" method="post" style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" id="scanner-input" name="barcode" placeholder="Отсканируйте штрихкод или введите код..." autofocus style="flex: 1; padding: 10px; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px;" autocomplete="off">
+        <button type="submit" class="btn btn-primary" style="padding: 10px 20px; font-size: 1rem;">Найти и добавить</button>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var inp = document.getElementById('scanner-input');
+        if (inp) {
+            inp.focus();
+        }
+    });
+</script>
+
 {% if cart %}
 <table class="table">
     <thead>

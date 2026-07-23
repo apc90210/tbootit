@@ -9,3 +9,4 @@ respx
 pytest-asyncio
 python-multipart
 itsdangerous
+python-barcode==0.15.1

@@ -71,6 +71,43 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    # --- Barcode methods (Stage 04I) ---
+
+    async def get_product_by_barcode(self, barcode: str):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/products/by-barcode/{barcode.strip()}", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                error_detail = ""
+                try:
+                    error_detail = response.json().get("detail", "")
+                except Exception:
+                    error_detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": error_detail}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def generate_product_barcode(self, product_id: int):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/{product_id}/barcode/generate", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def generate_missing_barcodes(self):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/barcodes/generate-missing", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
     # --- Sales methods (Stage 04E) ---
 
     async def create_sale(self, payload: dict):

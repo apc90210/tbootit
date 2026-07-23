@@ -1,7 +1,9 @@
+from typing import Optional
 from fastapi import APIRouter, Request, Query, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
+from app.barcode_utils import render_barcode_svg
 import os
 
 router = APIRouter()
@@ -33,7 +35,8 @@ async def list_products(
     site_ready: str = Query(None),
     sort: str = Query(None),
     limit: int = Query(50),
-    offset: int = Query(0)
+    offset: int = Query(0),
+    msg: str = Query(None)
 ):
     params = {"limit": limit, "offset": offset}
     if q and q.strip(): params["q"] = q
@@ -78,9 +81,16 @@ async def list_products(
             "site_ready": site_ready or "",
             "sort": sort or "",
             "limit": limit,
-            "offset": offset
+            "offset": offset,
+            "msg": msg or ""
         }
     )
+
+@router.post("/products/barcodes/generate-missing")
+async def generate_missing_barcodes_endpoint(request: Request):
+    res = await core_client.generate_missing_barcodes()
+    msg = f"Сгенерировано штрихкодов: {res.get('generated', 0)}, пропущено: {res.get('skipped_existing', 0)}"
+    return RedirectResponse(url=f"/products?msg={msg}", status_code=303)
 
 @router.get("/products/{product_id}", response_class=HTMLResponse)
 async def product_detail(request: Request, product_id: int):
@@ -99,11 +109,21 @@ async def product_detail(request: Request, product_id: int):
             }
         )
 
+    barcode_svg = ""
+    if data.get("barcode") or data.get("sku"):
+        barcode_svg = render_barcode_svg(data.get("barcode") or data.get("sku"))
+
     return templates.TemplateResponse(
         request=request, name="product_detail.html", context={
-            "product": data
+            "product": data,
+            "barcode_svg": barcode_svg
         }
     )
+
+@router.post("/products/{product_id}/barcode/generate")
+async def generate_single_barcode_endpoint(request: Request, product_id: int):
+    res = await core_client.generate_product_barcode(product_id)
+    return RedirectResponse(url=f"/products/{product_id}", status_code=303)
 
 @router.post("/products/{product_id}/update")
 async def update_product_endpoint(request: Request, product_id: int, storage_location: str = Form(None), quantity: int = Form(None)):
@@ -120,8 +140,15 @@ async def update_product_endpoint(request: Request, product_id: int, storage_loc
         )
     return RedirectResponse(url=f"/products/{product_id}", status_code=303)
 
+@router.get("/products/{product_id}/price-tag/58x40", response_class=HTMLResponse)
 @router.get("/products/{product_id}/price-tag", response_class=HTMLResponse)
-async def price_tag_preview(request: Request, product_id: int):
+async def price_tag_preview(
+    request: Request,
+    product_id: int,
+    print_price: Optional[float] = Query(None),
+    warranty_text: Optional[str] = Query(None),
+    condition_text: Optional[str] = Query(None)
+):
     data = await core_client.get_product_details(product_id)
     
     if data and isinstance(data, dict) and "error" in data:
@@ -137,8 +164,22 @@ async def price_tag_preview(request: Request, product_id: int):
             }
         )
 
+    # Determine display price for print (without modifying Core DB Product.price)
+    default_price = float(data.get("sale_price") or data.get("price") or 0.0)
+    effective_print_price = print_price if print_price is not None else default_price
+    effective_warranty = warranty_text if warranty_text is not None else "Гарантия 30 дней"
+    effective_condition = condition_text if condition_text is not None else (data.get("condition") or "Б/У")
+
+    bc_val = data.get("barcode") or data.get("sku") or str(product_id)
+    barcode_svg = render_barcode_svg(bc_val)
+
     return templates.TemplateResponse(
         request=request, name="price_tag_preview.html", context={
-            "product": data
+            "product": data,
+            "print_price": effective_print_price,
+            "warranty_text": effective_warranty,
+            "condition_text": effective_condition,
+            "barcode_svg": barcode_svg,
+            "barcode_value": bc_val
         }
     )
