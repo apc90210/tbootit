@@ -1,20 +1,27 @@
-import random
+from typing import Optional, Set
 from sqlalchemy.orm import Session
 from app import models
 from app.routers.customers import log_audit
 
 PREFIX = "200"
 
-def generate_unique_barcode(db: Session) -> str:
+def generate_unique_barcode(db: Session, assigned_in_session: Optional[Set[str]] = None) -> str:
     """Generate a unique 12-digit barcode starting with '200'."""
+    if assigned_in_session is None:
+        assigned_in_session = set()
+        
     max_id = db.query(models.Product.id).order_by(models.Product.id.desc()).first()
     seq = (max_id[0] if max_id else 0) + 1
     
     while True:
-        # 12 digits: 200 + 9 digits
         candidate = f"{PREFIX}{seq:09d}"
+        if candidate in assigned_in_session:
+            seq += 1
+            continue
+            
         existing = db.query(models.Product).filter(models.Product.barcode == candidate).first()
         if not existing:
+            assigned_in_session.add(candidate)
             return candidate
         seq += 1
 
@@ -55,6 +62,12 @@ def generate_missing_barcodes(db: Session, actor: str = "system") -> dict:
         (models.Product.barcode == None) | (models.Product.barcode == "")
     ).all()
     
+    assigned_in_session = set(
+        b[0] for b in db.query(models.Product.barcode).filter(
+            models.Product.barcode != None, models.Product.barcode != ""
+        ).all()
+    )
+    
     processed = len(products)
     generated = 0
     skipped = 0
@@ -63,7 +76,7 @@ def generate_missing_barcodes(db: Session, actor: str = "system") -> dict:
     for prod in products:
         try:
             if not prod.barcode or not prod.barcode.strip():
-                new_bc = generate_unique_barcode(db)
+                new_bc = generate_unique_barcode(db, assigned_in_session=assigned_in_session)
                 prod.barcode = new_bc
                 generated += 1
                 log_audit(
