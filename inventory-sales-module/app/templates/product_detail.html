@@ -93,17 +93,25 @@
         {% else %}
             <button class="btn" disabled title="Продажа недоступна для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">Продать</button>
         {% endif %}
-        {% if product.status in ['in_stock', 'reserved'] and product.storage_location == 'store' and product.quantity > 0 %}
-            <form action="/cart/add" method="post" class="quick-add-form" style="display: inline; margin-left: 10px;" data-product-id="{{ product.id }}">
-                <input type="hidden" name="product_id" value="{{ product.id }}">
-                <input type="hidden" name="title" value="{{ product.title }}">
-                <input type="hidden" name="price" value="{{ product.sale_price if product.sale_price else product.price }}">
-                <input type="hidden" name="return_url" value="/products/{{ product.id }}">
-                <button type="submit" class="btn btn-danger quick-add-btn">В корзину</button>
-            </form>
-        {% else %}
-            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">В корзину</button>
-        {% endif %}
+        <div class="product-cart-actions" data-product-id="{{ product.id }}" style="display: inline-block;">
+            {% if product.status in ['in_stock', 'reserved'] and product.storage_location == 'store' and product.quantity > 0 %}
+                <form action="/cart/add" method="post" class="quick-add-form" style="display: inline; margin-left: 10px;" data-product-id="{{ product.id }}">
+                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                    <input type="hidden" name="title" value="{{ product.title }}">
+                    <input type="hidden" name="price" value="{{ product.sale_price if product.sale_price else product.price }}">
+                    <input type="hidden" name="return_url" value="/products/{{ product.id }}">
+                    <button type="submit" class="btn btn-danger quick-add-btn">В корзину</button>
+                </form>
+            {% else %}
+                <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">В корзину</button>
+            {% endif %}
+            <a href="/cart" class="btn btn-success product-go-to-cart" style="{% if product.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; background: #28a745; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; text-decoration: none;">
+                Перейти в корзину
+            </a>
+            <span class="product-cart-quantity" style="{% if product.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; font-size: 0.85rem; color: #155724; background: #d4edda; padding: 2px 6px; border-radius: 3px;" aria-live="polite">
+                В корзине: <span class="product-cart-quantity-value">{{ cart_quantities_by_product_id.get(product.id, 0) }}</span>
+            </span>
+        </div>
         {% if product.status == 'in_stock' %}
             <a href="/products/{{ product.id }}/price-tag/58x40" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Ценник 58×40</a>
         {% else %}

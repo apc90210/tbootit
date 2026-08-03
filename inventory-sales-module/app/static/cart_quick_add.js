@@ -48,12 +48,37 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (result) {
                 const data = result.data;
                 if (data && data.ok) {
-                    // Update cart button counter
+                    // Update header cart button counter
                     if (cartBtn) {
                         const span = cartBtn.querySelector('span');
                         if (span) span.textContent = data.cart_items_count;
                         cartBtn.style.display = 'inline-block';
                     }
+
+                    // Update per-product cart button & quantity for all containers matching product_id
+                    const prodId = data.product_id;
+                    if (prodId !== undefined && prodId !== null) {
+                        const containers = document.querySelectorAll('[data-product-id="' + prodId + '"]');
+                        containers.forEach(function (container) {
+                            const localCartBtn = container.querySelector('.product-go-to-cart') ||
+                                (container.classList.contains('product-go-to-cart') ? container : null) ||
+                                (container.parentElement ? container.parentElement.querySelector('.product-go-to-cart') : null);
+                            if (localCartBtn) {
+                                localCartBtn.style.display = 'inline-block';
+                            }
+                            const localQtyWrap = container.querySelector('.product-cart-quantity') ||
+                                (container.parentElement ? container.parentElement.querySelector('.product-cart-quantity') : null);
+                            if (localQtyWrap) {
+                                localQtyWrap.style.display = 'inline-block';
+                            }
+                            const localQtyVal = container.querySelector('.product-cart-quantity-value') ||
+                                (container.parentElement ? container.parentElement.querySelector('.product-cart-quantity-value') : null);
+                            if (localQtyVal && data.product_quantity_in_cart !== undefined) {
+                                localQtyVal.textContent = data.product_quantity_in_cart;
+                            }
+                        });
+                    }
+
                     submitBtn.textContent = '✓ Добавлено';
                     showToast(data.message || 'Товар добавлен в корзину', false);
                     setTimeout(function () {

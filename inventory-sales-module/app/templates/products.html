@@ -205,17 +205,25 @@
                         {% else %}
                             <button class="btn" disabled title="Продажа недоступна для этого статуса, локации или нулевого остатка">Продать</button>
                         {% endif %}
-                        {% if item.status in ['in_stock', 'reserved'] and item.storage_location == 'store' and item.quantity > 0 %}
-                            <form action="/cart/add" method="post" class="quick-add-form" style="display: inline;" data-product-id="{{ item.id }}">
-                                <input type="hidden" name="product_id" value="{{ item.id }}">
-                                <input type="hidden" name="title" value="{{ item.title }}">
-                                <input type="hidden" name="price" value="{{ item.sale_price if item.sale_price else item.price }}">
-                                <input type="hidden" name="return_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-                                <button type="submit" class="btn btn-danger quick-add-btn">В корзину</button>
-                            </form>
-                        {% else %}
-                            <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка">В корзину</button>
-                        {% endif %}
+                        <div class="product-cart-actions" data-product-id="{{ item.id }}" style="display: inline-block;">
+                            {% if item.status in ['in_stock', 'reserved'] and item.storage_location == 'store' and item.quantity > 0 %}
+                                <form action="/cart/add" method="post" class="quick-add-form" style="display: inline;" data-product-id="{{ item.id }}">
+                                    <input type="hidden" name="product_id" value="{{ item.id }}">
+                                    <input type="hidden" name="title" value="{{ item.title }}">
+                                    <input type="hidden" name="price" value="{{ item.sale_price if item.sale_price else item.price }}">
+                                    <input type="hidden" name="return_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                    <button type="submit" class="btn btn-danger quick-add-btn">В корзину</button>
+                                </form>
+                            {% else %}
+                                <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка">В корзину</button>
+                            {% endif %}
+                            <a href="/cart" class="btn btn-success product-go-to-cart" style="{% if item.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; background: #28a745; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; text-decoration: none;">
+                                Перейти в корзину
+                            </a>
+                            <span class="product-cart-quantity" style="{% if item.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; font-size: 0.85rem; color: #155724; background: #d4edda; padding: 2px 6px; border-radius: 3px;" aria-live="polite">
+                                В корзине: <span class="product-cart-quantity-value">{{ cart_quantities_by_product_id.get(item.id, 0) }}</span>
+                            </span>
+                        </div>
                         {% if item.status == 'in_stock' %}
                             <a href="/products/{{ item.id }}/price-tag/58x40" class="btn btn-primary" target="_blank">Ценник 58×40</a>
                         {% else %}

@@ -66,12 +66,20 @@ async def list_products(
         filter_options_response = {}
         
     cart = request.session.get("cart", [])
-    cart_items_count = sum(item.get("quantity", 1) for item in cart)
+    cart_items_count = sum(item.get("quantity", 1) for item in cart if isinstance(item, dict))
+    cart_quantities_by_product_id = {
+        int(item["product_id"]): int(item.get("quantity", 1))
+        for item in cart
+        if isinstance(item, dict) and "product_id" in item
+    }
+    cart_product_ids = set(cart_quantities_by_product_id.keys())
 
     return templates.TemplateResponse(
         request=request, name="products.html", context={
             "products_data": data,
             "cart_items_count": cart_items_count,
+            "cart_quantities_by_product_id": cart_quantities_by_product_id,
+            "cart_product_ids": cart_product_ids,
             "filter_options": filter_options_response,
             "filter_options_error": filter_options_error,
             "q": q or "",
@@ -118,13 +126,21 @@ async def product_detail(request: Request, product_id: int):
         barcode_svg = render_barcode_svg(data.get("barcode") or data.get("sku"))
 
     cart = request.session.get("cart", [])
-    cart_items_count = sum(item.get("quantity", 1) for item in cart)
+    cart_items_count = sum(item.get("quantity", 1) for item in cart if isinstance(item, dict))
+    cart_quantities_by_product_id = {
+        int(item["product_id"]): int(item.get("quantity", 1))
+        for item in cart
+        if isinstance(item, dict) and "product_id" in item
+    }
+    cart_product_ids = set(cart_quantities_by_product_id.keys())
 
     return templates.TemplateResponse(
         request=request, name="product_detail.html", context={
             "product": data,
             "barcode_svg": barcode_svg,
-            "cart_items_count": cart_items_count
+            "cart_items_count": cart_items_count,
+            "cart_quantities_by_product_id": cart_quantities_by_product_id,
+            "cart_product_ids": cart_product_ids
         }
     )
 

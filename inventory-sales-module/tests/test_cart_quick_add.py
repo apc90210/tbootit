@@ -32,6 +32,7 @@ def test_quick_add_success_json(mock_core):
     assert data["cart_items_count"] == 1
     assert data["cart_lines_count"] == 1
     assert data["product_id"] == 100
+    assert data["product_quantity_in_cart"] == 1
     assert "Test Phone" in data["message"]
 
 def test_quick_add_no_redirect(mock_core):

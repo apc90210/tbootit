@@ -105,7 +105,7 @@ async def add_to_cart(
         "application/json" in request.headers.get("accept", "")
     )
     
-    target_id = path_product_id or product_id
+    target_id = int(path_product_id or product_id) if (path_product_id or product_id) else None
     if not target_id:
         err_msg = "Не указан ID товара."
         if is_json_api:
