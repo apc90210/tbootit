@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Техноребут — {% block title %}Ремонты{% endblock %}</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+    <header>
+        <a href="/repairs">Техноребут — Модуль ремонтов</a>
+    </header>
+    <nav>
+        <a href="http://localhost:8011/">Главная</a>
+        <a href="http://localhost:8030/products">Товары</a>
+        <a href="http://localhost:8030/sales">Продажи</a>
+        <a href="http://localhost:8030/reports/sales">Отчёты</a>
+        <a href="/repairs">Ремонты</a>
+        <a href="http://localhost:8020/">Avito</a>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

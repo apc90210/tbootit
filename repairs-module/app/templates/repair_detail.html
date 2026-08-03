@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Ремонт {{ repair.number }}{% endblock %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="margin: 0;">Ремонтный заказ: {{ repair.number }}</h2>
+        <div>
+            {% if repair.status not in ['issued', 'canceled'] %}
+            <a href="/repairs/{{ repair.id }}/edit" class="btn btn-primary">Редактировать</a>
+            {% endif %}
+            <a href="/repairs" class="btn btn-secondary" style="margin-left: 5px;">К списку ремонтов</a>
+        </div>
+    </div>
+
+    {% if msg %}
+    <div style="background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
+        ✓ {{ msg }}
+    </div>
+    {% endif %}
+
+    {% if error_msg %}
+    <div style="background: #f8d7da; color: #721c24; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+        ⚠️ {{ error_msg }}
+    </div>
+    {% endif %}
+
+    <!-- Main Card Body -->
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 25px;">
+        <!-- Left Panel: Info -->
+        <div style="flex: 2; min-width: 320px; background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <span class="badge badge-{{ repair.status }}" style="font-size: 1.1rem; padding: 6px 12px;">
+                    Статус: {{ repair.status_label or repair.status }}
+                </span>
+                <span class="badge badge-priority-{{ repair.priority }}" style="font-size: 0.95rem; padding: 6px 10px;">
+                    Приоритет: {{ repair.priority_label or repair.priority }}
+                </span>
+            </div>
+
+            <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Устройство</h3>
+            <p><strong>Тип:</strong> {{ repair.device_type }}</p>
+            <p><strong>Бренд / Модель:</strong> {{ repair.brand or '—' }} {{ repair.model or '' }}</p>
+            <p><strong>Серийный номер:</strong> <code>{{ repair.serial_number or 'Не указан' }}</code></p>
+            <p><strong>Код доступа передан:</strong> {% if repair.access_code_provided %}<span style="color: green; font-weight: bold;">Да</span>{% else %}<span style="color: #666;">Нет</span>{% endif %}</p>
+
+            <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">Неисправность и состояние</h3>
+            <p><strong>Заявленная неисправность:</strong><br><span style="white-space: pre-wrap;">{{ repair.reported_issue }}</span></p>
+            <p><strong>Комплектность:</strong> {{ repair.completeness or '—' }}</p>
+            <p><strong>Внешний вид:</strong> {{ repair.appearance or '—' }}</p>
+
+            {% if repair.customer_comment %}
+            <p><strong>Комментарий клиента:</strong><br><span style="white-space: pre-wrap;">{{ repair.customer_comment }}</span></p>
+            {% endif %}
+
+            {% if repair.internal_note %}
+            <p><strong>Внутренняя заметка:</strong><br><span style="white-space: pre-wrap; background: #fff3cd; padding: 5px; display: block;">{{ repair.internal_note }}</span></p>
+            {% endif %}
+
+            <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">Клиент</h3>
+            <p><strong>ФИО:</strong> {{ repair.customer_name }}</p>
+            <p><strong>Телефон:</strong> <code>{{ repair.customer_phone }}</code></p>
+            <p><strong>Email:</strong> {{ repair.customer_email or '—' }}</p>
+        </div>
+
+        <!-- Right Panel: Status Management & Timestamps -->
+        <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 20px;">
+            <!-- Status Update Action Box -->
+            <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 4px;">
+                <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Изменить статус</h3>
+                
+                {% if allowed_statuses %}
+                <form method="POST" action="/repairs/{{ repair.id }}/status">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Новый статус:</label>
+                        <select name="status" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+                            {% for st in allowed_statuses %}
+                            <option value="{{ st.value }}">{{ st.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Комментарий:</label>
+                        <textarea name="comment" rows="2" placeholder="Причина смены статуса..." style="width: 100%; padding: 8px; box-sizing: border-box;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Мастер / Администратор:</label>
+                        <input type="text" name="changed_by" value="{{ repair.assigned_to or '' }}" placeholder="ФИО..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                    </div>
+
+                    <button type="submit" class="btn btn-success" style="width: 100%; font-weight: bold;">Сохранить новый статус</button>
+                </form>
+                {% else %}
+                <p style="color: #666; font-style: italic;">Переход из статуса «{{ repair.status_label or repair.status }}» не предусмотрен (финальный статус).</p>
+                {% endif %}
+            </div>
+
+            <!-- Service Details Box -->
+            <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 4px;">
+                <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Сведения и даты</h3>
+                <p><strong>Ответственный:</strong> {{ repair.assigned_to or 'Не назначен' }}</p>
+                <p><strong>Принят:</strong> {{ repair.accepted_at[:16] if repair.accepted_at else '—' }}</p>
+                <p><strong>Обновлён:</strong> {{ repair.updated_at[:16] if repair.updated_at else '—' }}</p>
+                {% if repair.closed_at %}
+                <p><strong>Закрыт:</strong> {{ repair.closed_at[:16] }}</p>
+                {% endif %}
+                {% if repair.issued_at %}
+                <p><strong>Выдан:</strong> {{ repair.issued_at[:16] }}</p>
+                {% endif %}
+                {% if repair.canceled_at %}
+                <p><strong>Отменён:</strong> {{ repair.canceled_at[:16] }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Status History Timeline -->
+    <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 4px; margin-top: 20px;">
+        <h3>История статусов</h3>
+        {% if repair.history %}
+        <table style="margin-top: 10px;">
+            <thead>
+                <tr>
+                    <th>Дата / Время</th>
+                    <th>Предыдущий статус</th>
+                    <th>Новый статус</th>
+                    <th>Комментарий</th>
+                    <th>Кто изменил</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for hist in repair.history %}
+                <tr>
+                    <td>{{ hist.changed_at[:19] if hist.changed_at else '—' }}</td>
+                    <td>{{ hist.old_status or '—' }}</td>
+                    <td><strong>{{ hist.new_status }}</strong></td>
+                    <td>{{ hist.comment or '—' }}</td>
+                    <td>{{ hist.changed_by or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: #666;">Записи в истории отсутствуют.</p>
+        {% endif %}
+    </div>
+{% endblock %}

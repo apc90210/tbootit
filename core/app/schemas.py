@@ -430,3 +430,140 @@ class SalesReportResponse(BaseModel):
     money_summary_granularity: str = "day"
     payment_labels: dict = {}
     sales: List[ReportSaleItem]
+
+# Repair Order Constants and Schemas
+REPAIR_STATUSES = {
+    "received": "Принят",
+    "diagnostics": "Диагностика",
+    "waiting_customer": "Ожидает клиента",
+    "waiting_parts": "Ожидает запчасти",
+    "in_repair": "В ремонте",
+    "ready": "Готов",
+    "unrepairable": "Ремонт невозможен",
+    "issued": "Выдан",
+    "canceled": "Отменён"
+}
+
+REPAIR_PRIORITIES = {
+    "normal": "Обычный",
+    "urgent": "Срочный"
+}
+
+REPAIR_DEVICE_TYPES = [
+    "Ноутбук",
+    "Системный блок",
+    "Моноблок",
+    "Монитор",
+    "Принтер",
+    "МФУ",
+    "Планшет",
+    "Телефон",
+    "Сетевое оборудование",
+    "Комплектующее",
+    "Другое"
+]
+
+class RepairStatusHistorySchema(BaseModel):
+    id: int
+    repair_id: int
+    old_status: Optional[str] = None
+    new_status: str
+    comment: Optional[str] = None
+    changed_by: Optional[str] = None
+    changed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class RepairOrderBase(BaseModel):
+    customer_id: Optional[int] = None
+    customer_name: str
+    customer_phone: str
+    customer_email: Optional[str] = None
+    device_type: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    reported_issue: str
+    completeness: Optional[str] = None
+    appearance: Optional[str] = None
+    customer_comment: Optional[str] = None
+    internal_note: Optional[str] = None
+    access_code_provided: Optional[bool] = False
+    assigned_to: Optional[str] = None
+    priority: Optional[str] = "normal"
+
+    @field_validator("priority")
+    def validate_priority(cls, v):
+        if v is not None and v not in ["normal", "urgent"]:
+            raise ValueError("Приоритет должен быть 'normal' или 'urgent'")
+        return v or "normal"
+
+    @field_validator("customer_name", "customer_phone", "device_type", "reported_issue", mode="before")
+    def validate_non_empty(cls, v, info):
+        if v is None or not str(v).strip():
+            field_labels = {
+                "customer_name": "ФИО клиента",
+                "customer_phone": "Телефон",
+                "device_type": "Тип устройства",
+                "reported_issue": "Заявленная неисправность"
+            }
+            label = field_labels.get(info.field_name, info.field_name)
+            raise ValueError(f"Поле '{label}' обязательно для заполнения")
+        return str(v).strip()
+
+class RepairOrderCreate(RepairOrderBase):
+    pass
+
+class RepairOrderUpdate(BaseModel):
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    device_type: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    reported_issue: Optional[str] = None
+    completeness: Optional[str] = None
+    appearance: Optional[str] = None
+    customer_comment: Optional[str] = None
+    internal_note: Optional[str] = None
+    access_code_provided: Optional[bool] = None
+    assigned_to: Optional[str] = None
+    priority: Optional[str] = None
+
+    @field_validator("priority")
+    def validate_priority_opt(cls, v):
+        if v is not None and v not in ["normal", "urgent"]:
+            raise ValueError("Приоритет должен быть 'normal' или 'urgent'")
+        return v
+
+class RepairOrderStatusUpdate(BaseModel):
+    status: str
+    comment: Optional[str] = None
+    changed_by: Optional[str] = None
+
+class RepairOrder(RepairOrderBase):
+    id: int
+    number: str
+    status: str
+    status_label: Optional[str] = None
+    priority_label: Optional[str] = None
+    accepted_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    issued_at: Optional[datetime] = None
+    canceled_at: Optional[datetime] = None
+    history: List[RepairStatusHistorySchema] = []
+
+    class Config:
+        from_attributes = True
+
+class RepairListResponse(BaseModel):
+    items: List[RepairOrder]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+

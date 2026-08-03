@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Приём техники в ремонт{% endblock %}
+
+{% block content %}
+    <h2>Приём техники в ремонт</h2>
+
+    {% if error_msg %}
+    <div style="background: #f8d7da; color: #721c24; padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+        ⚠️ {{ error_msg }}
+    </div>
+    {% endif %}
+
+    <div style="background: #fff; padding: 25px; border: 1px solid #ddd; border-radius: 4px;">
+        <form method="POST" action="/repairs/new">
+            <h3 style="margin-top: 0; border-bottom: 2px solid #005a9c; padding-bottom: 8px;">1. Данные клиента</h3>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">ФИО клиента <span style="color: red;">*</span></label>
+                    <input type="text" name="customer_name" value="{{ form_data.customer_name or '' }}" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Телефон <span style="color: red;">*</span></label>
+                    <input type="text" name="customer_phone" value="{{ form_data.customer_phone or '' }}" required placeholder="+7 900 000-00-00" style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Email</label>
+                    <input type="email" name="customer_email" value="{{ form_data.customer_email or '' }}" placeholder="client@example.com" style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <h3 style="border-bottom: 2px solid #005a9c; padding-bottom: 8px; margin-top: 25px;">2. Данные устройства</h3>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Тип устройства <span style="color: red;">*</span></label>
+                    <select name="device_type" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+                        {% for dt in options.device_types %}
+                        <option value="{{ dt }}" {% if form_data.device_type == dt %}selected{% endif %}>{{ dt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Бренд</label>
+                    <input type="text" name="brand" value="{{ form_data.brand or '' }}" placeholder="Lenovo, Asus, Apple..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Модель</label>
+                    <input type="text" name="model" value="{{ form_data.model or '' }}" placeholder="ThinkPad T480..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Серийный номер</label>
+                    <input type="text" name="serial_number" value="{{ form_data.serial_number or '' }}" style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <h3 style="border-bottom: 2px solid #005a9c; padding-bottom: 8px; margin-top: 25px;">3. Состояние и неисправность</h3>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Заявленная неисправность <span style="color: red;">*</span></label>
+                <textarea name="reported_issue" required rows="3" style="width: 100%; padding: 8px; box-sizing: border-box;">{{ form_data.reported_issue or '' }}</textarea>
+            </div>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                <div style="flex: 1; min-width: 300px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Комплектность</label>
+                    <input type="text" name="completeness" value="{{ form_data.completeness or '' }}" placeholder="Ноутбук, зарядка, чехол..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 300px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Внешний вид</label>
+                    <input type="text" name="appearance" value="{{ form_data.appearance or '' }}" placeholder="Потёртости, царпины..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                <div style="flex: 1; min-width: 300px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Комментарий клиента</label>
+                    <textarea name="customer_comment" rows="2" style="width: 100%; padding: 8px; box-sizing: border-box;">{{ form_data.customer_comment or '' }}</textarea>
+                </div>
+                <div style="flex: 1; min-width: 300px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Внутренняя заметка</label>
+                    <textarea name="internal_note" rows="2" style="width: 100%; padding: 8px; box-sizing: border-box;">{{ form_data.internal_note or '' }}</textarea>
+                </div>
+            </div>
+
+            <h3 style="border-bottom: 2px solid #005a9c; padding-bottom: 8px; margin-top: 25px;">4. Сервисные параметры</h3>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; align-items: center;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Приоритет</label>
+                    <select name="priority" style="width: 100%; padding: 8px; box-sizing: border-box;">
+                        {% for pr in options.priorities %}
+                        <option value="{{ pr.value }}" {% if form_data.priority == pr.value %}selected{% endif %}>{{ pr.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Ответственный мастер</label>
+                    <input type="text" name="assigned_to" value="{{ form_data.assigned_to or '' }}" placeholder="ФИО мастера..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 200px; padding-top: 15px;">
+                    <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="access_code_provided" {% if form_data.access_code_provided %}checked{% endif %} style="width: 18px; height: 18px;">
+                        Код доступа к устройству передан клиентом
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; display: flex; gap: 15px;">
+                <button type="submit" class="btn btn-success" style="font-weight: bold; padding: 10px 20px; font-size: 1rem;">Принять в ремонт</button>
+                <a href="/repairs" class="btn btn-secondary" style="padding: 10px 20px; font-size: 1rem;">Отмена</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

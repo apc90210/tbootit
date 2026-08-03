@@ -14,6 +14,11 @@ services:
       - STORAGE_ROOT=/data/storage
       - BACKUP_ROOT=/data/backups
       - API_TOKEN=dev-token
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   admin-shell:
     build: ./admin-shell
@@ -61,3 +66,21 @@ services:
       - ./inventory-sales-module/tests:/app/tests
     depends_on:
       - core
+
+  repairs-module:
+    build:
+      context: ./repairs-module
+    container_name: technoreboot-repairs-module
+    environment:
+      REPAIRS_MODULE_NAME: technoreboot-repairs-module
+      CORE_API_BASE_URL: http://core:8000
+      PYTHONPATH: /app
+    ports:
+      - "8040:8040"
+    volumes:
+      - ./repairs-module/app:/app/app
+      - ./repairs-module/tests:/app/tests
+    depends_on:
+      core:
+        condition: service_healthy
+

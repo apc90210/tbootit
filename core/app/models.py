@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -111,18 +111,79 @@ class Customer(Base):
 class RepairOrder(Base):
     __tablename__ = "repair_orders"
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
-    device_title = Column(String)
-    device_serial = Column(String)
-    problem_description = Column(Text)
-    diagnostics_result = Column(Text)
-    work_description = Column(Text)
-    parts_description = Column(Text)
-    price = Column(Float)
-    status = Column(String, default="new", index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    closed_at = Column(DateTime(timezone=True))
+    number = Column(String, unique=True, index=True, nullable=True)
+    status = Column(String, default="received", index=True, nullable=False)
+
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    customer_name = Column(String, nullable=True)
+    customer_phone = Column(String, nullable=True)
+    customer_email = Column(String, nullable=True)
+
+    device_type = Column(String, default="Устройство", nullable=True)
+    brand = Column(String, nullable=True)
+    model = Column(String, nullable=True)
+    serial_number = Column(String, index=True, nullable=True)
+
+    reported_issue = Column(Text, nullable=True)
+    completeness = Column(Text, nullable=True)
+    appearance = Column(Text, nullable=True)
+    customer_comment = Column(Text, nullable=True)
+    internal_note = Column(Text, nullable=True)
+
+    access_code_provided = Column(Boolean, default=False, nullable=False)
+
+    assigned_to = Column(String, nullable=True)
+    priority = Column(String, default="normal", nullable=False)
+
+    accepted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+    issued_at = Column(DateTime(timezone=True), nullable=True)
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Legacy fields
+    device_title = Column(String, nullable=True)
+    device_serial = Column(String, nullable=True)
+    problem_description = Column(Text, nullable=True)
+    diagnostics_result = Column(Text, nullable=True)
+    work_description = Column(Text, nullable=True)
+    parts_description = Column(Text, nullable=True)
+    price = Column(Float, nullable=True)
+
+    history = relationship("RepairStatusHistory", back_populates="repair", order_by="RepairStatusHistory.changed_at.asc()")
+
+from sqlalchemy import event
+import datetime
+
+@event.listens_for(RepairOrder, 'before_insert')
+def repair_order_before_insert(mapper, connection, target):
+    now = datetime.datetime.utcnow()
+    date_str = now.strftime("%Y%m%d")
+    if not target.number:
+        import random
+        rnd = random.randint(1000, 9999)
+        target.number = f"R-{date_str}-{rnd}"
+    if not target.customer_name:
+        target.customer_name = f"Клиент #{target.customer_id or 1}"
+    if not target.customer_phone:
+        target.customer_phone = "+7 000 000-00-00"
+    if not target.device_type:
+        target.device_type = target.device_title or "Устройство"
+    if not target.reported_issue:
+        target.reported_issue = target.problem_description or "Заявка на ремонт"
+
+class RepairStatusHistory(Base):
+    __tablename__ = "repair_status_history"
+    id = Column(Integer, primary_key=True, index=True)
+    repair_id = Column(Integer, ForeignKey("repair_orders.id"), nullable=False, index=True)
+    old_status = Column(String, nullable=True)
+    new_status = Column(String, nullable=False)
+    comment = Column(Text, nullable=True)
+    changed_by = Column(String, nullable=True)
+    changed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    repair = relationship("RepairOrder", back_populates="history")
 
 class Sale(Base):
     __tablename__ = "sales"

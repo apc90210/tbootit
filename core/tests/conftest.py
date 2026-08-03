@@ -22,10 +22,16 @@ app.database.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind
 app.database.settings.database_url = TEST_DATABASE_URL
 
 from app.database import Base, engine
+from fastapi.testclient import TestClient
+from app.main import app
 
 # Hard safety assertion
 assert "/data/db/technoreboot.db" not in str(engine.url), "FATAL: Pytest attempted to bind to live production database!"
 assert "isolated_test.db" in str(engine.url), "FATAL: Pytest is not using isolated temporary database!"
+
+@pytest.fixture
+def client():
+    return TestClient(app)
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_isolated_test_database():

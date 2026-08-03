@@ -124,6 +124,63 @@ def migrate_db():
         except Exception as e:
             print(f"Migration error on sales status normalization: {e}")
 
+        # Migrate repair_orders table for Stage 05A
+        res_repairs = conn.execute(text("PRAGMA table_info(repair_orders);")).fetchall()
+        repairs_columns = [row[1] for row in res_repairs]
+        repairs_updates = [
+            ("number", "TEXT"),
+            ("status", "TEXT DEFAULT 'received'"),
+            ("customer_id", "INTEGER"),
+            ("customer_name", "TEXT"),
+            ("customer_phone", "TEXT"),
+            ("customer_email", "TEXT"),
+            ("device_type", "TEXT"),
+            ("brand", "TEXT"),
+            ("model", "TEXT"),
+            ("serial_number", "TEXT"),
+            ("reported_issue", "TEXT"),
+            ("completeness", "TEXT"),
+            ("appearance", "TEXT"),
+            ("customer_comment", "TEXT"),
+            ("internal_note", "TEXT"),
+            ("access_code_provided", "INTEGER DEFAULT 0"),
+            ("assigned_to", "TEXT"),
+            ("priority", "TEXT DEFAULT 'normal'"),
+            ("accepted_at", "DATETIME"),
+            ("created_at", "DATETIME"),
+            ("updated_at", "DATETIME"),
+            ("closed_at", "DATETIME"),
+            ("issued_at", "DATETIME"),
+            ("canceled_at", "DATETIME")
+        ]
+        for col_name, col_type in repairs_updates:
+            if col_name not in repairs_columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE repair_orders ADD COLUMN {col_name} {col_type};"))
+                except Exception as e:
+                    print(f"Migration error on repair_orders.{col_name}: {e}")
+
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS repair_status_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    repair_id INTEGER NOT NULL,
+                    old_status TEXT,
+                    new_status TEXT NOT NULL,
+                    comment TEXT,
+                    changed_by TEXT,
+                    changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (repair_id) REFERENCES repair_orders (id)
+                );
+            """))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_repair_orders_number ON repair_orders (number);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_repair_orders_status ON repair_orders (status);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_repair_orders_phone ON repair_orders (customer_phone);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_repair_orders_serial ON repair_orders (serial_number);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_repair_history_repair_id ON repair_status_history (repair_id);"))
+        except Exception as e:
+            print(f"Migration error on repair tables/indexes: {e}")
+
 migrate_db()
 
 app = FastAPI(title="Technoreboot Core API", version="0.1.0")

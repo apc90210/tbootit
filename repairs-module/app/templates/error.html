@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Ошибка{% endblock %}
+{% block content %}
+    <div style="background: #f8d7da; color: #721c24; padding: 20px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+        <h2>Произошла ошибка</h2>
+        <p>{{ message }}</p>
+    </div>
+    <a href="/repairs" class="btn btn-secondary">Вернуться к списку ремонтов</a>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Реестр ремонтных заказов{% endblock %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="margin: 0;">Реестр ремонтных заказов</h2>
+        <a href="/repairs/new" class="btn btn-success" style="font-weight: bold;">+ Принять технику в ремонт</a>
+    </div>
+
+    {% if msg %}
+    <div style="background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
+        ✓ {{ msg }}
+    </div>
+    {% endif %}
+
+    <!-- Quick Status Filters -->
+    <div style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="/repairs" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">Все</a>
+        {% for st in statuses %}
+        <a href="/repairs?status={{ st.value }}" class="btn {% if status_filter == st.value %}btn-primary{% else %}btn-secondary{% endif %}">{{ st.label }}</a>
+        {% endfor %}
+    </div>
+
+    <!-- Search Form -->
+    <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
+        <form method="GET" action="/repairs" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 250px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Поиск:</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Номер, клиент, телефон, модель, серийный №..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Тип устройства:</label>
+                <select name="device_type" style="padding: 8px;">
+                    <option value="">Все типы</option>
+                    {% for dt in device_types %}
+                    <option value="{{ dt }}" {% if device_type == dt %}selected{% endif %}>{{ dt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Приоритет:</label>
+                <select name="priority" style="padding: 8px;">
+                    <option value="">Все</option>
+                    {% for pr in priorities %}
+                    <option value="{{ pr.value }}" {% if priority == pr.value %}selected{% endif %}>{{ pr.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary">Искать</button>
+                <a href="/repairs" class="btn btn-secondary" style="margin-left: 5px;">Сбросить</a>
+            </div>
+        </form>
+    </div>
+
+    {% if items %}
+        <p>Найдено заказов: <strong>{{ total }}</strong></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Номер</th>
+                    <th>Дата приёма</th>
+                    <th>Клиент</th>
+                    <th>Телефон</th>
+                    <th>Устройство</th>
+                    <th>Неисправность</th>
+                    <th>Статус</th>
+                    <th>Приоритет</th>
+                    <th>Мастер</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td><strong>{{ item.number }}</strong></td>
+                    <td>{{ item.accepted_at[:16] if item.accepted_at else '—' }}</td>
+                    <td>{{ item.customer_name }}</td>
+                    <td><code>{{ item.customer_phone }}</code></td>
+                    <td>{{ item.device_type }} {% if item.brand or item.model %}({{ item.brand or '' }} {{ item.model or '' }}){% endif %}</td>
+                    <td>{{ item.reported_issue }}</td>
+                    <td>
+                        <span class="badge badge-{{ item.status }}">
+                            {{ item.status_label or item.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-priority-{{ item.priority }}">
+                            {{ item.priority_label or item.priority }}
+                        </span>
+                    </td>
+                    <td>{{ item.assigned_to or 'Не назначен' }}</td>
+                    <td>
+                        <a href="/repairs/{{ item.id }}" class="btn">Открыть</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="background: #fff; padding: 20px; text-align: center; border: 1px solid #ddd;">
+            <p>Ремонтные заказы не найдены.</p>
+        </div>
+    {% endif %}
+{% endblock %}
