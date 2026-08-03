@@ -71,17 +71,25 @@ async def list_repairs(
         }
     )
 
+DEFAULT_COMPLETENESS = "Ноутбук, зарядка, чехол..."
+DEFAULT_APPEARANCE = "Потёртости, царпины..."
+
 @router.get("/repairs/new", response_class=HTMLResponse)
 async def new_repair_form(request: Request, error_msg: Optional[str] = None):
     options = await core_client.get_repair_options()
     if isinstance(options, dict) and options.get("error"):
         options = {"statuses": [], "priorities": [], "device_types": []}
 
+    default_form_data = {
+        "completeness": DEFAULT_COMPLETENESS,
+        "appearance": DEFAULT_APPEARANCE
+    }
+
     return templates.TemplateResponse(
         request=request, name="repair_new.html", context={
             "options": options,
             "error_msg": error_msg or "",
-            "form_data": {}
+            "form_data": default_form_data
         }
     )
 
@@ -113,8 +121,8 @@ async def create_repair_submit(
         "model": model or None,
         "serial_number": serial_number or None,
         "reported_issue": reported_issue,
-        "completeness": completeness or None,
-        "appearance": appearance or None,
+        "completeness": completeness if completeness is not None else "",
+        "appearance": appearance if appearance is not None else "",
         "customer_comment": customer_comment or None,
         "internal_note": internal_note or None,
         "access_code_provided": access_code_provided in ["on", "true", "1", "True"],
@@ -157,7 +165,7 @@ async def repair_detail(request: Request, repair_id: int, msg: Optional[str] = N
     cur_status = data.get("status")
     VALID_TRANSITIONS = {
         "received": ["diagnostics", "canceled"],
-        "diagnostics": ["waiting_customer", "waiting_parts", "in_repair", "unrepairable", "canceled"],
+        "diagnostics": ["waiting_customer", "waiting_parts", "in_repair", "ready", "unrepairable", "canceled"],
         "waiting_customer": ["diagnostics", "waiting_parts", "in_repair", "unrepairable", "canceled"],
         "waiting_parts": ["waiting_customer", "in_repair", "unrepairable", "canceled"],
         "in_repair": ["waiting_customer", "waiting_parts", "ready", "unrepairable", "canceled"],
@@ -270,6 +278,15 @@ async def update_repair_status_submit(
     comment: Optional[str] = Form(None),
     changed_by: Optional[str] = Form(None)
 ):
+    repair_data = await core_client.get_repair(repair_id)
+    if isinstance(repair_data, dict) and repair_data.get("status") == "diagnostics" and status_value == "ready":
+        if not comment or not comment.strip():
+            return await repair_detail(
+                request,
+                repair_id,
+                error_msg="Для перехода из диагностики в статус 'Готов' требуется указать комментарий с описанием выполненных работ"
+            )
+
     res = await core_client.update_repair_status(
         repair_id=repair_id,
         status=status_value,

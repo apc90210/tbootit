@@ -13,7 +13,7 @@ router = APIRouter()
 
 VALID_TRANSITIONS = {
     "received": ["diagnostics", "canceled"],
-    "diagnostics": ["waiting_customer", "waiting_parts", "in_repair", "unrepairable", "canceled"],
+    "diagnostics": ["waiting_customer", "waiting_parts", "in_repair", "ready", "unrepairable", "canceled"],
     "waiting_customer": ["diagnostics", "waiting_parts", "in_repair", "unrepairable", "canceled"],
     "waiting_parts": ["waiting_customer", "in_repair", "unrepairable", "canceled"],
     "in_repair": ["waiting_customer", "waiting_parts", "ready", "unrepairable", "canceled"],
@@ -290,6 +290,13 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
             status_code=409,
             detail=f"Недопустимый переход статуса из '{cur_label}' в '{new_label}'"
         )
+
+    if current_status == "diagnostics" and new_status == "ready":
+        if not status_in.comment or not status_in.comment.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Для перехода из диагностики в статус 'Готов' требуется указать комментарий с описанием выполненных работ"
+            )
 
     now = datetime.utcnow()
     db_repair.status = new_status
