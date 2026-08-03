@@ -1,0 +1,212 @@
+@page {
+  size: A4 portrait;
+  margin: 8mm;
+}
+
+body {
+  font-family: Arial, "DejaVu Sans", "Liberation Sans", sans-serif;
+  color: #000;
+  background: #fff;
+  margin: 0;
+  padding: 0;
+  font-size: 9pt;
+  line-height: 1.35;
+}
+
+.no-print {
+  display: flex;
+  gap: 10px;
+  background: #f0f0f0;
+  padding: 10px 15px;
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 15px;
+}
+
+.btn {
+  padding: 6px 12px;
+  font-size: 9pt;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-primary {
+  background: #005a9c;
+  color: #fff;
+  border: 1px solid #004070;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: #fff;
+  border: 1px solid #545b62;
+}
+
+.page {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-break {
+  page-break-before: always;
+  break-before: page;
+}
+
+.header-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.header-table td {
+  vertical-align: top;
+  padding: 0;
+}
+
+.org-block {
+  font-size: 8.5pt;
+  line-height: 1.3;
+}
+
+.doc-title-block {
+  text-align: right;
+}
+
+.doc-title {
+  font-size: 13pt;
+  font-weight: bold;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+}
+
+.doc-meta {
+  font-size: 9.5pt;
+  font-weight: bold;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.data-table th, .data-table td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  font-size: 8.5pt;
+  vertical-align: top;
+}
+
+.data-table th {
+  background: #f8f8f8;
+  font-weight: bold;
+  text-align: left;
+}
+
+.short-terms {
+  font-size: 8pt;
+  line-height: 1.25;
+  margin-bottom: 12px;
+  text-align: justify;
+}
+
+.short-terms p {
+  margin: 0 0 4px 0;
+}
+
+.signatures-block {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 8.5pt;
+}
+
+.sig-line {
+  border-bottom: 1px solid #000;
+  display: inline-block;
+  min-width: 180px;
+}
+
+.issue-block {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  font-size: 8pt;
+  margin-bottom: 12px;
+  line-height: 1.25;
+}
+
+.tear-line {
+  border-top: 1px dashed #000;
+  margin: 10px 0;
+  position: relative;
+  text-align: center;
+}
+
+.tear-line-text {
+  background: #fff;
+  padding: 0 10px;
+  font-size: 8pt;
+  font-weight: bold;
+  position: relative;
+  top: -8px;
+}
+
+.ticket-header {
+  font-size: 11pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin: 0 0 6px 0;
+  text-align: center;
+}
+
+.terms-header {
+  font-size: 12pt;
+  font-weight: bold;
+  text-align: center;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+}
+
+.preamble {
+  font-weight: bold;
+  font-size: 8.5pt;
+  margin-bottom: 10px;
+  background: #f4f4f4;
+  padding: 6px;
+  border: 1px solid #ccc;
+}
+
+.terms-list {
+  font-size: 8.5pt;
+  line-height: 1.35;
+  text-align: justify;
+}
+
+.terms-item {
+  margin-bottom: 8px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.terms-item strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    font-size: 8.5pt;
+  }
+
+  .page {
+    padding: 0;
+    margin: 0;
+  }
+}

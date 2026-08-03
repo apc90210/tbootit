@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Наряд-заказ № {{ repair.number }}</title>
+    <link rel="stylesheet" href="/static/repair_print.css">
+    <style>
+        @page { size: A4 portrait; margin: 8mm; }
+        body { font-family: Arial, "DejaVu Sans", "Liberation Sans", sans-serif; color: #000; background: #fff; margin: 0; padding: 0; font-size: 8.5pt; line-height: 1.3; }
+        .no-print { display: flex; gap: 10px; background: #e9ecef; padding: 10px 15px; border-bottom: 1px solid #ccc; margin-bottom: 15px; }
+        .btn { padding: 6px 14px; font-size: 9pt; font-weight: bold; cursor: pointer; border-radius: 3px; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #005a9c; color: #fff; border: 1px solid #004070; }
+        .btn-secondary { background: #6c757d; color: #fff; border: 1px solid #545b62; }
+        .page { width: 100%; box-sizing: border-box; }
+        .page-break { page-break-before: always; break-before: page; margin-top: 15px; }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        .header-table td { vertical-align: top; }
+        .org-block { font-size: 8pt; line-height: 1.25; }
+        .doc-title-block { text-align: right; }
+        .doc-title { font-size: 12pt; font-weight: bold; margin: 0 0 3px 0; text-transform: uppercase; }
+        .doc-meta { font-size: 9pt; font-weight: bold; }
+        .data-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        .data-table th, .data-table td { border: 1px solid #000; padding: 3px 5px; font-size: 8pt; vertical-align: top; }
+        .data-table th { background: #f2f2f2; font-weight: bold; text-align: left; width: 30%; }
+        .short-terms { font-size: 7.5pt; line-height: 1.2; margin-bottom: 8px; text-align: justify; }
+        .short-terms p { margin: 0 0 3px 0; }
+        .signatures-block { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 8pt; }
+        .sig-line { border-bottom: 1px solid #000; display: inline-block; min-width: 170px; }
+        .issue-block { border: 1px solid #000; padding: 5px 7px; font-size: 7.5pt; margin-bottom: 8px; line-height: 1.2; }
+        .tear-line { border-top: 1px dashed #000; margin: 8px 0; position: relative; text-align: center; }
+        .tear-line-text { background: #fff; padding: 0 8px; font-size: 7.5pt; font-weight: bold; position: relative; top: -7px; }
+        .ticket-header { font-size: 10pt; font-weight: bold; text-transform: uppercase; margin: 0 0 4px 0; text-align: center; }
+        .terms-header { font-size: 11pt; font-weight: bold; text-align: center; margin: 0 0 6px 0; text-transform: uppercase; }
+        .preamble { font-weight: bold; font-size: 8pt; margin-bottom: 8px; background: #f8f8f8; padding: 5px; border: 1px solid #ccc; line-height: 1.25; }
+        .terms-list { font-size: 8pt; line-height: 1.3; text-align: justify; }
+        .terms-item { margin-bottom: 6px; break-inside: avoid; page-break-inside: avoid; }
+        .terms-item strong { display: block; margin-bottom: 2px; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: #fff !important; font-size: 8pt; }
+            .page { padding: 0; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Action Bar (Hidden on Print) -->
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">🖨️ Печать</button>
+        <a href="/repairs/{{ repair.id }}" class="btn btn-secondary">← Назад к ремонту</a>
+    </div>
+
+    <!-- PAGE 1: WORK ORDER & DETACHABLE TICKET -->
+    <div class="page">
+
+        <!-- WORK ORDER HEADER -->
+        <table class="header-table">
+            <tr>
+                <td style="width: 55%;" class="org-block">
+                    {% if org.name or org.company_name or org.legal_name %}
+                    <strong>{{ org.name or org.company_name or org.legal_name }}</strong><br>
+                    {% else %}
+                    <strong>Сервисный центр «Техноребут»</strong><br>
+                    {% endif %}
+                    {% if org.legal_entity or org.ip_name or org.owner %}
+                    {{ org.legal_entity or org.ip_name or org.owner }}<br>
+                    {% else %}
+                    ИП Атанов Павел Сергеевич<br>
+                    {% endif %}
+                    {% if org.inn %}ИНН: {{ org.inn }}<br>{% endif %}
+                    {% if org.address %}Адрес: {{ org.address }}<br>{% endif %}
+                    {% if org.phone %}Тел.: {{ org.phone }}<br>{% endif %}
+                </td>
+                <td style="width: 45%;" class="doc-title-block">
+                    <div class="doc-title">Наряд-заказ на ремонт</div>
+                    <div class="doc-meta">№ {{ repair.number }}</div>
+                    <div style="font-size: 8.5pt; margin-top: 2px;">
+                        Дата приема: <strong>{{ repair.accepted_at[:16] if repair.accepted_at else '' }}</strong>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- REPAIR & CUSTOMER DATA TABLE -->
+        <table class="data-table">
+            <tr>
+                <th>Заказчик (Ф.И.О.)</th>
+                <td><strong>{{ repair.customer_name }}</strong></td>
+            </tr>
+            <tr>
+                <th>Телефон заказчика</th>
+                <td><code>{{ repair.customer_phone }}</code></td>
+            </tr>
+            {% if repair.customer_email %}
+            <tr>
+                <th>Email заказчика</th>
+                <td>{{ repair.customer_email }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>Тип и наименование аппарата</th>
+                <td>
+                    <strong>{{ repair.device_type }}</strong>
+                    {% if repair.brand or repair.model %} — {{ repair.brand or '' }} {{ repair.model or '' }}{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Серийный номер</th>
+                <td><code>{{ repair.serial_number or 'Не указан' }}</code></td>
+            </tr>
+            <tr>
+                <th>Комплектность</th>
+                <td>{{ repair.completeness or '—' }}</td>
+            </tr>
+            <tr>
+                <th>Внешний вид / Дефекты</th>
+                <td>{{ repair.appearance or '—' }}</td>
+            </tr>
+            <tr>
+                <th>Заявленная неисправность</th>
+                <td>{{ repair.reported_issue }}</td>
+            </tr>
+            {% if repair.customer_comment %}
+            <tr>
+                <th>Комментарий клиента</th>
+                <td>{{ repair.customer_comment }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>Приоритет / Статус</th>
+                <td>{{ repair.priority_label or repair.priority }} | {{ repair.status_label or repair.status }}</td>
+            </tr>
+            <tr>
+                <th>Код доступа передан</th>
+                <td>{% if repair.access_code_provided %}Да{% else %}Нет{% endif %}</td>
+            </tr>
+            <tr>
+                <th>Аппарат принял / Ответственный</th>
+                <td>{{ repair.assigned_to or '______________________' }}</td>
+            </tr>
+        </table>
+
+        <!-- SHORT TERMS ON FRONT SIDE -->
+        <div class="short-terms">
+            <p>Оборудование с согласия клиента принято без разборки и проверки неисправностей, без проверки внутренних повреждений и дефектов. Клиент согласен, что все неисправности и внутренние повреждения, которые могут быть обнаружены в оборудовании при техническом обслуживании и ремонте, возникли до приема оборудования по данной квитанции.</p>
+            <p>В случае утери квитанции выдача аппарата производится при предъявлении паспорта лица, сдавшего аппарат, и письменного заявления.</p>
+            <p><strong>Внимание:</strong> срок ремонта — от 3 дней. При отсутствии запчастей на складе поставщика максимальный срок ремонта может быть увеличен до 45 дней.</p>
+            <p>Стоимость диагностики при отказе от ремонта или невозможности ремонта — <strong>500 рублей</strong>.</p>
+            <p>Заказчик согласен на обработку персональных данных, а также несет ответственность за достоверность представленной информации.</p>
+            <p>С комплектацией, описанием неисправностей и повреждений, условиями хранения и обслуживания оборудования ознакомлен и согласен.</p>
+        </div>
+
+        <!-- INTAKE SIGNATURES -->
+        <div class="signatures-block">
+            <div>Подпись заказчика: <span class="sig-line"></span></div>
+            <div>Оборудование принял: <span class="sig-line"></span> {% if repair.assigned_to %}({{ repair.assigned_to }}){% endif %}</div>
+        </div>
+
+        <!-- ISSUE & GUARANTEE CONFIRMATION BLOCK -->
+        <div class="issue-block">
+            <strong>Подтверждение получения и отсутствия претензий:</strong><br>
+            Аппарат получен в исправном/исходном состоянии. Проверен в моем присутствии, заявленная неисправность устранена. Претензий по ремонту не имею. С условиями гарантии ознакомлен.<br><br>
+            <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                <div>Дата получения: __________________</div>
+                <div>Подпись заказчика: <span class="sig-line"></span></div>
+            </div>
+        </div>
+
+        <!-- DETACHABLE TICKET (ОТРЫВНОЙ ТАЛОН) -->
+        <div class="tear-line">
+            <span class="tear-line-text">✂ -------------------- ЛИНИЯ ОТРЫВА -------------------- ✂</span>
+        </div>
+
+        <div class="ticket-header">
+            Отрывной талон к наряд-заказу № {{ repair.number }} от {{ repair.accepted_at[:16] if repair.accepted_at else '' }}
+        </div>
+
+        <table class="data-table" style="margin-bottom: 6px;">
+            <tr>
+                <td style="width: 45%; border-right: 1px solid #000;">
+                    <strong>Сервисный центр «Техноребут»</strong><br>
+                    {% if org.legal_entity or org.ip_name or org.owner %}{{ org.legal_entity or org.ip_name or org.owner }}<br>{% endif %}
+                    {% if org.inn %}ИНН: {{ org.inn }}<br>{% endif %}
+                    {% if org.address %}Адрес: {{ org.address }}<br>{% endif %}
+                    {% if org.phone %}Тел.: {{ org.phone }}<br>{% endif %}
+                </td>
+                <td style="width: 55%;">
+                    <strong>Заказчик:</strong> {{ repair.customer_name }} (<code>{{ repair.customer_phone }}</code>)<br>
+                    <strong>Аппарат:</strong> {{ repair.device_type }} {% if repair.brand or repair.model %}{{ repair.brand or '' }} {{ repair.model or '' }}{% endif %}<br>
+                    <strong>Серийный номер:</strong> {{ repair.serial_number or 'Не указан' }}<br>
+                    <strong>Комплектность:</strong> {{ repair.completeness or '—' }}<br>
+                    <strong>Код доступа передан:</strong> {% if repair.access_code_provided %}Да{% else %}Нет{% endif %}<br>
+                    <strong>Принял:</strong> {{ repair.assigned_to or '______________________' }}
+                </td>
+            </tr>
+        </table>
+
+        <div class="short-terms" style="margin-bottom: 6px;">
+            <p>Оборудование с согласия клиента принято без разборки и проверки неисправностей, без проверки внутренних повреждений и дефектов.</p>
+            <p>Клиент согласен, что все неисправности и внутренние повреждения, обнаруженные в процессе обслуживания, возникли до приема оборудования.</p>
+            <p>В случае утери талона выдача оборудования производится при предъявлении паспорта лица, сдавшего оборудование, и письменного заявления.</p>
+            <p>Стоимость диагностики при отказе от ремонта или невозможности ремонта — <strong>500 рублей</strong>.</p>
+        </div>
+
+        <div class="signatures-block" style="margin-bottom: 0;">
+            <div>Подпись заказчика: <span class="sig-line"></span></div>
+            <div>Оборудование принял: <span class="sig-line"></span></div>
+        </div>
+
+    </div>
+
+    <!-- PAGE 2: DETAILED REPAIR & DIAGNOSTIC TERMS -->
+    <div class="page page-break">
+        <div class="terms-header">
+            Условия приема оборудования, проведения ремонтных работ, диагностики, хранения и выдачи
+        </div>
+
+        <div class="preamble">
+            Ремонт стоимостью до 1500 рублей производится без дополнительного согласования с Заказчиком.<br>
+            Если в ходе работ выясняется невозможность выполнения работ по указанной стоимости, то все изменения состава и стоимости работ согласовываются дополнительно с Заказчиком.
+        </div>
+
+        <div class="terms-list">
+            <div class="terms-item">
+                <strong>1. Прием оборудования и презумпция возникших дефектов:</strong>
+                Оборудование с согласия Заказчика принимается на ремонт и оценку ремонтопригодности без разборки и проверки неисправностей, без проверки внутренних повреждений.<br>
+                Заказчик согласен, что все неисправности и внутренние повреждения, которые могут быть обнаружены в оборудовании при его техническом обслуживании, возникли до приема оборудования по данной квитанции.
+            </div>
+
+            <div class="terms-item">
+                <strong>2. Аксессуары и комплектация:</strong>
+                Оборудование принимается на ремонт и оценку ремонтопригодности без аксессуаров, кроме случаев, когда это необходимо для выполнения ремонта или оценки ремонтопригодности.<br>
+                Такой случай фиксируется в Наряд-заказе дополнительно.<br>
+                Исполнитель не несет ответственности за сохранность переданных устройств при отсутствии соответствующей записи в Наряд-заказе.
+            </div>
+
+            <div class="terms-item">
+                <strong>3. Предупреждение о риске ухудшения состояния:</strong>
+                Исполнитель ставит в известность Заказчика, что во время ремонта оборудования, уже имеющего внешние повреждения, в том числе следы попадания жидкости, ударов, трещины или следы неквалифицированного ремонта, возможно появление новых дефектов.<br>
+                Это может быть связано с проявлением скрытых дефектов, вызванных такими повреждениями.<br>
+                В связи с этим во время выполнения работ возможно ухудшение свойств оборудования, вплоть до полного выхода из строя.<br>
+                Заказчик предупрежден о такой возможности и осознает ее последствия.<br>
+                При наступлении такого случая Заказчик не будет иметь претензий к Исполнителю.
+            </div>
+
+            <div class="terms-item">
+                <strong>4. Ограничение ответственности и плавающие неисправности:</strong>
+                Сервисный центр, далее «Исполнитель», не несет ответственности, если после разборки, при оценке ремонтопригодности или ремонте состояние аппарата ухудшится вследствие нарушения Заказчиком правил эксплуатации аппарата.<br>
+                К таким нарушениям относятся воздействие жидкости, механические повреждения, использование техники не в соответствии с инструкцией и другие подобные обстоятельства.<br>
+                При неустойчивом проявлении заявленной неисправности или если неисправность не проявляется, срок ремонта и диагностики может быть увеличен.<br>
+                Увеличение срока предварительно согласовывается с Заказчиком.
+            </div>
+
+            <div class="terms-item">
+                <strong>5. Ответственное хранение, пеня и утилизация:</strong>
+                Аппарат Заказчика принимается на ответственное хранение на весь срок обслуживания, включая оценку ремонтопригодности и ремонт.<br>
+                Готовый аппарат, аппарат с актом выполненных работ, аппарат, не подлежащий ремонту, либо аппарат, согласованный без ремонта, должен быть получен в течение 14 календарных дней после окончания ремонтных работ.<br>
+                Отсчет срока начинается с момента сообщения Заказчику об окончании ремонтных работ.<br>
+                При невыполнении этого требования взимается пеня в размере 50 рублей за каждый день просрочки.<br>
+                Выдача аппарата в таком случае производится только после уплаты всей суммы задолженности Заказчика перед Исполнителем.<br>
+                Аппараты, невостребованные в течение 3 месяцев, могут быть реализованы или утилизированы в установленном законом порядке для погашения задолженности Заказчика перед Исполнителем.<br>
+                После окончания указанного срока претензии по аппарату не принимаются.
+            </div>
+
+            <div class="terms-item">
+                <strong>6. Сохранность данных:</strong>
+                Исполнитель не несет ответственности за потерю данных и индивидуальной памяти устройства, связанную с заменой плат, установкой программного обеспечения или заменой носителя информации.
+            </div>
+
+            <div class="terms-item">
+                <strong>7. Отказ от проведения работ:</strong>
+                В случае отсутствия запчастей, материалов, технической документации и других необходимых ресурсов Исполнитель вправе в одностороннем порядке отказаться от проведения ремонтных работ.
+            </div>
+        </div>
+
+        <div style="margin-top: 15px; border-top: 1px solid #000; padding-top: 10px; font-size: 8.5pt;">
+            С условиями проведения ремонтных работ, диагностики, хранения и выдачи ознакомлен и согласен. Претензий не имею.<br><br>
+            <div style="display: flex; justify-content: space-between;">
+                <div>Дата: __________________</div>
+                <div>Подпись заказчика: <span class="sig-line"></span></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

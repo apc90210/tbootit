@@ -303,3 +303,24 @@ async def update_repair_status_submit(
         url=f"/repairs/{repair_id}?msg=Статус+успешно+изменён+на+«{status_label}»",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+@router.get("/repairs/{repair_id}/print", response_class=HTMLResponse)
+async def print_repair_order(request: Request, repair_id: int):
+    data = await core_client.get_repair(repair_id)
+    if isinstance(data, dict) and data.get("error"):
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={
+                "message": data.get("detail") or "Ремонтный заказ не найден"
+            }
+        )
+
+    org_settings = await core_client.get_organization_settings()
+    if isinstance(org_settings, dict) and org_settings.get("error"):
+        org_settings = {}
+
+    return templates.TemplateResponse(
+        request=request, name="repair_print_order.html", context={
+            "repair": data,
+            "org": org_settings
+        }
+    )
