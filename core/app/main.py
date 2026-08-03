@@ -114,6 +114,16 @@ def migrate_db():
                 )
             """))
 
+        # Idempotent normalization of misclassified reissued sales
+        try:
+            conn.execute(text("""
+                UPDATE sales
+                SET status = 'reissued'
+                WHERE source_sale_id IS NOT NULL AND status = 'completed';
+            """))
+        except Exception as e:
+            print(f"Migration error on sales status normalization: {e}")
+
 migrate_db()
 
 app = FastAPI(title="Technoreboot Core API", version="0.1.0")
