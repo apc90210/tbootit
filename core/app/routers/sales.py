@@ -90,9 +90,12 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
         if (db_product.quantity or 0) < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient quantity for product {item.product_id}. Available: {db_product.quantity or 0}")
 
+    calculated_total = sum(item.price * item.quantity for item in sale.items)
+
     sale_data = sale.model_dump()
     items_data = sale_data.pop("items")
     
+    sale_data["total_amount"] = calculated_total
     sale_data["warranty_enabled"] = 1 if sale_data.get("warranty_enabled") else 0
     sale_data["status"] = "completed"
     

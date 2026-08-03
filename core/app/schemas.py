@@ -188,7 +188,7 @@ class SaleItem(SaleItemBase):
 
 class SaleBase(BaseModel):
     customer_id: Optional[int] = None
-    total_amount: float
+    total_amount: Optional[float] = None
     payment_method: Optional[str] = "cash"
     comment: Optional[str] = None
     warranty_days: Optional[int] = 30

@@ -21,6 +21,9 @@ client = TestClient(app)
 def setup_db():
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
+    db.query(models.Product).delete()
+    db.query(models.Category).delete()
+    db.commit()
     
     # Categories
     c1 = models.Category(id=1, name="Laptops")
