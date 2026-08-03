@@ -35,7 +35,8 @@ def test_repair_print_order_full(client, mock_core):
         "customer_comment": "Срочно к вечеру",
         "access_code_provided": True,
         "assigned_to": "Мастер А.В.",
-        "internal_note": "ВНУТРЕННИЙ_СЕКРЕТ_НЕ_ПЕЧАТАТЬ"
+        "internal_note": "ВНУТРЕННИЙ_СЕКРЕТ_НЕ_ПЕЧАТАТЬ",
+        "diagnostic_fee": 500.0
     }))
 
     # 1. Print route returns 200 OK
@@ -112,6 +113,36 @@ def test_repair_print_order_full(client, mock_core):
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html or "Сидоров С.С." in html
 
 
+def test_repair_print_order_custom_diagnostic_fee(client, mock_core):
+    """
+    Test Repair B with custom diagnostic_fee = 800 (Prompt Section 23).
+    Verifies 800 рублей is rendered in main terms and detachable ticket, while 500 рублей is absent.
+    """
+    mock_core.get("/api/settings/organization").mock(return_value=Response(200, json={
+        "name": "Сервисный центр «Техноребут»"
+    }))
+
+    mock_core.get("/api/repairs/800").mock(return_value=Response(200, json={
+        "id": 800,
+        "number": "R-20260803-0800",
+        "accepted_at": "2026-08-03T10:00:00",
+        "status": "in_repair",
+        "customer_name": "Петров П.П.",
+        "customer_phone": "+7 900 888-77-66",
+        "device_type": "Телефон",
+        "reported_issue": "Разбит экран",
+        "diagnostic_fee": 800.0
+    }))
+
+    res = client.get("/repairs/800/print")
+    assert res.status_code == 200
+    html = res.text
+
+    assert "800 рублей" in html
+    assert "<strong>500 рублей</strong>" not in html
+    assert "Отрывной талон" in html
+
+
 def test_repair_print_order_email_absence_and_error(client, mock_core):
     """
     Test email absence and unknown repair 404 behavior.
@@ -127,7 +158,8 @@ def test_repair_print_order_email_absence_and_error(client, mock_core):
         "customer_phone": "+7 900 999-88-77",
         "customer_email": None,
         "device_type": "Телефон",
-        "reported_issue": "Экран разбился"
+        "reported_issue": "Экран разбился",
+        "diagnostic_fee": 500.0
     }))
 
     res = client.get("/repairs/501/print")

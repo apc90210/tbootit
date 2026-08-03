@@ -36,7 +36,8 @@ def get_repair_options():
     return {
         "statuses": statuses_list,
         "priorities": priorities_list,
-        "device_types": schemas.REPAIR_DEVICE_TYPES
+        "device_types": schemas.REPAIR_DEVICE_TYPES,
+        "default_diagnostic_fee": 500
     }
 
 @router.post("/", response_model=schemas.RepairOrder, status_code=status.HTTP_201_CREATED)
@@ -115,7 +116,8 @@ def create_repair(repair_in: schemas.RepairOrderCreate, db: Session = Depends(ge
             "model": db_repair.model,
             "reported_issue": db_repair.reported_issue,
             "status": "received",
-            "priority": db_repair.priority
+            "priority": db_repair.priority,
+            "diagnostic_fee": db_repair.diagnostic_fee
         }
     )
     db.commit()
@@ -245,7 +247,8 @@ def update_repair(repair_id: int, repair_update: schemas.RepairOrderUpdate, db: 
         "device_type": db_repair.device_type,
         "brand": db_repair.brand,
         "model": db_repair.model,
-        "reported_issue": db_repair.reported_issue
+        "reported_issue": db_repair.reported_issue,
+        "diagnostic_fee": db_repair.diagnostic_fee
     }
 
     update_dict = repair_update.model_dump(exclude_unset=True)

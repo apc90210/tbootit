@@ -44,6 +44,7 @@
             <p><strong>Бренд / Модель:</strong> {{ repair.brand or '—' }} {{ repair.model or '' }}</p>
             <p><strong>Серийный номер:</strong> <code>{{ repair.serial_number or 'Не указан' }}</code></p>
             <p><strong>Код доступа передан:</strong> {% if repair.access_code_provided %}<span style="color: green; font-weight: bold;">Да</span>{% else %}<span style="color: #666;">Нет</span>{% endif %}</p>
+            <p><strong>Стоимость диагностики:</strong> <strong>{{ (repair.get('diagnostic_fee') if (repair.get('diagnostic_fee') is not none) else 500) | int }} ₽</strong></p>
 
             <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">Неисправность и состояние</h3>
             <p><strong>Заявленная неисправность:</strong><br><span style="white-space: pre-wrap;">{{ repair.reported_issue }}</span></p>

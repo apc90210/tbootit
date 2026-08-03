@@ -80,9 +80,11 @@ async def new_repair_form(request: Request, error_msg: Optional[str] = None):
     if isinstance(options, dict) and options.get("error"):
         options = {"statuses": [], "priorities": [], "device_types": []}
 
+    default_fee = options.get("default_diagnostic_fee", 500) if isinstance(options, dict) else 500
     default_form_data = {
         "completeness": DEFAULT_COMPLETENESS,
-        "appearance": DEFAULT_APPEARANCE
+        "appearance": DEFAULT_APPEARANCE,
+        "diagnostic_fee": default_fee
     }
 
     return templates.TemplateResponse(
@@ -110,8 +112,43 @@ async def create_repair_submit(
     internal_note: Optional[str] = Form(None),
     access_code_provided: Optional[str] = Form("off"),
     assigned_to: Optional[str] = Form(None),
-    priority: Optional[str] = Form("normal")
+    priority: Optional[str] = Form("normal"),
+    diagnostic_fee: Optional[float] = Form(500.0)
 ):
+    if diagnostic_fee is None:
+        options = await core_client.get_repair_options()
+        return templates.TemplateResponse(
+            request=request, name="repair_new.html", context={
+                "options": options if isinstance(options, dict) else {},
+                "error_msg": "Укажите стоимость диагностики",
+                "form_data": {
+                    "customer_name": customer_name, "customer_phone": customer_phone, "customer_email": customer_email,
+                    "device_type": device_type, "brand": brand, "model": model, "serial_number": serial_number,
+                    "reported_issue": reported_issue, "completeness": completeness, "appearance": appearance,
+                    "customer_comment": customer_comment, "internal_note": internal_note,
+                    "access_code_provided": access_code_provided in ["on", "true", "1", "True"],
+                    "assigned_to": assigned_to, "priority": priority, "diagnostic_fee": None
+                }
+            }
+        )
+
+    if diagnostic_fee < 0:
+        options = await core_client.get_repair_options()
+        return templates.TemplateResponse(
+            request=request, name="repair_new.html", context={
+                "options": options if isinstance(options, dict) else {},
+                "error_msg": "Стоимость диагностики не может быть отрицательной",
+                "form_data": {
+                    "customer_name": customer_name, "customer_phone": customer_phone, "customer_email": customer_email,
+                    "device_type": device_type, "brand": brand, "model": model, "serial_number": serial_number,
+                    "reported_issue": reported_issue, "completeness": completeness, "appearance": appearance,
+                    "customer_comment": customer_comment, "internal_note": internal_note,
+                    "access_code_provided": access_code_provided in ["on", "true", "1", "True"],
+                    "assigned_to": assigned_to, "priority": priority, "diagnostic_fee": diagnostic_fee
+                }
+            }
+        )
+
     form_data = {
         "customer_name": customer_name,
         "customer_phone": customer_phone,
@@ -127,7 +164,8 @@ async def create_repair_submit(
         "internal_note": internal_note or None,
         "access_code_provided": access_code_provided in ["on", "true", "1", "True"],
         "assigned_to": assigned_to or None,
-        "priority": priority or "normal"
+        "priority": priority or "normal",
+        "diagnostic_fee": diagnostic_fee
     }
 
     res = await core_client.create_repair(form_data)
@@ -232,8 +270,20 @@ async def update_repair_submit(
     internal_note: Optional[str] = Form(None),
     access_code_provided: Optional[str] = Form("off"),
     assigned_to: Optional[str] = Form(None),
-    priority: Optional[str] = Form("normal")
+    priority: Optional[str] = Form("normal"),
+    diagnostic_fee: Optional[float] = Form(None)
 ):
+    if diagnostic_fee is not None and diagnostic_fee < 0:
+        options = await core_client.get_repair_options()
+        data = await core_client.get_repair(repair_id)
+        return templates.TemplateResponse(
+            request=request, name="repair_edit.html", context={
+                "repair": data if isinstance(data, dict) else {},
+                "options": options if isinstance(options, dict) else {},
+                "error_msg": "Стоимость диагностики не может быть отрицательной"
+            }
+        )
+
     payload = {
         "customer_name": customer_name,
         "customer_phone": customer_phone,
@@ -251,6 +301,8 @@ async def update_repair_submit(
         "assigned_to": assigned_to or None,
         "priority": priority or "normal"
     }
+    if diagnostic_fee is not None:
+        payload["diagnostic_fee"] = diagnostic_fee
 
     res = await core_client.update_repair(repair_id, payload)
     if isinstance(res, dict) and res.get("error"):

@@ -134,6 +134,7 @@ class RepairOrder(Base):
 
     assigned_to = Column(String, nullable=True)
     priority = Column(String, default="normal", nullable=False)
+    diagnostic_fee = Column(Float, default=500.0, nullable=False)
 
     accepted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

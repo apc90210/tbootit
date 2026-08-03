@@ -95,6 +95,10 @@
                     <label style="display: block; font-weight: bold; margin-bottom: 5px;">Ответственный мастер</label>
                     <input type="text" name="assigned_to" value="{{ repair.assigned_to or '' }}" style="width: 100%; padding: 8px; box-sizing: border-box;">
                 </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Стоимость диагностики, ₽ <span style="color: red;">*</span></label>
+                    <input type="number" name="diagnostic_fee" step="1" min="0" value="{{ (repair.get('diagnostic_fee') if (repair.get('diagnostic_fee') is not none) else 500) | int }}" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
                 <div style="flex: 1; min-width: 200px; padding-top: 15px;">
                     <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" name="access_code_provided" {% if repair.access_code_provided %}checked{% endif %} style="width: 18px; height: 18px;">
