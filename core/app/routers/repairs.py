@@ -54,10 +54,11 @@ def create_repair(repair_in: schemas.RepairOrderCreate, db: Session = Depends(ge
 
     if cust_id:
         existing_cust = db.query(models.Customer).filter(models.Customer.id == cust_id).first()
-        if existing_cust:
-            if not cust_name: payload["customer_name"] = existing_cust.name
-            if not cust_phone: payload["customer_phone"] = existing_cust.phone
-            if not cust_email: payload["customer_email"] = existing_cust.email
+        if not existing_cust:
+            raise HTTPException(status_code=404, detail="Указанный клиент не найден")
+        if not cust_name: payload["customer_name"] = existing_cust.name
+        if not cust_phone: payload["customer_phone"] = existing_cust.phone
+        if not cust_email: payload["customer_email"] = existing_cust.email
     elif cust_phone and cust_phone.strip():
         clean_phone = cust_phone.strip()
         existing_cust = db.query(models.Customer).filter(models.Customer.phone == clean_phone).first()

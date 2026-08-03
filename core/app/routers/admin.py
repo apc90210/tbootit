@@ -175,11 +175,3 @@ def seed_data(db: Session = Depends(get_db)):
 @router.post("/backup")
 def trigger_backup():
     return {"message": "Backup triggered (stub)"}
-
-@router.post("/dev-reset")
-def dev_reset(db: Session = Depends(get_db)):
-    # Dev-only: drops and recreates
-    from app.database import Base
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    return {"message": "Dev reset complete"}
