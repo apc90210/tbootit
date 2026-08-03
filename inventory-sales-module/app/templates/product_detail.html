@@ -3,7 +3,13 @@
 {% block title %}{{ product.title }}{% endblock %}
 
 {% block content %}
-    <h2>Карточка товара: {{ product.title }}</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="margin: 0;">Карточка товара: {{ product.title }}</h2>
+        {% set cart_count = cart_items_count if cart_items_count is defined else 0 %}
+        <a id="go-to-cart-button" href="/cart" class="btn btn-success" style="{% if not cart_count or cart_count == 0 %}display: none;{% endif %} background: #28a745; color: #fff; padding: 8px 16px; border-radius: 4px; font-weight: bold; text-decoration: none;">
+            Перейти в корзину (<span>{{ cart_count }}</span>)
+        </a>
+    </div>
     
     <div style="background: #fff; padding: 20px; border: 1px solid #ddd; margin-bottom: 20px;">
         <p><strong>Название:</strong> {{ product.title }}</p>
@@ -88,11 +94,12 @@
             <button class="btn" disabled title="Продажа недоступна для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">Продать</button>
         {% endif %}
         {% if product.status in ['in_stock', 'reserved'] and product.storage_location == 'store' and product.quantity > 0 %}
-            <form action="/cart/add" method="post" style="display: inline; margin-left: 10px;">
+            <form action="/cart/add" method="post" class="quick-add-form" style="display: inline; margin-left: 10px;" data-product-id="{{ product.id }}">
                 <input type="hidden" name="product_id" value="{{ product.id }}">
                 <input type="hidden" name="title" value="{{ product.title }}">
                 <input type="hidden" name="price" value="{{ product.sale_price if product.sale_price else product.price }}">
-                <button type="submit" class="btn btn-danger">В корзину</button>
+                <input type="hidden" name="return_url" value="/products/{{ product.id }}">
+                <button type="submit" class="btn btn-danger quick-add-btn">В корзину</button>
             </form>
         {% else %}
             <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">В корзину</button>

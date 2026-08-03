@@ -65,9 +65,13 @@ async def list_products(
         filter_options_error = True
         filter_options_response = {}
         
+    cart = request.session.get("cart", [])
+    cart_items_count = sum(item.get("quantity", 1) for item in cart)
+
     return templates.TemplateResponse(
         request=request, name="products.html", context={
             "products_data": data,
+            "cart_items_count": cart_items_count,
             "filter_options": filter_options_response,
             "filter_options_error": filter_options_error,
             "q": q or "",
@@ -113,10 +117,14 @@ async def product_detail(request: Request, product_id: int):
     if data.get("barcode") or data.get("sku"):
         barcode_svg = render_barcode_svg(data.get("barcode") or data.get("sku"))
 
+    cart = request.session.get("cart", [])
+    cart_items_count = sum(item.get("quantity", 1) for item in cart)
+
     return templates.TemplateResponse(
         request=request, name="product_detail.html", context={
             "product": data,
-            "barcode_svg": barcode_svg
+            "barcode_svg": barcode_svg,
+            "cart_items_count": cart_items_count
         }
     )
 
