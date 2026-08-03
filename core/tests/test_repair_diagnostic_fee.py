@@ -1,5 +1,6 @@
 import pytest
 from app import models
+import json
 
 def test_create_repair_diagnostic_fee_default(client):
     res = client.post("/api/repairs/", json={
@@ -10,7 +11,8 @@ def test_create_repair_diagnostic_fee_default(client):
     })
     assert res.status_code == 201
     data = res.json()
-    assert data["diagnostic_fee"] == 500.0
+    assert data["diagnostic_fee"] == 500
+    assert isinstance(data["diagnostic_fee"], int)
 
 def test_create_repair_diagnostic_fee_custom_and_zero(client):
     # Custom 750
@@ -22,7 +24,8 @@ def test_create_repair_diagnostic_fee_custom_and_zero(client):
         "diagnostic_fee": 750
     })
     assert res750.status_code == 201
-    assert res750.json()["diagnostic_fee"] == 750.0
+    assert res750.json()["diagnostic_fee"] == 750
+    assert isinstance(res750.json()["diagnostic_fee"], int)
 
     # Zero 0
     res0 = client.post("/api/repairs/", json={
@@ -33,7 +36,8 @@ def test_create_repair_diagnostic_fee_custom_and_zero(client):
         "diagnostic_fee": 0
     })
     assert res0.status_code == 201
-    assert res0.json()["diagnostic_fee"] == 0.0
+    assert res0.json()["diagnostic_fee"] == 0
+    assert isinstance(res0.json()["diagnostic_fee"], int)
 
 def test_create_repair_diagnostic_fee_validation(client):
     # Negative value
@@ -56,6 +60,16 @@ def test_create_repair_diagnostic_fee_validation(client):
     })
     assert res_str.status_code == 422
 
+    # Decimal 500.5 rejection (Prompt Section 10 & 22)
+    res_dec = client.post("/api/repairs/", json={
+        "customer_name": "Тест Дробный",
+        "customer_phone": "+7 900 111-22-33",
+        "device_type": "Ноутбук",
+        "reported_issue": "Тест",
+        "diagnostic_fee": 500.5
+    })
+    assert res_dec.status_code == 422
+
 def test_read_endpoints_include_diagnostic_fee(client):
     res = client.post("/api/repairs/", json={
         "customer_name": "Тест Чтения",
@@ -70,19 +84,22 @@ def test_read_endpoints_include_diagnostic_fee(client):
     # Detail
     res_det = client.get(f"/api/repairs/{rep_id}")
     assert res_det.status_code == 200
-    assert res_det.json()["diagnostic_fee"] == 650.0
+    assert res_det.json()["diagnostic_fee"] == 650
+    assert isinstance(res_det.json()["diagnostic_fee"], int)
 
     # By number
     res_num = client.get(f"/api/repairs/by-number/{number}")
     assert res_num.status_code == 200
-    assert res_num.json()["diagnostic_fee"] == 650.0
+    assert res_num.json()["diagnostic_fee"] == 650
+    assert isinstance(res_num.json()["diagnostic_fee"], int)
 
     # List
     res_list = client.get("/api/repairs/")
     assert res_list.status_code == 200
     items = res_list.json()["items"]
     match = next(i for i in items if i["id"] == rep_id)
-    assert match["diagnostic_fee"] == 650.0
+    assert match["diagnostic_fee"] == 650
+    assert isinstance(match["diagnostic_fee"], int)
 
 def test_patch_diagnostic_fee_and_terminal_protection(client):
     res = client.post("/api/repairs/", json={
@@ -97,12 +114,18 @@ def test_patch_diagnostic_fee_and_terminal_protection(client):
     # PATCH 500 -> 800
     res_patch = client.patch(f"/api/repairs/{rep_id}", json={"diagnostic_fee": 800})
     assert res_patch.status_code == 200
-    assert res_patch.json()["diagnostic_fee"] == 800.0
+    assert res_patch.json()["diagnostic_fee"] == 800
+    assert isinstance(res_patch.json()["diagnostic_fee"], int)
 
     # PATCH 800 -> 0
     res_patch0 = client.patch(f"/api/repairs/{rep_id}", json={"diagnostic_fee": 0})
     assert res_patch0.status_code == 200
-    assert res_patch0.json()["diagnostic_fee"] == 0.0
+    assert res_patch0.json()["diagnostic_fee"] == 0
+    assert isinstance(res_patch0.json()["diagnostic_fee"], int)
+
+    # PATCH 500.5 decimal rejection -> 422
+    res_patch_dec = client.patch(f"/api/repairs/{rep_id}", json={"diagnostic_fee": 500.5})
+    assert res_patch_dec.status_code == 422
 
     # Transition to terminal status 'canceled'
     client.post(f"/api/repairs/{rep_id}/status", json={"status": "canceled", "comment": "Отменён"})
@@ -115,9 +138,9 @@ def test_options_diagnostic_fee_default(client):
     res = client.get("/api/repairs/options")
     assert res.status_code == 200
     assert res.json().get("default_diagnostic_fee") == 500
+    assert isinstance(res.json().get("default_diagnostic_fee"), int)
 
 def test_audit_contains_diagnostic_fee(client, db_session):
-    import json
     res = client.post("/api/repairs/", json={
         "customer_name": "Тест Аудита",
         "customer_phone": "+7 900 111-22-33",
@@ -134,7 +157,7 @@ def test_audit_contains_diagnostic_fee(client, db_session):
 
     create_log = next(a for a in audit_logs if a.action == "repair.created")
     val_create = json.loads(create_log.new_value)
-    assert val_create.get("diagnostic_fee") == 750.0
+    assert val_create.get("diagnostic_fee") == 750
 
     # PATCH
     client.patch(f"/api/repairs/{rep_id}", json={"diagnostic_fee": 900})
@@ -147,5 +170,5 @@ def test_audit_contains_diagnostic_fee(client, db_session):
     update_log = next(a for a in audit_logs_after if a.action == "repair.updated")
     val_old = json.loads(update_log.old_value)
     val_new = json.loads(update_log.new_value)
-    assert val_old.get("diagnostic_fee") == 750.0
-    assert val_new.get("diagnostic_fee") == 900.0
+    assert val_old.get("diagnostic_fee") == 750
+    assert val_new.get("diagnostic_fee") == 900

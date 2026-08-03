@@ -131,7 +131,7 @@ def test_repair_print_order_custom_diagnostic_fee(client, mock_core):
         "customer_phone": "+7 900 888-77-66",
         "device_type": "Телефон",
         "reported_issue": "Разбит экран",
-        "diagnostic_fee": 800.0
+        "diagnostic_fee": 800
     }))
 
     res = client.get("/repairs/800/print")
@@ -159,17 +159,38 @@ def test_repair_print_order_email_absence_and_error(client, mock_core):
         "customer_email": None,
         "device_type": "Телефон",
         "reported_issue": "Экран разбился",
-        "diagnostic_fee": 500.0
+        "diagnostic_fee": 500
     }))
 
     res = client.get("/repairs/501/print")
     assert res.status_code == 200
-    assert "Email заказчика" not in res.text
+    assert "Не указан" in res.text
 
-    # 2. Unknown repair returns error
+    # Unknown repair 404
     mock_core.get("/api/repairs/9999").mock(return_value=Response(404, json={
+        "error": True,
         "detail": "Ремонтный заказ не найден"
     }))
-    res_404 = client.get("/repairs/9999/print")
-    assert res_404.status_code == 200
-    assert "Ремонтный заказ не найден" in res_404.text
+
+    res404 = client.get("/repairs/9999/print")
+    assert res404.status_code == 200
+    assert "Ремонтный заказ не найден" in res404.text
+
+
+def test_repair_print_order_missing_fee_error(client, mock_core):
+    """
+    Test missing diagnostic_fee returns controlled error (Prompt Section 11 & 17).
+    """
+    mock_core.get("/api/repairs/502").mock(return_value=Response(200, json={
+        "id": 502,
+        "number": "R-20260803-0502",
+        "customer_name": "Петров П.П.",
+        "customer_phone": "+7 900 999-88-77",
+        "device_type": "Телефон",
+        "reported_issue": "Экран разбился",
+        "diagnostic_fee": None
+    }))
+
+    res = client.get("/repairs/502/print")
+    assert res.status_code == 400
+    assert "отсутствует стоимость диагностики" in res.text

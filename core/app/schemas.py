@@ -492,7 +492,7 @@ class RepairOrderBase(BaseModel):
     access_code_provided: Optional[bool] = False
     assigned_to: Optional[str] = None
     priority: Optional[str] = "normal"
-    diagnostic_fee: Optional[float] = 500.0
+    diagnostic_fee: Optional[int] = 500
 
     @field_validator("priority")
     def validate_priority(cls, v):
@@ -500,11 +500,35 @@ class RepairOrderBase(BaseModel):
             raise ValueError("Приоритет должен быть 'normal' или 'urgent'")
         return v or "normal"
 
-    @field_validator("diagnostic_fee")
+    @field_validator("diagnostic_fee", mode="before")
     def validate_diagnostic_fee(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("Стоимость диагностики не может быть отрицательной")
-        return 500.0 if v is None else float(v)
+        if v is None:
+            return 500
+        if isinstance(v, float):
+            if not v.is_integer():
+                raise ValueError("Стоимость диагностики должна быть целым числом")
+            val_int = int(v)
+            if val_int < 0:
+                raise ValueError("Стоимость диагностики не может быть отрицательной")
+            return val_int
+        if isinstance(v, int):
+            if v < 0:
+                raise ValueError("Стоимость диагностики не может быть отрицательной")
+            return v
+        if isinstance(v, str):
+            if not v.strip():
+                return 500
+            try:
+                val = float(v)
+                if not val.is_integer():
+                    raise ValueError("Стоимость диагностики должна быть целым числом")
+                val_int = int(val)
+                if val_int < 0:
+                    raise ValueError("Стоимость диагностики не может быть отрицательной")
+                return val_int
+            except Exception:
+                raise ValueError("Стоимость диагностики должна быть целым числом")
+        return v
 
     @field_validator("customer_name", "customer_phone", "device_type", "reported_issue", mode="before")
     def validate_non_empty(cls, v, info):
@@ -538,7 +562,7 @@ class RepairOrderUpdate(BaseModel):
     access_code_provided: Optional[bool] = None
     assigned_to: Optional[str] = None
     priority: Optional[str] = None
-    diagnostic_fee: Optional[float] = None
+    diagnostic_fee: Optional[int] = None
 
     @field_validator("priority")
     def validate_priority_opt(cls, v):
@@ -546,10 +570,34 @@ class RepairOrderUpdate(BaseModel):
             raise ValueError("Приоритет должен быть 'normal' или 'urgent'")
         return v
 
-    @field_validator("diagnostic_fee")
+    @field_validator("diagnostic_fee", mode="before")
     def validate_diagnostic_fee_opt(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("Стоимость диагностики не может быть отрицательной")
+        if v is None:
+            return None
+        if isinstance(v, float):
+            if not v.is_integer():
+                raise ValueError("Стоимость диагностики должна быть целым числом")
+            val_int = int(v)
+            if val_int < 0:
+                raise ValueError("Стоимость диагностики не может быть отрицательной")
+            return val_int
+        if isinstance(v, int):
+            if v < 0:
+                raise ValueError("Стоимость диагностики не может быть отрицательной")
+            return v
+        if isinstance(v, str):
+            if not v.strip():
+                return None
+            try:
+                val = float(v)
+                if not val.is_integer():
+                    raise ValueError("Стоимость диагностики должна быть целым числом")
+                val_int = int(val)
+                if val_int < 0:
+                    raise ValueError("Стоимость диагностики не может быть отрицательной")
+                return val_int
+            except Exception:
+                raise ValueError("Стоимость диагностики должна быть целым числом")
         return v
 
 class RepairOrderStatusUpdate(BaseModel):

@@ -113,7 +113,7 @@ async def create_repair_submit(
     access_code_provided: Optional[str] = Form("off"),
     assigned_to: Optional[str] = Form(None),
     priority: Optional[str] = Form("normal"),
-    diagnostic_fee: Optional[float] = Form(500.0)
+    diagnostic_fee: Optional[int] = Form(500)
 ):
     if diagnostic_fee is None:
         options = await core_client.get_repair_options()
@@ -271,7 +271,7 @@ async def update_repair_submit(
     access_code_provided: Optional[str] = Form("off"),
     assigned_to: Optional[str] = Form(None),
     priority: Optional[str] = Form("normal"),
-    diagnostic_fee: Optional[float] = Form(None)
+    diagnostic_fee: Optional[int] = Form(None)
 ):
     if diagnostic_fee is not None and diagnostic_fee < 0:
         options = await core_client.get_repair_options()
@@ -364,6 +364,13 @@ async def print_repair_order(request: Request, repair_id: int):
             request=request, name="error.html", context={
                 "message": data.get("detail") or "Ремонтный заказ не найден"
             }
+        )
+
+    if not isinstance(data, dict) or data.get("diagnostic_fee") is None:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={
+                "message": "В ремонтном заказе отсутствует стоимость диагностики"
+            }, status_code=400
         )
 
     org_settings = await core_client.get_organization_settings()

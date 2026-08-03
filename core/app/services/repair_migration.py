@@ -68,7 +68,7 @@ def run_repair_additive_migration(db_path: str):
             ("access_code_provided", "INTEGER DEFAULT 0"),
             ("assigned_to", "TEXT"),
             ("priority", "TEXT DEFAULT 'normal'"),
-            ("diagnostic_fee", "FLOAT DEFAULT 500.0"),
+            ("diagnostic_fee", "INTEGER DEFAULT 500"),
             ("accepted_at", "DATETIME"),
             ("created_at", "DATETIME"),
             ("updated_at", "DATETIME"),
@@ -103,7 +103,7 @@ def run_repair_additive_migration(db_path: str):
         cur.execute("CREATE INDEX IF NOT EXISTS idx_repair_history_repair_id ON repair_status_history (repair_id)")
 
         # Backfill diagnostic_fee for any existing rows where it is NULL
-        cur.execute("UPDATE repair_orders SET diagnostic_fee = 500.0 WHERE diagnostic_fee IS NULL")
+        cur.execute("UPDATE repair_orders SET diagnostic_fee = 500 WHERE diagnostic_fee IS NULL")
 
         # 5. Populate default values for legacy prototype records
         cur.execute("SELECT id, number, status, device_title, problem_description, customer_id FROM repair_orders")
@@ -143,7 +143,7 @@ def run_repair_additive_migration(db_path: str):
             updates.setdefault("accepted_at", now_str)
             updates.setdefault("access_code_provided", 0)
             updates.setdefault("priority", "normal")
-            updates.setdefault("diagnostic_fee", 500.0)
+            updates.setdefault("diagnostic_fee", 500)
 
             # Check existing values in table before overriding
             cur.execute("SELECT customer_name, customer_phone, device_type, reported_issue FROM repair_orders WHERE id = ?", (row_id,))
