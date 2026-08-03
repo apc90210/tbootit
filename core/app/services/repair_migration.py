@@ -107,10 +107,20 @@ def run_repair_additive_migration(db_path: str):
         now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         date_str = datetime.datetime.utcnow().strftime("%Y%m%d")
 
+        cur.execute("SELECT number FROM repair_orders WHERE number IS NOT NULL")
+        existing_numbers = {r[0] for r in cur.fetchall() if r[0]}
+
+        counter = 1
         for row_id, num, status, dev_title, prob_desc, cust_id in rows:
             updates = {}
             if not num:
-                updates["number"] = f"R-{date_str}-{row_id:04d}"
+                candidate = f"R-{date_str}-{counter:04d}"
+                while candidate in existing_numbers:
+                    counter += 1
+                    candidate = f"R-{date_str}-{counter:04d}"
+                updates["number"] = candidate
+                existing_numbers.add(candidate)
+                counter += 1
             if not status or status == "new":
                 updates["status"] = "received"
             

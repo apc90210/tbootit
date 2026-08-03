@@ -181,6 +181,13 @@ def migrate_db():
         except Exception as e:
             print(f"Migration error on repair tables/indexes: {e}")
 
+    try:
+        from app.services.repair_migration import run_repair_additive_migration
+        db_file = settings.database_url.replace("sqlite:///", "")
+        run_repair_additive_migration(db_file)
+    except Exception as e:
+        print(f"Migration error on run_repair_additive_migration: {e}")
+
 migrate_db()
 
 app = FastAPI(title="Technoreboot Core API", version="0.1.0")

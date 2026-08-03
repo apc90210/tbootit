@@ -41,11 +41,40 @@ def get_repair_options():
 
 @router.post("/", response_model=schemas.RepairOrder, status_code=status.HTTP_201_CREATED)
 def create_repair(repair_in: schemas.RepairOrderCreate, db: Session = Depends(get_db)):
-    # Block client from passing secret/forbidden fields
     now = datetime.utcnow()
     number = generate_repair_number(db, accepted_at=now)
 
     payload = repair_in.model_dump()
+
+    # Customer integration & snapshot logic
+    cust_id = payload.get("customer_id")
+    cust_phone = payload.get("customer_phone")
+    cust_name = payload.get("customer_name")
+    cust_email = payload.get("customer_email")
+
+    if cust_id:
+        existing_cust = db.query(models.Customer).filter(models.Customer.id == cust_id).first()
+        if existing_cust:
+            if not cust_name: payload["customer_name"] = existing_cust.name
+            if not cust_phone: payload["customer_phone"] = existing_cust.phone
+            if not cust_email: payload["customer_email"] = existing_cust.email
+    elif cust_phone and cust_phone.strip():
+        clean_phone = cust_phone.strip()
+        existing_cust = db.query(models.Customer).filter(models.Customer.phone == clean_phone).first()
+        if existing_cust:
+            payload["customer_id"] = existing_cust.id
+            if not cust_name: payload["customer_name"] = existing_cust.name
+            if not cust_email: payload["customer_email"] = existing_cust.email
+        elif cust_name and cust_name.strip():
+            new_cust = models.Customer(
+                name=cust_name.strip(),
+                phone=clean_phone,
+                email=cust_email.strip() if cust_email else None
+            )
+            db.add(new_cust)
+            db.flush()
+            payload["customer_id"] = new_cust.id
+
     db_repair = models.RepairOrder(
         number=number,
         status="received",

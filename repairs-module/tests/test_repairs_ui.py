@@ -130,3 +130,34 @@ def test_core_unavailable_shows_friendly_error(client, mock_core):
     res = client.get("/repairs")
     assert res.status_code == 200
     assert "Ошибка связи с Core API" in res.text
+
+def test_all_nine_status_filters_rendered_in_ui(client, mock_core):
+    mock_core.get("/api/repairs/").mock(return_value=Response(200, json={"items": [], "total": 0, "page": 1, "page_size": 50}))
+    mock_core.get("/api/repairs/options").mock(return_value=Response(200, json={
+        "statuses": [
+            {"value": "received", "label": "Принят"},
+            {"value": "diagnostics", "label": "Диагностика"},
+            {"value": "waiting_customer", "label": "Ожидает клиента"},
+            {"value": "waiting_parts", "label": "Ожидает запчасти"},
+            {"value": "in_repair", "label": "В ремонте"},
+            {"value": "ready", "label": "Готов"},
+            {"value": "unrepairable", "label": "Ремонт невозможен"},
+            {"value": "issued", "label": "Выдан"},
+            {"value": "canceled", "label": "Отменён"}
+        ],
+        "priorities": [],
+        "device_types": []
+    }))
+
+    res = client.get("/repairs")
+    assert res.status_code == 200
+    html = res.text
+    assert "Принят" in html
+    assert "Диагностика" in html
+    assert "Ожидает клиента" in html
+    assert "Ожидает запчасти" in html
+    assert "В ремонте" in html
+    assert "Готов" in html
+    assert "Ремонт невозможен" in html
+    assert "Выдан" in html
+    assert "Отменён" in html

@@ -33,6 +33,15 @@ assert "isolated_test.db" in str(engine.url), "FATAL: Pytest is not using isolat
 def client():
     return TestClient(app)
 
+@pytest.fixture
+def db_session():
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 @pytest.fixture(autouse=True, scope="session")
 def setup_isolated_test_database():
     """Ensure isolated temp DB tables are initialized before tests and cleaned up after session."""

@@ -16,9 +16,9 @@
 
     <!-- Quick Status Filters -->
     <div style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <a href="/repairs" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">Все</a>
+        <a href="/repairs{% if q %}?q={{ q }}{% endif %}" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">Все</a>
         {% for st in statuses %}
-        <a href="/repairs?status={{ st.value }}" class="btn {% if status_filter == st.value %}btn-primary{% else %}btn-secondary{% endif %}">{{ st.label }}</a>
+        <a href="/repairs?status={{ st.value }}{% if q %}&q={{ q }}{% endif %}" class="btn {% if status_filter == st.value %}btn-primary{% else %}btn-secondary{% endif %}">{{ st.label }}</a>
         {% endfor %}
     </div>
 
