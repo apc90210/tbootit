@@ -365,22 +365,43 @@ async def update_repair_status_submit(
     repair_id: int,
     status_value: str = Form(..., alias="status"),
     comment: Optional[str] = Form(None),
-    changed_by: Optional[str] = Form(None)
+    changed_by: Optional[str] = Form(None),
+    estimated_repair_amount_raw: Optional[str] = Form(None, alias="estimated_repair_amount")
 ):
-    repair_data = await core_client.get_repair(repair_id)
-    if isinstance(repair_data, dict) and repair_data.get("status") == "diagnostics" and status_value == "ready":
-        if repair_data.get("estimated_repair_amount") is None:
+    parsed_amount: Optional[int] = None
+    if estimated_repair_amount_raw is not None and estimated_repair_amount_raw.strip() != "":
+        try:
+            val_float = float(estimated_repair_amount_raw)
+            if not val_float.is_integer() or val_float < 0:
+                return await repair_detail(
+                    request,
+                    repair_id,
+                    error_msg="Предполагаемая стоимость ремонта должна быть целым неотрицательным числом"
+                )
+            parsed_amount = int(val_float)
+        except ValueError:
             return await repair_detail(
                 request,
                 repair_id,
-                error_msg="Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта. Можно указать 0 ₽."
+                error_msg="Предполагаемая стоимость ремонта должна быть целым числом"
+            )
+
+    repair_data = await core_client.get_repair(repair_id)
+    if isinstance(repair_data, dict) and repair_data.get("status") == "diagnostics" and status_value != "diagnostics":
+        effective_amount = parsed_amount if parsed_amount is not None else repair_data.get("estimated_repair_amount")
+        if effective_amount is None:
+            return await repair_detail(
+                request,
+                repair_id,
+                error_msg="Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
             )
 
     res = await core_client.update_repair_status(
         repair_id=repair_id,
         status=status_value,
         comment=comment,
-        changed_by=changed_by
+        changed_by=changed_by,
+        estimated_repair_amount=parsed_amount
     )
 
     if isinstance(res, dict) and res.get("error"):

@@ -672,6 +672,37 @@ class RepairOrderStatusUpdate(BaseModel):
     status: str
     comment: Optional[str] = None
     changed_by: Optional[str] = None
+    estimated_repair_amount: Optional[int] = None
+
+    @field_validator("estimated_repair_amount", mode="before")
+    def validate_estimated_repair_amount_opt(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, float):
+            if not v.is_integer():
+                raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+            val_int = int(v)
+            if val_int < 0:
+                raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+            return val_int
+        if isinstance(v, int):
+            if v < 0:
+                raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+            return v
+        if isinstance(v, str):
+            if not v.strip():
+                return None
+            try:
+                val = float(v)
+                if not val.is_integer():
+                    raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+                val_int = int(val)
+                if val_int < 0:
+                    raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+                return val_int
+            except Exception:
+                raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+        return v
 
 class RepairOrder(RepairOrderBase):
     id: int

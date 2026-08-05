@@ -42,7 +42,7 @@ def test_repair_diagnostics_to_ready_ui_flow(client, mock_core):
         "comment": ""
     })
     assert res_empty_amount.status_code == 200
-    assert "Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта" in res_empty_amount.text
+    assert "Для выхода из статуса «Диагностика» укажите стоимость ремонта" in res_empty_amount.text
     assert "Можно указать 0 ₽" in res_empty_amount.text
     assert "требуется указать комментарий" not in res_empty_amount.text
     assert "Указать стоимость ремонта" in res_empty_amount.text

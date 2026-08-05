@@ -102,6 +102,13 @@
                         </select>
                     </div>
 
+                    {% if repair.status == 'diagnostics' %}
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Стоимость ремонта, ₽:</label>
+                        <input type="number" name="estimated_repair_amount" step="1" min="0" value="{% if repair.estimated_repair_amount is not none %}{{ repair.estimated_repair_amount }}{% endif %}" placeholder="Например: 2800" style="width: 100%; padding: 8px; box-sizing: border-box;">
+                    </div>
+                    {% endif %}
+
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; font-weight: bold; margin-bottom: 5px;">Комментарий:</label>
                         <textarea name="comment" rows="2" placeholder="Причина смены статуса..." style="width: 100%; padding: 8px; box-sizing: border-box;"></textarea>

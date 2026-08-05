@@ -21,7 +21,7 @@ def test_diagnostics_to_ready_blocked_when_amount_is_none(client, db_session):
     # 2. Attempt diagnostics -> ready with estimated_repair_amount=None -> Blocked (HTTP 400)
     res = client.post(f"/api/repairs/{rep_id}/status", json={"status": "ready"})
     assert res.status_code == 400
-    assert "укажите предполагаемую стоимость ремонта" in res.json()["detail"]
+    assert "укажите стоимость ремонта" in res.json()["detail"]
     assert "Можно указать 0 ₽" in res.json()["detail"]
 
     # 3. Verify status remains diagnostics, no history or audit entry created

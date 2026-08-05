@@ -71,7 +71,7 @@ def test_diagnostics_to_ready_amount_requirement(client, db_session):
     # 1. Attempt with estimated_repair_amount=None -> should return HTTP 400
     res_no_amount = client.post(f"/api/repairs/{repair.id}/status", json={"status": "ready"})
     assert res_no_amount.status_code == 400
-    assert "укажите предполагаемую стоимость ремонта" in res_no_amount.json()["detail"]
+    assert "укажите стоимость ремонта" in res_no_amount.json()["detail"]
 
     # Verify status and history remained untouched
     db_session.refresh(repair)

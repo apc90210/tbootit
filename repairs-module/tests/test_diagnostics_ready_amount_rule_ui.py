@@ -35,7 +35,7 @@ def test_ui_diagnostics_to_ready_blocked_when_amount_none(client, mock_core):
     })
     assert res_post.status_code == 200
     html = res_post.text
-    assert "Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта" in html
+    assert "Для выхода из статуса «Диагностика» укажите стоимость ремонта" in html
     assert "Можно указать 0 ₽" in html
     assert "требуется указать комментарий" not in html
     assert "Указать стоимость ремонта" in html

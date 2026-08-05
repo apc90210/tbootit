@@ -15,8 +15,8 @@ def test_repair_status_transition_matrix(client):
     assert res1.status_code == 200
     assert res1.json()["status"] == "diagnostics"
 
-    # Valid transition: diagnostics -> in_repair
-    res2 = client.post(f"/api/repairs/{r_id}/status", json={"status": "in_repair", "comment": "В работе"})
+    # Valid transition: diagnostics -> in_repair (requires estimated_repair_amount)
+    res2 = client.post(f"/api/repairs/{r_id}/status", json={"status": "in_repair", "comment": "В работе", "estimated_repair_amount": 1000})
     assert res2.status_code == 200
     assert res2.json()["status"] == "in_repair"
 
@@ -53,8 +53,9 @@ def test_closed_repair_edit_blocked(client):
     }).json()
 
     r_id = r["id"]
-    # Cancel repair
-    client.post(f"/api/repairs/{r_id}/status", json={"status": "canceled", "comment": "Отказ от ремонта"})
+    # Cancel repair from received -> diagnostics -> canceled with estimated_repair_amount=0
+    client.post(f"/api/repairs/{r_id}/status", json={"status": "diagnostics", "comment": "На диагностику"})
+    client.post(f"/api/repairs/{r_id}/status", json={"status": "canceled", "comment": "Отказ от ремонта", "estimated_repair_amount": 0})
 
     # Attempt to edit cancelled repair
     res_edit = client.patch(f"/api/repairs/{r_id}", json={"customer_name": "Новое Имя"})

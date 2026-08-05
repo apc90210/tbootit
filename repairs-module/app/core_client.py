@@ -88,10 +88,19 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
-    async def update_repair_status(self, repair_id: int, status: str, comment: Optional[str] = None, changed_by: Optional[str] = None):
+    async def update_repair_status(
+        self,
+        repair_id: int,
+        status: str,
+        comment: Optional[str] = None,
+        changed_by: Optional[str] = None,
+        estimated_repair_amount: Optional[int] = None
+    ):
         async with httpx.AsyncClient() as client:
             try:
                 payload = {"status": status, "comment": comment, "changed_by": changed_by}
+                if estimated_repair_amount is not None:
+                    payload["estimated_repair_amount"] = estimated_repair_amount
                 response = await client.post(f"{self.base_url}/api/repairs/{repair_id}/status", json=payload, timeout=10.0)
                 if response.status_code == 200:
                     return response.json()

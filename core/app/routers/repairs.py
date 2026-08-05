@@ -298,12 +298,22 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
             detail=f"Недопустимый переход статуса из '{cur_label}' в '{new_label}'"
         )
 
-    if current_status == "diagnostics" and new_status == "ready":
-        if db_repair.estimated_repair_amount is None:
+    effective_amount = (
+        status_in.estimated_repair_amount
+        if status_in.estimated_repair_amount is not None
+        else db_repair.estimated_repair_amount
+    )
+
+    if current_status == "diagnostics" and new_status != "diagnostics":
+        if effective_amount is None:
             raise HTTPException(
                 status_code=400,
-                detail="Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта. Можно указать 0 ₽."
+                detail="Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
             )
+
+    old_amount = db_repair.estimated_repair_amount
+    if status_in.estimated_repair_amount is not None:
+        db_repair.estimated_repair_amount = status_in.estimated_repair_amount
 
     now = datetime.utcnow()
     db_repair.status = new_status
@@ -332,13 +342,19 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
     elif new_status == "canceled":
         event_type = "repair.canceled"
 
+    audit_old = {"status": current_status}
+    audit_new = {"status": new_status, "comment": status_in.comment}
+    if old_amount != db_repair.estimated_repair_amount:
+        audit_old["estimated_repair_amount"] = old_amount
+        audit_new["estimated_repair_amount"] = db_repair.estimated_repair_amount
+
     log_audit(
         db,
         "repair_order",
         db_repair.id,
         event_type,
-        old_value={"status": current_status},
-        new_value={"status": new_status, "comment": status_in.comment}
+        old_value=audit_old,
+        new_value=audit_new
     )
 
     db.commit()
