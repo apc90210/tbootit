@@ -248,7 +248,11 @@ def update_repair(repair_id: int, repair_update: schemas.RepairOrderUpdate, db: 
         "brand": db_repair.brand,
         "model": db_repair.model,
         "reported_issue": db_repair.reported_issue,
-        "diagnostic_fee": db_repair.diagnostic_fee
+        "diagnostic_fee": db_repair.diagnostic_fee,
+        "diagnosis_text": db_repair.diagnosis_text,
+        "planned_works_text": db_repair.planned_works_text,
+        "planned_parts_text": db_repair.planned_parts_text,
+        "estimated_repair_amount": db_repair.estimated_repair_amount
     }
 
     update_dict = repair_update.model_dump(exclude_unset=True)

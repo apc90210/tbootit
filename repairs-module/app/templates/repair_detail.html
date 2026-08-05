@@ -59,6 +59,23 @@
             <p><strong>Внутренняя заметка:</strong><br><span style="white-space: pre-wrap; background: #fff3cd; padding: 5px; display: block;">{{ repair.internal_note }}</span></p>
             {% endif %}
 
+            <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">Диагностика и предварительная стоимость</h3>
+            <p><strong>Результат диагностики:</strong><br>
+            {% if repair.diagnosis_text %}<span style="white-space: pre-wrap;">{{ repair.diagnosis_text }}</span>{% else %}<span style="color: #888;">Не указано</span>{% endif %}
+            </p>
+
+            <p><strong>Предполагаемые работы:</strong><br>
+            {% if repair.planned_works_text %}<span style="white-space: pre-wrap;">{{ repair.planned_works_text }}</span>{% else %}<span style="color: #888;">Не указано</span>{% endif %}
+            </p>
+
+            <p><strong>Предполагаемые детали и материалы:</strong><br>
+            {% if repair.planned_parts_text %}<span style="white-space: pre-wrap;">{{ repair.planned_parts_text }}</span>{% else %}<span style="color: #888;">Не указано</span>{% endif %}
+            </p>
+
+            <p><strong>Предполагаемая стоимость ремонта:</strong>
+            {% if repair.estimated_repair_amount is not none %}<strong>{{ repair.estimated_repair_amount }} ₽</strong>{% else %}<span style="color: #888;">Не указано</span>{% endif %}
+            </p>
+
             <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">Клиент</h3>
             <p><strong>ФИО:</strong> {{ repair.customer_name }}</p>
             <p><strong>Телефон:</strong> <code>{{ repair.customer_phone }}</code></p>

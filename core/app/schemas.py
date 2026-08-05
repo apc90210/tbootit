@@ -493,12 +493,46 @@ class RepairOrderBase(BaseModel):
     assigned_to: Optional[str] = None
     priority: Optional[str] = "normal"
     diagnostic_fee: Optional[int] = 500
+    diagnosis_text: Optional[str] = None
+    planned_works_text: Optional[str] = None
+    planned_parts_text: Optional[str] = None
+    estimated_repair_amount: Optional[int] = None
 
     @field_validator("priority")
     def validate_priority(cls, v):
         if v is not None and v not in ["normal", "urgent"]:
             raise ValueError("Приоритет должен быть 'normal' или 'urgent'")
         return v or "normal"
+
+    @field_validator("estimated_repair_amount", mode="before")
+    def validate_estimated_repair_amount(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, float):
+            if not v.is_integer():
+                raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+            val_int = int(v)
+            if val_int < 0:
+                raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+            return val_int
+        if isinstance(v, int):
+            if v < 0:
+                raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+            return v
+        if isinstance(v, str):
+            if not v.strip():
+                return None
+            try:
+                val = float(v)
+                if not val.is_integer():
+                    raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+                val_int = int(val)
+                if val_int < 0:
+                    raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+                return val_int
+            except Exception:
+                raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+        return v
 
     @field_validator("diagnostic_fee", mode="before")
     def validate_diagnostic_fee(cls, v):
@@ -563,11 +597,45 @@ class RepairOrderUpdate(BaseModel):
     assigned_to: Optional[str] = None
     priority: Optional[str] = None
     diagnostic_fee: Optional[int] = None
+    diagnosis_text: Optional[str] = None
+    planned_works_text: Optional[str] = None
+    planned_parts_text: Optional[str] = None
+    estimated_repair_amount: Optional[int] = None
 
     @field_validator("priority")
     def validate_priority_opt(cls, v):
         if v is not None and v not in ["normal", "urgent"]:
             raise ValueError("Приоритет должен быть 'normal' или 'urgent'")
+        return v
+
+    @field_validator("estimated_repair_amount", mode="before")
+    def validate_estimated_repair_amount_opt(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, float):
+            if not v.is_integer():
+                raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+            val_int = int(v)
+            if val_int < 0:
+                raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+            return val_int
+        if isinstance(v, int):
+            if v < 0:
+                raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+            return v
+        if isinstance(v, str):
+            if not v.strip():
+                return None
+            try:
+                val = float(v)
+                if not val.is_integer():
+                    raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
+                val_int = int(val)
+                if val_int < 0:
+                    raise ValueError("Предполагаемая стоимость ремонта не может быть отрицательной")
+                return val_int
+            except Exception:
+                raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
         return v
 
     @field_validator("diagnostic_fee", mode="before")

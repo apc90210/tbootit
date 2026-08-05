@@ -136,6 +136,12 @@ class RepairOrder(Base):
     priority = Column(String, default="normal", nullable=False)
     diagnostic_fee = Column(Integer, default=500, nullable=False)
 
+    # Stage05B Simple Diagnosis and Manual Estimate
+    diagnosis_text = Column(Text, nullable=True)
+    planned_works_text = Column(Text, nullable=True)
+    planned_parts_text = Column(Text, nullable=True)
+    estimated_repair_amount = Column(Integer, nullable=True)
+
     accepted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)

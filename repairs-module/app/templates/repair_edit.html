@@ -107,6 +107,27 @@
                 </div>
             </div>
 
+            <h3 style="border-bottom: 2px solid #005a9c; padding-bottom: 8px; margin-top: 25px;">5. Диагностика и предварительная стоимость</h3>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Результат диагностики</label>
+                <textarea name="diagnosis_text" rows="3" placeholder="Результаты осмотра и диагностики..." style="width: 100%; padding: 8px; box-sizing: border-box;">{{ repair.diagnosis_text or '' }}</textarea>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Предполагаемые работы</label>
+                <textarea name="planned_works_text" rows="3" placeholder="Перечень планируемых работ с ценами..." style="width: 100%; padding: 8px; box-sizing: border-box;">{{ repair.planned_works_text or '' }}</textarea>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Предполагаемые детали и материалы</label>
+                <textarea name="planned_parts_text" rows="3" placeholder="Перечень планируемых деталей и материалов..." style="width: 100%; padding: 8px; box-sizing: border-box;">{{ repair.planned_parts_text or '' }}</textarea>
+            </div>
+
+            <div style="margin-bottom: 20px; max-width: 300px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Предполагаемая стоимость ремонта, ₽</label>
+                <input type="number" name="estimated_repair_amount" step="1" min="0" value="{{ repair.estimated_repair_amount if repair.estimated_repair_amount is not none else '' }}" placeholder="Например: 4100" style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
+
             <div style="margin-top: 30px; display: flex; gap: 15px;">
                 <button type="submit" class="btn btn-primary" style="font-weight: bold; padding: 10px 20px; font-size: 1rem;">Сохранить изменения</button>
                 <a href="/repairs/{{ repair.id }}" class="btn btn-secondary" style="padding: 10px 20px; font-size: 1rem;">Отмена</a>
