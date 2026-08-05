@@ -299,10 +299,10 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
         )
 
     if current_status == "diagnostics" and new_status == "ready":
-        if not status_in.comment or not status_in.comment.strip():
+        if db_repair.estimated_repair_amount is None:
             raise HTTPException(
                 status_code=400,
-                detail="Для перехода из диагностики в статус 'Готов' требуется указать комментарий с описанием выполненных работ"
+                detail="Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта. Можно указать 0 ₽."
             )
 
     now = datetime.utcnow()
@@ -320,7 +320,7 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
         repair_id=db_repair.id,
         old_status=current_status,
         new_status=new_status,
-        comment=status_in.comment or f"Изменение статуса на '{schemas.REPAIR_STATUSES.get(new_status, new_status)}'",
+        comment=status_in.comment.strip() if (status_in.comment and status_in.comment.strip()) else None,
         changed_by=status_in.changed_by,
         changed_at=now
     )

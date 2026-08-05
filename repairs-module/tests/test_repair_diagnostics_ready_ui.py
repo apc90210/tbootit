@@ -3,7 +3,7 @@ from httpx import Response
 
 def test_repair_diagnostics_to_ready_ui_flow(client, mock_core):
     """
-    Test UI rendering and comment validation for diagnostics -> ready transition in repairs-module.
+    Test UI rendering and amount validation for diagnostics -> ready transition in repairs-module.
     """
     mock_core.get("/api/repairs/200").mock(return_value=Response(200, json={
         "id": 200,
@@ -13,7 +13,8 @@ def test_repair_diagnostics_to_ready_ui_flow(client, mock_core):
         "customer_name": "Иван Диагностический",
         "customer_phone": "+7 900 555-44-33",
         "device_type": "Ноутбук",
-        "reported_issue": "Тест диагностики"
+        "reported_issue": "Тест диагностики",
+        "estimated_repair_amount": None
     }))
 
     mock_core.get("/api/repairs/options").mock(return_value=Response(200, json={
@@ -35,15 +36,30 @@ def test_repair_diagnostics_to_ready_ui_flow(client, mock_core):
     html = res_detail.text
     assert '<option value="ready">Готов</option>' in html
 
-    # 2. Attempting status change to 'ready' with empty comment is blocked with error message
-    res_empty_comment = client.post("/repairs/200/status", data={
+    # 2. Attempting status change to 'ready' when amount is None is blocked with new error message
+    res_empty_amount = client.post("/repairs/200/status", data={
         "status": "ready",
-        "comment": "   "
+        "comment": ""
     })
-    assert res_empty_comment.status_code == 200
-    assert "требуется указать комментарий" in res_empty_comment.text
+    assert res_empty_amount.status_code == 200
+    assert "Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта" in res_empty_amount.text
+    assert "Можно указать 0 ₽" in res_empty_amount.text
+    assert "требуется указать комментарий" not in res_empty_amount.text
+    assert "Указать стоимость ремонта" in res_empty_amount.text
 
-    # 3. Valid status change to 'ready' with comment succeeds and redirects
+    # 3. When amount is set, transition succeeds without mandatory comment
+    mock_core.get("/api/repairs/200").mock(return_value=Response(200, json={
+        "id": 200,
+        "number": "R-DIAG-001",
+        "status": "diagnostics",
+        "status_label": "Диагностика",
+        "customer_name": "Иван Диагностический",
+        "customer_phone": "+7 900 555-44-33",
+        "device_type": "Ноутбук",
+        "reported_issue": "Тест диагностики",
+        "estimated_repair_amount": 1500
+    }))
+
     mock_core.post("/api/repairs/200/status").mock(return_value=Response(200, json={
         "id": 200,
         "number": "R-DIAG-001",
@@ -53,7 +69,7 @@ def test_repair_diagnostics_to_ready_ui_flow(client, mock_core):
 
     res_valid_submit = client.post("/repairs/200/status", data={
         "status": "ready",
-        "comment": "Неисправность устранена во время диагностики"
+        "comment": ""
     }, follow_redirects=False)
     assert res_valid_submit.status_code == 303
     assert "msg=" in res_valid_submit.headers["location"]

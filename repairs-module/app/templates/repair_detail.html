@@ -21,8 +21,11 @@
     {% endif %}
 
     {% if error_msg %}
-    <div style="background: #f8d7da; color: #721c24; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
-        ⚠️ {{ error_msg }}
+    <div style="background: #f8d7da; color: #721c24; padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>⚠️ {{ error_msg }}</div>
+        {% if "стоимость ремонта" in error_msg or repair.estimated_repair_amount is none %}
+        <a href="/repairs/{{ repair.id }}/edit" class="btn btn-warning" style="font-weight: bold; text-decoration: none; padding: 6px 12px;">Указать стоимость ремонта</a>
+        {% endif %}
     </div>
     {% endif %}
 

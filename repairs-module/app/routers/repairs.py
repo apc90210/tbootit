@@ -369,11 +369,11 @@ async def update_repair_status_submit(
 ):
     repair_data = await core_client.get_repair(repair_id)
     if isinstance(repair_data, dict) and repair_data.get("status") == "diagnostics" and status_value == "ready":
-        if not comment or not comment.strip():
+        if repair_data.get("estimated_repair_amount") is None:
             return await repair_detail(
                 request,
                 repair_id,
-                error_msg="Для перехода из диагностики в статус 'Готов' требуется указать комментарий с описанием выполненных работ"
+                error_msg="Для перехода в статус «Готов» укажите предполагаемую стоимость ремонта. Можно указать 0 ₽."
             )
 
     res = await core_client.update_repair_status(
@@ -385,7 +385,7 @@ async def update_repair_status_submit(
 
     if isinstance(res, dict) and res.get("error"):
         err_detail = res.get("detail") or "Недопустимый переход статуса"
-        return await repair_detail(request, repair_id, error_msg=f"Ошибка смены статуса: {err_detail}")
+        return await repair_detail(request, repair_id, error_msg=err_detail)
 
     status_label = res.get("status_label") or status_value
     return RedirectResponse(

@@ -26,7 +26,8 @@ def test_all_valid_status_transitions_complete(client, db_session):
                 customer_name="Тест Переходов",
                 customer_phone="+7 900 111-22-33",
                 device_type="Ноутбук",
-                reported_issue="Тестирование переходов"
+                reported_issue="Тестирование переходов",
+                estimated_repair_amount=500 if start_status == "diagnostics" else None
             )
             db_session.add(repair)
             db_session.commit()
@@ -48,10 +49,10 @@ def test_all_valid_status_transitions_complete(client, db_session):
             assert last_entry["old_status"] == start_status
             assert last_entry["new_status"] == target
 
-def test_diagnostics_to_ready_comment_requirement(client, db_session):
+def test_diagnostics_to_ready_amount_requirement(client, db_session):
     """
-    Test that diagnostics -> ready transition requires a non-empty comment.
-    Empty or whitespace-only comments must be rejected with HTTP 400 and preserve status/history.
+    Test that diagnostics -> ready transition requires estimated_repair_amount is not None.
+    Comment is optional (Stage05B-R1).
     """
     repair = models.RepairOrder(
         number="TEST-DIAG-READY-REQ",
@@ -59,21 +60,18 @@ def test_diagnostics_to_ready_comment_requirement(client, db_session):
         customer_name="Тест Диагностика Готов",
         customer_phone="+7 900 333-22-11",
         device_type="Смартфон",
-        reported_issue="Не включается"
+        reported_issue="Не включается",
+        estimated_repair_amount=None
     )
     db_session.add(repair)
     db_session.commit()
 
     hist_before = len(db_session.query(models.RepairStatusHistory).filter_by(repair_id=repair.id).all())
 
-    # 1. Attempt without comment -> should return HTTP 400
-    res_no_comment = client.post(f"/api/repairs/{repair.id}/status", json={"status": "ready"})
-    assert res_no_comment.status_code == 400
-    assert "требуется указать комментарий" in res_no_comment.json()["detail"]
-
-    # 2. Attempt with whitespace-only comment -> should return HTTP 400
-    res_ws_comment = client.post(f"/api/repairs/{repair.id}/status", json={"status": "ready", "comment": "   "})
-    assert res_ws_comment.status_code == 400
+    # 1. Attempt with estimated_repair_amount=None -> should return HTTP 400
+    res_no_amount = client.post(f"/api/repairs/{repair.id}/status", json={"status": "ready"})
+    assert res_no_amount.status_code == 400
+    assert "укажите предполагаемую стоимость ремонта" in res_no_amount.json()["detail"]
 
     # Verify status and history remained untouched
     db_session.refresh(repair)
@@ -81,19 +79,21 @@ def test_diagnostics_to_ready_comment_requirement(client, db_session):
     hist_after = len(db_session.query(models.RepairStatusHistory).filter_by(repair_id=repair.id).all())
     assert hist_after == hist_before
 
-    # 3. Valid transition with comment -> should succeed
+    # 2. Set amount = 500, attempt ready without comment -> should succeed
+    repair.estimated_repair_amount = 500
+    db_session.commit()
+
     res_success = client.post(
         f"/api/repairs/{repair.id}/status",
-        json={"status": "ready", "comment": "Сбой устранён сбросом настроек"}
+        json={"status": "ready"}
     )
     assert res_success.status_code == 200
     assert res_success.json()["status"] == "ready"
     assert res_success.json()["closed_at"] is None  # 'ready' does not close repair!
 
-    # Verify history entry created with comment
+    # Verify history entry created
     hist_final = db_session.query(models.RepairStatusHistory).filter_by(repair_id=repair.id).all()
     assert len(hist_final) == hist_before + 1
-    assert hist_final[-1].comment == "Сбой устранён сбросом настроек"
 
 def test_forbidden_status_transitions_rejected(client, db_session):
     """
