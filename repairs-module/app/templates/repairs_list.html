@@ -14,33 +14,25 @@
     </div>
     {% endif %}
 
-    <!-- Quick Status Filters -->
-    <div style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <a href="/repairs{% if q %}?q={{ q }}{% endif %}" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %}">Все</a>
-        {% for st in statuses %}
-        <a href="/repairs?status={{ st.value }}{% if q %}&q={{ q }}{% endif %}" class="btn {% if status_filter == st.value %}btn-primary{% else %}btn-secondary{% endif %}">{{ st.label }}</a>
-        {% endfor %}
-    </div>
-
-    <!-- Search Form -->
+    <!-- Filter Form -->
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
         <form method="GET" action="/repairs" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
-            <div style="flex: 1; min-width: 250px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Поиск:</label>
-                <input type="text" name="q" value="{{ q }}" placeholder="Номер, клиент, телефон, модель, серийный №..." style="width: 100%; padding: 8px; box-sizing: border-box;">
-            </div>
             <div>
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Тип устройства:</label>
-                <select name="device_type" style="padding: 8px;">
-                    <option value="">Все типы</option>
-                    {% for dt in device_types %}
-                    <option value="{{ dt }}" {% if device_type == dt %}selected{% endif %}>{{ dt }}</option>
+                <label for="status" style="display: block; margin-bottom: 5px; font-weight: bold;">Статус ремонта:</label>
+                <select name="status" id="status" onchange="this.form.submit()" style="padding: 8px;">
+                    <option value="">Все статусы</option>
+                    {% for st in statuses %}
+                    <option value="{{ st.value }}" {% if status_filter == st.value %}selected{% endif %}>{{ st.label }}</option>
                     {% endfor %}
                 </select>
             </div>
+            <div style="flex: 1; min-width: 250px;">
+                <label for="q" style="display: block; margin-bottom: 5px; font-weight: bold;">Поиск:</label>
+                <input type="text" id="q" name="q" value="{{ q }}" placeholder="Номер, клиент, телефон, модель, серийный №..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+            </div>
             <div>
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Приоритет:</label>
-                <select name="priority" style="padding: 8px;">
+                <label for="priority" style="display: block; margin-bottom: 5px; font-weight: bold;">Приоритет:</label>
+                <select name="priority" id="priority" style="padding: 8px;">
                     <option value="">Все</option>
                     {% for pr in priorities %}
                     <option value="{{ pr.value }}" {% if priority == pr.value %}selected{% endif %}>{{ pr.label }}</option>
@@ -48,8 +40,26 @@
                 </select>
             </div>
             <div>
+                <label for="device_type" style="display: block; margin-bottom: 5px; font-weight: bold;">Тип устройства:</label>
+                <select name="device_type" id="device_type" style="padding: 8px;">
+                    <option value="">Все типы</option>
+                    {% for dt in device_types %}
+                    <option value="{{ dt }}" {% if device_type == dt %}selected{% endif %}>{{ dt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% if assigned_to %}<input type="hidden" name="assigned_to" value="{{ assigned_to }}">{% endif %}
+            {% if customer_phone %}<input type="hidden" name="customer_phone" value="{{ customer_phone }}">{% endif %}
+            {% if serial_number %}<input type="hidden" name="serial_number" value="{{ serial_number }}">{% endif %}
+            {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from }}">{% endif %}
+            {% if date_to %}<input type="hidden" name="date_to" value="{{ date_to }}">{% endif %}
+            {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
+            {% if page_size and page_size != 50 %}<input type="hidden" name="page_size" value="{{ page_size }}">{% endif %}
+
+            <div>
                 <button type="submit" class="btn btn-primary">Искать</button>
-                <a href="/repairs" class="btn btn-secondary" style="margin-left: 5px;">Сбросить</a>
+                <a href="/repairs" class="btn btn-secondary" style="margin-left: 5px;">Сбросить фильтры</a>
             </div>
         </form>
     </div>
@@ -98,9 +108,27 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if total > page_size %}
+        <div style="margin-top: 20px; display: flex; gap: 10px; align-items: center; justify-content: center;">
+            {% set max_page = ((total - 1) // page_size) + 1 %}
+            {% if page > 1 %}
+            <a href="/repairs?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if priority %}&priority={{ priority }}{% endif %}{% if device_type %}&device_type={{ device_type }}{% endif %}{% if assigned_to %}&assigned_to={{ assigned_to }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if customer_phone %}&customer_phone={{ customer_phone }}{% endif %}{% if serial_number %}&serial_number={{ serial_number }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if page_size and page_size != 50 %}&page_size={{ page_size }}{% endif %}" class="btn btn-secondary">« Назад</a>
+            {% endif %}
+            <span>Страница <strong>{{ page }}</strong> из <strong>{{ max_page }}</strong></span>
+            {% if page < max_page %}
+            <a href="/repairs?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if priority %}&priority={{ priority }}{% endif %}{% if device_type %}&device_type={{ device_type }}{% endif %}{% if assigned_to %}&assigned_to={{ assigned_to }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if customer_phone %}&customer_phone={{ customer_phone }}{% endif %}{% if serial_number %}&serial_number={{ serial_number }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if page_size and page_size != 50 %}&page_size={{ page_size }}{% endif %}" class="btn btn-secondary">Вперёд »</a>
+            {% endif %}
+        </div>
+        {% endif %}
     {% else %}
-        <div style="background: #fff; padding: 20px; text-align: center; border: 1px solid #ddd;">
-            <p>Ремонтные заказы не найдены.</p>
+        <div style="background: #fff; padding: 25px; text-align: center; border: 1px solid #ddd; margin-top: 10px;">
+            {% if status_filter or q or priority or device_type or assigned_to or customer_phone or serial_number or date_from or date_to %}
+                <p style="margin-bottom: 15px; font-size: 1.1em; color: #555;">Ремонты с выбранным статусом не найдены.</p>
+                <a href="/repairs" class="btn btn-secondary">Сбросить фильтры</a>
+            {% else %}
+                <p style="font-size: 1.1em; color: #555;">Ремонтные заказы не найдены.</p>
+            {% endif %}
         </div>
     {% endif %}
 {% endblock %}

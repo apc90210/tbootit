@@ -24,6 +24,9 @@ async def list_repairs(
     assigned_to: Optional[str] = Query(None),
     customer_phone: Optional[str] = Query(None),
     serial_number: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1),
     msg: Optional[str] = Query(None)
@@ -36,6 +39,9 @@ async def list_repairs(
     if assigned_to and assigned_to.strip(): params["assigned_to"] = assigned_to.strip()
     if customer_phone and customer_phone.strip(): params["customer_phone"] = customer_phone.strip()
     if serial_number and serial_number.strip(): params["serial_number"] = serial_number.strip()
+    if date_from and date_from.strip(): params["date_from"] = date_from.strip()
+    if date_to and date_to.strip(): params["date_to"] = date_to.strip()
+    if sort and sort.strip(): params["sort"] = sort.strip()
 
     data = await core_client.get_repairs(params)
     options = await core_client.get_repair_options()
@@ -66,7 +72,13 @@ async def list_repairs(
             "priority": priority or "",
             "device_type": device_type or "",
             "assigned_to": assigned_to or "",
+            "customer_phone": customer_phone or "",
+            "serial_number": serial_number or "",
+            "date_from": date_from or "",
+            "date_to": date_to or "",
+            "sort": sort or "",
             "page": page,
+            "page_size": page_size,
             "msg": msg or ""
         }
     )
