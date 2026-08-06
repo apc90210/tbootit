@@ -31,10 +31,21 @@
             <tbody>
                 {% for sale in sales_data['items'] %}
                 <tr>
-                    <td>#{{ sale.id }}</td>
+                    <td>
+                        #{{ sale.id }}
+                        {% if sale.source_type == 'repair' %}
+                            <span style="background: #17a2b8; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 4px;">Ремонт</span>
+                        {% endif %}
+                    </td>
                     <td>{{ sale.created_at or '—' }}</td>
-                    <td>{{ sale.get('items')|length if sale.get('items') else 0 }} шт.</td>
-                    <td>{{ sale.total_amount }} ₽</td>
+                    <td>
+                        {% if sale.source_type == 'repair' %}
+                            <div style="font-size: 0.9rem; max-width: 300px; color: #333;">{{ sale.comment or 'Ремонтные работы' }}</div>
+                        {% else %}
+                            {{ sale.get('items')|length if sale.get('items') else 0 }} шт.
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ sale.total_amount }} ₽</strong></td>
                     <td>
                         {% if sale.payment_method in payment_methods %}
                             {{ payment_methods[sale.payment_method] }}
@@ -58,7 +69,11 @@
                     </td>
                     <td>
                         <a href="/sales/{{ sale.id }}" class="btn btn-success">Открыть</a>
-                        <a href="/sales/{{ sale.id }}/receipt" class="btn">Товарный чек</a>
+                        {% if sale.source_type == 'repair' and sale.source_id %}
+                            <a href="http://localhost:8040/repairs/{{ sale.source_id }}" target="_blank" class="btn" style="background: #17a2b8; color: #fff; margin-left: 5px;">Открыть ремонт</a>
+                        {% else %}
+                            <a href="/sales/{{ sale.id }}/receipt" class="btn">Товарный чек</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

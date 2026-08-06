@@ -60,7 +60,7 @@ def migrate_db():
         except Exception as e:
             print(f"Index creation warning: {e}")
 
-        # Migrate sales table for Stage 04C
+        # Migrate sales table for Stage 04C & Stage 05C
         res_sales = conn.execute(text("PRAGMA table_info(sales);")).fetchall()
         sales_columns = [row[1] for row in res_sales]
         sales_updates = [
@@ -74,7 +74,9 @@ def migrate_db():
             ("superseded_by_sale_id", "INTEGER"),
             ("reissued_at", "DATETIME"),
             ("warranty_days", "INTEGER"),
-            ("warranty_enabled", "INTEGER DEFAULT 1")
+            ("warranty_enabled", "INTEGER DEFAULT 1"),
+            ("source_type", "VARCHAR"),
+            ("source_id", "INTEGER")
         ]
         for col_name, col_type in sales_updates:
             if col_name not in sales_columns:
@@ -82,6 +84,11 @@ def migrate_db():
                     conn.execute(text(f"ALTER TABLE sales ADD COLUMN {col_name} {col_type};"))
                 except Exception as e:
                     print(f"Migration error on {col_name}: {e}")
+
+        try:
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sales_source_type_source_id ON sales(source_type, source_id) WHERE source_type IS NOT NULL AND source_id IS NOT NULL;"))
+        except Exception as e:
+            print(f"Index creation error on ix_sales_source_type_source_id: {e}")
 
         # Migrate organization_settings table
         res_org = conn.execute(text("PRAGMA table_info(organization_settings);")).fetchall()

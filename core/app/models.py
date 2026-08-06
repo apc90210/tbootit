@@ -200,6 +200,8 @@ class Sale(Base):
     payment_method = Column(String)
     comment = Column(Text)
     status = Column(String, default="completed", index=True)
+    source_type = Column(String, nullable=True, index=True)
+    source_id = Column(Integer, nullable=True, index=True)
     warranty_days = Column(Integer, nullable=True)
     warranty_enabled = Column(Integer, default=1)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
@@ -218,7 +220,7 @@ class SaleItem(Base):
     __tablename__ = "sale_items"
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     title = Column(String)
     price = Column(Float)
     quantity = Column(Integer)

@@ -4,7 +4,7 @@
 This is the MVP prototype for the Technoreboot project. It consists of:
 - **Core API**: FastAPI backend managing the database, storage, inventory, and repair orders.
 - **Admin Shell**: Simple HTML/FastAPI frontend for managing data.
-- **Repairs Module**: Dedicated microservice for repair intake, registry, diagnostic fee management, simple repair diagnosis, and manual estimate tracking (Stage05B).
+- **Repairs Module**: Dedicated microservice for repair intake, registry, status filtering, diagnostic fee management, simple repair diagnosis, manual estimate tracking, and automatic accounting integration with sales (Stage05C).
 
 ## How to run
 Make sure you have Docker and Docker Compose installed.

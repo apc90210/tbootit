@@ -166,12 +166,13 @@ class RepairOrder(RepairOrderBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
+    linked_sale_id: Optional[int] = None
     class Config:
         from_attributes = True
 
 # Sale Schemas
 class SaleItemBase(BaseModel):
-    product_id: int
+    product_id: Optional[int] = None
     title: str
     price: float
     quantity: int
@@ -191,6 +192,8 @@ class SaleBase(BaseModel):
     total_amount: Optional[float] = None
     payment_method: Optional[str] = "cash"
     comment: Optional[str] = None
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
     warranty_days: Optional[int] = 30
     warranty_enabled: Optional[bool] = True
 

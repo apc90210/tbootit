@@ -23,10 +23,17 @@ VALID_TRANSITIONS = {
     "canceled": []
 }
 
-def enrich_repair_labels(db_repair: models.RepairOrder) -> models.RepairOrder:
+def enrich_repair_labels(db_repair: models.RepairOrder, db: Session = None) -> models.RepairOrder:
     if db_repair:
         setattr(db_repair, "status_label", schemas.REPAIR_STATUSES.get(db_repair.status, db_repair.status))
         setattr(db_repair, "priority_label", schemas.REPAIR_PRIORITIES.get(db_repair.priority, db_repair.priority))
+        if db is not None:
+            linked_sale = db.query(models.Sale).filter(
+                models.Sale.source_type == "repair",
+                models.Sale.source_id == db_repair.id
+            ).first()
+            if linked_sale:
+                setattr(db_repair, "linked_sale_id", linked_sale.id)
     return db_repair
 
 @router.get("/options")
@@ -326,6 +333,100 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
         db_repair.canceled_at = now
         db_repair.closed_at = now
 
+        existing_sale = db.query(models.Sale).filter(
+            models.Sale.source_type == "repair",
+            models.Sale.source_id == db_repair.id
+        ).first()
+        if existing_sale:
+            existing_sale.status = "canceled"
+            existing_sale.cancelled_at = now
+            existing_sale.canceled_by = status_in.changed_by
+            db.flush()
+            log_audit(
+                db,
+                "repair_order",
+                db_repair.id,
+                "repair.sale_canceled",
+                new_value={
+                    "repair_id": db_repair.id,
+                    "repair_number": db_repair.number,
+                    "sale_id": existing_sale.id,
+                    "amount": existing_sale.total_amount,
+                    "source_type": "repair"
+                }
+            )
+    elif new_status == "ready":
+        sale_amount = db_repair.estimated_repair_amount or 0
+        desc_parts = [f"Ремонт {db_repair.number}"]
+        dev_info = " ".join([p for p in [db_repair.device_type, db_repair.brand, db_repair.model] if p and p.strip()])
+        if dev_info:
+            desc_parts.append(f"- {dev_info}")
+        if db_repair.reported_issue and db_repair.reported_issue.strip():
+            desc_parts.append(f". Неисправность: {db_repair.reported_issue.strip()}")
+        sale_comment = " ".join(desc_parts)
+
+        existing_sale = db.query(models.Sale).filter(
+            models.Sale.source_type == "repair",
+            models.Sale.source_id == db_repair.id
+        ).first()
+
+        if existing_sale:
+            existing_sale.total_amount = sale_amount
+            existing_sale.comment = sale_comment
+            existing_sale.status = "completed"
+            db.flush()
+            log_audit(
+                db,
+                "repair_order",
+                db_repair.id,
+                "repair.sale_updated",
+                new_value={
+                    "repair_id": db_repair.id,
+                    "repair_number": db_repair.number,
+                    "sale_id": existing_sale.id,
+                    "amount": sale_amount,
+                    "source_type": "repair"
+                }
+            )
+        else:
+            new_sale = models.Sale(
+                customer_id=db_repair.customer_id,
+                total_amount=sale_amount,
+                payment_method="other",
+                comment=sale_comment,
+                status="completed",
+                source_type="repair",
+                source_id=db_repair.id,
+                created_at=now
+            )
+            db.add(new_sale)
+            db.flush()
+
+            sale_item = models.SaleItem(
+                sale_id=new_sale.id,
+                product_id=None,
+                title=f"Ремонт {db_repair.number}",
+                price=sale_amount,
+                quantity=1,
+                created_at=now
+            )
+            db.add(sale_item)
+            db.flush()
+
+            log_audit(
+                db,
+                "repair_order",
+                db_repair.id,
+                "repair.sale_created",
+                new_value={
+                    "repair_id": db_repair.id,
+                    "repair_number": db_repair.number,
+                    "sale_id": new_sale.id,
+                    "amount": sale_amount,
+                    "source_type": "repair"
+                }
+            )
+
     hist = models.RepairStatusHistory(
         repair_id=db_repair.id,
         old_status=current_status,
@@ -360,4 +461,4 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
     db.commit()
     db.refresh(db_repair)
 
-    return enrich_repair_labels(db_repair)
+    return enrich_repair_labels(db_repair, db)
