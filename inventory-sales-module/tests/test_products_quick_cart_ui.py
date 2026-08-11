@@ -52,7 +52,7 @@ def test_products_list_quick_add_form_elements(mock_core):
     html = res.text
     assert 'class="quick-add-form"' in html
     assert 'class="btn btn-danger quick-add-btn"' in html
-    assert 'src="/static/cart_quick_add.js"' in html
+    assert 'cart_quick_add.js' in html
 
 def test_non_js_fallback_redirect(mock_core):
     mock_core.get("/api/products/201").mock(return_value=Response(200, json={

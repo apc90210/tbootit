@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/playwright/python:v1.41.2-jammy
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PYTHONPATH=/app \
     DISPLAY=:99
 

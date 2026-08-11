@@ -7,11 +7,11 @@
 
     <div style="margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
         <strong>Статус:</strong>
-        <a href="/sales" class="btn {% if not selected_status %}btn-success{% endif %}">Все</a>
-        <a href="/sales?status=completed" class="btn {% if selected_status == 'completed' %}btn-success{% endif %}">Завершённые</a>
-        <a href="/sales?status=canceled" class="btn {% if selected_status == 'canceled' or selected_status == 'cancelled' %}btn-success{% endif %}">Отменённые</a>
-        <a href="/sales?status=superseded" class="btn {% if selected_status == 'superseded' %}btn-success{% endif %}">Заменённые</a>
-        <a href="/sales?status=reissued" class="btn {% if selected_status == 'reissued' %}btn-success{% endif %}">Повторно оформленные</a>
+        <a href="/inventory/sales" class="btn {% if not selected_status %}btn-success{% endif %}">Все</a>
+        <a href="/inventory/sales?status=completed" class="btn {% if selected_status == 'completed' %}btn-success{% endif %}">Завершённые</a>
+        <a href="/inventory/sales?status=canceled" class="btn {% if selected_status == 'canceled' or selected_status == 'cancelled' %}btn-success{% endif %}">Отменённые</a>
+        <a href="/inventory/sales?status=superseded" class="btn {% if selected_status == 'superseded' %}btn-success{% endif %}">Заменённые</a>
+        <a href="/inventory/sales?status=reissued" class="btn {% if selected_status == 'reissued' %}btn-success{% endif %}">Повторно оформленные</a>
     </div>
 
     {% if sales_data and sales_data['items'] %}
@@ -68,11 +68,11 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="/sales/{{ sale.id }}" class="btn btn-success">Открыть</a>
+                        <a href="/inventory/sales/{{ sale.id }}" class="btn btn-success">Открыть</a>
                         {% if sale.source_type == 'repair' and sale.source_id %}
                             <a href="/repairs/repairs/{{ sale.source_id }}" target="_blank" class="btn" style="background: #17a2b8; color: #fff; margin-left: 5px;">Открыть ремонт</a>
                         {% else %}
-                            <a href="/sales/{{ sale.id }}/receipt" class="btn">Товарный чек</a>
+                            <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn">Товарный чек</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -83,13 +83,13 @@
         <div style="margin-top: 15px;">
             {% set status_param = '&status=' + selected_status if selected_status else '' %}
             {% if offset > 0 %}
-                <a href="/sales?limit={{ limit }}&offset={{ offset - limit }}{{ status_param }}" class="btn">Назад</a>
+                <a href="/inventory/sales?limit={{ limit }}&offset={{ offset - limit }}{{ status_param }}" class="btn">Назад</a>
             {% else %}
                 <button class="btn" disabled>Назад</button>
             {% endif %}
 
             {% if (offset + limit) < sales_data.total %}
-                <a href="/sales?limit={{ limit }}&offset={{ offset + limit }}{{ status_param }}" class="btn" style="margin-left: 10px;">Вперед</a>
+                <a href="/inventory/sales?limit={{ limit }}&offset={{ offset + limit }}{{ status_param }}" class="btn" style="margin-left: 10px;">Вперед</a>
             {% else %}
                 <button class="btn" disabled style="margin-left: 10px;">Вперед</button>
             {% endif %}
@@ -97,7 +97,7 @@
     {% else %}
         <div style="background: #fff; padding: 30px; border: 1px solid #ddd; border-radius: 5px; text-align: center;">
             <p style="font-size: 1.1rem; color: #777;">Продаж пока нет</p>
-            <a href="/products" class="btn">Перейти к товарам</a>
+            <a href="/inventory/products" class="btn">Перейти к товарам</a>
         </div>
     {% endif %}
 {% endblock %}

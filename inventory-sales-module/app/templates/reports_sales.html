@@ -13,12 +13,12 @@
     <div class="col">
         <div class="card">
             <div class="card-body">
-                <form action="/reports/sales" method="get" class="row g-3 align-items-end">
+                <form action="/inventory/reports/sales" method="get" class="row g-3 align-items-end">
                     <div class="col-auto">
-                        <a href="/reports/sales?period=today" class="btn btn-outline-primary {% if period == 'today' %}active{% endif %}">Сегодня</a>
-                        <a href="/reports/sales?period=week" class="btn btn-outline-primary {% if period == 'week' %}active{% endif %}">Неделя</a>
-                        <a href="/reports/sales?period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">Месяц</a>
-                        <a href="/reports/sales?period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">Год</a>
+                        <a href="/inventory/reports/sales?period=today" class="btn btn-outline-primary {% if period == 'today' %}active{% endif %}">Сегодня</a>
+                        <a href="/inventory/reports/sales?period=week" class="btn btn-outline-primary {% if period == 'week' %}active{% endif %}">Неделя</a>
+                        <a href="/inventory/reports/sales?period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">Месяц</a>
+                        <a href="/inventory/reports/sales?period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">Год</a>
                     </div>
                     <div class="col-auto">
                         <label for="date_from" class="form-label">С</label>
@@ -205,8 +205,8 @@
                     <td>{{ sale.get('items_count', 0) }}</td>
                     <td>{{ "{:,.2f}".format(sale.get('total_amount', 0)|float).replace(',', ' ') }} ₽</td>
                     <td>
-                        <a href="/sales/{{ sale.get('id', '') }}" class="btn btn-sm btn-outline-info">Открыть</a>
-                        <a href="/sales/{{ sale.get('id', '') }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
+                        <a href="/inventory/sales/{{ sale.get('id', '') }}" class="btn btn-sm btn-outline-info">Открыть</a>
+                        <a href="/inventory/sales/{{ sale.get('id', '') }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
                     </td>
                     {% else %}
                     <td>{{ sale.id }}</td>
@@ -215,8 +215,8 @@
                     <td>{{ sale.items_count }}</td>
                     <td>{{ "{:,.2f}".format(sale.total_amount).replace(',', ' ') }} ₽</td>
                     <td>
-                        <a href="/sales/{{ sale.id }}" class="btn btn-sm btn-outline-info">Открыть</a>
-                        <a href="/sales/{{ sale.id }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
+                        <a href="/inventory/sales/{{ sale.id }}" class="btn btn-sm btn-outline-info">Открыть</a>
+                        <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn btn-sm btn-outline-secondary" target="_blank">Товарный чек</a>
                     </td>
                     {% endif %}
                 </tr>

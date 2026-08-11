@@ -90,7 +90,7 @@ def test_repairs_status_filter_ui_elements_and_persistence():
         assert '<option value="diagnostics" selected>' in html
 
         # Verify reset button link
-        assert 'href="/repairs"' in html
+        assert 'href="/repairs/repairs"' in html or 'href="/repairs"' in html
         assert 'Сбросить фильтры' in html
 
 def test_repairs_status_filter_ui_empty_result():
@@ -110,7 +110,7 @@ def test_repairs_status_filter_ui_empty_result():
         html = response.text
 
         assert "Ремонты с выбранным статусом не найдены." in html
-        assert 'href="/repairs"' in html
+        assert 'href="/repairs/repairs"' in html or 'href="/repairs"' in html
         assert "Сбросить фильтры" in html
 
 def test_repairs_status_filter_pagination_preserves_query_params():

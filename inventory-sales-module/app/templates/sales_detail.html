@@ -15,7 +15,7 @@
             {% if sale.source_sale_id or sale.original_sale_id %}
                 <p style="margin: 0; color: #1976d2;">
                     Создана на основе отменённой продажи 
-                    <a href="/sales/{{ sale.source_sale_id or sale.original_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.source_sale_id or sale.original_sale_id }}</a>
+                    <a href="/inventory/sales/{{ sale.source_sale_id or sale.original_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.source_sale_id or sale.original_sale_id }}</a>
                 </p>
             {% endif %}
         </div>
@@ -30,7 +30,7 @@
             {% if sale.superseded_by_sale_id or sale.replaced_by_sale_id %}
                 <p style="margin: 0; color: #616161;">
                     Заменена новой продажей 
-                    <a href="/sales/{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}</a>
+                    <a href="/inventory/sales/{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}</a>
                 </p>
             {% endif %}
         </div>
@@ -103,14 +103,13 @@
             {% if sale.superseded_by_sale_id or sale.replaced_by_sale_id %}
             <tr>
                 <th>Новая продажа (Reissue)</th>
-                <td><a href="/sales/{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}</a></td>
+                <td><a href="/inventory/sales/{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.superseded_by_sale_id or sale.replaced_by_sale_id }}</a></td>
             </tr>
             {% endif %}
-
             {% if sale.source_sale_id or sale.original_sale_id %}
             <tr>
-                <th>Исходная продажа</th>
-                <td><a href="/sales/{{ sale.source_sale_id or sale.original_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.source_sale_id or sale.original_sale_id }}</a></td>
+                <td><strong>Исходная продажа:</strong></td>
+                <td><a href="/inventory/sales/{{ sale.source_sale_id or sale.original_sale_id }}" style="font-weight: bold; text-decoration: underline;">№{{ sale.source_sale_id or sale.original_sale_id }}</a></td>
             </tr>
             {% endif %}
         </table>
@@ -143,9 +142,9 @@
     {% endif %}
 
     <div style="margin-top: 20px;">
-        <a href="/sales/{{ sale.id }}/receipt" class="btn btn-primary" style="margin-right: 15px;">Товарный чек</a>
-        <a href="/products" class="btn">Вернуться к товарам</a>
-        <a href="/sales" class="btn" style="margin-left: 10px;">Все продажи</a>
+        <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn btn-primary" style="margin-right: 15px;">Товарный чек</a>
+        <a href="/inventory/products" class="btn">Вернуться к товарам</a>
+        <a href="/inventory/sales" class="btn" style="margin-left: 10px;">Все продажи</a>
     </div>
 
     {% if st == 'completed' or st == 'reissued' %}
@@ -153,7 +152,7 @@
     <div style="background: #fff; padding: 20px; border: 1px solid #f5c6cb; border-radius: 5px; max-width: 600px;">
         <h3 style="color: #721c24; margin-top: 0;">Отменить продажу</h3>
         <p style="color: #555; font-size: 0.95rem;">Отмена вернет товары из чека обратно в остатки на склад.</p>
-        <form action="/sales/{{ sale.id }}/cancel" method="POST">
+        <form action="/inventory/sales/{{ sale.id }}/cancel" method="POST">
             <div style="margin-bottom: 10px;">
                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">Причина отмены *</label>
                 <input type="text" name="reason" placeholder="Укажите причину отмены" required style="width: 100%; padding: 8px; box-sizing: border-box;">
@@ -170,7 +169,7 @@
     <div style="background: #fff; padding: 20px; border: 1px solid #ffeeba; border-radius: 5px; max-width: 600px;">
         <h3 style="color: #856404; margin-top: 0;">Повторное оформление продажи</h3>
         <p style="color: #555; font-size: 0.95rem;">Вы можете оформить новую продажу на основе этой отменённой продажи.</p>
-        <a href="/sales/{{ sale.id }}/reissue" class="btn" style="background: #ffc107; color: #212529; border: 1px solid #d39e00;">Оформить повторно</a>
+        <a href="/inventory/sales/{{ sale.id }}/reissue" class="btn" style="background: #ffc107; color: #212529; border: 1px solid #d39e00;">Оформить повторно</a>
     </div>
     {% endif %}
 {% endblock %}

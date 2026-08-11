@@ -7,11 +7,11 @@
         <div style="display: flex; align-items: center; gap: 15px;">
             <h2 style="margin: 0;">Список товаров</h2>
             {% set cart_count = cart_items_count if cart_items_count is defined else 0 %}
-            <a id="go-to-cart-button" href="/cart" class="btn btn-success" style="{% if not cart_count or cart_count == 0 %}display: none;{% endif %} background: #28a745; color: #fff; padding: 8px 16px; border-radius: 4px; font-weight: bold; text-decoration: none;">
+            <a id="go-to-cart-button" href="/inventory/cart" class="btn btn-success" style="{% if not cart_count or cart_count == 0 %}display: none;{% endif %} background: #28a745; color: #fff; padding: 8px 16px; border-radius: 4px; font-weight: bold; text-decoration: none;">
                 Перейти в корзину (<span>{{ cart_count }}</span>)
             </a>
         </div>
-        <form action="/products/barcodes/generate-missing" method="post" style="display:inline;" onsubmit="return confirm('Будут созданы штрихкоды только товарам, у которых они отсутствуют. Существующие штрихкоды не изменятся. Продолжить?');">
+        <form action="/inventory/products/barcodes/generate-missing" method="post" style="display:inline;" onsubmit="return confirm('Будут созданы штрихкоды только товарам, у которых они отсутствуют. Существующие штрихкоды не изменятся. Продолжить?');">
             <button type="submit" class="btn btn-secondary" style="background:#6c757d; color:#fff; padding: 8px 15px; border-radius: 4px; border:none;">Сгенерировать отсутствующие штрихкоды</button>
         </form>
     </div>
@@ -29,11 +29,11 @@
     {% endif %}
 
     <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-        <a href="/products?location=all" class="btn {% if location == 'all' %}btn-primary{% endif %}" style="{% if location != 'all' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Все</a>
-        <a href="/products?location=store" class="btn {% if location == 'store' %}btn-primary{% endif %}" style="{% if location != 'store' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Магазин</a>
-        <a href="/products?location=workshop" class="btn {% if location == 'workshop' %}btn-primary{% endif %}" style="{% if location != 'workshop' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Мастерская</a>
-        <a href="/products?location=archive" class="btn {% if location == 'archive' %}btn-primary{% endif %}" style="{% if location != 'archive' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Архив</a>
-        <a href="/products?location=draft" class="btn {% if location == 'draft' %}btn-primary{% endif %}" style="{% if location != 'draft' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Черновики</a>
+        <a href="/inventory/products?location=all" class="btn {% if location == 'all' %}btn-primary{% endif %}" style="{% if location != 'all' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Все</a>
+        <a href="/inventory/products?location=store" class="btn {% if location == 'store' %}btn-primary{% endif %}" style="{% if location != 'store' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Магазин</a>
+        <a href="/inventory/products?location=workshop" class="btn {% if location == 'workshop' %}btn-primary{% endif %}" style="{% if location != 'workshop' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Мастерская</a>
+        <a href="/inventory/products?location=archive" class="btn {% if location == 'archive' %}btn-primary{% endif %}" style="{% if location != 'archive' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Архив</a>
+        <a href="/inventory/products?location=draft" class="btn {% if location == 'draft' %}btn-primary{% endif %}" style="{% if location != 'draft' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Черновики</a>
     </div>
 
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
@@ -52,7 +52,7 @@
             form.submit();
         }
         </script>
-        <form id="filters-form" method="GET" action="/products" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+        <form id="filters-form" method="GET" action="/inventory/products" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
             <div>
                 <label style="display: block; margin-bottom: 5px;">Поиск:</label>
                 <input type="text" name="q" value="{{ q }}" placeholder="Название, ID, артикул или штрихкод..." style="width: 280px; padding: 6px;">
@@ -159,7 +159,7 @@
             
             <div style="margin-left: auto;">
                 <button type="submit" class="btn btn-primary">Применить</button>
-                <a href="/products" class="btn" style="margin-left: 10px;">Сбросить фильтры</a>
+                <a href="/inventory/products" class="btn" style="margin-left: 10px;">Сбросить фильтры</a>
             </div>
         </form>
     </div>
@@ -199,15 +199,15 @@
                     <td>{{ item.quantity }}</td>
                     <td>{{ item.storage_location or '—' }}</td>
                     <td>
-                        <a href="/products/{{ item.id }}" class="btn">Открыть</a>
+                        <a href="/inventory/products/{{ item.id }}" class="btn">Открыть</a>
                         {% if item.status == 'in_stock' and item.storage_location == 'store' and item.quantity > 0 %}
-                            <a href="/sales/new?product_id={{ item.id }}" class="btn btn-success">Продать</a>
+                            <a href="/inventory/sales/new?product_id={{ item.id }}" class="btn btn-success">Продать</a>
                         {% else %}
                             <button class="btn" disabled title="Продажа недоступна для этого статуса, локации или нулевого остатка">Продать</button>
                         {% endif %}
                         <div class="product-cart-actions" data-product-id="{{ item.id }}" style="display: inline-block;">
                             {% if item.status in ['in_stock', 'reserved'] and item.storage_location == 'store' and item.quantity > 0 %}
-                                <form action="/cart/add" method="post" class="quick-add-form" style="display: inline;" data-product-id="{{ item.id }}">
+                                <form action="/inventory/cart/add" method="post" class="quick-add-form" style="display: inline;" data-product-id="{{ item.id }}">
                                     <input type="hidden" name="product_id" value="{{ item.id }}">
                                     <input type="hidden" name="title" value="{{ item.title }}">
                                     <input type="hidden" name="price" value="{{ item.sale_price if item.sale_price else item.price }}">
@@ -217,7 +217,7 @@
                             {% else %}
                                 <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка">В корзину</button>
                             {% endif %}
-                            <a href="/cart" class="btn btn-success product-go-to-cart" style="{% if item.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; background: #28a745; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; text-decoration: none;">
+                            <a href="/inventory/cart" class="btn btn-success product-go-to-cart" style="{% if item.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; background: #28a745; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; text-decoration: none;">
                                 Перейти в корзину
                             </a>
                             <span class="product-cart-quantity" style="{% if item.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; font-size: 0.85rem; color: #155724; background: #d4edda; padding: 2px 6px; border-radius: 3px;" aria-live="polite">
@@ -225,7 +225,7 @@
                             </span>
                         </div>
                         {% if item.status == 'in_stock' %}
-                            <a href="/products/{{ item.id }}/price-tag/58x40" class="btn btn-primary" target="_blank">Ценник 58×40</a>
+                            <a href="/inventory/products/{{ item.id }}/price-tag/58x40" class="btn btn-primary" target="_blank">Ценник 58×40</a>
                         {% else %}
                             <button class="btn" disabled title="Ценник доступен только для товаров в наличии">Ценник 58×40</button>
                         {% endif %}
@@ -241,13 +241,13 @@
         
         <div style="margin-top: 15px;">
             {% if offset > 0 %}
-                <a href="/products?q={{ q }}&status={{ status }}&limit={{ limit }}&offset={{ offset - limit }}" class="btn">Назад</a>
+                <a href="/inventory/products?q={{ q }}&status={{ status }}&limit={{ limit }}&offset={{ offset - limit }}" class="btn">Назад</a>
             {% else %}
                 <button class="btn" disabled>Назад</button>
             {% endif %}
             
             {% if (offset + limit) < products_data.total %}
-                <a href="/products?q={{ q }}&status={{ status }}&limit={{ limit }}&offset={{ offset + limit }}" class="btn" style="margin-left: 10px;">Вперед</a>
+                <a href="/inventory/products?q={{ q }}&status={{ status }}&limit={{ limit }}&offset={{ offset + limit }}" class="btn" style="margin-left: 10px;">Вперед</a>
             {% else %}
                 <button class="btn" disabled style="margin-left: 10px;">Вперед</button>
             {% endif %}

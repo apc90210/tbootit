@@ -7,10 +7,10 @@
         <h2 style="margin: 0;">Ремонтный заказ: {{ repair.number }}</h2>
         <div>
             {% if repair.status not in ['issued', 'canceled'] %}
-            <a href="/repairs/{{ repair.id }}/edit" class="btn btn-primary">Редактировать</a>
+            <a href="/repairs/repairs/{{ repair.id }}/edit" class="btn btn-primary">Редактировать</a>
             {% endif %}
-            <a href="/repairs/{{ repair.id }}/print" target="_blank" class="btn btn-info" style="margin-left: 5px;">🖨️ Печать наряд-заказа</a>
-            <a href="/repairs" class="btn btn-secondary" style="margin-left: 5px;">К списку ремонтов</a>
+            <a href="/repairs/repairs/{{ repair.id }}/print" target="_blank" class="btn btn-info" style="margin-left: 5px;">🖨️ Печать наряд-заказа</a>
+            <a href="/repairs/repairs" class="btn btn-secondary" style="margin-left: 5px;">К списку ремонтов</a>
         </div>
     </div>
 
@@ -24,7 +24,7 @@
     <div style="background: #f8d7da; color: #721c24; padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>⚠️ {{ error_msg }}</div>
         {% if "стоимость ремонта" in error_msg or repair.estimated_repair_amount is none %}
-        <a href="/repairs/{{ repair.id }}/edit" class="btn btn-warning" style="font-weight: bold; text-decoration: none; padding: 6px 12px;">Указать стоимость ремонта</a>
+        <a href="/repairs/repairs/{{ repair.id }}/edit" class="btn btn-warning" style="font-weight: bold; text-decoration: none; padding: 6px 12px;">Указать стоимость ремонта</a>
         {% endif %}
     </div>
     {% endif %}
@@ -92,7 +92,7 @@
                 <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Изменить статус</h3>
                 
                 {% if allowed_statuses %}
-                <form method="POST" action="/repairs/{{ repair.id }}/status">
+                <form method="POST" action="/repairs/repairs/{{ repair.id }}/status">
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; font-weight: bold; margin-bottom: 5px;">Новый статус:</label>
                         <select name="status" required style="width: 100%; padding: 8px; box-sizing: border-box;">

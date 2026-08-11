@@ -5,16 +5,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @router.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return RedirectResponse(url="/repairs", status_code=status.HTTP_303_SEE_OTHER)
-
 @router.get("/repairs", response_class=HTMLResponse)
+@router.get("/repairs/", response_class=HTMLResponse)
 async def list_repairs(
     request: Request,
     q: Optional[str] = Query(None),

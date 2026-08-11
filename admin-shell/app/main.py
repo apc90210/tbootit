@@ -487,8 +487,22 @@ async def novnc_websocket_proxy(websocket: WebSocket):
 # SAME-ORIGIN REVERSE PROXY FOR INVENTORY-SALES MODULE
 # =====================================================================
 
+import re
+
+def rewrite_location_header(loc: str, prefix: str) -> str:
+    if not loc:
+        return loc
+    path = re.sub(r'^https?://[^/]+', '', loc)
+    if not path.startswith('/'):
+        path = '/' + path
+    for p in ["/inventory", "/repairs", "/avito"]:
+        if path == p or path.startswith(p + "/"):
+            return path
+    prefix_clean = prefix.rstrip('/')
+    return f"{prefix_clean}{path}"
+
 async def _proxy_request(request: Request, target_base_url: str, path: str, prefix: str):
-    """Generic HTTP reverse proxy handler."""
+    """Generic HTTP reverse proxy handler with header and location rewriting."""
     target_url = f"{target_base_url.rstrip('/')}/{path}"
     query = str(request.query_params)
     if query:
@@ -496,6 +510,9 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
 
     headers = dict(request.headers)
     headers.pop("host", None)
+    headers["x-forwarded-host"] = request.headers.get("host", "localhost:8011")
+    headers["x-forwarded-port"] = "8011"
+    headers["x-forwarded-proto"] = request.url.scheme or "http"
     headers["x-forwarded-prefix"] = prefix
 
     body = await request.body()
@@ -512,10 +529,7 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
     # Rewrite Location header for redirects
     resp_headers = dict(resp.headers)
     if "location" in resp_headers:
-        loc = resp_headers["location"]
-        # Rewrite absolute redirects back to same-origin
-        if loc.startswith("/"):
-            resp_headers["location"] = f"{prefix}{loc}"
+        resp_headers["location"] = rewrite_location_header(resp_headers["location"], prefix)
 
     # Remove hop-by-hop headers
     for h in ["transfer-encoding", "content-encoding", "content-length"]:

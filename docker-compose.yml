@@ -32,6 +32,9 @@ services:
       - AVITO_NOVNC_URL=http://avito-module:6080
       - INVENTORY_MODULE_URL=http://inventory-sales-module:8030
       - REPAIRS_MODULE_URL=http://repairs-module:8040
+    volumes:
+      - ./admin-shell/app:/app/app
+      - ./admin-shell/tests:/app/tests
     depends_on:
       - core
       - avito-module

@@ -12,7 +12,7 @@
     {% endif %}
 
     <div style="background: #fff; padding: 25px; border: 1px solid #ddd; border-radius: 4px;">
-        <form method="POST" action="/repairs/new">
+        <form method="POST" action="/repairs/repairs/new">
             <h3 style="margin-top: 0; border-bottom: 2px solid #005a9c; padding-bottom: 8px;">1. Данные клиента</h3>
             <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
                 <div style="flex: 1; min-width: 250px;">
@@ -109,7 +109,7 @@
 
             <div style="margin-top: 30px; display: flex; gap: 15px;">
                 <button type="submit" class="btn btn-success" style="font-weight: bold; padding: 10px 20px; font-size: 1rem;">Принять в ремонт</button>
-                <a href="/repairs" class="btn btn-secondary" style="padding: 10px 20px; font-size: 1rem;">Отмена</a>
+                <a href="/repairs/repairs" class="btn btn-secondary" style="padding: 10px 20px; font-size: 1rem;">Отмена</a>
             </div>
         </form>
     </div>

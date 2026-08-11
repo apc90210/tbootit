@@ -5,7 +5,7 @@
 {% block content %}
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
         <h2 style="margin: 0;">Реестр ремонтных заказов</h2>
-        <a href="/repairs/new" class="btn btn-success" style="font-weight: bold;">+ Принять технику в ремонт</a>
+        <a href="/repairs/repairs/new" class="btn btn-success" style="font-weight: bold;">+ Принять технику в ремонт</a>
     </div>
 
     {% if msg %}
@@ -16,7 +16,7 @@
 
     <!-- Filter Form -->
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
-        <form method="GET" action="/repairs" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+        <form method="GET" action="/repairs/repairs" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
             <div>
                 <label for="status" style="display: block; margin-bottom: 5px; font-weight: bold;">Статус ремонта:</label>
                 <select name="status" id="status" onchange="this.form.submit()" style="padding: 8px;">
@@ -59,7 +59,7 @@
 
             <div>
                 <button type="submit" class="btn btn-primary">Искать</button>
-                <a href="/repairs" class="btn btn-secondary" style="margin-left: 5px;">Сбросить фильтры</a>
+                <a href="/repairs/repairs" class="btn btn-secondary" style="margin-left: 5px;">Сбросить фильтры</a>
             </div>
         </form>
     </div>
@@ -102,7 +102,7 @@
                     </td>
                     <td>{{ item.assigned_to or 'Не назначен' }}</td>
                     <td>
-                        <a href="/repairs/{{ item.id }}" class="btn">Открыть</a>
+                        <a href="/repairs/repairs/{{ item.id }}" class="btn">Открыть</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -113,11 +113,11 @@
         <div style="margin-top: 20px; display: flex; gap: 10px; align-items: center; justify-content: center;">
             {% set max_page = ((total - 1) // page_size) + 1 %}
             {% if page > 1 %}
-            <a href="/repairs?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if priority %}&priority={{ priority }}{% endif %}{% if device_type %}&device_type={{ device_type }}{% endif %}{% if assigned_to %}&assigned_to={{ assigned_to }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if customer_phone %}&customer_phone={{ customer_phone }}{% endif %}{% if serial_number %}&serial_number={{ serial_number }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if page_size and page_size != 50 %}&page_size={{ page_size }}{% endif %}" class="btn btn-secondary">« Назад</a>
+            <a href="/repairs/repairs?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if priority %}&priority={{ priority }}{% endif %}{% if device_type %}&device_type={{ device_type }}{% endif %}{% if assigned_to %}&assigned_to={{ assigned_to }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if customer_phone %}&customer_phone={{ customer_phone }}{% endif %}{% if serial_number %}&serial_number={{ serial_number }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if page_size and page_size != 50 %}&page_size={{ page_size }}{% endif %}" class="btn btn-secondary">« Назад</a>
             {% endif %}
             <span>Страница <strong>{{ page }}</strong> из <strong>{{ max_page }}</strong></span>
             {% if page < max_page %}
-            <a href="/repairs?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if priority %}&priority={{ priority }}{% endif %}{% if device_type %}&device_type={{ device_type }}{% endif %}{% if assigned_to %}&assigned_to={{ assigned_to }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if customer_phone %}&customer_phone={{ customer_phone }}{% endif %}{% if serial_number %}&serial_number={{ serial_number }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if page_size and page_size != 50 %}&page_size={{ page_size }}{% endif %}" class="btn btn-secondary">Вперёд »</a>
+            <a href="/repairs/repairs?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if priority %}&priority={{ priority }}{% endif %}{% if device_type %}&device_type={{ device_type }}{% endif %}{% if assigned_to %}&assigned_to={{ assigned_to }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if customer_phone %}&customer_phone={{ customer_phone }}{% endif %}{% if serial_number %}&serial_number={{ serial_number }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if page_size and page_size != 50 %}&page_size={{ page_size }}{% endif %}" class="btn btn-secondary">Вперёд »</a>
             {% endif %}
         </div>
         {% endif %}
@@ -125,7 +125,7 @@
         <div style="background: #fff; padding: 25px; text-align: center; border: 1px solid #ddd; margin-top: 10px;">
             {% if status_filter or q or priority or device_type or assigned_to or customer_phone or serial_number or date_from or date_to %}
                 <p style="margin-bottom: 15px; font-size: 1.1em; color: #555;">Ремонты с выбранным статусом не найдены.</p>
-                <a href="/repairs" class="btn btn-secondary">Сбросить фильтры</a>
+                <a href="/repairs/repairs" class="btn btn-secondary">Сбросить фильтры</a>
             {% else %}
                 <p style="font-size: 1.1em; color: #555;">Ремонтные заказы не найдены.</p>
             {% endif %}

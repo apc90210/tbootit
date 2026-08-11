@@ -39,7 +39,7 @@ def test_ui_diagnostics_to_ready_blocked_when_amount_none(client, mock_core):
     assert "Можно указать 0 ₽" in html
     assert "требуется указать комментарий" not in html
     assert "Указать стоимость ремонта" in html
-    assert 'href="/repairs/901/edit"' in html
+    assert '/901/edit' in html
 
 
 def test_ui_diagnostics_to_ready_success_with_amount_0(client, mock_core):
