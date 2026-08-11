@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Аккаунты Avito — Техноребут</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #007bff; padding-bottom: 15px; margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 1.6rem; color: #007bff; }
+        .nav-links a { margin-left: 15px; color: #007bff; text-decoration: none; font-weight: 500; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; padding: 20px; }
+        .card h3 { margin-top: 0; display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
+        .badge-authorized { background: #28a745; color: #fff; }
+        .badge-unauthorized { background: #dc3545; color: #fff; }
+        .badge-challenge_required { background: #ffc107; color: #212529; }
+        .badge-unknown { background: #6c757d; color: #fff; }
+        .stat-row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 0.9rem; color: #555; }
+        .actions { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .btn { padding: 7px 12px; border-radius: 5px; border: none; font-size: 0.85rem; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #007bff; color: #fff; }
+        .btn-success { background: #28a745; color: #fff; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-secondary { background: #6c757d; color: #fff; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        th { background: #f1f3f5; color: #495057; font-weight: 600; }
+        .section-title { font-size: 1.3rem; margin-bottom: 15px; color: #212529; }
+        form { margin: 0; }
+        select, input[type="text"] { padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Аккаунты Avito — Импорт в Каталог</h1>
+            <div class="nav-links">
+                <a href="/accounts">Аккаунты</a>
+                <a href="/parsed-ads">Объявления</a>
+                <a href="/profiles">Профили</a>
+                <a href="/exports">Экспорт</a>
+                <a href="http://localhost:8040/repairs">Ремонты</a>
+            </div>
+        </header>
+
+        <div class="section-title">Подключённые браузерные аккаунты</div>
+        <div class="grid">
+            {% for p in profiles %}
+            <div class="card">
+                <h3>
+                    <span>{{ p.display_name }}</span>
+                    <span class="badge badge-{{ p.auth_status }}">
+                        {% if p.auth_status == 'authorized' %}Авторизован
+                        {% elif p.auth_status == 'unauthorized' %}Не авторизован
+                        {% elif p.auth_status == 'challenge_required' %}Требуется 2FA/CAPTCHA
+                        {% else %}Не проверен{% endif %}
+                    </span>
+                </h3>
+                <div class="stat-row"><span>Ключ профиля:</span> <strong>{{ p.account_key }}</strong></div>
+                <div class="stat-row"><span>Последняя проверка:</span> <span>{{ p.last_checked_at or '—' }}</span></div>
+                <div class="stat-row"><span>Найдено объявлений:</span> <span>{{ p.stats.found }}</span></div>
+                <div class="stat-row"><span>Импортировано:</span> <span>{{ p.stats.imported }}</span></div>
+                <div class="stat-row"><span>Обновлено:</span> <span>{{ p.stats.updated }}</span></div>
+                <div class="stat-row"><span>Ошибок:</span> <span>{{ p.stats.errors }}</span></div>
+
+                <div class="actions">
+                    <a href="{{ novnc_url }}" target="_blank" class="btn btn-warning">Открыть браузер</a>
+
+                    <form action="/accounts/api/profiles/{{ p.account_key }}/check-auth" method="post">
+                        <button type="submit" class="btn btn-secondary">Проверить вход</button>
+                    </form>
+
+                    <form action="/accounts/api/profiles/{{ p.account_key }}/import" method="post" style="display: flex; gap: 5px; align-items: center;">
+                        <select name="scope">
+                            <option value="all">Все объявления</option>
+                            <option value="active">Только активные</option>
+                            <option value="archived">Только архивные</option>
+                        </select>
+                        <button type="submit" class="btn btn-success">Начать импорт</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="section-title">Последние импорты (Import Runs)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Запуска</th>
+                    <th>Аккаунт</th>
+                    <th>Область</th>
+                    <th>Статус</th>
+                    <th>Найдено</th>
+                    <th>Создано</th>
+                    <th>Обновлено</th>
+                    <th>Пропущено</th>
+                    <th>Ошибки</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in runs %}
+                <tr>
+                    <td><code>{{ r.run_id[:8] }}...</code></td>
+                    <td><strong>{{ r.account_key }}</strong></td>
+                    <td>{{ r.scope }}</td>
+                    <td>
+                        <span class="badge {% if r.status == 'completed' %}badge-authorized{% elif r.status == 'running' %}badge-challenge_required{% else %}badge-unauthorized{% endif %}">
+                            {{ r.status }}
+                        </span>
+                    </td>
+                    <td>{{ r.listings_found }}</td>
+                    <td>{{ r.created_count }}</td>
+                    <td>{{ r.updated_count }}</td>
+                    <td>{{ r.skipped_count }}</td>
+                    <td>{{ r.error_count }}</td>
+                    <td>
+                        {% if r.status == 'running' %}
+                        <form action="/accounts/api/runs/{{ r.run_id }}/stop" method="post" style="display:inline;">
+                            <button type="submit" class="btn btn-danger" style="padding: 3px 8px;">Остановить</button>
+                        </form>
+                        {% endif %}
+                        {% if r.error_count > 0 %}
+                        <form action="/accounts/api/runs/{{ r.run_id }}/retry" method="post" style="display:inline;">
+                            <button type="submit" class="btn btn-warning" style="padding: 3px 8px;">Повторить ошибки</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; color: #888;">Запуски импорта отсутствуют</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

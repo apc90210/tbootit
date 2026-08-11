@@ -731,3 +731,61 @@ class RepairListResponse(BaseModel):
     page_size: int
     total_pages: int
 
+# External Listing Schemas
+class ProductExternalListingBase(BaseModel):
+    product_id: int
+    marketplace: str = "avito"
+    external_account_key: str
+    external_item_id: str
+    external_url: Optional[str] = None
+    remote_status: str = "active"
+    remote_status_raw: Optional[str] = None
+    source_title: Optional[str] = None
+    source_price: Optional[float] = None
+    source_attributes_json: Optional[str] = None
+    last_seen_at: Optional[datetime] = None
+    last_imported_at: Optional[datetime] = None
+    last_pushed_at: Optional[datetime] = None
+    sync_state: str = "synced"
+    sync_error: Optional[str] = None
+
+class ProductExternalListingCreate(ProductExternalListingBase):
+    pass
+
+class ProductExternalListing(ProductExternalListingBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+# Avito Item Import Payload Schema
+class AvitoImportPhotoItem(BaseModel):
+    url: Optional[str] = None
+    content_base64: Optional[str] = None
+    filename: Optional[str] = None
+
+class AvitoItemImportPayload(BaseModel):
+    account_key: str
+    external_item_id: str
+    external_url: Optional[str] = None
+    remote_status: str = "active"
+    remote_status_raw: Optional[str] = None
+    title: str
+    price: Optional[float] = None
+    description: Optional[str] = None
+    category_path: List[str] = []
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    condition: Optional[str] = None
+    parameters: dict = {}
+    photos: List[AvitoImportPhotoItem] = []
+    raw_source_data: Optional[dict] = None
+
+class AvitoItemImportResponse(BaseModel):
+    status: str
+    product_id: int
+    external_listing_id: int
+    photos_imported: int
+    photos_skipped: int = 0
+

@@ -49,9 +49,36 @@ class Product(Base):
     avito_seller_type = Column(String, nullable=True)
     source_json = Column(Text, nullable=True)
     source_type = Column(String, nullable=True)
+    source_origin = Column(String, nullable=True, default="avito")
+    source_attributes_json = Column(Text, nullable=True)
     last_imported_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    external_listings = relationship("ProductExternalListing", back_populates="product", cascade="all, delete-orphan")
+
+class ProductExternalListing(Base):
+    __tablename__ = "product_external_listings"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), index=True, nullable=False)
+    marketplace = Column(String, default="avito", index=True, nullable=False)
+    external_account_key = Column(String, index=True, nullable=False)
+    external_item_id = Column(String, index=True, nullable=False)
+    external_url = Column(String, nullable=True)
+    remote_status = Column(String, default="active", index=True, nullable=False)
+    remote_status_raw = Column(String, nullable=True)
+    source_title = Column(String, nullable=True)
+    source_price = Column(Float, nullable=True)
+    source_attributes_json = Column(Text, nullable=True)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    last_imported_at = Column(DateTime(timezone=True), nullable=True)
+    last_pushed_at = Column(DateTime(timezone=True), nullable=True)
+    sync_state = Column(String, default="synced", nullable=False)
+    sync_error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    product = relationship("Product", back_populates="external_listings")
 
 class ProductCardImport(Base):
     __tablename__ = "product_cards"
@@ -95,6 +122,8 @@ class ProductPhoto(Base):
     filename = Column(String)
     storage_path = Column(String)
     media_url = Column(String)
+    source_url = Column(String, nullable=True)
+    content_hash = Column(String, nullable=True, index=True)
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

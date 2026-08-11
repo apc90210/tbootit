@@ -39,3 +39,10 @@ debug.py
 task.md
 implementation_plan.md
 TECHNOREBOOT_*_REPORT.md
+
+# Avito Browser Profiles & Session Storage
+data/avito-module/profiles/
+user-data-dir/
+browser_data/
+storage_state.json
+*.cookie

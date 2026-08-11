@@ -101,3 +101,51 @@ class ProductCardImport(BaseModel):
 class ImportRequest(BaseModel):
     force: bool = False
 
+# Stage 06A Account Profile & Import Schemas
+class AccountStats(BaseModel):
+    found: int = 0
+    imported: int = 0
+    updated: int = 0
+    skipped: int = 0
+    errors: int = 0
+
+class AvitoAccountProfile(BaseModel):
+    account_key: str
+    display_name: str
+    auth_status: str = "unknown"  # "authorized", "unauthorized", "challenge_required", "unknown"
+    last_checked_at: Optional[str] = None
+    last_imported_at: Optional[str] = None
+    api_client_id: Optional[str] = None
+    api_client_secret: Optional[str] = None
+    stats: AccountStats = AccountStats()
+
+class ProfileCreateRequest(BaseModel):
+    account_key: str
+    display_name: str
+    api_client_id: Optional[str] = None
+    api_client_secret: Optional[str] = None
+
+class ImportItemResult(BaseModel):
+    external_item_id: str
+    title: str
+    status: str  # "created", "updated", "unchanged", "skipped", "failed"
+    product_id: Optional[int] = None
+    photos_imported: int = 0
+    error: Optional[str] = None
+
+class ImportRun(BaseModel):
+    run_id: str
+    account_key: str
+    started_at: str
+    finished_at: Optional[str] = None
+    status: str = "running"  # "running", "completed", "stopped", "failed"
+    scope: str = "all"  # "active", "archived", "all"
+    listings_found: int = 0
+    created_count: int = 0
+    updated_count: int = 0
+    skipped_count: int = 0
+    error_count: int = 0
+    last_error: Optional[str] = None
+    items: List[ImportItemResult] = []
+
+

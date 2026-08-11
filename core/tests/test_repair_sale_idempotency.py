@@ -50,13 +50,15 @@ def test_repair_sale_idempotency_and_cancellation(client, db_session):
     assert len(sales_2) == 1
     assert sales_2[0].total_amount == 3500.0
 
-    # 3. Transition to canceled after ready
+    # 3. Transition to in_repair and then canceled
+    client.post(f"/api/repairs/{rep.id}/status", json={"status": "in_repair", "comment": "Возврат на доработку"})
     res3 = client.post(
         f"/api/repairs/{rep.id}/status",
         json={"status": "canceled", "comment": "Клиент передумал", "changed_by": "Менеджер"}
     )
     assert res3.status_code == 200
 
+    db_session.expire_all()
     sale_after_cancel = db_session.query(models.Sale).filter(
         models.Sale.source_type == "repair",
         models.Sale.source_id == rep.id

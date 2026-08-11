@@ -188,6 +188,64 @@ def migrate_db():
         except Exception as e:
             print(f"Migration error on repair tables/indexes: {e}")
 
+        # Migrate products table for Stage 06A
+        res_prod = conn.execute(text("PRAGMA table_info(products);")).fetchall()
+        prod_columns = [row[1] for row in res_prod]
+        prod_updates = [
+            ("source_origin", "VARCHAR DEFAULT 'avito'"),
+            ("source_attributes_json", "TEXT")
+        ]
+        for col_name, col_type in prod_updates:
+            if col_name not in prod_columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE products ADD COLUMN {col_name} {col_type};"))
+                except Exception as e:
+                    print(f"Migration error on products.{col_name}: {e}")
+
+        # Migrate product_photos table for Stage 06A photo deduplication
+        res_photos = conn.execute(text("PRAGMA table_info(product_photos);")).fetchall()
+        photos_columns = [row[1] for row in res_photos]
+        photos_updates = [
+            ("source_url", "VARCHAR"),
+            ("content_hash", "VARCHAR")
+        ]
+        for col_name, col_type in photos_updates:
+            if col_name not in photos_columns:
+                try:
+                    conn.execute(text(f"ALTER TABLE product_photos ADD COLUMN {col_name} {col_type};"))
+                except Exception as e:
+                    print(f"Migration error on product_photos.{col_name}: {e}")
+
+        # Create product_external_listings table if not exists
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS product_external_listings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL,
+                marketplace VARCHAR NOT NULL DEFAULT 'avito',
+                external_account_key VARCHAR NOT NULL,
+                external_item_id VARCHAR NOT NULL,
+                external_url VARCHAR,
+                remote_status VARCHAR NOT NULL DEFAULT 'active',
+                remote_status_raw VARCHAR,
+                source_title VARCHAR,
+                source_price FLOAT,
+                source_attributes_json TEXT,
+                last_seen_at DATETIME,
+                last_imported_at DATETIME,
+                last_pushed_at DATETIME,
+                sync_state VARCHAR NOT NULL DEFAULT 'synced',
+                sync_error TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME,
+                FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+            );
+        """))
+
+        try:
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_product_ext_listings_market_item ON product_external_listings(marketplace, external_item_id);"))
+        except Exception as e:
+            print(f"Index creation error on ix_product_ext_listings_market_item: {e}")
+
     try:
         from app.services.repair_migration import run_repair_additive_migration
         db_file = settings.database_url.replace("sqlite:///", "")
@@ -210,6 +268,7 @@ app.add_middleware(
 app.mount("/media", StaticFiles(directory=settings.storage_root), name="media")
 
 from app.routers import settings as settings_router
+from app.routers import integrations as integrations_router
 
 app.include_router(health.router)
 app.include_router(products.router, prefix="/api/products", tags=["products"])
@@ -222,3 +281,4 @@ app.include_router(product_cards.router, prefix="/api/product-cards", tags=["pro
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(settings_router.router, prefix="/api", tags=["settings"])
+app.include_router(integrations_router.router, prefix="/api/integrations", tags=["integrations"])

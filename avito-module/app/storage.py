@@ -2,7 +2,7 @@ import os
 import json
 from typing import List, Optional, Dict, Any
 from app.config import settings
-from app.schemas import ParseRun, ParsedAd
+from app.schemas import ParseRun, ParsedAd, AvitoAccountProfile, ImportRun
 
 def _get_runs_dir() -> str:
     path = os.path.join(settings.AVITO_STORAGE_DIR, "runs")
@@ -84,3 +84,82 @@ def get_import_status(ad_id: str) -> Optional[Dict[str, Any]]:
         return None
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+# Stage 06A Account Profiles & Import Runs Storage
+def _get_profiles_file() -> str:
+    os.makedirs(settings.AVITO_STORAGE_DIR, exist_ok=True)
+    return os.path.join(settings.AVITO_STORAGE_DIR, "profiles.json")
+
+def list_profiles() -> List[AvitoAccountProfile]:
+    path = _get_profiles_file()
+    if not os.path.exists(path):
+        defaults = [
+            AvitoAccountProfile(account_key="main", display_name="Avito — Основной"),
+            AvitoAccountProfile(account_key="laptops", display_name="Avito — Ноутбуки"),
+            AvitoAccountProfile(account_key="office", display_name="Avito — Оргтехника")
+        ]
+        save_profiles(defaults)
+        return defaults
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        return [AvitoAccountProfile(**p) for p in data]
+
+def save_profiles(profiles: List[AvitoAccountProfile]):
+    path = _get_profiles_file()
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump([p.model_dump() for p in profiles], f, ensure_ascii=False, indent=2)
+
+def get_profile(account_key: str) -> Optional[AvitoAccountProfile]:
+    profiles = list_profiles()
+    for p in profiles:
+        if p.account_key == account_key:
+            return p
+    return None
+
+def save_profile(profile: AvitoAccountProfile):
+    profiles = list_profiles()
+    updated = False
+    for idx, p in enumerate(profiles):
+        if p.account_key == profile.account_key:
+            profiles[idx] = profile
+            updated = True
+            break
+    if not updated:
+        profiles.append(profile)
+    save_profiles(profiles)
+
+def delete_profile(account_key: str):
+    profiles = list_profiles()
+    profiles = [p for p in profiles if p.account_key != account_key]
+    save_profiles(profiles)
+
+def _get_import_runs_dir() -> str:
+    path = os.path.join(settings.AVITO_STORAGE_DIR, "import_runs")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def save_import_run(run: ImportRun):
+    run_dir = _get_import_runs_dir()
+    path = os.path.join(run_dir, f"{run.run_id}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(run.model_dump_json(indent=2))
+
+def get_import_run(run_id: str) -> Optional[ImportRun]:
+    run_dir = _get_import_runs_dir()
+    path = os.path.join(run_dir, f"{run_id}.json")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return ImportRun(**json.load(f))
+
+def list_import_runs() -> List[ImportRun]:
+    runs = []
+    run_dir = _get_import_runs_dir()
+    if os.path.exists(run_dir):
+        for filename in os.listdir(run_dir):
+            if filename.endswith(".json"):
+                run_id = filename[:-5]
+                run = get_import_run(run_id)
+                if run:
+                    runs.append(run)
+    return sorted(runs, key=lambda x: x.started_at, reverse=True)
