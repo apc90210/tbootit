@@ -110,6 +110,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         if payload.parameters:
             product.avito_params_json = json.dumps(payload.parameters, ensure_ascii=False)
             product.source_attributes_json = json.dumps(payload.parameters, ensure_ascii=False)
+        product.source_origin = "avito"
         product.last_imported_at = now
         db.flush()
 

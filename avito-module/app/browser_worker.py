@@ -5,11 +5,76 @@ from typing import Optional, List, Dict, Any, Tuple
 from bs4 import BeautifulSoup
 from app.config import settings
 
+class BrowserSessionManager:
+    def __init__(self):
+        self.active_account_key: Optional[str] = None
+        self.active_display_name: Optional[str] = None
+        self.playwright = None
+        self.context = None
+
+    async def launch_session(self, account_key: str, display_name: str = "") -> Tuple[bool, str]:
+        if self.active_account_key and self.active_account_key != account_key:
+            name_str = self.active_display_name or self.active_account_key
+            return False, f"Сейчас открыт браузер аккаунта <{name_str}>. Закройте его или переключитесь."
+        
+        if self.active_account_key == account_key and self.context:
+            return True, "Браузер уже открыт."
+
+        profile_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles", account_key, "browser_data")
+        os.makedirs(profile_dir, exist_ok=True)
+
+        try:
+            from playwright.async_api import async_playwright
+            self.playwright = await async_playwright().start()
+            self.context = await self.playwright.chromium.launch_persistent_context(
+                user_data_dir=profile_dir,
+                headless=False,
+                args=["--no-sandbox", "--disable-setuid-sandbox"]
+            )
+            page = await self.context.new_page()
+            await page.goto("https://www.avito.ru/", timeout=20000, wait_until="domcontentloaded")
+            self.active_account_key = account_key
+            self.active_display_name = display_name or account_key
+            return True, "Браузер успешно запущен."
+        except Exception as e:
+            await self.stop_session()
+            return False, f"Не удалось запустить браузер: {str(e)}"
+
+    async def stop_session(self):
+        try:
+            if self.context:
+                await self.context.close()
+        except Exception:
+            pass
+        try:
+            if self.playwright:
+                await self.playwright.stop()
+        except Exception:
+            pass
+        self.context = None
+        self.playwright = None
+        self.active_account_key = None
+        self.active_display_name = None
+
+    def get_status(self, account_key: Optional[str] = None) -> Dict[str, Any]:
+        is_active = self.active_account_key is not None and self.context is not None
+        is_current = is_active and (account_key is None or self.active_account_key == account_key)
+        return {
+            "active": is_active,
+            "active_account_key": self.active_account_key,
+            "active_display_name": self.active_display_name,
+            "is_current": is_current,
+            "status_text": "Открыт" if is_current else ("Занят другим аккаунтом" if is_active else "Не запущен")
+        }
+
+browser_session_manager = BrowserSessionManager()
+
 class AvitoBrowserWorker:
     def __init__(self, account_key: str):
         self.account_key = account_key
         self.profile_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles", account_key, "browser_data")
         os.makedirs(self.profile_dir, exist_ok=True)
+
 
     def detect_challenge_or_captcha(self, html: str) -> bool:
         lower = html.lower()

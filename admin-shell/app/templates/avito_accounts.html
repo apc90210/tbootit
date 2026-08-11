@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аккаунты Avito — Техноребут</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
+        h1, h2, h3 { color: #222; }
+        h2 { border-bottom: 2px solid #ddd; padding-bottom: 6px; margin-top: 20px; }
+        nav.main-nav { background: #333; color: #fff; padding: 10px 15px; margin-bottom: 15px; border-radius: 4px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        nav.main-nav a { color: #fff; text-decoration: none; }
+        .sub-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .sub-nav a { text-decoration: none; padding: 6px 14px; border-radius: 4px; background: #e5e7eb; color: #374151; font-weight: 500; font-size: 0.9em; }
+        .sub-nav a.active { background: #2563eb; color: #fff; }
+        .section { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 20px; }
+        .actions { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        button, a.btn { display: inline-block; padding: 6px 13px; cursor: pointer; border: 1px solid #bbb; background: #fff; border-radius: 4px; font-size: 0.88em; text-decoration: none; color: #333; }
+        button:hover, a.btn:hover { background: #f0f0f0; }
+        .btn-primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+        .btn-primary:hover { background: #1d4ed8; color: #fff; }
+        .btn-success { background: #16a34a; color: #fff; border-color: #15803d; }
+        .btn-success:hover { background: #15803d; color: #fff; }
+        .btn-danger { background: #dc2626; color: #fff; border-color: #b91c1c; }
+        .btn-danger:hover { background: #b91c1c; color: #fff; }
+        .badge { display: inline-block; padding: 3px 8px; font-size: 0.78em; font-weight: 600; border-radius: 10px; background-color: #e5e7eb; }
+        .badge.green { background: #d1fae5; color: #065f46; }
+        .badge.blue { background: #dbeafe; color: #1e40af; }
+        .badge.red { background: #fee2e2; color: #991b1b; }
+        .badge.yellow { background: #fef3c7; color: #92400e; }
+        .profile-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-top: 15px; }
+        .profile-card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .profile-card h3 { margin: 0 0 10px; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; }
+        .info-row { font-size: 0.85em; color: #555; margin-bottom: 6px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: #fff; margin: 10% auto; padding: 24px; border-radius: 8px; width: 90%; max-width: 450px; }
+        input[type="text"] { width: 100%; padding: 8px; margin: 8px 0 16px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .alert { padding: 10px; border-radius: 4px; font-size: 0.88em; margin-bottom: 12px; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/">Панель управления</a>
+        <a href="http://localhost:8030/products">Товары</a>
+        <a href="http://localhost:8030/sales">Продажи</a>
+        <a href="http://localhost:8030/reports/sales">Отчёты</a>
+        <a href="http://localhost:8040/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
+        <a href="/avito" style="font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
+    </nav>
+
+    <div class="sub-nav">
+        <a href="/avito">Обзор</a>
+        <a href="/avito/accounts" class="active">Аккаунты</a>
+        <a href="/avito/probe">Пробный импорт</a>
+    </div>
+
+    <div class="actions" style="justify-content: space-between;">
+        <h2>Аккаунты Avito ({{ profiles|length }} / 3)</h2>
+        {% if profiles|length < 3 %}
+            <button class="btn-success" onclick="showNewModal()">+ Добавить аккаунт</button>
+        {% else %}
+            <span class="badge yellow">Лимит 3 профилей достигнут</span>
+        {% endif %}
+    </div>
+
+    <div id="statusAlert" class="alert alert-danger" style="display:none;"></div>
+
+    <div class="profile-cards">
+        {% for p in profiles %}
+        <div class="profile-card">
+            <h3>
+                <span>{{ p.display_name }}</span>
+                {% if p.auth_status == 'authorized' %}
+                    <span class="badge green">Авторизован</span>
+                {% elif p.auth_status == 'challenge_required' %}
+                    <span class="badge yellow">Требуется подтверждение</span>
+                {% elif p.auth_status == 'unauthorized' %}
+                    <span class="badge red">Не авторизован</span>
+                {% else %}
+                    <span class="badge">Не проверен</span>
+                {% endif %}
+            </h3>
+
+            <div class="info-row"><strong>Пробный импорт:</strong> 
+                {% if p.probe_verified %}
+                    <span class="badge green">Проверен</span>
+                {% else %}
+                    <span class="badge yellow">Не проверен</span>
+                {% endif %}
+            </div>
+            <div class="info-row"><strong>Последняя проверка:</strong> {{ p.last_checked_at or 'Ещё не проводилась' }}</div>
+            <div class="info-row"><strong>Последний импорт:</strong> {{ p.last_imported_at or 'Ещё не проводился' }}</div>
+
+            <div class="actions" style="margin-top:15px;">
+                <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary">Авторизоваться / Открыть Avito</a>
+                <button onclick="checkAuth('{{ p.account_key }}')">Проверить авторизацию</button>
+                <a href="/avito/probe?account={{ p.account_key }}" class="btn">Пробный импорт</a>
+                <button onclick="showEditModal('{{ p.account_key }}', '{{ p.display_name }}')">Переименовать</button>
+                <button class="btn-danger" onclick="deleteProfile('{{ p.account_key }}')">Удалить</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Modal for new profile -->
+    <div id="newProfileModal" class="modal">
+        <div class="modal-content">
+            <h3>Добавить аккаунт Avito</h3>
+            <label for="newDisplayName">Название аккаунта:</label>
+            <input type="text" id="newDisplayName" placeholder="Например: Основной аккаунт">
+            <div class="actions">
+                <button class="btn-primary" onclick="createProfile()">Создать</button>
+                <button onclick="hideModals()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for edit profile -->
+    <div id="editProfileModal" class="modal">
+        <div class="modal-content">
+            <h3>Переименовать аккаунт</h3>
+            <input type="hidden" id="editAccountKey">
+            <label for="editDisplayName">Новое название:</label>
+            <input type="text" id="editDisplayName">
+            <div class="actions">
+                <button class="btn-primary" onclick="updateProfile()">Сохранить</button>
+                <button onclick="hideModals()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showAlert(msg, isSuccess = false) {
+            const el = document.getElementById('statusAlert');
+            el.className = 'alert ' + (isSuccess ? 'alert-success' : 'alert-danger');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function showNewModal() {
+            document.getElementById('newProfileModal').style.display = 'block';
+        }
+
+        function showEditModal(key, name) {
+            document.getElementById('editAccountKey').value = key;
+            document.getElementById('editDisplayName').value = name;
+            document.getElementById('editProfileModal').style.display = 'block';
+        }
+
+        function hideModals() {
+            document.getElementById('newProfileModal').style.display = 'none';
+            document.getElementById('editProfileModal').style.display = 'none';
+        }
+
+        async function createProfile() {
+            const name = document.getElementById('newDisplayName').value.trim();
+            if (!name) return alert('Введите название аккаунта');
+            try {
+                const res = await fetch('/admin-api/avito/profiles', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({display_name: name})
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    showAlert(data.detail || 'Не удалось создать профиль');
+                } else {
+                    location.reload();
+                }
+            } catch (e) {
+                showAlert('Ошибка при создании профиля: ' + e.message);
+            }
+        }
+
+        async function updateProfile() {
+            const key = document.getElementById('editAccountKey').value;
+            const name = document.getElementById('editDisplayName').value.trim();
+            if (!name) return alert('Введите новое название');
+            try {
+                const res = await fetch('/admin-api/avito/profiles', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({account_key: key, display_name: name})
+                });
+                if (!res.ok) {
+                    const data = await res.json();
+                    showAlert(data.detail || 'Не удалось обновить профиль');
+                } else {
+                    location.reload();
+                }
+            } catch (e) {
+                showAlert('Ошибка при обновлении: ' + e.message);
+            }
+        }
+
+        async function deleteProfile(key) {
+            if (!confirm('Удалить этот профиль аккаунта?')) return;
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${key}`, {method: 'DELETE'});
+                if (!res.ok) {
+                    const data = await res.json();
+                    showAlert(data.detail || 'Не удалось удалить профиль');
+                } else {
+                    location.reload();
+                }
+            } catch (e) {
+                showAlert('Ошибка при удалении: ' + e.message);
+            }
+        }
+
+        async function checkAuth(key) {
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${key}/check-auth`, {method: 'POST'});
+                const data = await res.json();
+                if (data.auth_status === 'authorized') {
+                    showAlert('Авторизация подтверждена!', true);
+                } else {
+                    showAlert(data.error || ('Статус авторизации: ' + data.auth_status));
+                }
+                setTimeout(() => location.reload(), 1500);
+            } catch (e) {
+                showAlert('Ошибка при проверке авторизации: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>

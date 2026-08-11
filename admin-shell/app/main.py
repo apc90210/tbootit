@@ -1,18 +1,25 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 from pydantic import BaseModel
 import os
 import httpx
+import asyncio
 
 app = FastAPI(title="Technoreboot Admin Shell")
-templates = Jinja2Templates(directory="app/templates")
+templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+templates = Jinja2Templates(directory=templates_dir)
+
+
 
 CORE_API_URL = os.getenv("CORE_API_URL", "http://127.0.0.1:8000")
+AVITO_MODULE_URL = os.getenv("AVITO_MODULE_URL", "http://127.0.0.1:8020")
+AVITO_NOVNC_URL = os.getenv("AVITO_NOVNC_URL", "http://127.0.0.1:6080")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             stats_resp = await client.get(f"{CORE_API_URL}/api/admin/stats")
             stats = stats_resp.json() if stats_resp.status_code == 200 else {}
@@ -82,7 +89,7 @@ class StatusUpdate(BaseModel):
 
 @app.post("/admin-api/seed")
 async def proxy_seed():
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/admin/seed")
             if resp.status_code == 200:
@@ -93,7 +100,7 @@ async def proxy_seed():
 
 @app.patch("/admin-api/products/{product_id}/status")
 async def proxy_product_status(product_id: int, status_update: StatusUpdate):
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.patch(
                 f"{CORE_API_URL}/api/products/{product_id}/status",
@@ -108,7 +115,7 @@ async def proxy_product_status(product_id: int, status_update: StatusUpdate):
 @app.post("/admin-api/products")
 async def proxy_create_product(request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/products/", json=data)
             if resp.status_code == 200:
@@ -120,7 +127,7 @@ async def proxy_create_product(request: Request):
 @app.post("/admin-api/customers")
 async def proxy_create_customer(request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/customers/", json=data)
             if resp.status_code == 200:
@@ -132,7 +139,7 @@ async def proxy_create_customer(request: Request):
 @app.post("/admin-api/repairs")
 async def proxy_create_repair(request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/repairs/", json=data)
             if resp.status_code == 200:
@@ -143,7 +150,7 @@ async def proxy_create_repair(request: Request):
 
 @app.patch("/admin-api/repairs/{repair_id}/status")
 async def proxy_repair_status(repair_id: int, status_update: StatusUpdate):
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.patch(
                 f"{CORE_API_URL}/api/repairs/{repair_id}/status",
@@ -158,7 +165,7 @@ async def proxy_repair_status(repair_id: int, status_update: StatusUpdate):
 @app.post("/admin-api/sales")
 async def proxy_create_sale(request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/sales/", json=data)
             if resp.status_code == 200:
@@ -169,7 +176,7 @@ async def proxy_create_sale(request: Request):
 
 @app.post("/admin-api/dev-reset")
 async def proxy_dev_reset():
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/admin/dev-reset")
             if resp.status_code == 200:
@@ -180,7 +187,7 @@ async def proxy_dev_reset():
 
 @app.get("/admin-api/products/{product_id}/details")
 async def proxy_product_details(product_id: int):
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.get(f"{CORE_API_URL}/api/products/{product_id}/details")
             if resp.status_code == 200:
@@ -192,7 +199,7 @@ async def proxy_product_details(product_id: int):
 @app.post("/admin-api/products/{product_id}/stock-adjustment")
 async def proxy_stock_adjustment(product_id: int, request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/products/{product_id}/stock-adjustment", json=data)
             if resp.status_code == 200:
@@ -204,7 +211,7 @@ async def proxy_stock_adjustment(product_id: int, request: Request):
 @app.patch("/admin-api/products/{product_id}/site-publication")
 async def proxy_site_publication(product_id: int, request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.patch(f"{CORE_API_URL}/api/products/{product_id}/site-publication", json=data)
             if resp.status_code == 200:
@@ -216,7 +223,7 @@ async def proxy_site_publication(product_id: int, request: Request):
 @app.patch("/admin-api/products/{product_id}/avito-publication")
 async def proxy_avito_publication(product_id: int, request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.patch(f"{CORE_API_URL}/api/products/{product_id}/avito-publication", json=data)
             if resp.status_code == 200:
@@ -228,7 +235,7 @@ async def proxy_avito_publication(product_id: int, request: Request):
 @app.post("/admin-api/product-cards/validate-json")
 async def proxy_validate_json(request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/product-cards/validate-json", json=data)
             return resp.json()
@@ -238,7 +245,7 @@ async def proxy_validate_json(request: Request):
 @app.post("/admin-api/product-cards/import-json")
 async def proxy_import_json(request: Request):
     data = await request.json()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/product-cards/import-json", json=data)
             return resp.json()
@@ -247,7 +254,7 @@ async def proxy_import_json(request: Request):
 
 @app.get("/admin-api/product-cards/imports")
 async def proxy_imports_list():
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.get(f"{CORE_API_URL}/api/product-cards/imports")
             if resp.status_code == 200:
@@ -255,4 +262,222 @@ async def proxy_imports_list():
             raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+# =====================================================================
+# AVITO INTEGRATED SETTINGS & ZERO-CLI OWNER UI ROUTES
+# =====================================================================
+
+@app.get("/avito", response_class=HTMLResponse)
+async def avito_dashboard(request: Request):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            prof_resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles")
+            profiles = prof_resp.json() if prof_resp.status_code == 200 else []
+        except Exception:
+            profiles = []
+
+        try:
+            runs_resp = await client.get(f"{AVITO_MODULE_URL}/health")
+            runs = []
+        except Exception:
+            runs = []
+
+    auth_count = sum(1 for p in profiles if p.get("auth_status") == "authorized")
+    return templates.TemplateResponse("avito.html", {
+        "request": request,
+        "profiles": profiles,
+        "authorized_count": auth_count,
+        "runs": runs
+    })
+
+@app.get("/avito/accounts", response_class=HTMLResponse)
+async def avito_accounts_page(request: Request):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            prof_resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles")
+            profiles = prof_resp.json() if prof_resp.status_code == 200 else []
+        except Exception:
+            profiles = []
+
+    return templates.TemplateResponse("avito_accounts.html", {
+        "request": request,
+        "profiles": profiles
+    })
+
+@app.get("/avito/accounts/{account_key}/browser", response_class=HTMLResponse)
+async def avito_browser_page(account_key: str, request: Request):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            prof_resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles")
+            profiles = prof_resp.json() if prof_resp.status_code == 200 else []
+            profile = next((p for p in profiles if p.get("account_key") == account_key), {"account_key": account_key, "display_name": account_key})
+        except Exception:
+            profile = {"account_key": account_key, "display_name": account_key}
+
+    return templates.TemplateResponse("avito_browser.html", {
+        "request": request,
+        "profile": profile
+    })
+
+@app.get("/avito/probe", response_class=HTMLResponse)
+async def avito_probe_page(request: Request, account: str = None):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            prof_resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles")
+            profiles = prof_resp.json() if prof_resp.status_code == 200 else []
+        except Exception:
+            profiles = []
+
+    selected_account = account or (profiles[0]["account_key"] if profiles else "")
+    return templates.TemplateResponse("avito_probe.html", {
+        "request": request,
+        "profiles": profiles,
+        "selected_account": selected_account
+    })
+
+@app.get("/avito/health")
+async def avito_health_proxy():
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(f"{AVITO_MODULE_URL}/health/details", timeout=5)
+            if resp.status_code == 200:
+                return resp.json()
+            return {"module": "error", "core": "error", "browser_runtime": "error", "chromium": "error", "profile_storage": "error"}
+        except Exception:
+            return {"module": "offline", "core": "offline", "browser_runtime": "offline", "chromium": "offline", "profile_storage": "offline"}
+
+# --- Avito API Proxies ---
+
+@app.get("/admin-api/avito/profiles")
+async def proxy_get_profiles():
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles")
+async def proxy_create_profile(request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles", json=data)
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.delete("/admin-api/avito/profiles/{account_key}")
+async def proxy_delete_profile(account_key: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.delete(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles/{account_key}/launch-browser")
+async def proxy_launch_browser(account_key: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/launch-browser")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles/{account_key}/stop-browser")
+async def proxy_stop_browser(account_key: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/stop-browser")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.get("/admin-api/avito/profiles/{account_key}/browser-status")
+async def proxy_browser_status(account_key: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/browser-status")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles/{account_key}/check-auth")
+async def proxy_check_auth(account_key: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/check-auth")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.get("/admin-api/avito/profiles/{account_key}/discover")
+async def proxy_discover(account_key: str, scope: str = "active"):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/discover?scope={scope}")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.get("/admin-api/avito/profiles/{account_key}/preview/{item_id}")
+async def proxy_preview(account_key: str, item_id: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/preview/{item_id}")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles/{account_key}/probe-import")
+async def proxy_probe_import(account_key: str, request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/probe-import", json=data)
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles/{account_key}/verify-probe")
+async def proxy_verify_probe(account_key: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/verify-probe")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/profiles/{account_key}/import")
+async def proxy_start_import(account_key: str, request: Request):
+    data = await request.form()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/import", data=data)
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+# --- noVNC Static Asset & WebSocket Proxies ---
+
+@app.get("/avito/novnc/{path:path}")
+async def proxy_novnc_static(path: str):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            target_url = f"{AVITO_NOVNC_URL.rstrip('/')}/{path}"
+            resp = await client.get(target_url, timeout=10)
+            return Response(
+                content=resp.content,
+                status_code=resp.status_code,
+                headers=dict(resp.headers)
+            )
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"noVNC proxy error: {str(e)}")
+
+@app.websocket("/avito/novnc/websockify")
+async def novnc_websocket_proxy(websocket: WebSocket):
+    await websocket.accept()
+    import websockets
+    target_host = AVITO_NOVNC_URL.replace("http://", "ws://").replace("https://", "wss://")
+    target_url = f"{target_host.rstrip('/')}/websockify"
+
+    subprotocols = []
+    sec_proto = websocket.headers.get("sec-websocket-protocol")
+    if sec_proto:
+        subprotocols = [p.strip() for p in sec_proto.split(",") if p.strip()]
+
+    try:
+        async with websockets.connect(target_url, subprotocols=subprotocols) as target_ws:
+            async def client_to_target():
+                try:
+                    while True:
+                        msg = await websocket.receive()
+                        if "bytes" in msg and msg["bytes"]:
+                            await target_ws.send(msg["bytes"])
+                        elif "text" in msg and msg["text"]:
+                            await target_ws.send(msg["text"])
+                        elif msg.get("type") == "websocket.disconnect":
+                            break
+                except Exception:
+                    pass
+
+            async def target_to_client():
+                try:
+                    async for msg in target_ws:
+                        if isinstance(msg, bytes):
+                            await websocket.send_bytes(msg)
+                        else:
+                            await websocket.send_text(msg)
+                except Exception:
+                    pass
+
+            await asyncio.gather(client_to_target(), target_to_client(), return_exceptions=True)
+    except Exception as e:
+        await websocket.close(code=1011, reason=str(e))
+
 

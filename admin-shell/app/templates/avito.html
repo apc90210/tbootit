@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авито — Интеграция — Техноребут</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
+        h1, h2, h3 { color: #222; }
+        h2 { border-bottom: 2px solid #ddd; padding-bottom: 6px; margin-top: 20px; }
+        nav.main-nav { background: #333; color: #fff; padding: 10px 15px; margin-bottom: 15px; border-radius: 4px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        nav.main-nav a { color: #fff; text-decoration: none; }
+        .sub-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .sub-nav a { text-decoration: none; padding: 6px 14px; border-radius: 4px; background: #e5e7eb; color: #374151; font-weight: 500; font-size: 0.9em; }
+        .sub-nav a.active { background: #2563eb; color: #fff; }
+        .dashboard { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+        .card { padding: 16px 20px; background: #fff; border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 160px; text-align: center; }
+        .card h3 { margin: 0 0 6px; font-size: 0.9em; color: #666; }
+        .card p { margin: 0; font-size: 1.6em; font-weight: bold; }
+        .section { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 20px; }
+        .actions { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        button, a.btn { display: inline-block; padding: 6px 13px; cursor: pointer; border: 1px solid #bbb; background: #fff; border-radius: 4px; font-size: 0.88em; text-decoration: none; color: #333; }
+        button:hover, a.btn:hover { background: #f0f0f0; }
+        .btn-primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+        .btn-primary:hover { background: #1d4ed8; color: #fff; }
+        .btn-success { background: #16a34a; color: #fff; border-color: #15803d; }
+        .btn-success:hover { background: #15803d; color: #fff; }
+        .badge { display: inline-block; padding: 3px 8px; font-size: 0.78em; font-weight: 600; border-radius: 10px; background-color: #e5e7eb; }
+        .badge.green { background: #d1fae5; color: #065f46; }
+        .badge.blue { background: #dbeafe; color: #1e40af; }
+        .badge.red { background: #fee2e2; color: #991b1b; }
+        .badge.yellow { background: #fef3c7; color: #92400e; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.88em; margin-top: 10px; }
+        th, td { border: 1px solid #e5e5e5; padding: 8px 10px; text-align: left; vertical-align: top; }
+        th { background: #f4f4f4; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/">Панель управления</a>
+        <a href="http://localhost:8030/products">Товары</a>
+        <a href="http://localhost:8030/sales">Продажи</a>
+        <a href="http://localhost:8030/reports/sales">Отчёты</a>
+        <a href="http://localhost:8040/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
+        <a href="/avito" style="font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
+    </nav>
+
+    <div class="sub-nav">
+        <a href="/avito" class="active">Обзор</a>
+        <a href="/avito/accounts">Аккаунты</a>
+        <a href="/avito/probe">Пробный импорт</a>
+    </div>
+
+    <h2>Интеграция с Avito</h2>
+
+    <div class="dashboard">
+        <div class="card">
+            <h3>Аккаунтов настроено</h3>
+            <p>{{ profiles|length }} / 3</p>
+        </div>
+        <div class="card">
+            <h3>Авторизовано</h3>
+            <p>{{ authorized_count }}</p>
+        </div>
+        <div class="card">
+            <h3>Пробных импортов</h3>
+            <p>{{ runs|length }}</p>
+        </div>
+        <div class="card">
+            <h3>Статус системы</h3>
+            <p><span id="sysStatusBadge" class="badge green">Проверка...</span></p>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="/avito/accounts" class="btn btn-primary">Управление аккаунтами</a>
+        <a href="/avito/accounts?action=new" class="btn btn-success">Добавить аккаунт</a>
+        <a href="/avito/probe" class="btn">Пробный импорт</a>
+        <button onclick="checkHealth()">Проверить систему</button>
+    </div>
+
+    <div class="section">
+        <h2>Состояние компонентов системы</h2>
+        <table id="healthTable">
+            <thead>
+                <tr>
+                    <th>Компонент</th>
+                    <th>Описание</th>
+                    <th>Состояние</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Core API</td>
+                    <td>Базовая система управления каталогом</td>
+                    <td><span id="h-core" class="badge">Проверка...</span></td>
+                </tr>
+                <tr>
+                    <td>Avito Module</td>
+                    <td>Микросервис работы с Avito</td>
+                    <td><span id="h-module" class="badge">Проверка...</span></td>
+                </tr>
+                <tr>
+                    <td>Browser Runtime</td>
+                    <td>Виртуальный дисплей и сессионный сервис</td>
+                    <td><span id="h-browser" class="badge">Проверка...</span></td>
+                </tr>
+                <tr>
+                    <td>Chromium Engine</td>
+                    <td>Официальный движок браузера</td>
+                    <td><span id="h-chromium" class="badge">Проверка...</span></td>
+                </tr>
+                <tr>
+                    <td>Profile Storage</td>
+                    <td>Безопасное хранилище профилей</td>
+                    <td><span id="h-storage" class="badge">Проверка...</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Настроенные аккаунты Avito</h2>
+        {% if not profiles %}
+            <p style="color:#666;">Аккаунты ещё не созданы. Добавьте первый профиль для работы с Avito.</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Название профиля</th>
+                        <th>Статус авторизации</th>
+                        <th>Проверка пробного импорта</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in profiles %}
+                    <tr>
+                        <td><strong>{{ p.display_name }}</strong></td>
+                        <td>
+                            {% if p.auth_status == 'authorized' %}
+                                <span class="badge green">Авторизован</span>
+                            {% elif p.auth_status == 'challenge_required' %}
+                                <span class="badge yellow">Требуется подтверждение</span>
+                            {% elif p.auth_status == 'unauthorized' %}
+                                <span class="badge red">Не авторизован</span>
+                            {% else %}
+                                <span class="badge">Не проверен</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.probe_verified %}
+                                <span class="badge green">Проверен</span>
+                            {% else %}
+                                <span class="badge yellow">Требуется проверка</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary" style="font-size:0.8em;">Открыть Avito</a>
+                            <a href="/avito/probe?account={{ p.account_key }}" class="btn" style="font-size:0.8em;">Пробный импорт</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
+    <script>
+        async function checkHealth() {
+            try {
+                const res = await fetch('/avito/health');
+                const data = await res.json();
+                
+                document.getElementById('h-core').className = 'badge ' + (data.core === 'ok' ? 'green' : 'red');
+                document.getElementById('h-core').textContent = data.core === 'ok' ? 'Работает' : 'Ошибка';
+                
+                document.getElementById('h-module').className = 'badge ' + (data.module === 'ok' ? 'green' : 'red');
+                document.getElementById('h-module').textContent = data.module === 'ok' ? 'Работает' : 'Ошибка';
+
+                document.getElementById('h-browser').className = 'badge ' + (data.browser_runtime === 'ok' ? 'green' : 'red');
+                document.getElementById('h-browser').textContent = data.browser_runtime === 'ok' ? 'Работает' : 'Ошибка';
+
+                document.getElementById('h-chromium').className = 'badge ' + (data.chromium === 'ok' ? 'green' : 'red');
+                document.getElementById('h-chromium').textContent = data.chromium === 'ok' ? 'Доступен' : 'Ошибка';
+
+                document.getElementById('h-storage').className = 'badge ' + (data.profile_storage === 'ok' ? 'green' : 'red');
+                document.getElementById('h-storage').textContent = data.profile_storage === 'ok' ? 'Доступен' : 'Ошибка';
+
+                const allOk = Object.values(data).every(v => v === 'ok');
+                document.getElementById('sysStatusBadge').className = 'badge ' + (allOk ? 'green' : 'yellow');
+                document.getElementById('sysStatusBadge').textContent = allOk ? 'Готов к работе' : 'Требует внимания';
+            } catch (e) {
+                document.getElementById('sysStatusBadge').className = 'badge red';
+                document.getElementById('sysStatusBadge').textContent = 'Недоступно';
+            }
+        }
+        checkHealth();
+    </script>
+</body>
+</html>

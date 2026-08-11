@@ -192,7 +192,7 @@ def migrate_db():
         res_prod = conn.execute(text("PRAGMA table_info(products);")).fetchall()
         prod_columns = [row[1] for row in res_prod]
         prod_updates = [
-            ("source_origin", "VARCHAR DEFAULT 'avito'"),
+            ("source_origin", "VARCHAR DEFAULT 'manual'"),
             ("source_attributes_json", "TEXT")
         ]
         for col_name, col_type in prod_updates:

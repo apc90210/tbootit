@@ -78,7 +78,7 @@ async def run_account_import(
     # Step 3: Process items sequentially
     core_url = f"{settings.CORE_API_BASE_URL.rstrip('/')}/api/integrations/avito/import-item"
 
-    async with httpx.AsyncClient(timeout=15.0) as http_client:
+    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as http_client:
         for item_data in listings:
             if ACTIVE_RUN_STOP_FLAGS.get(run_id, False):
                 run.status = "stopped"

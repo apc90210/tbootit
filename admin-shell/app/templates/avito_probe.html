@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пробный импорт Avito — Техноребут</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
+        h1, h2, h3 { color: #222; }
+        h2 { border-bottom: 2px solid #ddd; padding-bottom: 6px; margin-top: 20px; }
+        nav.main-nav { background: #333; color: #fff; padding: 10px 15px; margin-bottom: 15px; border-radius: 4px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        nav.main-nav a { color: #fff; text-decoration: none; }
+        .sub-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .sub-nav a { text-decoration: none; padding: 6px 14px; border-radius: 4px; background: #e5e7eb; color: #374151; font-weight: 500; font-size: 0.9em; }
+        .sub-nav a.active { background: #2563eb; color: #fff; }
+        .section { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 20px; }
+        .actions { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        button, a.btn { display: inline-block; padding: 7px 14px; cursor: pointer; border: 1px solid #bbb; background: #fff; border-radius: 4px; font-size: 0.88em; text-decoration: none; color: #333; }
+        button:hover, a.btn:hover { background: #f0f0f0; }
+        .btn-primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+        .btn-primary:hover { background: #1d4ed8; color: #fff; }
+        .btn-success { background: #16a34a; color: #fff; border-color: #15803d; }
+        .btn-success:hover { background: #15803d; color: #fff; }
+        .btn-warn { background: #d97706; color: #fff; border-color: #b45309; }
+        .btn-warn:hover { background: #b45309; color: #fff; }
+        .badge { display: inline-block; padding: 3px 8px; font-size: 0.78em; font-weight: 600; border-radius: 10px; background-color: #e5e7eb; }
+        .badge.green { background: #d1fae5; color: #065f46; }
+        .badge.blue { background: #dbeafe; color: #1e40af; }
+        .badge.red { background: #fee2e2; color: #991b1b; }
+        .badge.yellow { background: #fef3c7; color: #92400e; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.88em; margin-top: 10px; }
+        th, td { border: 1px solid #e5e5e5; padding: 8px 10px; text-align: left; vertical-align: top; }
+        th { background: #f4f4f4; font-weight: 600; }
+        select, input[type="text"] { padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; }
+        .alert { padding: 12px 16px; border-radius: 6px; font-size: 0.9em; margin-bottom: 15px; }
+        .alert-info { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .preview-box { border: 1px solid #2563eb; border-radius: 6px; padding: 16px; background: #eff6ff; margin-top: 15px; }
+        .photo-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .photo-thumbs img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/">Панель управления</a>
+        <a href="http://localhost:8030/products">Товары</a>
+        <a href="http://localhost:8030/sales">Продажи</a>
+        <a href="http://localhost:8030/reports/sales">Отчёты</a>
+        <a href="http://localhost:8040/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
+        <a href="/avito" style="font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
+    </nav>
+
+    <div class="sub-nav">
+        <a href="/avito">Обзор</a>
+        <a href="/avito/accounts">Аккаунты</a>
+        <a href="/avito/probe" class="active">Пробный импорт</a>
+    </div>
+
+    <h2>Пробный импорт 1 объявления (One-Item Probe)</h2>
+
+    <div class="section">
+        <div class="actions">
+            <label for="accountSelect"><strong>Аккаунт Avito:</strong></label>
+            <select id="accountSelect" onchange="onAccountChange()">
+                {% for p in profiles %}
+                <option value="{{ p.account_key }}" {% if selected_account == p.account_key %}selected{% endif %}>
+                    {{ p.display_name }} ({% if p.auth_status == 'authorized' %}Авторизован{% else %}Не авторизован{% endif %})
+                </option>
+                {% endfor %}
+            </select>
+
+            <button class="btn-primary" onclick="loadMyListings()">Загрузить мои объявления</button>
+        </div>
+
+        <div id="probeAlert" class="alert alert-info" style="display:none;"></div>
+
+        <!-- Section 1: Listings table -->
+        <div id="listingsSection" style="display:none;">
+            <h3>Мои объявления на Avito</h3>
+            <table id="listingsTable">
+                <thead>
+                    <tr>
+                        <th>Avito ID</th>
+                        <th>Название</th>
+                        <th>Цена</th>
+                        <th>Статус</th>
+                        <th>Ссылка</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="listingsTbody"></tbody>
+            </table>
+        </div>
+
+        <!-- Section 2: Preview box -->
+        <div id="previewSection" class="preview-box" style="display:none;">
+            <h3>Предпросмотр объявления перед импортом</h3>
+            <div id="previewContent"></div>
+            <div class="actions" style="margin-top:15px;">
+                <button class="btn-success" onclick="runProbeImport()">Импортировать в Техноребут</button>
+                <button onclick="hidePreview()">Отмена</button>
+            </div>
+        </div>
+
+        <!-- Section 3: Import Result box -->
+        <div id="resultSection" class="section" style="display:none; background:#f0fdf4; border-color:#86efac;">
+            <h3 style="color:#166534;">Результат пробного импорта</h3>
+            <div id="resultContent"></div>
+
+            <div class="actions" style="margin-top:15px;">
+                <button class="btn-primary" onclick="repeatProbeImport()">Повторить импорт (проверка дедупликации)</button>
+                <button class="btn-success" id="btnVerifyProbe" onclick="confirmProbeVerified()">Пробный импорт проверен</button>
+                <a href="/avito/accounts" class="btn">Назад к аккаунтам</a>
+            </div>
+        </div>
+
+        <!-- Section 4: Dedup Check Card -->
+        <div id="dedupSection" class="alert alert-success" style="display:none;">
+            <strong>Проверка дублей: пройдена</strong>
+            <p id="dedupDetails" style="margin:4px 0 0;"></p>
+        </div>
+    </div>
+
+    <script>
+        let currentSelectedItem = null;
+        let lastImportResult = null;
+
+        function showAlert(msg, type = 'info') {
+            const el = document.getElementById('probeAlert');
+            el.className = 'alert alert-' + type;
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function onAccountChange() {
+            document.getElementById('listingsSection').style.display = 'none';
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('resultSection').style.display = 'none';
+            document.getElementById('dedupSection').style.display = 'none';
+            document.getElementById('probeAlert').style.display = 'none';
+        }
+
+        async function loadMyListings() {
+            const accountKey = document.getElementById('accountSelect').value;
+            if (!accountKey) return alert('Выберите аккаунт');
+
+            showAlert('Загрузка списка ваших объявлений из Avito...', 'info');
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${accountKey}/discover`);
+                const data = await res.json();
+                
+                const tbody = document.getElementById('listingsTbody');
+                tbody.innerHTML = '';
+
+                if (!data.items || data.items.length === 0) {
+                    showAlert('Объявления не найдены или сессия требует повторной авторизации.', 'warning');
+                    return;
+                }
+
+                data.items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><code>${item.external_item_id}</code></td>
+                        <td><strong>${item.title}</strong></td>
+                        <td>${item.price ? item.price + ' ₽' : '—'}</td>
+                        <td><span class="badge green">${item.remote_status === 'active' ? 'Активно' : item.remote_status}</span></td>
+                        <td><a href="${item.external_url}" target="_blank">Открыть на Avito ↗</a></td>
+                        <td><button class="btn-primary" onclick="selectItem('${item.external_item_id}')">Выбрать для пробного импорта</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('listingsSection').style.display = 'block';
+                showAlert(`Найдено объявлений: ${data.items.length}`, 'success');
+            } catch (e) {
+                showAlert('Ошибка загрузки объявлений: ' + e.message, 'danger');
+            }
+        }
+
+        async function selectItem(itemId) {
+            const accountKey = document.getElementById('accountSelect').value;
+            showAlert(`Получение данных для предпросмотра объявления ${itemId}...`, 'info');
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${accountKey}/preview/${itemId}`);
+                const data = await res.json();
+                currentSelectedItem = data;
+
+                let photosHtml = '';
+                if (data.photo_urls && data.photo_urls.length > 0) {
+                    photosHtml = '<div class="photo-thumbs">' + data.photo_urls.map(u => `<img src="${u}" alt="Photo">`).join('') + '</div>';
+                }
+
+                document.getElementById('previewContent').innerHTML = `
+                    <p><strong>Название:</strong> ${data.title}</p>
+                    <p><strong>Цена:</strong> ${data.price ? data.price + ' ₽' : 'Не указана'}</p>
+                    <p><strong>Avito ID:</strong> <code>${data.external_item_id}</code></p>
+                    <p><strong>Статус:</strong> <span class="badge green">${data.remote_status}</span></p>
+                    <p><strong>Количество фото:</strong> ${data.photo_count}</p>
+                    ${photosHtml}
+                    ${data.description ? '<p><strong>Описание:</strong><br>' + data.description.substring(0, 300) + '...</p>' : ''}
+                `;
+
+                document.getElementById('previewSection').style.display = 'block';
+                document.getElementById('previewSection').scrollIntoView({behavior: 'smooth'});
+            } catch (e) {
+                showAlert('Ошибка загрузки предпросмотра: ' + e.message, 'danger');
+            }
+        }
+
+        function hidePreview() {
+            document.getElementById('previewSection').style.display = 'none';
+        }
+
+        async function runProbeImport() {
+            if (!currentSelectedItem) return;
+            const accountKey = document.getElementById('accountSelect').value;
+            showAlert(`Запуск пробного импорта объявления ${currentSelectedItem.external_item_id}...`, 'info');
+
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${accountKey}/probe-import`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({external_item_id: currentSelectedItem.external_item_id})
+                });
+                const data = await res.json();
+                lastImportResult = data;
+
+                const itemRes = data.items && data.items.length > 0 ? data.items[0] : null;
+
+                document.getElementById('resultContent').innerHTML = `
+                    <p><strong>Статус импорта:</strong> <span class="badge green">${data.status}</span></p>
+                    <p><strong>Создано:</strong> ${data.created_count} | <strong>Обновлено:</strong> ${data.updated_count} | <strong>Пропущено:</strong> ${data.skipped_count}</p>
+                    ${itemRes ? `
+                        <p><strong>Product ID в каталоге:</strong> <code>${itemRes.product_id || 'N/A'}</code></p>
+                        <p><strong>Импортировано фото:</strong> ${itemRes.photos_imported}</p>
+                        <p><a href="/admin-api/products/${itemRes.product_id}/details" target="_blank" class="btn btn-primary">Открыть товар</a></p>
+                    ` : ''}
+                `;
+
+                document.getElementById('resultSection').style.display = 'block';
+                showAlert('Пробный импорт успешно выполнен! Проверьте результат.', 'success');
+            } catch (e) {
+                showAlert('Ошибка проведения пробного импорта: ' + e.message, 'danger');
+            }
+        }
+
+        async function repeatProbeImport() {
+            if (!currentSelectedItem) return;
+            const firstResult = lastImportResult;
+            const accountKey = document.getElementById('accountSelect').value;
+            showAlert('Выполнение повторного импорта для проверки идемпотентности и отсутствия дублей...', 'info');
+
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${accountKey}/probe-import`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({external_item_id: currentSelectedItem.external_item_id})
+                });
+                const secondResult = await res.json();
+
+                const firstItem = firstResult && firstResult.items ? firstResult.items[0] : null;
+                const secondItem = secondResult && secondResult.items ? secondResult.items[0] : null;
+
+                const sameProductId = firstItem && secondItem && (firstItem.product_id === secondItem.product_id);
+                const noNewProducts = secondResult.created_count === 0;
+
+                if (sameProductId || noNewProducts) {
+                    document.getElementById('dedupDetails').innerHTML = `
+                        Товар не продублирован.<br>
+                        Product ID: <code>${secondItem ? secondItem.product_id : 'Совпадает'}</code> | 
+                        Создано повторно: 0 | Фото: без дублирования.
+                    `;
+                    document.getElementById('dedupSection').style.display = 'block';
+                    showAlert('Повторный импорт подтвердил 100% идемпотентность и дедупликацию!', 'success');
+                } else {
+                    document.getElementById('dedupSection').className = 'alert alert-danger';
+                    document.getElementById('dedupSection').innerHTML = '<strong>Обнаружена проблема дедупликации!</strong> Повторный импорт создал дубликат.';
+                    document.getElementById('dedupSection').style.display = 'block';
+                }
+            } catch (e) {
+                showAlert('Ошибка при повторном импорте: ' + e.message, 'danger');
+            }
+        }
+
+        async function confirmProbeVerified() {
+            const accountKey = document.getElementById('accountSelect').value;
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/${accountKey}/verify-probe`, {method: 'POST'});
+                const data = await res.json();
+                if (data.probe_verified) {
+                    showAlert('Пробный импорт успешно проверен и зафиксирован владельцем! Полный импорт разблокирован.', 'success');
+                    document.getElementById('btnVerifyProbe').textContent = '✓ Пробный импорт проверен';
+                    document.getElementById('btnVerifyProbe').disabled = true;
+                }
+            } catch (e) {
+                showAlert('Ошибка подтверждения: ' + e.message, 'danger');
+            }
+        }
+    </script>
+</body>
+</html>

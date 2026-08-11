@@ -3,16 +3,16 @@ from app import storage, schemas
 
 def test_browser_profiles_seeding_and_isolation():
     """
-    Test that default account profiles (minimum 3: main, laptops, office) are seeded
-    and profiles maintain separate keys and statistics.
+    Test user-defined profile creation and profile storage isolation.
     """
-    profiles = storage.list_profiles()
-    assert len(profiles) >= 3
+    p1 = schemas.AvitoAccountProfile(account_key="acc_1", display_name="Профиль 1")
+    storage.save_profile(p1)
+    p2 = schemas.AvitoAccountProfile(account_key="acc_2", display_name="Профиль 2")
+    storage.save_profile(p2)
 
-    keys = [p.account_key for p in profiles]
-    assert "main" in keys
-    assert "laptops" in keys
-    assert "office" in keys
+    profiles = storage.list_profiles()
+    assert len(profiles) >= 2
+
 
     # Add a custom profile
     new_profile = schemas.AvitoAccountProfile(

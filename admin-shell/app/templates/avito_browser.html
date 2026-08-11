@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация Avito — {{ profile.display_name }} — Техноребут</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
+        h1, h2, h3 { color: #222; }
+        nav.main-nav { background: #333; color: #fff; padding: 10px 15px; margin-bottom: 15px; border-radius: 4px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        nav.main-nav a { color: #fff; text-decoration: none; }
+        .sub-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        .sub-nav a { text-decoration: none; padding: 6px 14px; border-radius: 4px; background: #e5e7eb; color: #374151; font-weight: 500; font-size: 0.9em; }
+        .sub-nav a.active { background: #2563eb; color: #fff; }
+        .section { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 20px; }
+        .actions { margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        button, a.btn { display: inline-block; padding: 8px 16px; cursor: pointer; border: 1px solid #bbb; background: #fff; border-radius: 4px; font-size: 0.9em; text-decoration: none; color: #333; font-weight: 600; }
+        button:hover, a.btn:hover { background: #f0f0f0; }
+        .btn-primary { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+        .btn-primary:hover { background: #1d4ed8; color: #fff; }
+        .btn-success { background: #16a34a; color: #fff; border-color: #15803d; }
+        .btn-success:hover { background: #15803d; color: #fff; }
+        .btn-danger { background: #dc2626; color: #fff; border-color: #b91c1c; }
+        .btn-danger:hover { background: #b91c1c; color: #fff; }
+        .alert { padding: 12px 16px; border-radius: 6px; font-size: 0.9em; margin-bottom: 15px; }
+        .alert-info { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .iframe-container { width: 100%; position: relative; background: #111; border-radius: 6px; overflow: hidden; }
+        iframe { width: 100%; height: 750px; border: none; display: block; }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/">Панель управления</a>
+        <a href="http://localhost:8030/products">Товары</a>
+        <a href="http://localhost:8030/sales">Продажи</a>
+        <a href="http://localhost:8030/reports/sales">Отчёты</a>
+        <a href="http://localhost:8040/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
+        <a href="/avito" style="font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
+    </nav>
+
+    <div class="sub-nav">
+        <a href="/avito">Обзор</a>
+        <a href="/avito/accounts" class="active">Аккаунты</a>
+        <a href="/avito/probe">Пробный импорт</a>
+    </div>
+
+    <div class="section" style="padding-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+            <h2>Авторизация Avito — «{{ profile.display_name }}»</h2>
+            <div class="actions">
+                <button class="btn-success" onclick="verifyAuth()">Я вошёл — проверить авторизацию</button>
+                <button class="btn-danger" onclick="closeBrowser()">Закрыть браузер</button>
+                <a href="/avito/accounts" class="btn">Назад к аккаунтам</a>
+            </div>
+        </div>
+
+        <div id="noticeAlert" class="alert alert-info">
+            Встроенный браузер Avito готов. Выполните вход в свой аккаунт Avito прямо на экране ниже, пройдя необходимые проверки (логин, пароль, СМС, CAPTCHA). После этого нажмите <strong>«Я вошёл — проверить авторизацию»</strong>.
+        </div>
+    </div>
+
+    <div class="iframe-container">
+        <iframe id="vncFrame" src="/avito/novnc/vnc.html?path=avito/novnc/websockify&autoconnect=true&resize=scale"></iframe>
+    </div>
+
+    <script>
+        async function launchBrowser() {
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/{{ profile.account_key }}/launch-browser`, {method: 'POST'});
+                const data = await res.json();
+                if (!res.ok) {
+                    const alertEl = document.getElementById('noticeAlert');
+                    alertEl.className = 'alert alert-warning';
+                    alertEl.textContent = data.detail || 'Ошибка запуска браузера';
+                }
+            } catch (e) {
+                console.error('Launch browser call:', e);
+            }
+        }
+
+        async function verifyAuth() {
+            const alertEl = document.getElementById('noticeAlert');
+            alertEl.className = 'alert alert-info';
+            alertEl.textContent = 'Проверка статуса авторизации...';
+            try {
+                const res = await fetch(`/admin-api/avito/profiles/{{ profile.account_key }}/check-auth`, {method: 'POST'});
+                const data = await res.json();
+                if (data.auth_status === 'authorized') {
+                    alertEl.className = 'alert alert-success';
+                    alertEl.innerHTML = '<strong>Успех!</strong> Аккаунт «{{ profile.display_name }}» успешно авторизован. Перенаправление...';
+                    setTimeout(() => {
+                        window.location.href = '/avito/probe?account={{ profile.account_key }}';
+                    }, 1800);
+                } else if (data.auth_status === 'challenge_required') {
+                    alertEl.className = 'alert alert-warning';
+                    alertEl.textContent = 'Avito запросил дополнительное подтверждение (CAPTCHA или СМС). Завершите проверку в окне браузера ниже и нажмите кнопку повторно.';
+                } else {
+                    alertEl.className = 'alert alert-danger';
+                    alertEl.textContent = data.error || 'Сессия не авторизована. Войдите в Avito в окне браузера.';
+                }
+            } catch (e) {
+                alertEl.className = 'alert alert-danger';
+                alertEl.textContent = 'Ошибка при проверке авторизации: ' + e.message;
+            }
+        }
+
+        async function closeBrowser() {
+            try {
+                await fetch(`/admin-api/avito/profiles/{{ profile.account_key }}/stop-browser`, {method: 'POST'});
+            } catch (e) {}
+            window.location.href = '/avito/accounts';
+        }
+
+        launchBrowser();
+    </script>
+</body>
+</html>

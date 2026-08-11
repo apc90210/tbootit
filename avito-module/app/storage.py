@@ -93,13 +93,7 @@ def _get_profiles_file() -> str:
 def list_profiles() -> List[AvitoAccountProfile]:
     path = _get_profiles_file()
     if not os.path.exists(path):
-        defaults = [
-            AvitoAccountProfile(account_key="main", display_name="Avito — Основной"),
-            AvitoAccountProfile(account_key="laptops", display_name="Avito — Ноутбуки"),
-            AvitoAccountProfile(account_key="office", display_name="Avito — Оргтехника")
-        ]
-        save_profiles(defaults)
-        return defaults
+        return []
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
         return [AvitoAccountProfile(**p) for p in data]

@@ -117,13 +117,30 @@ class AvitoAccountProfile(BaseModel):
     last_imported_at: Optional[str] = None
     api_client_id: Optional[str] = None
     api_client_secret: Optional[str] = None
+    probe_verified: bool = False
     stats: AccountStats = AccountStats()
 
+
 class ProfileCreateRequest(BaseModel):
-    account_key: str
     display_name: str
+    account_key: Optional[str] = None
     api_client_id: Optional[str] = None
     api_client_secret: Optional[str] = None
+
+class OneItemProbeRequest(BaseModel):
+    external_item_id: str
+
+class ProbePreviewResponse(BaseModel):
+    account_key: str
+    external_item_id: str
+    external_url: str
+    title: str
+    price: Optional[float] = None
+    remote_status: str = "active"
+    photo_count: int = 0
+    photo_urls: List[str] = []
+    description: Optional[str] = None
+    parameters: Dict[str, str] = {}
 
 class ImportItemResult(BaseModel):
     external_item_id: str

@@ -49,7 +49,7 @@ class Product(Base):
     avito_seller_type = Column(String, nullable=True)
     source_json = Column(Text, nullable=True)
     source_type = Column(String, nullable=True)
-    source_origin = Column(String, nullable=True, default="avito")
+    source_origin = Column(String, nullable=True, default="manual")
     source_attributes_json = Column(Text, nullable=True)
     last_imported_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

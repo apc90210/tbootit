@@ -28,8 +28,12 @@ services:
     environment:
       - CORE_API_URL=http://core:8000
       - CORE_API_TOKEN=dev-token
+      - AVITO_MODULE_URL=http://avito-module:8020
+      - AVITO_NOVNC_URL=http://avito-module:6080
     depends_on:
       - core
+      - avito-module
+
 
   avito-module:
     build:
@@ -42,8 +46,10 @@ services:
       AVITO_STORAGE_DIR: /app/data
       AVITO_REQUEST_DELAY_SECONDS: 3
       AVITO_MAX_PAGES_PER_RUN: 2
+      DISPLAY: ":99"
     ports:
       - "8020:8020"
+      - "127.0.0.1:8061:6080"
     volumes:
       - ./data/avito-module:/app/data
       - ./avito-module/app:/app/app
