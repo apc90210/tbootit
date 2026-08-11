@@ -344,9 +344,9 @@ async def avito_health_proxy():
             resp = await client.get(f"{AVITO_MODULE_URL}/health/details", timeout=5)
             if resp.status_code == 200:
                 return resp.json()
-            return {"module": "error", "core": "error", "browser_runtime": "error", "chromium": "error", "profile_storage": "error"}
+            return {"module": "error", "core": "error", "browser_runtime": "error", "xvfb": "error", "vnc": "error", "novnc": "error", "chromium": "error", "profile_storage": "error"}
         except Exception:
-            return {"module": "offline", "core": "offline", "browser_runtime": "offline", "chromium": "offline", "profile_storage": "offline"}
+            return {"module": "offline", "core": "offline", "browser_runtime": "offline", "xvfb": "offline", "vnc": "offline", "novnc": "offline", "chromium": "offline", "profile_storage": "offline"}
 
 # --- Avito API Proxies ---
 

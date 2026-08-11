@@ -5,6 +5,18 @@ from typing import Optional, List, Dict, Any, Tuple
 from bs4 import BeautifulSoup
 from app.config import settings
 
+def cleanup_stale_singleton_locks(profile_dir: str):
+    import subprocess
+    try:
+        subprocess.run(["pkill", "-9", "chrome"], capture_output=True)
+    except Exception:
+        pass
+    if os.path.exists(profile_dir):
+        try:
+            subprocess.run(f"rm -rf '{profile_dir}'/Singleton*", shell=True, capture_output=True)
+        except Exception:
+            pass
+
 class BrowserSessionManager:
     def __init__(self):
         self.active_account_key: Optional[str] = None
@@ -22,6 +34,7 @@ class BrowserSessionManager:
 
         profile_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles", account_key, "browser_data")
         os.makedirs(profile_dir, exist_ok=True)
+        cleanup_stale_singleton_locks(profile_dir)
 
         try:
             from playwright.async_api import async_playwright
@@ -97,6 +110,7 @@ class AvitoBrowserWorker:
             return "unknown", "Не удалось однозначно определить статус"
 
         try:
+            cleanup_stale_singleton_locks(self.profile_dir)
             from playwright.async_api import async_playwright
             async with async_playwright() as p:
                 context = await p.chromium.launch_persistent_context(

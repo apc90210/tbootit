@@ -204,9 +204,9 @@
                 <!-- Primary Action CTA Bar -->
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#fff; padding:12px 16px; border-radius:6px; border:1px solid #e5e7eb;">
                     {% if p.auth_status != 'authorized' %}
-                        <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary" style="font-weight:bold; padding:8px 16px; font-size:0.95em;">🔑 Авторизоваться в Avito</a>
+                        <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary avito-browser-btn" style="font-weight:bold; padding:8px 16px; font-size:0.95em;">🔑 Авторизоваться в Avito</a>
                     {% else %}
-                        <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary" style="padding:8px 16px; font-size:0.95em;">🌐 Открыть браузер Avito</a>
+                        <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary avito-browser-btn" style="padding:8px 16px; font-size:0.95em;">🌐 Открыть браузер Avito</a>
                         <a href="/avito/probe?account={{ p.account_key }}" class="btn btn-success" style="padding:8px 16px; font-size:0.95em;">📦 Загрузить мои объявления / Пробный импорт</a>
                     {% endif %}
                 </div>
@@ -231,7 +231,7 @@
                 document.getElementById('h-module').textContent = data.module === 'ok' ? 'Работает' : 'Ошибка';
 
                 document.getElementById('h-browser').className = 'badge ' + (data.browser_runtime === 'ok' ? 'green' : 'red');
-                document.getElementById('h-browser').textContent = data.browser_runtime === 'ok' ? 'Работает' : 'Ошибка';
+                document.getElementById('h-browser').textContent = data.browser_runtime === 'ok' ? 'Готов' : 'Не готов';
 
                 document.getElementById('h-chromium').className = 'badge ' + (data.chromium === 'ok' ? 'green' : 'red');
                 document.getElementById('h-chromium').textContent = data.chromium === 'ok' ? 'Доступен' : 'Ошибка';
@@ -242,6 +242,20 @@
                 const allOk = Object.values(data).every(v => v === 'ok');
                 document.getElementById('sysStatusBadge').className = 'badge ' + (allOk ? 'green' : 'yellow');
                 document.getElementById('sysStatusBadge').textContent = allOk ? 'Готов к работе' : 'Требует внимания';
+
+                const browserBtns = document.querySelectorAll('.avito-browser-btn');
+                browserBtns.forEach(btn => {
+                    if (data.browser_runtime === 'ok') {
+                        btn.classList.remove('disabled');
+                        btn.style.pointerEvents = 'auto';
+                        btn.style.opacity = '1';
+                    } else {
+                        btn.classList.add('disabled');
+                        btn.style.pointerEvents = 'none';
+                        btn.style.opacity = '0.5';
+                        btn.title = 'Браузер Avito не готов. Проверьте службы (Xvfb/vnc/novnc)';
+                    }
+                });
             } catch (e) {
                 document.getElementById('sysStatusBadge').className = 'badge red';
                 document.getElementById('sysStatusBadge').textContent = 'Недоступно';

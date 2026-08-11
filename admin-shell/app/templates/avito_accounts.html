@@ -94,7 +94,7 @@
             <div class="info-row"><strong>Последний импорт:</strong> {{ p.last_imported_at or 'Ещё не проводился' }}</div>
 
             <div class="actions" style="margin-top:15px;">
-                <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary">Авторизоваться / Открыть Avito</a>
+                <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary avito-browser-btn">Авторизоваться / Открыть Avito</a>
                 <button onclick="checkAuth('{{ p.account_key }}')">Проверить авторизацию</button>
                 <a href="/avito/probe?account={{ p.account_key }}" class="btn">Пробный импорт</a>
                 <button onclick="showEditModal('{{ p.account_key }}', '{{ p.display_name }}')">Переименовать</button>
