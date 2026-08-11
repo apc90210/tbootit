@@ -34,10 +34,10 @@
 <body>
     <nav class="main-nav">
         <a href="/">Панель управления</a>
-        <a href="http://localhost:8030/products">Товары</a>
-        <a href="http://localhost:8030/sales">Продажи</a>
-        <a href="http://localhost:8030/reports/sales">Отчёты</a>
-        <a href="http://localhost:8040/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
+        <a href="/inventory/products">Товары</a>
+        <a href="/inventory/sales">Продажи</a>
+        <a href="/inventory/reports/sales">Отчёты</a>
+        <a href="/repairs/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
         <a href="/avito" style="font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
     </nav>
 
@@ -49,16 +49,19 @@
 
     <div class="section" style="padding-bottom:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-            <h2>Авторизация Avito — «{{ profile.display_name }}»</h2>
-            <div class="actions">
-                <button class="btn-success" onclick="verifyAuth()">Я вошёл — проверить авторизацию</button>
+            <div>
+                <h2 style="margin-bottom:4px;">Авторизация Avito — «{{ profile.display_name }}»</h2>
+                <p style="margin:0; color:#666; font-size:0.95em;">Войдите в свой аккаунт вручную</p>
+            </div>
+            <div class="actions" style="margin-top:10px;">
+                <button class="btn-success" onclick="verifyAuth()">Я вошёл в Avito — продолжить</button>
                 <button class="btn-danger" onclick="closeBrowser()">Закрыть браузер</button>
                 <a href="/avito/accounts" class="btn">Назад к аккаунтам</a>
             </div>
         </div>
 
-        <div id="noticeAlert" class="alert alert-info">
-            Встроенный браузер Avito готов. Выполните вход в свой аккаунт Avito прямо на экране ниже, пройдя необходимые проверки (логин, пароль, СМС, CAPTCHA). После этого нажмите <strong>«Я вошёл — проверить авторизацию»</strong>.
+        <div id="noticeAlert" class="alert alert-info" style="margin-top:15px;">
+            Встроенный браузер Avito готов. Выполните вход в свой аккаунт Avito прямо на экране ниже (логин, пароль, СМС, CAPTCHA). После этого нажмите <strong>«Я вошёл в Avito — продолжить»</strong>.
         </div>
     </div>
 

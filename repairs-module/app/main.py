@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from app.routers import repairs
 from app.core_client import core_client
 
-app = FastAPI(title="Technoreboot Repairs Module", version="0.1.0")
+app = FastAPI(title="Technoreboot Repairs Module", version="0.1.0", root_path=os.getenv("ROOT_PATH", ""))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(BASE_DIR, "static")

@@ -11,7 +11,7 @@ def test_full_import_blocked_before_probe():
     Attempts to trigger full account import without an authorized probe or allow_full=true
     must be blocked with HTTP 403 FULL_ACCOUNT_IMPORT_NOT_YET_AUTHORIZED.
     """
-    p = schemas.AvitoAccountProfile(account_key="gated_acc_1", display_name="Заблокированный Профиль")
+    p = schemas.AvitoAccountProfile(account_key="gated_acc_1", display_name="Заблокированный Профиль", auth_status="authorized")
     storage.save_profile(p)
 
     # Attempt full import without probe

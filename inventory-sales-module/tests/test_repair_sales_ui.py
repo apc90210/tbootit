@@ -53,7 +53,7 @@ def test_repair_sales_ui_rendering():
         assert "2800" in html
 
         # Verify link to repair
-        assert 'href="http://localhost:8040/repairs/15"' in html
+        assert 'href="/repairs/repairs/15"' in html
         assert "Открыть ремонт" in html
 
 def test_no_direct_db_imports_in_inventory_sales_module():

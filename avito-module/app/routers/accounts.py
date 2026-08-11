@@ -119,6 +119,12 @@ async def discover_listings(account_key: str, scope: str = "active"):
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
+    if profile.auth_status != "authorized":
+        raise HTTPException(
+            status_code=409,
+            detail="AUTH_REQUIRED: Сначала выполните ручную авторизацию в Avito встроенном браузере."
+        )
+
     worker = AvitoBrowserWorker(account_key)
     listings = await worker.discover_my_listings(scope=scope)
     return {"account_key": account_key, "listings_found": len(listings), "items": listings[:10]}
@@ -128,6 +134,12 @@ async def preview_listing(account_key: str, external_item_id: str):
     profile = storage.get_profile(account_key)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
+
+    if profile.auth_status != "authorized":
+        raise HTTPException(
+            status_code=409,
+            detail="AUTH_REQUIRED: Сначала выполните ручную авторизацию в Avito встроенном браузере."
+        )
 
     worker = AvitoBrowserWorker(account_key)
     item_url = f"https://www.avito.ru/item/{external_item_id}"
@@ -160,6 +172,12 @@ async def execute_one_item_probe(account_key: str, payload: schemas.OneItemProbe
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
+    if profile.auth_status != "authorized":
+        raise HTTPException(
+            status_code=409,
+            detail="AUTH_REQUIRED: Сначала выполните ручную авторизацию в Avito встроенном браузере."
+        )
+
     run = await import_service.run_account_import(
         account_key=account_key,
         scope="probe",
@@ -177,6 +195,12 @@ async def start_full_import(
     profile = storage.get_profile(account_key)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
+
+    if profile.auth_status != "authorized":
+        raise HTTPException(
+            status_code=409,
+            detail="AUTH_REQUIRED: Сначала выполните ручную авторизацию в Avito встроенном браузере."
+        )
 
     # Gate: do not allow full account import until probe import has been executed or allow_full is True or probe_verified is True
     if not allow_full and not item_id_filter:

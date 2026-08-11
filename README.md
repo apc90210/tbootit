@@ -3,9 +3,9 @@
 ## Overview
 This is the MVP prototype for the Technoreboot project. It consists of:
 - **Core API**: FastAPI backend managing the database, storage, inventory, and repair orders.
-- **Admin Shell**: Simple HTML/FastAPI frontend for managing data.
+- **Admin Shell**: Unified navigation interface (`http://localhost:8011`) reverse-proxying all modules under a single top menu bar.
 - **Repairs Module**: Dedicated microservice for repair intake, registry, status filtering, diagnostic fee management, simple repair diagnosis, manual estimate tracking, and automatic accounting integration with sales (Stage 05C).
-- **Avito Module**: Microservice for authorized Avito catalog import, multi-account browser profile management, embedded noVNC authentication, 1-item trial probe import, and idempotency verification (Stage 06A-R2).
+- **Avito Module**: Microservice for mandatory manual Avito login via embedded noVNC Chromium browser, persistent account profiles, 1-item trial probe import, and same-origin parsing (Stage 06A-R3).
 
 ## How to run
 For standard non-technical usage (Zero-CLI owner workflow on Windows):
@@ -18,12 +18,13 @@ For developers:
 docker compose up --build -d
 ```
 
-## Service URLs
-- Admin Shell & Avito Management UI: http://127.0.0.1:8011 (or http://127.0.0.1:8011/avito)
-- Core API: http://127.0.0.1:8000
-- Core API Docs: http://127.0.0.1:8000/docs
-- Inventory & Sales UI: http://127.0.0.1:8030
-- Repairs Module UI: http://127.0.0.1:8040
+## Service URLs (Owner Access)
+- **Single Owner Interface**: http://localhost:8011
+  - Dashboard: `http://localhost:8011/`
+  - Products & Inventory: `http://localhost:8011/inventory/products`
+  - Sales & Reports: `http://localhost:8011/inventory/sales`
+  - Repairs: `http://localhost:8011/repairs/repairs`
+  - Avito Settings & Auth: `http://localhost:8011/avito`
 
 ## How to test
 Run automated tests across modules:

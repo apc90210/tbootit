@@ -70,7 +70,7 @@
                     <td>
                         <a href="/sales/{{ sale.id }}" class="btn btn-success">Открыть</a>
                         {% if sale.source_type == 'repair' and sale.source_id %}
-                            <a href="http://localhost:8040/repairs/{{ sale.source_id }}" target="_blank" class="btn" style="background: #17a2b8; color: #fff; margin-left: 5px;">Открыть ремонт</a>
+                            <a href="/repairs/repairs/{{ sale.source_id }}" target="_blank" class="btn" style="background: #17a2b8; color: #fff; margin-left: 5px;">Открыть ремонт</a>
                         {% else %}
                             <a href="/sales/{{ sale.id }}/receipt" class="btn">Товарный чек</a>
                         {% endif %}

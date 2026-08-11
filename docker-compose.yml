@@ -30,9 +30,13 @@ services:
       - CORE_API_TOKEN=dev-token
       - AVITO_MODULE_URL=http://avito-module:8020
       - AVITO_NOVNC_URL=http://avito-module:6080
+      - INVENTORY_MODULE_URL=http://inventory-sales-module:8030
+      - REPAIRS_MODULE_URL=http://repairs-module:8040
     depends_on:
       - core
       - avito-module
+      - inventory-sales-module
+      - repairs-module
 
 
   avito-module:
@@ -65,6 +69,7 @@ services:
       INVENTORY_SALES_MODULE_NAME: technoreboot-inventory-sales-module
       CORE_API_BASE_URL: http://core:8000
       PYTHONPATH: /app
+      ROOT_PATH: /inventory
     ports:
       - "8030:8030"
     volumes:
@@ -81,6 +86,7 @@ services:
       REPAIRS_MODULE_NAME: technoreboot-repairs-module
       CORE_API_BASE_URL: http://core:8000
       PYTHONPATH: /app
+      ROOT_PATH: /repairs
     ports:
       - "8040:8040"
     volumes:

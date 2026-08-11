@@ -8,7 +8,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_profile():
-    p = schemas.AvitoAccountProfile(account_key="acc_dedup", display_name="Профиль дедупликации")
+    p = schemas.AvitoAccountProfile(account_key="acc_dedup", display_name="Профиль дедупликации", auth_status="authorized")
     storage.save_profile(p)
     yield
     storage.delete_profile("acc_dedup")

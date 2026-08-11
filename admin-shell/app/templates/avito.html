@@ -38,10 +38,10 @@
 <body>
     <nav class="main-nav">
         <a href="/">Панель управления</a>
-        <a href="http://localhost:8030/products">Товары</a>
-        <a href="http://localhost:8030/sales">Продажи</a>
-        <a href="http://localhost:8030/reports/sales">Отчёты</a>
-        <a href="http://localhost:8040/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
+        <a href="/inventory/products">Товары</a>
+        <a href="/inventory/sales">Продажи</a>
+        <a href="/inventory/reports/sales">Отчёты</a>
+        <a href="/repairs/repairs" style="font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
         <a href="/avito" style="font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
     </nav>
 
@@ -120,49 +120,101 @@
     </div>
 
     <div class="section">
-        <h2>Настроенные аккаунты Avito</h2>
+        <h2>Настройки Avito — Пошаговая настройка аккаунта</h2>
         {% if not profiles %}
-            <p style="color:#666;">Аккаунты ещё не созданы. Добавьте первый профиль для работы с Avito.</p>
+            <p style="color:#666; font-size:1.1em; margin-bottom:15px;">Аккаунты ещё не созданы. Добавьте первый профиль для работы с Avito.</p>
+            <a href="/avito/accounts?action=new" class="btn btn-success" style="font-size:1.1em; padding:8px 16px;">+ Добавить аккаунт</a>
         {% else %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Название профиля</th>
-                        <th>Статус авторизации</th>
-                        <th>Проверка пробного импорта</th>
-                        <th>Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in profiles %}
-                    <tr>
-                        <td><strong>{{ p.display_name }}</strong></td>
-                        <td>
+            {% for p in profiles %}
+            <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:18px; margin-bottom:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <div>
+                        <h3 style="margin:0; font-size:1.2em; color:#111;">{{ p.display_name }} <span style="font-size:0.8em; color:#666;">({{ p.account_key }})</span></h3>
+                    </div>
+                    <div>
+                        {% if p.auth_status == 'authorized' %}
+                            <span class="badge green" style="font-size:0.9em; padding:5px 12px;">✓ Авторизован</span>
+                        {% elif p.auth_status in ['challenge_required', 'user_action_required'] %}
+                            <span class="badge yellow" style="font-size:0.9em; padding:5px 12px;">⚠️ Требуется действие пользователя</span>
+                        {% elif p.auth_status == 'unauthorized' %}
+                            <span class="badge red" style="font-size:0.9em; padding:5px 12px;">Не авторизован</span>
+                        {% else %}
+                            <span class="badge" style="font-size:0.9em; padding:5px 12px;">Не проверен</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 5-Step Account Stepper -->
+                <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+                    <!-- Step 1 -->
+                    <div style="flex:1; min-width:140px; padding:10px; background:#fff; border:1px solid #d1d5db; border-radius:6px; border-top:4px solid #16a34a;">
+                        <strong style="font-size:0.85em; color:#16a34a;">Шаг 1. Профиль</strong>
+                        <p style="margin:4px 0 0; font-size:0.85em; color:#374151;">Профиль создан</p>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div style="flex:1; min-width:140px; padding:10px; background:#fff; border:1px solid #d1d5db; border-radius:6px; border-top:4px solid {% if p.auth_status == 'authorized' %}#16a34a{% elif p.auth_status in ['unauthorized', 'challenge_required'] %}#2563eb{% else %}#9ca3af{% endif %};">
+                        <strong style="font-size:0.85em; color:{% if p.auth_status == 'authorized' %}#16a34a{% elif p.auth_status in ['unauthorized', 'challenge_required'] %}#2563eb{% else %}#6b7280{% endif %};">Шаг 2. Вход</strong>
+                        <p style="margin:4px 0 0; font-size:0.85em; color:#374151;">
                             {% if p.auth_status == 'authorized' %}
-                                <span class="badge green">Авторизован</span>
-                            {% elif p.auth_status == 'challenge_required' %}
-                                <span class="badge yellow">Требуется подтверждение</span>
-                            {% elif p.auth_status == 'unauthorized' %}
-                                <span class="badge red">Не авторизован</span>
+                                Вход выполнен
                             {% else %}
-                                <span class="badge">Не проверен</span>
+                                Ручной вход в Avito
                             {% endif %}
-                        </td>
-                        <td>
+                        </p>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div style="flex:1; min-width:140px; padding:10px; background:#fff; border:1px solid #d1d5db; border-radius:6px; border-top:4px solid {% if p.auth_status == 'authorized' %}#16a34a{% else %}#9ca3af{% endif %};">
+                        <strong style="font-size:0.85em; color:{% if p.auth_status == 'authorized' %}#16a34a{% else %}#6b7280{% endif %};">Шаг 3. Подтверждение</strong>
+                        <p style="margin:4px 0 0; font-size:0.85em; color:#374151;">
+                            {% if p.auth_status == 'authorized' %}
+                                Авторизован
+                            {% else %}
+                                Ожидает входа
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div style="flex:1; min-width:140px; padding:10px; background:#fff; border:1px solid #d1d5db; border-radius:6px; border-top:4px solid {% if p.auth_status == 'authorized' %}#16a34a{% else %}#9ca3af{% endif %};">
+                        <strong style="font-size:0.85em; color:{% if p.auth_status == 'authorized' %}#16a34a{% else %}#6b7280{% endif %};">Шаг 4. Объявления</strong>
+                        <p style="margin:4px 0 0; font-size:0.85em; color:#374151;">
+                            {% if p.auth_status == 'authorized' %}
+                                Доступны к загрузке
+                            {% else %}
+                                Заблокированы (нужен вход)
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Step 5 -->
+                    <div style="flex:1; min-width:140px; padding:10px; background:#fff; border:1px solid #d1d5db; border-radius:6px; border-top:4px solid {% if p.probe_verified %}#16a34a{% elif p.auth_status == 'authorized' %}#eab308{% else %}#9ca3af{% endif %};">
+                        <strong style="font-size:0.85em; color:{% if p.probe_verified %}#16a34a{% elif p.auth_status == 'authorized' %}#ca8a04{% else %}#6b7280{% endif %};">Шаг 5. Пробный импорт</strong>
+                        <p style="margin:4px 0 0; font-size:0.85em; color:#374151;">
                             {% if p.probe_verified %}
-                                <span class="badge green">Проверен</span>
+                                Успешно проверен
                             {% else %}
-                                <span class="badge yellow">Требуется проверка</span>
+                                Проба 1 товара
                             {% endif %}
-                        </td>
-                        <td>
-                            <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary" style="font-size:0.8em;">Открыть Avito</a>
-                            <a href="/avito/probe?account={{ p.account_key }}" class="btn" style="font-size:0.8em;">Пробный импорт</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Primary Action CTA Bar -->
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:#fff; padding:12px 16px; border-radius:6px; border:1px solid #e5e7eb;">
+                    {% if p.auth_status != 'authorized' %}
+                        <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary" style="font-weight:bold; padding:8px 16px; font-size:0.95em;">🔑 Авторизоваться в Avito</a>
+                    {% else %}
+                        <a href="/avito/accounts/{{ p.account_key }}/browser" class="btn btn-primary" style="padding:8px 16px; font-size:0.95em;">🌐 Открыть браузер Avito</a>
+                        <a href="/avito/probe?account={{ p.account_key }}" class="btn btn-success" style="padding:8px 16px; font-size:0.95em;">📦 Загрузить мои объявления / Пробный импорт</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            <div style="margin-top:15px;">
+                <a href="/avito/accounts?action=new" class="btn btn-success">+ Добавить еще аккаунт</a>
+            </div>
         {% endif %}
     </div>
 

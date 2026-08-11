@@ -15,6 +15,8 @@ templates = Jinja2Templates(directory=templates_dir)
 CORE_API_URL = os.getenv("CORE_API_URL", "http://127.0.0.1:8000")
 AVITO_MODULE_URL = os.getenv("AVITO_MODULE_URL", "http://127.0.0.1:8020")
 AVITO_NOVNC_URL = os.getenv("AVITO_NOVNC_URL", "http://127.0.0.1:6080")
+INVENTORY_MODULE_URL = os.getenv("INVENTORY_MODULE_URL", "http://127.0.0.1:8030")
+REPAIRS_MODULE_URL = os.getenv("REPAIRS_MODULE_URL", "http://127.0.0.1:8040")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -481,3 +483,56 @@ async def novnc_websocket_proxy(websocket: WebSocket):
         await websocket.close(code=1011, reason=str(e))
 
 
+# =====================================================================
+# SAME-ORIGIN REVERSE PROXY FOR INVENTORY-SALES MODULE
+# =====================================================================
+
+async def _proxy_request(request: Request, target_base_url: str, path: str, prefix: str):
+    """Generic HTTP reverse proxy handler."""
+    target_url = f"{target_base_url.rstrip('/')}/{path}"
+    query = str(request.query_params)
+    if query:
+        target_url = f"{target_url}?{query}"
+
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    headers["x-forwarded-prefix"] = prefix
+
+    body = await request.body()
+    method = request.method
+
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0, follow_redirects=False) as client:
+        resp = await client.request(
+            method=method,
+            url=target_url,
+            headers=headers,
+            content=body if body else None,
+        )
+
+    # Rewrite Location header for redirects
+    resp_headers = dict(resp.headers)
+    if "location" in resp_headers:
+        loc = resp_headers["location"]
+        # Rewrite absolute redirects back to same-origin
+        if loc.startswith("/"):
+            resp_headers["location"] = f"{prefix}{loc}"
+
+    # Remove hop-by-hop headers
+    for h in ["transfer-encoding", "content-encoding", "content-length"]:
+        resp_headers.pop(h, None)
+
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=resp_headers,
+    )
+
+
+@app.api_route("/inventory/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_inventory(request: Request, path: str):
+    return await _proxy_request(request, INVENTORY_MODULE_URL, path, "/inventory")
+
+
+@app.api_route("/repairs/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_repairs(request: Request, path: str):
+    return await _proxy_request(request, REPAIRS_MODULE_URL, path, "/repairs")

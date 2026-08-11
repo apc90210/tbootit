@@ -5,7 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.routers import health, products, sales, settings, cart, reports
 import os
 
-app = FastAPI(title="Inventory and Sales Module")
+app = FastAPI(title="Inventory and Sales Module", root_path=os.getenv("ROOT_PATH", ""))
 
 # Add session middleware for cart
 app.add_middleware(SessionMiddleware, secret_key="technoreboot_secret_cart_key_mvp")
