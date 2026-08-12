@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse
 from pydantic import BaseModel
 import os
 import httpx
@@ -432,6 +432,44 @@ async def proxy_start_import(account_key: str, request: Request):
     async with httpx.AsyncClient(trust_env=False) as client:
         resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/import", data=data)
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+# --- Extension Bridge Proxy Routes ---
+
+@app.get("/avito/extension", response_class=HTMLResponse)
+async def avito_extension_page(request: Request):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            status_resp = await client.get(f"{AVITO_MODULE_URL}/extension/api/status")
+            status_data = status_resp.json() if status_resp.status_code == 200 else {"online": False}
+        except Exception:
+            status_data = {"online": False}
+
+    return templates.TemplateResponse("avito_extension.html", {
+        "request": request,
+        "extension_status": status_data
+    })
+
+@app.get("/avito/extension/download")
+async def download_extension_zip():
+    zip_path = os.path.abspath("dist/technoreboot-avito-extension.zip")
+    if not os.path.exists(zip_path):
+        from scripts.build_extension_zip import build_zip
+        build_zip()
+    return FileResponse(zip_path, filename="technoreboot-avito-extension.zip", media_type="application/zip")
+
+@app.api_route("/admin-api/avito-extension/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def proxy_avito_extension_api(path: str, request: Request):
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    body = await request.body()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.request(
+            method=request.method,
+            url=f"{AVITO_MODULE_URL}/extension/api/{path}",
+            headers=headers,
+            content=body
+        )
+        return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
 
 # --- noVNC Static Asset & WebSocket Proxies ---
 

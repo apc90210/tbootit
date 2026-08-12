@@ -184,3 +184,36 @@ async def run_account_import(
 
 def stop_import_run(run_id: str):
     ACTIVE_RUN_STOP_FLAGS[run_id] = True
+
+async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
+    ad = storage.get_parsed_ad(ad_id)
+    if not ad:
+        return {"status": "failed", "error": f"Parsed ad {ad_id} not found"}
+
+    core_url = f"{settings.CORE_API_BASE_URL}/avito/import"
+    photos = [p.url for p in ad.photos if p.url]
+    
+    payload = {
+        "account_key": account_key,
+        "external_item_id": ad.id,
+        "external_url": ad.source_url,
+        "remote_status": "active",
+        "title": ad.title,
+        "price": ad.price,
+        "description": ad.description,
+        "category_path": ad.category_path,
+        "brand": ad.parameters.get("Бренд") or ad.parameters.get("Марка"),
+        "model": ad.parameters.get("Модель"),
+        "condition": ad.parameters.get("Состояние"),
+        "parameters": ad.parameters,
+        "photos": photos
+    }
+
+    try:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            res = await client.post(core_url, json=payload, timeout=10)
+            if res.status_code == 200:
+                return res.json()
+            return {"status": "failed", "error": f"HTTP {res.status_code}: {res.text}"}
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}

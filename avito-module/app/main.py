@@ -3,7 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 import os
 
-from app.routers import health, profiles, parsed_ads, exports, accounts
+from app.routers import health, profiles, parsed_ads, exports, accounts, extension_bridge
 
 app = FastAPI(title="Technoreboot Avito Module API")
 
@@ -12,6 +12,7 @@ app.include_router(profiles.router)
 app.include_router(parsed_ads.router)
 app.include_router(exports.router)
 app.include_router(accounts.router)
+app.include_router(extension_bridge.router)
 
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 if not os.path.exists(templates_dir):

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Техноребут Avito</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="header">
+        <h2>Техноребут Avito</h2>
+        <span id="connBadge" class="badge badge-offline">Offline</span>
+    </div>
+
+    <div class="card" id="statusCard">
+        <p id="statusMsg">Проверка подключения к Техноребут...</p>
+    </div>
+
+    <!-- Pairing Section -->
+    <div class="card" id="pairSection" style="display:none;">
+        <h3>Подключение к Техноребут</h3>
+        <p class="small">Введите 6-значный код подключения со страницы <code>/avito/extension</code> в Техноребут:</p>
+        <div class="form-row">
+            <input type="text" id="pairCodeInput" placeholder="483921" maxlength="6">
+            <button id="pairBtn" class="btn btn-primary">Подключить</button>
+        </div>
+        <p id="pairMsg" class="msg"></p>
+    </div>
+
+    <!-- Main Ingest Section -->
+    <div class="card" id="actionSection" style="display:none;">
+        <h3 id="pageTypeTitle">Страница Avito</h3>
+        <p id="pageDetectInfo">Загрузка информации со страницы...</p>
+
+        <button id="sendBtn" class="btn btn-success btn-block" disabled>Передать в Техноребут</button>
+        <p id="resultMsg" class="msg" style="margin-top:10px;"></p>
+    </div>
+
+    <div class="footer">
+        <small>Техноребут Avito Bridge v0.1.0 (Local)</small>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
