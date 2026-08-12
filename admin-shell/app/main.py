@@ -451,12 +451,22 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip"))
+    version = "0.1.1"
+    filename = f"technoreboot-avito-extension-{version}.zip"
+    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
     if not os.path.exists(zip_path):
-        zip_path = os.path.abspath("dist/technoreboot-avito-extension.zip")
+        zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip"))
+    if not os.path.exists(zip_path):
+        zip_path = os.path.abspath(f"dist/{filename}")
     if not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail="Файл расширения не найден.")
-    return FileResponse(zip_path, filename="technoreboot-avito-extension.zip", media_type="application/zip")
+    
+    return FileResponse(
+        zip_path,
+        filename=filename,
+        media_type="application/zip",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"}
+    )
 
 @app.api_route("/admin-api/avito-extension/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_avito_extension_api(path: str, request: Request):

@@ -81,7 +81,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.1.0",
+        "version": "0.1.1",
         "paired": paired or any_paired,
         "active_tokens_count": len(tokens)
     }
