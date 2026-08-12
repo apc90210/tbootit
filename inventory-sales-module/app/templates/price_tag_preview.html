@@ -185,7 +185,7 @@
     <div class="no-print">
         <h3 style="margin-top: 0; margin-bottom: 10px;">Параметры печати ценника 58×40 мм</h3>
         
-        <form method="GET" action="/products/{{ product.id }}/price-tag/58x40" style="margin-bottom: 15px;">
+        <form method="GET" action="/inventory/products/{{ product.id }}/price-tag/58x40" style="margin-bottom: 15px;">
             <div style="margin-bottom: 10px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 3px;">Цена для печати (₽):</label>
                 <input type="number" step="1" min="0" name="print_price" value="{{ print_price }}" style="width: 100%; padding: 6px; box-sizing: border-box;">

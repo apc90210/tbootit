@@ -16,7 +16,7 @@
         <p><strong>Артикул:</strong> {{ product.sku or '—' }}</p>
         <p><strong>Штрихкод:</strong> <code>{{ product.barcode or 'Не задан' }}</code>
             {% if not product.barcode %}
-            <form action="/products/{{ product.id }}/barcode/generate" method="post" style="display: inline; margin-left: 10px;">
+            <form action="/inventory/products/{{ product.id }}/barcode/generate" method="post" style="display: inline; margin-left: 10px;">
                 <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.9rem;">Сгенерировать штрихкод</button>
             </form>
             {% endif %}
@@ -39,7 +39,7 @@
         
         <div style="margin-top: 15px; margin-bottom: 15px; background: #eef9f1; padding: 15px; border: 1px solid #c3e6cb;">
             <h3 style="margin-top: 0;">Изменить местонахождение и остаток</h3>
-            <form action="/products/{{ product.id }}/update" method="POST" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+            <form action="/inventory/products/{{ product.id }}/update" method="POST" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
                 <div>
                     <label style="display: block; margin-bottom: 5px;">Локация</label>
                     <select name="storage_location" style="padding: 5px;">
@@ -87,9 +87,9 @@
     </div>
 
     <div style="margin-top: 20px;">
-        <a href="/products" class="btn">Назад к товарам</a>
+        <a href="/inventory/products" class="btn">Назад к товарам</a>
         {% if product.status == 'in_stock' and product.storage_location == 'store' and product.quantity > 0 %}
-            <a href="/sales/new?product_id={{ product.id }}" class="btn btn-success" style="margin-left: 10px;">Продать</a>
+            <a href="/inventory/sales/new?product_id={{ product.id }}" class="btn btn-success" style="margin-left: 10px;">Продать</a>
         {% else %}
             <button class="btn" disabled title="Продажа недоступна для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">Продать</button>
         {% endif %}
@@ -113,7 +113,7 @@
             </span>
         </div>
         {% if product.status == 'in_stock' %}
-            <a href="/products/{{ product.id }}/price-tag/58x40" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Ценник 58×40</a>
+            <a href="/inventory/products/{{ product.id }}/price-tag/58x40" class="btn btn-primary" target="_blank" style="margin-left: 10px;">Ценник 58×40</a>
         {% else %}
             <button class="btn" disabled title="Ценник доступен только для товаров в наличии" style="margin-left: 10px;">Ценник 58×40</button>
         {% endif %}

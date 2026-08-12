@@ -85,7 +85,7 @@ async def scan_barcode_to_cart(request: Request, barcode: str = Form(...)):
         })
         
     set_cart(request, cart)
-    return RedirectResponse(url="/cart", status_code=303)
+    return RedirectResponse(url="/inventory/cart", status_code=303)
 
 @router.post("/add-quick")
 @router.post("/add")
@@ -205,7 +205,7 @@ async def add_to_cart(
             "product_quantity_in_cart": product_in_cart_qty
         })
 
-    target_redirect = "/cart"
+    target_redirect = "/inventory/cart"
     if return_url and (return_url.startswith("/products") or return_url.startswith("/cart") or return_url.startswith("/inventory")):
         target_redirect = return_url
     return RedirectResponse(url=target_redirect, status_code=status.HTTP_303_SEE_OTHER)
@@ -225,7 +225,7 @@ async def update_cart_item(
             break
             
     set_cart(request, cart)
-    return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/inventory/cart", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.post("/remove")
 async def remove_cart_item(
@@ -237,12 +237,12 @@ async def remove_cart_item(
         target_str = str(product_id).strip()
         cart = [item for item in cart if str(item.get("product_id")).strip() != target_str]
     set_cart(request, cart)
-    return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/inventory/cart", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.post("/clear")
 async def clear_cart(request: Request):
     set_cart(request, [])
-    return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/inventory/cart", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.post("/checkout")
 async def checkout_cart(
@@ -254,7 +254,7 @@ async def checkout_cart(
 ):
     cart = get_cart(request)
     if not cart:
-        return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/inventory/cart", status_code=status.HTTP_303_SEE_OTHER)
         
     total_amount = sum(item["price"] * item["quantity"] for item in cart)
     is_warranty_active = warranty_enabled in ["on", "true", "1", "True"]

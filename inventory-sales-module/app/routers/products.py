@@ -102,7 +102,7 @@ async def list_products(
 async def generate_missing_barcodes_endpoint(request: Request):
     res = await core_client.generate_missing_barcodes()
     msg = f"Сгенерировано штрихкодов: {res.get('generated', 0)}, пропущено: {res.get('skipped_existing', 0)}"
-    return RedirectResponse(url=f"/products?msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/inventory/products?msg={msg}", status_code=303)
 
 @router.get("/products/{product_id}", response_class=HTMLResponse)
 async def product_detail(request: Request, product_id: int):
@@ -147,7 +147,7 @@ async def product_detail(request: Request, product_id: int):
 @router.post("/products/{product_id}/barcode/generate")
 async def generate_single_barcode_endpoint(request: Request, product_id: int):
     res = await core_client.generate_product_barcode(product_id)
-    return RedirectResponse(url=f"/products/{product_id}", status_code=303)
+    return RedirectResponse(url=f"/inventory/products/{product_id}", status_code=303)
 
 @router.post("/products/{product_id}/update")
 async def update_product_endpoint(request: Request, product_id: int, storage_location: str = Form(None), quantity: int = Form(None)):
@@ -162,7 +162,7 @@ async def update_product_endpoint(request: Request, product_id: int, storage_loc
         return templates.TemplateResponse(
             request=request, name="error.html", context={"message": "Ошибка обновления товара"}
         )
-    return RedirectResponse(url=f"/products/{product_id}", status_code=303)
+    return RedirectResponse(url=f"/inventory/products/{product_id}", status_code=303)
 
 @router.get("/products/{product_id}/price-tag/58x40", response_class=HTMLResponse)
 @router.get("/products/{product_id}/price-tag", response_class=HTMLResponse)

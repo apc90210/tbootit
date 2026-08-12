@@ -22,6 +22,13 @@ app.include_router(settings.router)
 app.include_router(cart.router)
 app.include_router(reports.router)
 
+# Include routers under /inventory prefix for direct route compatibility
+app.include_router(products.router, prefix="/inventory")
+app.include_router(sales.router, prefix="/inventory")
+app.include_router(settings.router, prefix="/inventory")
+app.include_router(cart.router, prefix="/inventory")
+app.include_router(reports.router, prefix="/inventory")
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return RedirectResponse(url="/products")
+    return RedirectResponse(url="/inventory/products")

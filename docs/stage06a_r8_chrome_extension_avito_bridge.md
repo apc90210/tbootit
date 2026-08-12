@@ -1,7 +1,7 @@
-# Stage 06A-R8 Architecture & Extension Package Documentation (v0.1.2)
+# Stage 06A-R8 Architecture & Extension Package Documentation (v0.1.3)
 
 ## Overview
-The **Technoreboot Avito Chrome Extension (v0.1.2)** provides a pure Manifest V3 local extension interface. It allows the owner to manually transfer Avito listing metadata from standard desktop Google Chrome into Technoreboot without automation, credentials, or cookies.
+The **Technoreboot Avito Chrome Extension (v0.1.3)** provides a pure Manifest V3 local extension interface. It allows the owner to manually transfer Avito listing metadata from standard desktop Google Chrome into Technoreboot without automation, credentials, or cookies.
 
 ## Pairing State Machine & Security Contracts
 - **Server Reachable vs. Extension Paired:**
@@ -13,3 +13,14 @@ The **Technoreboot Avito Chrome Extension (v0.1.2)** provides a pure Manifest V3
   - **STATE C (Token Expired / Revoked):** Detects HTTP 401 or `token_valid: false`, clears invalid token from `chrome.storage.local`, and displays pairing form.
   - **STATE D (Paired & Active):** Displays "Расширение привязано" (green badge). Hides pairing form. Enables transfer button when an Avito listing page is detected.
 - **Cache Prevention:** Download endpoint `/avito/extension/download` sends `Cache-Control: no-store, no-cache, must-revalidate` headers.
+
+## Empty Cart Products Link & Same-Origin Navigation (Stage06A-R8-R5)
+- All empty-cart and catalog navigation CTAs across `cart.html`, `product_detail.html`, `sales_new.html`, `index.html`, `error.html`, `price_tag_preview.html`, `products.py`, `cart.py`, and `main.py` enforce the canonical `/inventory/products` path.
+- Standalone un-prefixed `/products` CTAs are completely removed from owner templates.
+- Clicking «Товары» or «Перейти к товарам» in empty cart routes directly to `/inventory/products` and returns HTTP 200 OK on `http://localhost:8011`.
+
+## Product 58 & Single-Item Verification
+- **Product ID 58:** Preserved with `sale_price` = 6900.0, `source_origin` = `avito`, and `status` = `draft`.
+- **External Listing:** Single `ProductExternalListing` entry for `(avito, 8313765236)` referencing `product_id = 58`.
+- **Last Ingest Status:** Verified on `/avito/extension` as `Result: updated`, `Status: success`, Avito ID: `8313765236`, Product ID: `58`.
+

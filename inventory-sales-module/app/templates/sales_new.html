@@ -7,7 +7,7 @@
 
     {% if not product %}
         <div style="background: #fff3cd; color: #856404; padding: 15px; border: 1px solid #ffeeba; border-radius: 5px; margin-bottom: 20px;">
-            Товар не выбран. Перейдите в <a href="/products">список товаров</a> и нажмите "Продать".
+            Товар не выбран. Перейдите в <a href="/inventory/products">список товаров</a> и нажмите "Продать".
         </div>
     {% else %}
         <div style="background: #fff; padding: 25px; border: 1px solid #ddd; border-radius: 5px; max-width: 650px;">
@@ -37,7 +37,7 @@
                 </tr>
             </table>
 
-            <form action="/sales/create" method="POST">
+            <form action="/inventory/sales/create" method="POST">
                 <input type="hidden" name="product_id" value="{{ product.id }}">
 
                 <div style="margin-bottom: 15px;">
@@ -78,7 +78,7 @@
 
                 <div style="display: flex; gap: 10px;">
                     <button type="submit" class="btn btn-success" style="font-size: 1.05rem; padding: 10px 20px;">Подтвердить продажу</button>
-                    <a href="/products/{{ product.id }}" class="btn" style="padding: 10px 20px;">Отмена</a>
+                    <a href="/inventory/products/{{ product.id }}" class="btn" style="padding: 10px 20px;">Отмена</a>
                 </div>
             </form>
         </div>
