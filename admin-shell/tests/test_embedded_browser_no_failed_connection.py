@@ -1,9 +1,21 @@
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 
-def test_avito_browser_page_has_reconnect_fallback_ui():
+class MockResponse:
+    def __init__(self, status_code=200, json_data=None):
+        self.status_code = status_code
+        self._json_data = json_data or []
+    def json(self):
+        return self._json_data
+
+async def mock_async_get(*args, **kwargs):
+    return MockResponse(200, [{"account_key": "acc_test", "display_name": "Acc Test"}])
+
+@patch("httpx.AsyncClient.get", side_effect=mock_async_get)
+def test_avito_browser_page_has_reconnect_fallback_ui(mock_get):
     """Verify avito_browser.html contains reloadVncFrame fallback script and container."""
     res = client.get("/avito/accounts/acc_test/browser")
     assert res.status_code == 200

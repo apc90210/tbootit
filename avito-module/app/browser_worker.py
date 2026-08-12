@@ -21,15 +21,15 @@ class BrowserSessionManager:
     def __init__(self):
         self.active_account_key: Optional[str] = None
         self.active_display_name: Optional[str] = None
-        self.playwright = None
-        self.context = None
+        self.manual_process: Optional[Any] = None
+        self.session_mode: Optional[str] = None
 
     async def launch_session(self, account_key: str, display_name: str = "") -> Tuple[bool, str]:
         if self.active_account_key and self.active_account_key != account_key:
             name_str = self.active_display_name or self.active_account_key
             return False, f"Сейчас открыт браузер аккаунта <{name_str}>. Закройте его или переключитесь."
         
-        if self.active_account_key == account_key and self.context:
+        if self.active_account_key == account_key and self.manual_process and self.manual_process.poll() is None:
             return True, "Браузер уже открыт."
 
         profile_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles", account_key, "browser_data")
@@ -37,47 +37,63 @@ class BrowserSessionManager:
         cleanup_stale_singleton_locks(profile_dir)
 
         try:
-            from playwright.async_api import async_playwright
-            self.playwright = await async_playwright().start()
-            self.context = await self.playwright.chromium.launch_persistent_context(
-                user_data_dir=profile_dir,
-                headless=False,
-                args=["--no-sandbox", "--disable-setuid-sandbox"]
-            )
-            page = await self.context.new_page()
-            await page.goto("https://www.avito.ru/", timeout=20000, wait_until="domcontentloaded")
+            import subprocess
+            binary = os.getenv("CHROME_BIN", "/ms-playwright/chromium-1097/chrome-linux/chrome")
+            if not os.path.exists(binary):
+                binary = "chromium"
+
+            cmd = [
+                binary,
+                f"--user-data-dir={profile_dir}",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--no-first-run",
+                "--start-maximized",
+                "https://www.avito.ru/"
+            ]
+
+            env = os.environ.copy()
+            env["DISPLAY"] = os.getenv("DISPLAY", ":99")
+
+            self.manual_process = subprocess.Popen(cmd, env=env)
+            self.session_mode = "manual"
             self.active_account_key = account_key
             self.active_display_name = display_name or account_key
-            return True, "Браузер успешно запущен."
+            return True, "Встроенный браузер (ручной режим) успешно запущен."
         except Exception as e:
             await self.stop_session()
-            return False, f"Не удалось запустить браузер: {str(e)}"
+            return False, f"Не удалось запустить ручной браузер: {str(e)}"
 
     async def stop_session(self):
-        try:
-            if self.context:
-                await self.context.close()
-        except Exception:
-            pass
-        try:
-            if self.playwright:
-                await self.playwright.stop()
-        except Exception:
-            pass
-        self.context = None
-        self.playwright = None
+        if self.manual_process:
+            try:
+                self.manual_process.terminate()
+                self.manual_process.wait(timeout=5)
+            except Exception:
+                try:
+                    self.manual_process.kill()
+                except Exception:
+                    pass
+        self.manual_process = None
+        self.session_mode = None
+
+        if self.active_account_key:
+            profile_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles", self.active_account_key, "browser_data")
+            cleanup_stale_singleton_locks(profile_dir)
+
         self.active_account_key = None
         self.active_display_name = None
 
     def get_status(self, account_key: Optional[str] = None) -> Dict[str, Any]:
-        is_active = self.active_account_key is not None and self.context is not None
+        is_active = self.manual_process is not None and self.manual_process.poll() is None
         is_current = is_active and (account_key is None or self.active_account_key == account_key)
         return {
             "active": is_active,
-            "active_account_key": self.active_account_key,
-            "active_display_name": self.active_display_name,
+            "session_mode": self.session_mode if is_active else None,
+            "active_account_key": self.active_account_key if is_active else None,
+            "active_display_name": self.active_display_name if is_active else None,
             "is_current": is_current,
-            "status_text": "Открыт" if is_current else ("Занят другим аккаунтом" if is_active else "Не запущен")
+            "status_text": "Открыт (Ручной режим)" if is_current else ("Занят другим аккаунтом" if is_active else "Не запущен")
         }
 
 browser_session_manager = BrowserSessionManager()
@@ -91,16 +107,24 @@ class AvitoBrowserWorker:
 
     def detect_challenge_or_captcha(self, html: str) -> bool:
         lower = html.lower()
-        if "капч" in lower or "captcha" in lower or "доступ ограничен" in lower or "подтвердите" in lower or "geetest" in lower or "puzzle" in lower:
+        if "капч" in lower or "captcha" in lower or "подтвердите" in lower or "geetest" in lower or "puzzle" in lower:
+            return True
+        return False
+
+    def detect_access_denied(self, html: str) -> bool:
+        lower = html.lower()
+        if "доступ закрыт" in lower or "доступ ограничен" in lower or "ip заблокирован" in lower or "access denied" in lower:
             return True
         return False
 
     async def check_auth_state(self, mock_html: Optional[str] = None) -> Tuple[str, Optional[str]]:
         """
         Returns (status, error_message).
-        status: "authorized", "unauthorized", "challenge_required", "unknown"
+        status: "authorized", "unauthorized", "challenge_required", "access_denied", "unknown"
         """
         if mock_html:
+            if self.detect_access_denied(mock_html):
+                return "access_denied", "Avito закрыл доступ в этом браузере. Автоматический обход блокировки не выполняется."
             if self.detect_challenge_or_captcha(mock_html):
                 return "challenge_required", "Требуется прохождение CAPTCHA / проверки безопасности"
             if "Мои объявления" in mock_html or "Профиль" in mock_html or "my_items" in mock_html or "logout" in mock_html.lower():
@@ -110,6 +134,8 @@ class AvitoBrowserWorker:
             return "unknown", "Не удалось однозначно определить статус"
 
         try:
+            if browser_session_manager.manual_process:
+                await browser_session_manager.stop_session()
             cleanup_stale_singleton_locks(self.profile_dir)
             from playwright.async_api import async_playwright
             async with async_playwright() as p:
@@ -124,6 +150,8 @@ class AvitoBrowserWorker:
                 current_url = page.url
                 await context.close()
 
+                if self.detect_access_denied(html):
+                    return "access_denied", "Avito закрыл доступ в этом браузере. Автоматический обход блокировки не выполняется."
                 if self.detect_challenge_or_captcha(html):
                     return "challenge_required", "Требуется прохождение CAPTCHA / проверки безопасности в браузере"
                 if "Мои объявления" in html or "Профиль" in html or "item-snippet" in html or "my-items" in html or "avito.ru/profile" in current_url:

@@ -26,6 +26,13 @@ async def view_accounts_page(request: Request):
 async def get_profiles():
     return storage.list_profiles()
 
+@router.get("/accounts/api/profiles/{account_key}", response_model=schemas.AvitoAccountProfile)
+async def get_profile_by_key(account_key: str):
+    profile = storage.get_profile(account_key)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
+
 @router.post("/accounts/api/profiles", response_model=schemas.AvitoAccountProfile)
 async def create_profile(payload: schemas.ProfileCreateRequest):
     existing_profiles = storage.list_profiles()

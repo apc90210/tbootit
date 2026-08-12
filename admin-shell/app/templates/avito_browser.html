@@ -106,6 +106,9 @@
                 } else if (data.auth_status === 'challenge_required') {
                     alertEl.className = 'alert alert-warning';
                     alertEl.textContent = 'Avito запросил дополнительное подтверждение (CAPTCHA или СМС). Завершите проверку в окне браузера ниже и нажмите кнопку повторно.';
+                } else if (data.auth_status === 'access_denied') {
+                    alertEl.className = 'alert alert-danger';
+                    alertEl.innerHTML = '<strong>Доступ закрыт!</strong> Avito закрыл доступ в этом браузере. Автоматический обход блокировки не выполняется.<br><div style="margin-top:10px;"><a href="/avito/accounts" class="btn">К аккаунтам Avito</a></div>';
                 } else {
                     alertEl.className = 'alert alert-danger';
                     alertEl.textContent = data.error || 'Сессия не авторизована. Войдите в Avito в окне браузера.';

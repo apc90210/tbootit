@@ -90,13 +90,39 @@ def _get_profiles_file() -> str:
     os.makedirs(settings.AVITO_STORAGE_DIR, exist_ok=True)
     return os.path.join(settings.AVITO_STORAGE_DIR, "profiles.json")
 
-def list_profiles() -> List[AvitoAccountProfile]:
+def reconcile_profile_registry() -> List[AvitoAccountProfile]:
     path = _get_profiles_file()
-    if not os.path.exists(path):
-        return []
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        return [AvitoAccountProfile(**p) for p in data]
+    profiles = []
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                profiles = [AvitoAccountProfile(**p) for p in data]
+        except Exception:
+            profiles = []
+
+    profiles_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles")
+    if os.path.exists(profiles_dir):
+        existing_keys = {p.account_key for p in profiles}
+        updated = False
+        for folder in os.listdir(profiles_dir):
+            if folder.startswith("acc_") and folder not in existing_keys:
+                folder_path = os.path.join(profiles_dir, folder)
+                browser_data_path = os.path.join(folder_path, "browser_data")
+                if os.path.isdir(folder_path) and os.path.exists(browser_data_path):
+                    recovered_p = AvitoAccountProfile(
+                        account_key=folder,
+                        display_name=f"Восстановленный аккаунт {folder}",
+                        auth_status="unauthorized"
+                    )
+                    profiles.append(recovered_p)
+                    updated = True
+        if updated:
+            save_profiles(profiles)
+    return profiles
+
+def list_profiles() -> List[AvitoAccountProfile]:
+    return reconcile_profile_registry()
 
 def save_profiles(profiles: List[AvitoAccountProfile]):
     path = _get_profiles_file()
@@ -104,7 +130,7 @@ def save_profiles(profiles: List[AvitoAccountProfile]):
         json.dump([p.model_dump() for p in profiles], f, ensure_ascii=False, indent=2)
 
 def get_profile(account_key: str) -> Optional[AvitoAccountProfile]:
-    profiles = list_profiles()
+    profiles = reconcile_profile_registry()
     for p in profiles:
         if p.account_key == account_key:
             return p

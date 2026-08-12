@@ -1,5 +1,8 @@
+import os
+import shutil
 import pytest
 from app import storage, schemas
+from app.config import settings
 
 def test_owner_profile_crud_and_max_limit():
     """
@@ -8,8 +11,14 @@ def test_owner_profile_crud_and_max_limit():
     - No hardcoded profile names.
     - Maximum 3 profiles limit enforced.
     """
-    # Clean storage
-    storage.save_profiles([])
+    profiles_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles")
+    if os.path.exists(profiles_dir):
+        for folder in os.listdir(profiles_dir):
+            if folder.startswith("acc_"):
+                shutil.rmtree(os.path.join(profiles_dir, folder), ignore_errors=True)
+    profiles_file = os.path.join(settings.AVITO_STORAGE_DIR, "profiles.json")
+    if os.path.exists(profiles_file):
+        os.remove(profiles_file)
 
     profiles_before = storage.list_profiles()
     assert len(profiles_before) == 0
@@ -38,3 +47,7 @@ def test_owner_profile_crud_and_max_limit():
     storage.delete_profile("acc_11")
     assert storage.get_profile("acc_11") is None
     assert len(storage.list_profiles()) == 2
+
+    # Cleanup
+    storage.delete_profile("acc_22")
+    storage.delete_profile("acc_33")

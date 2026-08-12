@@ -312,9 +312,17 @@ async def avito_browser_page(account_key: str, request: Request):
         try:
             prof_resp = await client.get(f"{AVITO_MODULE_URL}/accounts/api/profiles")
             profiles = prof_resp.json() if prof_resp.status_code == 200 else []
-            profile = next((p for p in profiles if p.get("account_key") == account_key), {"account_key": account_key, "display_name": account_key})
+            profile = next((p for p in profiles if p.get("account_key") == account_key), None)
+            if not profile:
+                return templates.TemplateResponse("avito_profile_not_found.html", {
+                    "request": request,
+                    "account_key": account_key
+                }, status_code=404)
         except Exception:
-            profile = {"account_key": account_key, "display_name": account_key}
+            return templates.TemplateResponse("avito_profile_not_found.html", {
+                "request": request,
+                "account_key": account_key
+            }, status_code=404)
 
     return templates.TemplateResponse("avito_browser.html", {
         "request": request,

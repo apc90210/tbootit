@@ -1,19 +1,30 @@
+import os
+import shutil
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app import storage
+from app.config import settings
 
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def clean_profiles():
-    profiles = storage.list_profiles()
-    for p in profiles:
-        storage.delete_profile(p.account_key)
+    profiles_dir = os.path.join(settings.AVITO_STORAGE_DIR, "profiles")
+    if os.path.exists(profiles_dir):
+        for folder in os.listdir(profiles_dir):
+            if folder.startswith("acc_"):
+                shutil.rmtree(os.path.join(profiles_dir, folder), ignore_errors=True)
+    profiles_file = os.path.join(settings.AVITO_STORAGE_DIR, "profiles.json")
+    if os.path.exists(profiles_file):
+        os.remove(profiles_file)
     yield
-    profiles = storage.list_profiles()
-    for p in profiles:
-        storage.delete_profile(p.account_key)
+    if os.path.exists(profiles_dir):
+        for folder in os.listdir(profiles_dir):
+            if folder.startswith("acc_"):
+                shutil.rmtree(os.path.join(profiles_dir, folder), ignore_errors=True)
+    if os.path.exists(profiles_file):
+        os.remove(profiles_file)
 
 def test_profile_creation_and_limit():
     # Create 3 profiles

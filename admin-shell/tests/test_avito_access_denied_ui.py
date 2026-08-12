@@ -15,9 +15,9 @@ async def mock_async_get(*args, **kwargs):
     return MockResponse(200, [{"account_key": "acc_test", "display_name": "Acc Test"}])
 
 @patch("httpx.AsyncClient.get", side_effect=mock_async_get)
-def test_avito_browser_page_iframe_autoconnect(mock_get):
-    """Verify avito_browser.html iframe src uses autoconnect=1 and same-origin path."""
+def test_avito_browser_template_handles_access_denied_status(mock_get):
+    """Verify avito_browser.html template has access_denied branch in verifyAuth script."""
     res = client.get("/avito/accounts/acc_test/browser")
     assert res.status_code == 200
-    assert "autoconnect=1" in res.text
-    assert "path=avito/novnc/websockify" in res.text
+    assert "access_denied" in res.text
+    assert "Доступ закрыт!" in res.text
