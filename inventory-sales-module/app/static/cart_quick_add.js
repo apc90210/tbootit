@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const formData = new FormData(form);
 
-            fetch('/cart/add-quick', {
+            fetch('/inventory/cart/add-quick', {
                 method: 'POST',
                 body: formData,
                 headers: {

@@ -78,11 +78,18 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.1.2",
+        "version": "0.1.3",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
     }
+
+@router.get("/last-ingest")
+async def get_last_ingest():
+    last_ingest_file = os.path.join(settings.AVITO_STORAGE_DIR, "extension_last_ingest.json")
+    if os.path.exists(last_ingest_file):
+        return _load_json(last_ingest_file)
+    return {}
 
 @router.post("/pairing/generate")
 async def generate_pair_code():
@@ -198,6 +205,8 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         storage.save_profile(p)
 
     res = await import_service.import_ad_to_core(ext_id, account_key)
+    product_id = res.get("product_id")
+    result_status = res.get("status", "failed")
     
     # Save last ingest info
     last_ingest_file = os.path.join(settings.AVITO_STORAGE_DIR, "extension_last_ingest.json")
@@ -205,16 +214,30 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         "external_item_id": ext_id,
         "title": title,
         "price": price_val,
-        "result": res.get("status"),
-        "product_id": res.get("product_id"),
+        "result": result_status,
+        "product_id": product_id,
         "photos_count": len(photos),
+        "error": res.get("error"),
         "ingested_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
     })
 
+    if product_id is None or result_status == "failed":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "status": "failed",
+                "external_item_id": ext_id,
+                "product_id": None,
+                "message": f"Не удалось импортировать объявление в Техноребут: {res.get('error', 'Ошибка Core API')}",
+                "error_code": "CORE_IMPORT_FAILED"
+            }
+        )
+
     return {
-        "status": "imported",
+        "status": "success",
         "external_item_id": ext_id,
-        "product_id": res.get("product_id"),
-        "result": res.get("status", "created"),
+        "product_id": product_id,
+        "result": result_status,
+        "message": f"Объявление {ext_id} успешно импортировано в Техноребут (Product ID: {product_id}).",
         "details": res
     }

@@ -444,14 +444,21 @@ async def avito_extension_page(request: Request):
         except Exception:
             status_data = {"online": False}
 
+        try:
+            ingest_resp = await client.get(f"{AVITO_MODULE_URL}/extension/api/last-ingest")
+            last_ingest = ingest_resp.json() if ingest_resp.status_code == 200 else None
+        except Exception:
+            last_ingest = None
+
     return templates.TemplateResponse("avito_extension.html", {
         "request": request,
-        "extension_status": status_data
+        "extension_status": status_data,
+        "last_ingest": last_ingest
     })
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.1.2"
+    version = "0.1.3"
     filename = f"technoreboot-avito-extension-{version}.zip"
     zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
     if not os.path.exists(zip_path):

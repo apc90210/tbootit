@@ -35,7 +35,7 @@ async function checkBridgeStatus() {
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.1.2"
+                version: data.version || "0.1.3"
             };
         }
         return { online: false, error: `HTTP ${res.status}` };
@@ -77,16 +77,19 @@ async function sendListingPayload(payload) {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (res.ok && data.status === "imported") {
+        if (res.ok && (data.status === "success" || data.status === "imported") && data.product_id != null) {
             return {
                 success: true,
-                message: `Объявление ${data.external_item_id} успешно передано! (Product ID: ${data.product_id}, Результат: ${data.result})`,
+                product_id: data.product_id,
+                result: data.result,
+                message: data.message || `Объявление ${data.external_item_id} успешно импортировано!`,
                 details: data
             };
         }
-        return { success: false, message: data.detail || "Не удалось передать объявление." };
+        const errMsg = (data && data.detail && data.detail.message) ? data.detail.message : (data.detail || data.message || "Не удалось импортировать объявление.");
+        return { success: false, product_id: null, message: errMsg, details: data };
     } catch (e) {
-        return { success: false, message: `Ошибка при передаче: ${e.message}` };
+        return { success: false, product_id: null, message: `Ошибка при передаче: ${e.message}` };
     }
 }
 

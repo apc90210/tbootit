@@ -6,7 +6,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <h2 style="margin: 0;">Карточка товара: {{ product.title }}</h2>
         {% set cart_count = cart_items_count if cart_items_count is defined else 0 %}
-        <a id="go-to-cart-button" href="/cart" class="btn btn-success" style="{% if not cart_count or cart_count == 0 %}display: none;{% endif %} background: #28a745; color: #fff; padding: 8px 16px; border-radius: 4px; font-weight: bold; text-decoration: none;">
+        <a id="go-to-cart-button" href="/inventory/cart" class="btn btn-success" style="{% if not cart_count or cart_count == 0 %}display: none;{% endif %} background: #28a745; color: #fff; padding: 8px 16px; border-radius: 4px; font-weight: bold; text-decoration: none;">
             Перейти в корзину (<span>{{ cart_count }}</span>)
         </a>
     </div>
@@ -95,17 +95,17 @@
         {% endif %}
         <div class="product-cart-actions" data-product-id="{{ product.id }}" style="display: inline-block;">
             {% if product.status in ['in_stock', 'reserved'] and product.storage_location == 'store' and product.quantity > 0 %}
-                <form action="/cart/add" method="post" class="quick-add-form" style="display: inline; margin-left: 10px;" data-product-id="{{ product.id }}">
+                <form action="/inventory/cart/add" method="post" class="quick-add-form" style="display: inline; margin-left: 10px;" data-product-id="{{ product.id }}">
                     <input type="hidden" name="product_id" value="{{ product.id }}">
                     <input type="hidden" name="title" value="{{ product.title }}">
                     <input type="hidden" name="price" value="{{ product.sale_price if product.sale_price else product.price }}">
-                    <input type="hidden" name="return_url" value="/products/{{ product.id }}">
+                    <input type="hidden" name="return_url" value="/inventory/products/{{ product.id }}">
                     <button type="submit" class="btn btn-danger quick-add-btn">В корзину</button>
                 </form>
             {% else %}
                 <button class="btn" disabled title="Добавление в корзину недоступно для этого статуса, локации или нулевого остатка" style="margin-left: 10px;">В корзину</button>
             {% endif %}
-            <a href="/cart" class="btn btn-success product-go-to-cart" style="{% if product.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; background: #28a745; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; text-decoration: none;">
+            <a href="/inventory/cart" class="btn btn-success product-go-to-cart" style="{% if product.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; background: #28a745; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; text-decoration: none;">
                 Перейти в корзину
             </a>
             <span class="product-cart-quantity" style="{% if product.id not in cart_product_ids %}display: none;{% endif %} margin-left: 5px; font-size: 0.85rem; color: #155724; background: #d4edda; padding: 2px 6px; border-radius: 3px;" aria-live="polite">

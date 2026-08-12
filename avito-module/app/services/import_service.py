@@ -190,30 +190,31 @@ async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
     if not ad:
         return {"status": "failed", "error": f"Parsed ad {ad_id} not found"}
 
-    core_url = f"{settings.CORE_API_BASE_URL}/avito/import"
-    photos = [p.url for p in ad.photos if p.url]
+    core_url = f"{settings.CORE_API_BASE_URL.rstrip('/')}/api/integrations/avito/import-item"
+    photos = [{"url": p.url} if hasattr(p, "url") and p.url else {"url": str(p)} for p in ad.photos if p]
     
     payload = {
         "account_key": account_key,
-        "external_item_id": ad.id,
-        "external_url": ad.source_url,
+        "external_item_id": str(ad.id or ad.external_id),
+        "external_url": ad.source_url or f"https://www.avito.ru/item/{ad.id}",
         "remote_status": "active",
-        "title": ad.title,
+        "title": ad.title or f"Объявление Avito {ad.id}",
         "price": ad.price,
-        "description": ad.description,
-        "category_path": ad.category_path,
-        "brand": ad.parameters.get("Бренд") or ad.parameters.get("Марка"),
-        "model": ad.parameters.get("Модель"),
-        "condition": ad.parameters.get("Состояние"),
-        "parameters": ad.parameters,
+        "description": ad.description or "",
+        "category_path": ad.category_path or [],
+        "brand": ad.parameters.get("Бренд") or ad.parameters.get("Марка") if isinstance(ad.parameters, dict) else None,
+        "model": ad.parameters.get("Модель") if isinstance(ad.parameters, dict) else None,
+        "condition": ad.parameters.get("Состояние") if isinstance(ad.parameters, dict) else None,
+        "parameters": ad.parameters if isinstance(ad.parameters, dict) else {},
         "photos": photos
     }
 
     try:
         async with httpx.AsyncClient(trust_env=False) as client:
-            res = await client.post(core_url, json=payload, timeout=10)
+            res = await client.post(core_url, json=payload, timeout=15.0)
             if res.status_code == 200:
-                return res.json()
+                resp_json = res.json()
+                return resp_json
             return {"status": "failed", "error": f"HTTP {res.status_code}: {res.text}"}
     except Exception as e:
         return {"status": "failed", "error": str(e)}

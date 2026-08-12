@@ -156,12 +156,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const action = currentExtractionData.page_type === "listing" ? "ingest_listing" : "ingest_my_listings";
         chrome.runtime.sendMessage({ action: action, payload: currentExtractionData }, res => {
             sendBtn.disabled = false;
-            if (res && res.success) {
+            if (res && res.success && res.product_id != null) {
                 resultMsg.className = "msg msg-success";
-                resultMsg.textContent = res.message;
+                resultMsg.innerHTML = `✓ Объявление импортировано в Техноребут.<br>Product ID: <strong>${res.product_id}</strong><br>Результат: ${res.result || 'Created'}`;
             } else {
                 resultMsg.className = "msg msg-error";
-                resultMsg.textContent = (res && res.message) || "Ошибка передачи.";
+                const errDetail = res && res.message ? res.message : "Ошибка импорта товара в Core API.";
+                resultMsg.innerHTML = `✕ Объявление получено, но импорт товара завершился ошибкой.<br>${errDetail}`;
             }
         });
     });

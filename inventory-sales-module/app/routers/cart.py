@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, Request, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -206,7 +206,7 @@ async def add_to_cart(
         })
 
     target_redirect = "/cart"
-    if return_url and (return_url.startswith("/products") or return_url.startswith("/cart")):
+    if return_url and (return_url.startswith("/products") or return_url.startswith("/cart") or return_url.startswith("/inventory")):
         target_redirect = return_url
     return RedirectResponse(url=target_redirect, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -219,7 +219,7 @@ async def update_cart_item(
 ):
     cart = get_cart(request)
     for item in cart:
-        if item["product_id"] == product_id:
+        if str(item.get("product_id")) == str(product_id):
             item["quantity"] = max(1, quantity)
             item["price"] = max(0.0, price)
             break
@@ -230,9 +230,12 @@ async def update_cart_item(
 @router.post("/remove")
 async def remove_cart_item(
     request: Request,
-    product_id: int = Form(...)
+    product_id: Optional[Any] = Form(None)
 ):
-    cart = [item for item in get_cart(request) if item["product_id"] != product_id]
+    cart = get_cart(request)
+    if product_id is not None:
+        target_str = str(product_id).strip()
+        cart = [item for item in cart if str(item.get("product_id")).strip() != target_str]
     set_cart(request, cart)
     return RedirectResponse(url="/cart", status_code=status.HTTP_303_SEE_OTHER)
 

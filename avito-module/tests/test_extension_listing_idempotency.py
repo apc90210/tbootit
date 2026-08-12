@@ -26,9 +26,9 @@ def test_extension_listing_idempotency(mock_import):
 
     res1 = client.post("/extension/api/listing", headers={"X-Extension-Token": token}, json=payload)
     assert res1.status_code == 200
-    assert res1.json()["status"] == "imported"
+    assert res1.json()["status"] == "success"
 
     mock_import.return_value = {"status": "updated", "product_id": "prod_123"}
     res2 = client.post("/extension/api/listing", headers={"X-Extension-Token": token}, json=payload)
     assert res2.status_code == 200
-    assert res2.json()["status"] == "imported"
+    assert res2.json()["status"] == "success"

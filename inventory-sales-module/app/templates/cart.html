@@ -6,10 +6,10 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Корзина продаж</h1>
     <div>
-        <form action="/cart/clear" method="post" style="display: inline;">
+        <form action="/inventory/cart/clear" method="post" style="display: inline;">
             <button class="btn btn-danger" type="submit" {% if not cart %}disabled{% endif %}>Очистить корзину</button>
         </form>
-        <a href="/products" class="btn">Добавить товары</a>
+        <a href="/inventory/products" class="btn">Добавить товары</a>
     </div>
 </div>
 
@@ -20,7 +20,7 @@
         ✕ {{ scanner_error }}
     </div>
     {% endif %}
-    <form action="/cart/scan" method="post" style="display: flex; gap: 10px; align-items: center;">
+    <form action="/inventory/cart/scan" method="post" style="display: flex; gap: 10px; align-items: center;">
         <input type="text" id="scanner-input" name="barcode" placeholder="Отсканируйте штрихкод или введите код..." autofocus style="flex: 1; padding: 10px; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px;" autocomplete="off">
         <button type="submit" class="btn btn-primary" style="padding: 10px 20px; font-size: 1rem;">Найти и добавить</button>
     </form>
@@ -51,7 +51,7 @@
         <tr>
             <td>{{ item.title }}</td>
             <td>
-                <form action="/cart/update" method="post" style="display: flex; gap: 10px;">
+                <form action="/inventory/cart/update" method="post" style="display: flex; gap: 10px;">
                     <input type="hidden" name="product_id" value="{{ item.product_id }}">
                     <input type="number" step="0.01" min="0" name="price" value="{{ item.price }}" style="width: 100px;">
             </td>
@@ -62,7 +62,7 @@
             <td>
                     <button type="submit" class="btn">Обновить</button>
                 </form>
-                <form action="/cart/remove" method="post" style="display: inline; margin-left: 10px;">
+                <form action="/inventory/cart/remove" method="post" style="display: inline; margin-left: 10px;">
                     <input type="hidden" name="product_id" value="{{ item.product_id }}">
                     <button type="submit" class="btn btn-danger">Удалить</button>
                 </form>
@@ -80,7 +80,7 @@
 
 <div style="background: #fff; padding: 20px; border: 1px solid #ddd; margin-top: 30px; max-width: 600px;">
     <h3>Оформление продажи</h3>
-    <form action="/cart/checkout" method="post">
+    <form action="/inventory/cart/checkout" method="post">
         <div style="margin-bottom: 15px;">
             <label for="payment_method" style="display: block; font-weight: bold; margin-bottom: 5px;">Способ оплаты</label>
             <select name="payment_method" id="payment_method" style="width: 100%; padding: 8px;">
