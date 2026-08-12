@@ -24,6 +24,15 @@ def is_xvfb_running() -> bool:
     except Exception:
         return False
 
+def check_vnc_rfb_banner(host: str = "127.0.0.1", port: int = 5900, timeout: float = 1.0) -> bool:
+    try:
+        s = socket.create_connection((host, port), timeout=timeout)
+        banner = s.recv(12)
+        s.close()
+        return banner.startswith(b"RFB")
+    except Exception:
+        return False
+
 def is_chromium_available() -> bool:
     try:
         from playwright.async_api import async_playwright
@@ -60,7 +69,7 @@ async def health_details():
         profile_storage_ok = "error"
 
     xvfb_ok = "ok" if is_xvfb_running() else "error"
-    vnc_ok = "ok" if is_socket_open("127.0.0.1", 5900) else "error"
+    vnc_ok = "ok" if check_vnc_rfb_banner() else "error"
     novnc_ok = "ok" if is_socket_open("127.0.0.1", 6080) else "error"
     chromium_ok = "ok" if is_chromium_available() else "error"
 

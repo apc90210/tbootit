@@ -5,7 +5,7 @@ This is the MVP prototype for the Technoreboot project. It consists of:
 - **Core API**: FastAPI backend managing the database, storage, inventory, and repair orders.
 - **Admin Shell**: Unified navigation interface (`http://localhost:8011`) reverse-proxying all modules under a single top menu bar.
 - **Repairs Module**: Dedicated microservice for repair intake, registry, status filtering, diagnostic fee management, simple repair diagnosis, manual estimate tracking, and automatic accounting integration with sales (Stage 05C).
-- **Avito Module**: Microservice for mandatory manual Avito login via embedded noVNC Chromium browser (`Xvfb`, `x11vnc`, `websockify` auto-started runtime), persistent account profiles, 1-item trial probe import, and same-origin parsing (Stage 06A-R5).
+- **Avito Module**: Microservice for mandatory manual Avito login via embedded noVNC Chromium browser (`Xvfb`, `x11vnc`, `websockify` binary RFB WebSocket proxy), persistent account profiles, 1-item trial probe import, and same-origin parsing (Stage 06A-R6).
 
 ## How to run
 For standard non-technical usage (Zero-CLI owner workflow on Windows):

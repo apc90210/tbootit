@@ -443,44 +443,63 @@ async def proxy_novnc_static(path: str):
 
 @app.websocket("/avito/novnc/websockify")
 async def novnc_websocket_proxy(websocket: WebSocket):
-    await websocket.accept()
+    sec_proto = websocket.headers.get("sec-websocket-protocol")
+    subprotocols = []
+    selected_subprotocol = None
+    if sec_proto:
+        subprotocols = [p.strip() for p in sec_proto.split(",") if p.strip()]
+        if "binary" in subprotocols:
+            selected_subprotocol = "binary"
+        elif subprotocols:
+            selected_subprotocol = subprotocols[0]
+
+    await websocket.accept(subprotocol=selected_subprotocol)
+
     import websockets
     target_host = AVITO_NOVNC_URL.replace("http://", "ws://").replace("https://", "wss://")
     target_url = f"{target_host.rstrip('/')}/websockify"
 
-    subprotocols = []
-    sec_proto = websocket.headers.get("sec-websocket-protocol")
-    if sec_proto:
-        subprotocols = [p.strip() for p in sec_proto.split(",") if p.strip()]
-
     try:
-        async with websockets.connect(target_url, subprotocols=subprotocols) as target_ws:
+        async with websockets.connect(target_url, subprotocols=subprotocols if subprotocols else None) as target_ws:
             async def client_to_target():
                 try:
                     while True:
                         msg = await websocket.receive()
-                        if "bytes" in msg and msg["bytes"]:
-                            await target_ws.send(msg["bytes"])
-                        elif "text" in msg and msg["text"]:
-                            await target_ws.send(msg["text"])
-                        elif msg.get("type") == "websocket.disconnect":
+                        if msg.get("type") == "websocket.disconnect":
                             break
+                        if "bytes" in msg and msg["bytes"] is not None:
+                            await target_ws.send(msg["bytes"])
+                        elif "text" in msg and msg["text"] is not None:
+                            await target_ws.send(msg["text"])
                 except Exception:
                     pass
+                finally:
+                    try:
+                        await target_ws.close()
+                    except Exception:
+                        pass
 
             async def target_to_client():
                 try:
                     async for msg in target_ws:
                         if isinstance(msg, bytes):
                             await websocket.send_bytes(msg)
-                        else:
+                        elif isinstance(msg, str):
                             await websocket.send_text(msg)
                 except Exception:
                     pass
+                finally:
+                    try:
+                        await websocket.close()
+                    except Exception:
+                        pass
 
             await asyncio.gather(client_to_target(), target_to_client(), return_exceptions=True)
     except Exception as e:
-        await websocket.close(code=1011, reason=str(e))
+        try:
+            await websocket.close(code=1011, reason=str(e))
+        except Exception:
+            pass
 
 
 # =====================================================================
