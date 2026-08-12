@@ -6,8 +6,11 @@ from app.main import app
 
 client = TestClient(app)
 
+@patch("app.routers.health.is_xvfb_running", return_value=True)
+@patch("app.routers.health.check_vnc_rfb_banner", return_value=True)
+@patch("app.routers.health.is_socket_open", return_value=True)
 @patch("app.routers.health.httpx.AsyncClient.get", new_callable=AsyncMock)
-def test_health_details_endpoint(mock_get):
+def test_health_details_endpoint(mock_get, mock_socket, mock_vnc, mock_xvfb):
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_get.return_value = mock_resp

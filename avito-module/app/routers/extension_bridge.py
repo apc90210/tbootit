@@ -67,22 +67,20 @@ class MyListingsPayload(BaseModel):
 @router.get("/status")
 async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
     paired = False
+    tokens = _load_json(TOKENS_FILE)
+    
     if x_extension_token:
-        tokens = _load_json(TOKENS_FILE)
-        if _hash_token(x_extension_token) in tokens:
+        t_hash = _hash_token(x_extension_token)
+        if t_hash in tokens:
             paired = True
-            # Update last active
-            t_hash = _hash_token(x_extension_token)
             tokens[t_hash]["last_active_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
             _save_json(TOKENS_FILE, tokens)
 
-    tokens = _load_json(TOKENS_FILE)
-    any_paired = len(tokens) > 0
-
     return {
         "online": True,
-        "version": "0.1.1",
-        "paired": paired or any_paired,
+        "version": "0.1.2",
+        "paired": paired,
+        "token_valid": paired,
         "active_tokens_count": len(tokens)
     }
 

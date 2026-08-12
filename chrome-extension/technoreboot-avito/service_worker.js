@@ -26,7 +26,17 @@ async function checkBridgeStatus() {
         });
         if (res.ok) {
             const data = await res.json();
-            return { online: true, paired: data.paired === true, version: data.version };
+            const isPaired = data.paired === true && Boolean(token);
+            if (token && !data.paired) {
+                await new Promise(r => chrome.storage.local.remove(["extension_token"], r));
+            }
+            return {
+                online: true,
+                paired: isPaired,
+                has_token: Boolean(token),
+                token_valid: data.token_valid === true,
+                version: data.version || "0.1.2"
+            };
         }
         return { online: false, error: `HTTP ${res.status}` };
     } catch (e) {

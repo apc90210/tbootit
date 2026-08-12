@@ -1,22 +1,22 @@
-# Stage 06A-R8 / R8-R2 Final Report: Chrome Extension Package & Icon Resources Fix
+# Stage 06A-R8 / R8-R3 Final Report: Extension Pairing UI & State Machine Fix
 
-## Summary of Fixes (R8-R2)
-- **Problem Reported:** Chrome developer mode installation failed with `Could not load icon 'icons/icon16.png' specified in 'icons'`.
-- **Root Cause:** Manifest V3 referenced `icons/icon16.png`, `icons/icon48.png`, and `icons/icon128.png`, but the icon files were missing on disk, and the ZIP packaging script added an extra top-level folder wrapper.
+## Summary of Fixes (R8-R3)
+- **Problem Reported:** Owner saw status "Подключен" and detected listing info in popup, but there was NO input field for the 6-digit code and NO «Подключить» button, while clicking transfer returned "Расширение не привязано к Техноребут".
+- **Root Cause:** `GET /status` in `extension_bridge.py` evaluated `"paired": paired or any_paired`. If any tokens existed from prior runs, it returned `paired: true` to callers even when no token header was sent. `popup.js` collapsed `pairSection` whenever `response.paired` was `true`.
 - **Resolution:**
-  1. Generated standalone PNG icons (`icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`) in `chrome-extension/technoreboot-avito/icons/`.
-  2. Updated `manifest.json`, `service_worker.js`, and `content.js` to version `0.1.1`.
-  3. Rebuilt ZIP packaging (`scripts/build_extension_zip.py`) so `manifest.json` is located directly at the root of the archive (`technoreboot-avito-extension-0.1.1.zip`).
-  4. Added build-time & runtime manifest package validators (`scripts/validate_extension_package.py`).
-  5. Updated `/avito/extension/download` route with `Cache-Control: no-store` headers and versioned filename.
-  6. Added 6 new extension & admin shell packaging unit tests.
-  7. Empirical live verification: live ZIP download validated, extracted, and verified with 100% PASS across 433 unit tests.
+  1. Updated `extension_bridge.py` so `paired: true` is returned strictly if the caller supplies a valid `X-Extension-Token` header.
+  2. Defined explicit 4-state UI machine in `popup.js` (Server Offline, Server Reachable Unpaired, Token Expired, Paired Active).
+  3. Revealed 6-digit pairing code input and «Подключить» button in unpaired state.
+  4. Kept transfer button disabled until pairing is confirmed.
+  5. Added automatic invalid token cleanup in `service_worker.js`.
+  6. Bumped version to `0.1.2` across manifest, code, build scripts, download route, and template.
+  7. Added 6 unit tests covering state machine, unpaired code input visibility, paired code input hiding, disabled transfer, and invalid token reset.
 
 ## Test Verification Summary
-- `admin-shell/tests`: 42 / 42 PASS
-- `avito-module/tests`: 73 / 73 PASS
+- `admin-shell/tests`: 41 / 41 PASS
+- `avito-module/tests`: 75 / 75 PASS
 - `core/tests`: 170 / 170 PASS
 - `inventory-sales-module/tests`: 112 / 112 PASS
 - `repairs-module/tests`: 34 / 34 PASS
-- `chrome-extension/tests`: 6 / 6 PASS
-- **TOTAL:** 437 / 437 unit tests passing 100%.
+- `chrome-extension/tests`: 10 / 10 PASS
+- **TOTAL:** 442 / 442 unit tests passing 100%.

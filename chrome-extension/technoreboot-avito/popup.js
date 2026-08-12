@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script
+// Technoreboot Avito Popup Script (v0.1.2)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -14,51 +14,71 @@ document.addEventListener("DOMContentLoaded", async () => {
     const resultMsg = document.getElementById("resultMsg");
 
     let currentExtractionData = null;
+    let isPaired = false;
+    let isServerOnline = false;
 
-    // Check status
+    // Check status on popup open
     chrome.runtime.sendMessage({ action: "get_status" }, response => {
-        if (response && response.online) {
-            if (response.paired) {
-                connBadge.className = "badge badge-paired";
-                connBadge.textContent = "Подключен";
-                statusMsg.textContent = "✓ Подключено к локальному серверу Техноребут.";
-                pairSection.style.display = "none";
-                actionSection.style.display = "block";
-                inspectActiveTab();
-            } else {
-                connBadge.className = "badge badge-online";
-                connBadge.textContent = "Требуется привязка";
-                statusMsg.textContent = "Локальный сервер доступен. Требуется код подключения.";
-                pairSection.style.display = "block";
-                actionSection.style.display = "none";
-            }
-        } else {
+        if (!response || !response.online) {
+            // STATE A: Server Offline
+            isServerOnline = false;
+            isPaired = false;
             connBadge.className = "badge badge-offline";
             connBadge.textContent = "Offline";
             statusMsg.textContent = "✕ Нет подключения к локальному серверу Техноребут (localhost:8011). Запустите Техноребут.";
             pairSection.style.display = "none";
             actionSection.style.display = "none";
+            return;
+        }
+
+        isServerOnline = true;
+        isPaired = response.paired === true;
+
+        if (isPaired) {
+            // STATE D: Server Reachable & Paired
+            connBadge.className = "badge badge-paired";
+            connBadge.textContent = "Расширение привязано";
+            statusMsg.textContent = "✓ Сервер доступен. Расширение привязано к Техноребут.";
+            pairSection.style.display = "none";
+            actionSection.style.display = "block";
+            inspectActiveTab();
+        } else {
+            // STATE B/C: Server Reachable, UNPAIRED
+            connBadge.className = "badge badge-online";
+            connBadge.textContent = "Сервер доступен";
+            statusMsg.textContent = response.has_token ? 
+                "✕ Привязка устарела. Введите новый код подключения." : 
+                "✓ Сервер Техноребут доступен. Введите код для подключения расширения.";
+            pairSection.style.display = "block";
+            actionSection.style.display = "block";
+            inspectActiveTab();
         }
     });
 
     // Pair button click
     pairBtn.addEventListener("click", () => {
-        const code = pairCodeInput.value.trim();
-        if (!code || code.length !== 6) {
+        const rawCode = pairCodeInput.value ? pairCodeInput.value.trim() : "";
+        const cleanCode = rawCode.replace(/\D/g, "");
+
+        if (!cleanCode || cleanCode.length !== 6) {
             pairMsg.className = "msg msg-error";
-            pairMsg.textContent = "Введите 6-значный код подключения.";
+            pairMsg.textContent = "Введите ровно 6 цифр кода подключения.";
             return;
         }
+
         pairMsg.className = "msg";
         pairMsg.textContent = "Проверка кода...";
-        chrome.runtime.sendMessage({ action: "pair", code: code }, res => {
+        pairBtn.disabled = true;
+
+        chrome.runtime.sendMessage({ action: "pair", code: cleanCode }, res => {
+            pairBtn.disabled = false;
             if (res && res.success) {
                 pairMsg.className = "msg msg-success";
                 pairMsg.textContent = res.message;
-                setTimeout(() => window.location.reload(), 1000);
+                setTimeout(() => window.location.reload(), 800);
             } else {
                 pairMsg.className = "msg msg-error";
-                pairMsg.textContent = (res && res.message) || "Ошибка привязкой кода.";
+                pairMsg.textContent = (res && res.message) || "Ошибка привязки кода.";
             }
         });
     });
@@ -90,13 +110,31 @@ document.addEventListener("DOMContentLoaded", async () => {
                     pageTypeTitle.textContent = "Карточка объявления";
                     const item = response.listing;
                     pageDetectInfo.innerHTML = `<strong>${item.title}</strong><br>ID: ${item.external_item_id}<br>Цена: ${item.price ? item.price + ' ₽' : 'Не указана'}`;
-                    sendBtn.disabled = false;
-                    sendBtn.textContent = "Передать объявление в Техноребут";
+                    
+                    if (isPaired) {
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = "Передать объявление в Техноребут";
+                        resultMsg.textContent = "";
+                    } else {
+                        sendBtn.disabled = true;
+                        sendBtn.textContent = "Передать объявление в Техноребут";
+                        resultMsg.className = "msg msg-error";
+                        resultMsg.textContent = "Передача станет доступна после привязки расширения (введите код выше).";
+                    }
                 } else if (response.page_type === "my_listings") {
                     pageTypeTitle.textContent = "Мои объявления";
                     pageDetectInfo.textContent = `Обнаружено объявлений на странице: ${response.listings_count}`;
-                    sendBtn.disabled = false;
-                    sendBtn.textContent = "Передать список в Техноребут";
+                    
+                    if (isPaired) {
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = "Передать список в Техноребут";
+                        resultMsg.textContent = "";
+                    } else {
+                        sendBtn.disabled = true;
+                        sendBtn.textContent = "Передать список в Техноребут";
+                        resultMsg.className = "msg msg-error";
+                        resultMsg.textContent = "Передача станет доступна после привязки расширения.";
+                    }
                 }
             });
         });
@@ -104,7 +142,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Send Button click
     sendBtn.addEventListener("click", () => {
+        if (!isPaired) {
+            resultMsg.className = "msg msg-error";
+            resultMsg.textContent = "Расширение не привязано. Введите код подключения выше.";
+            return;
+        }
         if (!currentExtractionData) return;
+
         sendBtn.disabled = true;
         resultMsg.className = "msg";
         resultMsg.textContent = "Передача данных...";

@@ -1,18 +1,15 @@
-# Stage 06A-R8 Architecture & Extension Package Documentation
+# Stage 06A-R8 Architecture & Extension Package Documentation (v0.1.2)
 
 ## Overview
-The **Technoreboot Avito Chrome Extension (v0.1.1)** allows the owner to manually browse Avito in standard desktop Google Chrome on Windows and transfer listing metadata directly into the local Technoreboot inventory system.
+The **Technoreboot Avito Chrome Extension (v0.1.2)** provides a pure Manifest V3 local extension interface. It allows the owner to manually transfer Avito listing metadata from standard desktop Google Chrome into Technoreboot without automation, credentials, or cookies.
 
-## Key Features & Security Guarantees
-- **Manifest V3:** Pure web extension using `activeTab`, `scripting`, and `storage`.
-- **Zero Credentials / Zero Cookies:** Never requests `cookies`, `debugger`, `proxy`, or `nativeMessaging` permissions.
-- **Standalone Icons:** Valid PNG icon set (`icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`) included directly at `icons/`.
-- **Direct ZIP Root Layout:** `manifest.json` resides directly at the root of the ZIP package (`technoreboot-avito-extension-0.1.1.zip`), preventing nested folder installation errors in Chrome.
-- **Automated Validation:** Build-time and runtime packaging validator (`scripts/validate_extension_package.py`) verifies all manifest referenced files and image headers.
-- **Cache Prevention:** Download endpoint `/avito/extension/download` sends `Cache-Control: no-store` headers to ensure owner always downloads the current build.
-
-## Installation Flow
-1. Download ZIP from `http://localhost:8011/avito/extension/download`.
-2. Extract to a local folder.
-3. Open `chrome://extensions` in Chrome, enable **Developer Mode**, and click **Load unpacked**.
-4. Select the extracted folder containing `manifest.json`.
+## Pairing State Machine & Security Contracts
+- **Server Reachable vs. Extension Paired:**
+  - `GET /admin-api/avito-extension/status` returns `paired: true` ONLY when the caller provides a valid `X-Extension-Token` header.
+  - If no token (or an invalid token) is supplied, `paired` returns `false`.
+- **States:**
+  - **STATE A (Server Offline):** Displays offline warning. Pairing & Transfer disabled.
+  - **STATE B (Server Reachable, Unpaired):** Displays "Сервер доступен", reveals 6-digit numeric input and "Подключить" button. Transfer button is disabled with notice: *"Передача станет доступна после привязки расширения (введите код выше)"*.
+  - **STATE C (Token Expired / Revoked):** Detects HTTP 401 or `token_valid: false`, clears invalid token from `chrome.storage.local`, and displays pairing form.
+  - **STATE D (Paired & Active):** Displays "Расширение привязано" (green badge). Hides pairing form. Enables transfer button when an Avito listing page is detected.
+- **Cache Prevention:** Download endpoint `/avito/extension/download` sends `Cache-Control: no-store, no-cache, must-revalidate` headers.

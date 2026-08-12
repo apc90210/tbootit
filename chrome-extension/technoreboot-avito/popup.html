@@ -20,7 +20,7 @@
         <h3>Подключение к Техноребут</h3>
         <p class="small">Введите 6-значный код подключения со страницы <code>/avito/extension</code> в Техноребут:</p>
         <div class="form-row">
-            <input type="text" id="pairCodeInput" placeholder="483921" maxlength="6">
+            <input type="text" id="pairCodeInput" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="123456">
             <button id="pairBtn" class="btn btn-primary">Подключить</button>
         </div>
         <p id="pairMsg" class="msg"></p>
@@ -36,7 +36,7 @@
     </div>
 
     <div class="footer">
-        <small>Техноребут Avito Bridge v0.1.1 (Local)</small>
+        <small>Техноребут Avito Bridge v0.1.2 (Local)</small>
     </div>
 
     <script src="popup.js"></script>
