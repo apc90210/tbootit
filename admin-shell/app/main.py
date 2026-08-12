@@ -451,23 +451,28 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    zip_path = os.path.abspath("dist/technoreboot-avito-extension.zip")
+    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip"))
     if not os.path.exists(zip_path):
-        from scripts.build_extension_zip import build_zip
-        build_zip()
+        zip_path = os.path.abspath("dist/technoreboot-avito-extension.zip")
+    if not os.path.exists(zip_path):
+        raise HTTPException(status_code=404, detail="Файл расширения не найден.")
     return FileResponse(zip_path, filename="technoreboot-avito-extension.zip", media_type="application/zip")
 
 @app.api_route("/admin-api/avito-extension/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_avito_extension_api(path: str, request: Request):
+    target_url = f"{AVITO_MODULE_URL}/extension/api/{path}"
+    query = str(request.query_params)
+    if query:
+        target_url = f"{target_url}?{query}"
     headers = dict(request.headers)
     headers.pop("host", None)
     body = await request.body()
     async with httpx.AsyncClient(trust_env=False) as client:
         resp = await client.request(
             method=request.method,
-            url=f"{AVITO_MODULE_URL}/extension/api/{path}",
+            url=target_url,
             headers=headers,
-            content=body
+            content=body if body else None
         )
         return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
 
