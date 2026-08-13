@@ -45,3 +45,11 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
   - Extension popup warning: `"Основные данные обновлены, но фотографии импортировать не удалось."`.
 - Popup shows success ONLY when photos pass:
   `"✓ Объявление импортировано.\nProduct ID: 58\nФотографий: N"`.
+
+### 4. Owner Product Photo UI & Admin Shell Media Proxy (Stage 06A-R8-R7)
+- **Inventory Product Detail UI**: Displays a dedicated **«🖼️ Фотографии»** block on `http://localhost:8011/inventory/products/{id}`.
+  - Photos render as gallery thumbnails sorted by `sort_order` with the main photo marked by a badge.
+  - Clickable thumbnails open the full-resolution image in a new tab.
+  - Products with 0 photos cleanly show notice **«Фотографий нет»**.
+- **Same-Origin Media Reverse Proxy**: Admin Shell (`admin-shell/app/main.py`) proxies `/media/{path:path}` to Core API (`http://localhost:8000/media/{path}`), ensuring all media URLs resolve on origin `localhost:8011`.
+

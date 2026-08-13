@@ -184,7 +184,7 @@
                 <tr>
                     <td>{{ item.sku or '—' }}</td>
                     <td><code>{{ item.barcode or '—' }}</code></td>
-                    <td>{{ item.title }}</td>
+                    <td><a href="/inventory/products/{{ item.id }}" style="color: #007bff; text-decoration: none; font-weight: 500;">{{ item.title }}</a></td>
                     <td>
                         {% if item.status == 'in_stock' %}В наличии
                         {% elif item.status == 'reserved' %}В резерве

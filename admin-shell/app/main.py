@@ -637,3 +637,9 @@ async def proxy_inventory(request: Request, path: str):
 @app.api_route("/repairs/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_repairs(request: Request, path: str):
     return await _proxy_request(request, REPAIRS_MODULE_URL, path, "/repairs")
+
+
+@app.api_route("/media/{path:path}", methods=["GET", "HEAD"])
+async def proxy_media(request: Request, path: str):
+    return await _proxy_request(request, CORE_API_URL, f"media/{path}", "/media")
+

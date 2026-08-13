@@ -73,6 +73,41 @@
             <strong>Описание:</strong><br>
             <pre style="white-space: pre-wrap; font-family: inherit;">{{ product.description or 'Нет описания' }}</pre>
         </div>
+
+        <!-- Блок «Фотографии» -->
+        <div id="product-photos-block" style="margin-top: 20px; background: #fafafa; padding: 15px; border: 1px solid #e0e0e0; border-radius: 4px;">
+            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1.1rem; color: #333; display: flex; align-items: center; gap: 8px;">
+                🖼️ Фотографии
+                {% if product.photos and product.photos|length > 0 %}
+                    <span style="font-size: 0.85rem; font-weight: normal; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px;">
+                        {{ product.photos|length }}
+                    </span>
+                {% endif %}
+            </h3>
+
+            {% if product.photos and product.photos|length > 0 %}
+                <div class="product-gallery" style="display: flex; flex-wrap: wrap; gap: 12px;">
+                    {% for photo in product.photos %}
+                        {% set img_url = photo.media_url if photo.media_url.startswith('/') else '/' ~ photo.media_url %}
+                        <div class="photo-item" style="position: relative; width: 140px; text-align: center; background: #fff; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <a href="{{ img_url }}" target="_blank" title="Открыть в полном размере" style="display: block;">
+                                <img src="{{ img_url }}" alt="Фото {{ loop.index }}" style="width: 100%; height: 110px; object-fit: cover; border-radius: 2px;">
+                            </a>
+                            <div style="font-size: 0.75rem; color: #666; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Фото {{ loop.index }}</span>
+                                {% if photo.sort_order == 0 or loop.first %}
+                                    <span style="background: #28a745; color: #fff; padding: 1px 4px; border-radius: 2px; font-size: 0.65rem;">Главное</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div style="color: #666; font-style: italic; background: #fff; padding: 12px; border: 1px dashed #ccc; border-radius: 4px;">
+                    Фотографий нет
+                </div>
+            {% endif %}
+        </div>
         
         {% if product.events %}
         <div style="margin-top: 20px;">
