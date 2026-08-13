@@ -53,3 +53,10 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
   - Products with 0 photos cleanly show notice **«Фотографий нет»**.
 - **Same-Origin Media Reverse Proxy**: Admin Shell (`admin-shell/app/main.py`) proxies `/media/{path:path}` to Core API (`http://localhost:8000/media/{path}`), ensuring all media URLs resolve on origin `localhost:8011`.
 
+### 5. Multi-Photo & Best Quality Extraction (Stage 06A-R8-R8 — Extension v0.1.5)
+- **All Photos & Quality Upgrades**: Replaces Avito image URL dimension tokens (`140x105`, `208x156`, `480x360`, `640x480`) with high-resolution `1280x960` CDN URLs.
+- **Non-Listing Asset Filtering**: Filters out non-listing images (`/avatar/`, `/icons/`, `/logos/`, `/shop/`, `/recom/`, `/banner/`, `.svg`, `data:`).
+- **Image Hash Deduplication**: Groups image variants by unique Avito hash to avoid duplicates while preserving exact gallery position order (`position: 0, 1, 2, ...`).
+- **Packaging & Delivery**: Extension v0.1.5 packaged into `technoreboot-avito-extension-0.1.5.zip` served at `http://localhost:8011/avito/extension/download`.
+
+

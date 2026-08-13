@@ -1,11 +1,10 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.4)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.5)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
     const match = url.match(/_(\d+)(?:\?|$)/) || url.match(/\/(\d{8,12})(?:\?|$)/);
     if (match) return match[1];
 
-    // Try meta tag or jsonld
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical && canonical.href) {
         const canMatch = canonical.href.match(/_(\d+)(?:\?|$)/) || canonical.href.match(/\/(\d{8,12})(?:\?|$)/);
@@ -27,19 +26,42 @@ function parseJsonLd() {
     return null;
 }
 
+function upgradeToBestResolutionUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    let u = url.trim();
+    if (u.startsWith('//')) u = 'https:' + u;
+    if (!u.startsWith('http://') && !u.startsWith('https://')) return null;
+
+    // Filter out non-listing images (avatars, icons, logos, badges, ads, svgs)
+    const lower = u.toLowerCase();
+    if (lower.includes('/avatar/') || lower.includes('/avatars/') ||
+        lower.includes('/icons/') || lower.includes('/logos/') ||
+        lower.includes('/shop/') || lower.includes('/recom/') ||
+        lower.includes('/banner/') || lower.endsWith('.svg') ||
+        lower.startsWith('data:')) {
+        return null;
+    }
+
+    // Upgrade dimension path segments to 1280x960 (Avito CDN max resolution)
+    // Common formats: /140x105/, /208x156/, /480x360/, /640x480/, /800x600/
+    u = u.replace(/\/(?:140x105|208x156|320x240|480x360|640x480|800x600|1024x768)\//g, '/1280x960/');
+
+    return u;
+}
+
 function extractBestUrlFromSrcset(srcset) {
     if (!srcset || typeof srcset !== 'string') return null;
     const candidates = srcset.split(',').map(item => item.trim()).filter(Boolean);
     if (candidates.length === 0) return null;
-    
+
     let bestUrl = null;
     let maxVal = -1;
-    
+
     for (const cand of candidates) {
         const parts = cand.split(/\s+/);
         const url = parts[0];
         if (!url) continue;
-        
+
         const descriptor = parts[1] || '1x';
         let val = 1;
         if (descriptor.endsWith('w')) {
@@ -52,13 +74,24 @@ function extractBestUrlFromSrcset(srcset) {
             bestUrl = url;
         }
     }
-    return bestUrl;
+    return upgradeToBestResolutionUrl(bestUrl);
+}
+
+function getImageKey(url) {
+    if (!url) return '';
+    // Extract core Avito image hash from URL if present
+    // e.g. https://80.img.avito.st/image/1/1.m9BBHLa4... -> 1.m9BBHLa4...
+    const match = url.match(/\/image\/1\/([^\s?#]+)/) || url.match(/\/1280x960\/([^\s?#]+)/) || url.match(/\/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))/i);
+    if (match && match[1]) {
+        return match[1].split('?')[0];
+    }
+    return url.split('?')[0];
 }
 
 function parseJsonLdImages(jsonLd) {
     const urls = [];
     if (!jsonLd) return urls;
-    
+
     const nodes = [];
     if (Array.isArray(jsonLd)) {
         nodes.push(...jsonLd);
@@ -67,12 +100,12 @@ function parseJsonLdImages(jsonLd) {
     } else {
         nodes.push(jsonLd);
     }
-    
+
     for (const node of nodes) {
         if (!node) continue;
         const img = node.image || node.photos || node.photo;
         if (!img) continue;
-        
+
         if (typeof img === 'string') {
             urls.push(img);
         } else if (Array.isArray(img)) {
@@ -95,7 +128,8 @@ function extractPhotosFromEmbeddedState() {
     for (const script of scripts) {
         const text = script.textContent || '';
         if (text.includes('__initialData__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__')) {
-            const matches = text.match(/https?:\/\/[^\s"'<>]+\.img\.avito\.st\/image\/1\/[^\s"'<>]+/g);
+            // Match all Avito image CDN URLs in embedded script state
+            const matches = text.match(/https?:\/\/[^\s"'<>]+\.img\.avito\.st\/[^\s"'<>]+/g);
             if (matches) {
                 matches.forEach(u => urls.push(u));
             }
@@ -110,11 +144,19 @@ function extractPhotosFromDom() {
         '[data-marker="image-frame/image-wrapper"] img',
         '[data-marker="gallery/image"] img',
         '[data-marker="slider-image/image"] img',
+        '[data-marker*="image"] img',
+        '[data-marker*="gallery"] img',
+        '[data-marker*="slider"] img',
+        'picture source[srcset]',
+        'picture img',
+        'ul[data-marker="gallery/list"] li img',
+        'div[class*="gallery"] img',
+        'div[class*="image-frame"] img',
         '.gallery-img',
         '.image-frame-wrapper img',
         '.gallery-list img'
     ].join(', ');
-    
+
     const imgEls = document.querySelectorAll(selector);
     imgEls.forEach(img => {
         const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
@@ -127,38 +169,42 @@ function extractPhotosFromDom() {
 
 function extractAllPhotos(jsonLd) {
     const rawUrls = [];
-    
-    // 1. JSON-LD
+
+    // 1. JSON-LD photos
     const jsonLdUrls = parseJsonLdImages(jsonLd);
     rawUrls.push(...jsonLdUrls);
-    
-    // 2. Embedded State
+
+    // 2. Embedded State photos (__initialData__)
     const stateUrls = extractPhotosFromEmbeddedState();
     rawUrls.push(...stateUrls);
-    
+
     // 3. DOM gallery & srcset
     const domUrls = extractPhotosFromDom();
     rawUrls.push(...domUrls);
-    
-    // Normalize & Deduplicate
+
+    // Filter, Upgrade Resolution, Deduplicate & Preserve Order
     const uniquePhotos = [];
     const seen = new Set();
-    
-    for (let u of rawUrls) {
-        if (!u || typeof u !== 'string') continue;
-        if (u.startsWith('//')) u = 'https:' + u;
-        if (!u.startsWith('http://') && !u.startsWith('https://')) continue;
-        
-        // Skip avatar/icon small SVGs or data URIs
-        if (u.includes('/avatar/') || u.includes('/icons/') || u.startsWith('data:')) continue;
-        
-        if (!seen.has(u)) {
-            seen.add(u);
-            uniquePhotos.push({
-                url: u,
-                position: uniquePhotos.length
-            });
+    const seenKeys = new Set();
+    const seenUrls = new Set();
+
+    for (let raw of rawUrls) {
+        const upgraded = upgradeToBestResolutionUrl(raw);
+        if (!upgraded) continue;
+
+        const key = getImageKey(upgraded);
+        if (seen.has(upgraded) || seenUrls.has(upgraded) || (key && seenKeys.has(key))) {
+            continue;
         }
+
+        seen.add(upgraded);
+        seenUrls.add(upgraded);
+        if (key) seenKeys.add(key);
+
+        uniquePhotos.push({
+            url: upgraded,
+            position: uniquePhotos.length
+        });
     }
     return uniquePhotos;
 }
@@ -166,7 +212,7 @@ function extractAllPhotos(jsonLd) {
 function extractListingData() {
     const url = window.location.href;
     const itemId = extractAvitoItemId(url, document.documentElement.innerHTML);
-    
+
     if (!itemId && !url.includes('/profile/items') && !url.includes('/my/items')) {
         return { error: "Не удалось определить Avito ID объявления на этой странице." };
     }
@@ -229,7 +275,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.1.4",
+        extension_version: "0.1.5",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -255,13 +301,13 @@ function extractMyListingsData() {
         const titleEl = el.querySelector('[data-marker="item-title"], .item-title-link, h3');
         const linkEl = el.querySelector('a[href*="/"]');
         const priceEl = el.querySelector('[data-marker="item-price"], .price');
-        
+
         if (titleEl && linkEl) {
             const href = linkEl.getAttribute('href');
             const fullUrl = href.startsWith('http') ? href : 'https://www.avito.ru' + href;
             const itemId = extractAvitoItemId(fullUrl, el.innerHTML);
             const priceText = priceEl ? priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '') : null;
-            
+
             items.push({
                 external_item_id: itemId,
                 external_url: fullUrl,
@@ -273,7 +319,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.4",
+        extension_version: "0.1.5",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,

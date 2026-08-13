@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.1.2)
+// Technoreboot Avito Popup Script (v0.1.5)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
