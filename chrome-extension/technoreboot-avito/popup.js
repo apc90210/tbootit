@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.1.8)
+// Technoreboot Avito Popup Script
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -12,6 +12,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pageDetectInfo = document.getElementById("pageDetectInfo");
     const sendBtn = document.getElementById("sendBtn");
     const resultMsg = document.getElementById("resultMsg");
+    const versionLabel = document.getElementById("versionLabel");
+
+    // Dynamic version label from manifest.json
+    if (versionLabel) {
+        let manifestVer = "0.1.9";
+        try {
+            if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
+                const manifest = chrome.runtime.getManifest();
+                if (manifest && manifest.version) {
+                    manifestVer = manifest.version;
+                }
+            }
+        } catch (e) {}
+        versionLabel.textContent = `Техноребут Avito v${manifestVer}`;
+    }
 
     let currentExtractionData = null;
     let isPaired = false;

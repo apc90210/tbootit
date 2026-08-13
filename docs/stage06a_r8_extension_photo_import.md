@@ -63,7 +63,14 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
 - **60s Timeout Guarantee**: Increased HTTP proxy timeouts in Admin Shell (`proxy_avito_extension_api`) and `avito-module` (`import_ad_to_core`) from default 5s/15s to **60 seconds**, preventing `httpx.ReadTimeout` during remote multi-photo downloads.
 - **Structured Error Responses**: Proxy and backend exceptions return structured JSON with proper HTTP 504 / 500 status codes.
 - **Extension Safe JSON Parsing**: `service_worker.js` helper `parseJsonResponseSafely(res)` inspects status codes and `Content-Type`, formatting plain text / HTML error pages cleanly (`"Ошибка сервера <status>: <detail>"`) without throwing JavaScript `Unexpected token` SyntaxErrors.
-- **Packaging & Delivery**: Extension v0.1.8 packaged into `technoreboot-avito-extension-0.1.8.zip` served at `http://localhost:8011/avito/extension/download`.
+- **Packaging & Delivery**: Extension v0.1.8 packaged into `technoreboot-avito-extension-0.1.8.zip`.
+
+### 7. Canonical Avito Photo Identity & Dynamic Version (Stage 06A-R8-R8-R4 — Extension v0.1.9)
+- **Canonical Photo Identity**: `getCanonicalAvitoImageIdentity(url)` parses Avito's `1.{hash_prefix}La{variant_id}` CDN URL structure to extract the exact physical photo key (`avito_photo_{hash_prefix}`).
+- **Single Best-Variant Selection**: Candidates across ALL sources (JSON-LD, script hydration state, DOM, `srcset`) are grouped by canonical photo key. ONLY the single highest quality variant is selected, strictly discarding super-low thumbnail duplicates (`La1`).
+- **Dynamic Manifest-Driven Version**: `popup.html` and `popup.js` dynamically read `chrome.runtime.getManifest().version` at runtime, ensuring popup footer version label automatically stays synchronized with `manifest.json`.
+- **Packaging & Delivery**: Extension v0.1.9 packaged into `technoreboot-avito-extension-0.1.9.zip` served at `http://localhost:8011/avito/extension/download`.
+
 
 
 

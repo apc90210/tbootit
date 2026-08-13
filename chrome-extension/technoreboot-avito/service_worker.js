@@ -82,7 +82,7 @@ async function checkBridgeStatus() {
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.1.8"
+                version: data.version || "0.1.9"
             };
         }
         return { online: false, error: parsed.error };
