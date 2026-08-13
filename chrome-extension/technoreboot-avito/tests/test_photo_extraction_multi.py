@@ -1,7 +1,7 @@
 import re
 import pytest
 
-# Python port/simulator of content.js v0.1.6 extractAllPhotos logic for unit testing
+# Python port/simulator of content.js v0.1.7 extractAllPhotos logic for unit testing
 
 def validate_listing_image_url(url):
     if not url or not isinstance(url, str):
@@ -34,13 +34,15 @@ def get_image_key(url):
     return normalized
 
 
-def get_image_area(url):
+def get_image_quality_score(url):
     if not url:
         return 0
     match = re.search(r'/(?:(\d+)x(\d+))/', url)
     if match and match.group(1) and match.group(2):
         return int(match.group(1)) * int(match.group(2))
-    return 0
+    if '.img.avito.st/image/1/' in url:
+        return 99999999
+    return 1
 
 
 def process_extracted_urls(raw_urls):
@@ -70,12 +72,12 @@ def process_extracted_urls(raw_urls):
             continue
 
         best_url = variants[0]
-        max_area = get_image_area(best_url)
+        max_score = get_image_quality_score(best_url)
 
         for i in range(1, len(variants)):
-            area = get_image_area(variants[i])
-            if area > max_area:
-                max_area = area;
+            score = get_image_quality_score(variants[i])
+            if score > max_score:
+                max_score = score
                 best_url = variants[i]
 
         unique_photos.append({
@@ -87,7 +89,7 @@ def process_extracted_urls(raw_urls):
 
 
 def test_does_not_synthesize_unpublished_1280x960_url():
-    """Explicit regression test verifying content.js v0.1.6 does NOT synthesize 1280x960 URLs if absent from page data."""
+    """Explicit regression test verifying content.js v0.1.7 does NOT synthesize 1280x960 URLs if absent from page data."""
     raw_urls = [
         "https://80.img.avito.st/image/1/640x480/real_photo1.jpg"
     ]
@@ -95,6 +97,19 @@ def test_does_not_synthesize_unpublished_1280x960_url():
     assert len(processed) == 1
     assert processed[0]["url"] == "https://80.img.avito.st/image/1/640x480/real_photo1.jpg"
     assert "1280x960" not in processed[0]["url"]
+
+
+def test_selects_direct_original_cdn_asset_over_thumbnail():
+    """Verify when direct original CDN URL and thumbnail resize URLs are present, original full asset is selected."""
+    raw_urls = [
+        "https://80.img.avito.st/image/1/140x105/hashA.jpg",
+        "https://80.img.avito.st/image/1/640x480/hashA.jpg",
+        "https://80.img.avito.st/image/1/hashA.jpg"
+    ]
+    processed = process_extracted_urls(raw_urls)
+    assert len(processed) == 1
+    assert processed[0]["url"] == "https://80.img.avito.st/image/1/hashA.jpg"
+    assert processed[0]["position"] == 0
 
 
 def test_selects_best_real_size_variant_provided_by_page():

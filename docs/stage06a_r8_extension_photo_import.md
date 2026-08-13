@@ -53,12 +53,12 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
   - Products with 0 photos cleanly show notice **«Фотографий нет»**.
 - **Same-Origin Media Reverse Proxy**: Admin Shell (`admin-shell/app/main.py`) proxies `/media/{path:path}` to Core API (`http://localhost:8000/media/{path}`), ensuring all media URLs resolve on origin `localhost:8011`.
 
-### 5. Multi-Photo Real Gallery Source Extraction (Stage 06A-R8-R8-R1 — Extension v0.1.6)
-- **No Synthetic Guessed URLs**: Removed `.replace(/\/(?:140x105|...)\//g, '/1280x960/')` heuristic regex string rewriting.
-- **Real Quality Selection**: Groups photo URLs by unique image hash (`getImageKey`) and selects the variant with the largest actual area (`width * height`) explicitly provided in page DOM, `srcset`, JSON-LD, or script hydration state (`window.__initialData__`).
-- **Non-Listing Asset Filtering**: Excludes non-product images (`/avatar/`, `/icons/`, `/logos/`, `/shop/`, `/recom/`, `/banner/`, `.svg`, `data:`).
-- **Order Preservation**: Preserves original gallery discovery sequence (`position: 0` = main photo).
-- **Packaging & Delivery**: Extension v0.1.6 packaged into `technoreboot-avito-extension-0.1.6.zip` served at `http://localhost:8011/avito/extension/download`.
+### 5. Best Quality Only Photo Deduplication (Stage 06A-R8-R8-R2 — Extension v0.1.7)
+- **Quality Score Ranking**: `getImageQualityScore` ranks candidate URLs by actual resolution area (`width * height`) and gives top priority to direct original un-resized CDN URLs (`/image/1/hashA.jpg`).
+- **Single Best-Variant Selection**: Groups candidate URLs by unique image hash (`getImageKey`) and selects ONLY the single highest quality variant, discarding lower-resolution thumbnails.
+- **Asset Filtering & Sequence**: Filters out non-listing assets (`/avatar/`, `/icons/`, `/logos/`, `/shop/`, `/recom/`, `/banner/`, `.svg`, `data:`) and preserves original gallery sequence (`position: 0` = main photo).
+- **Packaging & Delivery**: Extension v0.1.7 packaged into `technoreboot-avito-extension-0.1.7.zip` served at `http://localhost:8011/avito/extension/download`.
+
 
 
 

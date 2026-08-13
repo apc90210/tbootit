@@ -458,7 +458,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.1.6"
+    version = "0.1.7"
     filename = f"technoreboot-avito-extension-{version}.zip"
     zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
     if not os.path.exists(zip_path):

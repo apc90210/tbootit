@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.6)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.7)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -61,13 +61,17 @@ function getImageKey(url) {
     return normalized;
 }
 
-function getImageArea(url) {
+function getImageQualityScore(url) {
     if (!url) return 0;
     const match = url.match(/\/(?:(\d+)x(\d+))\//);
     if (match && match[1] && match[2]) {
         return parseInt(match[1], 10) * parseInt(match[2], 10);
     }
-    return 0;
+    // Direct Avito CDN image path without thumbnail size token represents original full asset
+    if (url.includes('.img.avito.st/image/1/')) {
+        return 99999999;
+    }
+    return 1;
 }
 
 function extractBestUrlFromSrcset(srcset) {
@@ -200,7 +204,7 @@ function extractAllPhotos(jsonLd) {
     rawUrls.push(...domUrls);
 
     // Group variants by unique image hash while preserving discovery sequence
-    const groupsMap = new Map(); // key -> { firstSeenIndex: int, variants: [urls] }
+    const groupsMap = new Map(); // key -> [urls]
     const keyOrder = [];
     const seenUrls = new Set();
     const seen = new Set(); // Compatibility variable for test suite contracts
@@ -221,20 +225,19 @@ function extractAllPhotos(jsonLd) {
         groupsMap.get(key).push(validUrl);
     }
 
-    // For each unique image hash, select the best real variant provided by page data
+    // For each unique image hash, select ONLY the single highest quality variant provided by page data
     const uniquePhotos = [];
     for (const key of keyOrder) {
         const variants = groupsMap.get(key) || [];
         if (variants.length === 0) continue;
 
-        // Pick variant with maximum resolution area from path tokens, or first valid
         let bestUrl = variants[0];
-        let maxArea = getImageArea(bestUrl);
+        let maxScore = getImageQualityScore(bestUrl);
 
         for (let i = 1; i < variants.length; i++) {
-            const area = getImageArea(variants[i]);
-            if (area > maxArea) {
-                maxArea = area;
+            const score = getImageQualityScore(variants[i]);
+            if (score > maxScore) {
+                maxScore = score;
                 bestUrl = variants[i];
             }
         }
@@ -314,7 +317,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.1.6",
+        extension_version: "0.1.7",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -358,7 +361,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.6",
+        extension_version: "0.1.7",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,
