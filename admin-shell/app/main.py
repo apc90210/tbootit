@@ -458,7 +458,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.1.7"
+    version = "0.1.8"
     filename = f"technoreboot-avito-extension-{version}.zip"
     zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
     if not os.path.exists(zip_path):
@@ -484,14 +484,25 @@ async def proxy_avito_extension_api(path: str, request: Request):
     headers = dict(request.headers)
     headers.pop("host", None)
     body = await request.body()
-    async with httpx.AsyncClient(trust_env=False) as client:
-        resp = await client.request(
-            method=request.method,
-            url=target_url,
-            headers=headers,
-            content=body if body else None
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=60.0) as client:
+            resp = await client.request(
+                method=request.method,
+                url=target_url,
+                headers=headers,
+                content=body if body else None
+            )
+            return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
+    except httpx.TimeoutException as e:
+        return JSONResponse(
+            status_code=504,
+            content={"ok": False, "status": "failed", "detail": f"Превышено время ожидания ответа от модуля Avito (60с): {str(e)}"}
         )
-        return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "status": "failed", "detail": f"Ошибка проксирования запроса к модулю Avito: {str(e)}"}
+        )
 
 # --- noVNC Static Asset & WebSocket Proxies ---
 

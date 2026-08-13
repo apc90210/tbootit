@@ -57,7 +57,14 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
 - **Quality Score Ranking**: `getImageQualityScore` ranks candidate URLs by actual resolution area (`width * height`) and gives top priority to direct original un-resized CDN URLs (`/image/1/hashA.jpg`).
 - **Single Best-Variant Selection**: Groups candidate URLs by unique image hash (`getImageKey`) and selects ONLY the single highest quality variant, discarding lower-resolution thumbnails.
 - **Asset Filtering & Sequence**: Filters out non-listing assets (`/avatar/`, `/icons/`, `/logos/`, `/shop/`, `/recom/`, `/banner/`, `.svg`, `data:`) and preserves original gallery sequence (`position: 0` = main photo).
-- **Packaging & Delivery**: Extension v0.1.7 packaged into `technoreboot-avito-extension-0.1.7.zip` served at `http://localhost:8011/avito/extension/download`.
+- **Packaging & Delivery**: Extension v0.1.7 packaged into `technoreboot-avito-extension-0.1.7.zip`.
+
+### 6. Robust Proxy Timeouts & Error Parsing (Stage 06A-R8-R8-R3 — Extension v0.1.8)
+- **60s Timeout Guarantee**: Increased HTTP proxy timeouts in Admin Shell (`proxy_avito_extension_api`) and `avito-module` (`import_ad_to_core`) from default 5s/15s to **60 seconds**, preventing `httpx.ReadTimeout` during remote multi-photo downloads.
+- **Structured Error Responses**: Proxy and backend exceptions return structured JSON with proper HTTP 504 / 500 status codes.
+- **Extension Safe JSON Parsing**: `service_worker.js` helper `parseJsonResponseSafely(res)` inspects status codes and `Content-Type`, formatting plain text / HTML error pages cleanly (`"Ошибка сервера <status>: <detail>"`) without throwing JavaScript `Unexpected token` SyntaxErrors.
+- **Packaging & Delivery**: Extension v0.1.8 packaged into `technoreboot-avito-extension-0.1.8.zip` served at `http://localhost:8011/avito/extension/download`.
+
 
 
 

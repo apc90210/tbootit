@@ -317,7 +317,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.1.7",
+        extension_version: "0.1.8",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -361,7 +361,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.7",
+        extension_version: "0.1.8",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,

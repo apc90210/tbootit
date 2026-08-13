@@ -78,7 +78,7 @@ async def run_account_import(
     # Step 3: Process items sequentially
     core_url = f"{settings.CORE_API_BASE_URL.rstrip('/')}/api/integrations/avito/import-item"
 
-    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as http_client:
+    async with httpx.AsyncClient(timeout=60.0, trust_env=False) as http_client:
         for item_data in listings:
             if ACTIVE_RUN_STOP_FLAGS.get(run_id, False):
                 run.status = "stopped"
@@ -218,7 +218,7 @@ async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(trust_env=False) as client:
-            res = await client.post(core_url, json=payload, timeout=15.0)
+            res = await client.post(core_url, json=payload, timeout=60.0)
             if res.status_code == 200:
                 resp_json = res.json()
                 return resp_json
