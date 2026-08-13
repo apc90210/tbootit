@@ -789,4 +789,4 @@ class AvitoItemImportResponse(BaseModel):
     external_listing_id: int
     photos_imported: int
     photos_skipped: int = 0
-
+    photos_reconciled: int = 0

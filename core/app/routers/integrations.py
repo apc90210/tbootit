@@ -195,10 +195,16 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         db.flush()
 
     # 3. Import photos idempotently using content SHA256 / source_url / remote fetch
+    import re as _re
     photos_imported = 0
     photos_skipped = 0
+    photos_reconciled = 0
     storage_photos_dir = os.path.join(settings.storage_root, "product_photos")
     os.makedirs(storage_photos_dir, exist_ok=True)
+
+    # Track incoming content hashes and source URLs for reconciliation
+    incoming_content_hashes = set()
+    incoming_source_urls = set()
 
     for idx, item_photo in enumerate(payload.photos):
         photo_bytes = None
@@ -221,6 +227,11 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
 
         if not content_hash and source_url:
             content_hash = hashlib.sha256(source_url.encode("utf-8")).hexdigest()
+
+        if content_hash:
+            incoming_content_hashes.add(content_hash)
+        if source_url:
+            incoming_source_urls.add(source_url)
 
         # Check existing photo by content_hash or source_url for this product
         existing_photo = None
@@ -253,6 +264,8 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 except Exception:
                     photos_skipped += 1
             else:
+                # Update sort_order for existing photo
+                existing_photo.sort_order = sort_order
                 photos_skipped += 1
             continue
 
@@ -279,6 +292,115 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         )
         db.add(new_photo)
         photos_imported += 1
+
+    # 3b. Avito photo set reconciliation — remove stale Avito-managed variants & obsolete photos
+    # Only reconcile if we received at least one photo in the incoming payload
+    if len(payload.photos) > 0:
+        def _get_avito_canonical_identity(url):
+            """Extract canonical Avito photo identity from source_url."""
+            if not url:
+                return None
+            path_only = url.split("?")[0]
+            m = _re.search(r"1\.([A-Za-z0-9_-]+)La\d+", path_only, _re.IGNORECASE)
+            if m and len(m.group(1)) >= 3:
+                return "avito_photo_" + m.group(1)
+            # Fallback for standard Avito CDN path
+            if "img.avito.st" in url.lower():
+                return path_only
+            return None
+
+        def _get_avito_quality_score(url):
+            """Score Avito image variant quality by La descriptor."""
+            if not url:
+                return 0
+            m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
+            if m:
+                v = int(m.group(1))
+                if v == 1:
+                    return 100000   # Super low thumbnail (140x105 / 150x110)
+                elif v == 2:
+                    return 500000   # Medium thumbnail 208x156
+                elif v == 3:
+                    return 2000000  # Mid-high (640x480 / listing image)
+                else:
+                    return 4000000 + v * 100000  # High / original (La4, La5, La6, etc.)
+            return 1000000  # Unknown variant
+
+        def _is_avito_managed(source_url):
+            """Check if a photo is Avito-managed by source_url host."""
+            if not source_url:
+                return False
+            return "img.avito.st" in source_url.lower()
+
+        def _delete_photo_file_and_row(photo_row):
+            """Safely delete stored file if exists and delete DB row."""
+            if photo_row.storage_path and os.path.exists(photo_row.storage_path):
+                try:
+                    os.remove(photo_row.storage_path)
+                except Exception:
+                    pass
+            db.delete(photo_row)
+
+        # Build incoming set of canonical keys and source URLs
+        incoming_canonical_keys = set()
+        for p in payload.photos:
+            if p.url:
+                ckey = _get_avito_canonical_identity(p.url)
+                if ckey:
+                    incoming_canonical_keys.add(ckey)
+
+        # Get ALL current photos for this product after import
+        all_photos = db.query(models.ProductPhoto).filter(
+            models.ProductPhoto.product_id == product.id
+        ).all()
+
+        # Categorize photos
+        avito_groups = {}  # canonical_key -> [photo_rows]
+        unkeyed_avito_photos = []
+
+        for photo in all_photos:
+            if not _is_avito_managed(photo.source_url):
+                # Manual or non-Avito photo — DO NOT TOUCH!
+                continue
+            key = _get_avito_canonical_identity(photo.source_url)
+            if key:
+                if key not in avito_groups:
+                    avito_groups[key] = []
+                avito_groups[key].append(photo)
+            else:
+                unkeyed_avito_photos.append(photo)
+
+        # Reconcile keyed Avito photo groups
+        for key, variants in avito_groups.items():
+            if key not in incoming_canonical_keys:
+                # Obsolete Avito photo (removed from listing) — delete all variants
+                for variant in variants:
+                    _delete_photo_file_and_row(variant)
+                    photos_reconciled += 1
+            elif len(variants) > 1:
+                # Multiple variants in DB for an active photo — keep only the best quality
+                best = max(variants, key=lambda p: _get_avito_quality_score(p.source_url))
+                for variant in variants:
+                    if variant.id != best.id:
+                        _delete_photo_file_and_row(variant)
+                        photos_reconciled += 1
+
+        # Reconcile unkeyed Avito photos
+        for photo in unkeyed_avito_photos:
+            if photo.source_url not in incoming_source_urls and photo.content_hash not in incoming_content_hashes:
+                _delete_photo_file_and_row(photo)
+                photos_reconciled += 1
+
+        # Re-number sort_order contiguously for remaining photos
+        if photos_reconciled > 0 or photos_imported > 0:
+            remaining = db.query(models.ProductPhoto).filter(
+                models.ProductPhoto.product_id == product.id
+            ).order_by(models.ProductPhoto.sort_order, models.ProductPhoto.id).all()
+
+            for new_idx, photo in enumerate(remaining):
+                photo.sort_order = new_idx
+
+            db.flush()
 
     # 4. Audit events
     event_type = "avito.product_imported" if created_product else "avito.product_updated"
@@ -320,5 +442,6 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         product_id=product.id,
         external_listing_id=ext_link.id,
         photos_imported=photos_imported,
-        photos_skipped=photos_skipped
+        photos_skipped=photos_skipped,
+        photos_reconciled=photos_reconciled
     )

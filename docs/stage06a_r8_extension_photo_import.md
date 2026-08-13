@@ -65,11 +65,15 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
 - **Extension Safe JSON Parsing**: `service_worker.js` helper `parseJsonResponseSafely(res)` inspects status codes and `Content-Type`, formatting plain text / HTML error pages cleanly (`"Ошибка сервера <status>: <detail>"`) without throwing JavaScript `Unexpected token` SyntaxErrors.
 - **Packaging & Delivery**: Extension v0.1.8 packaged into `technoreboot-avito-extension-0.1.8.zip`.
 
-### 7. Canonical Avito Photo Identity & Dynamic Version (Stage 06A-R8-R8-R4 — Extension v0.1.9)
-- **Canonical Photo Identity**: `getCanonicalAvitoImageIdentity(url)` parses Avito's `1.{hash_prefix}La{variant_id}` CDN URL structure to extract the exact physical photo key (`avito_photo_{hash_prefix}`).
-- **Single Best-Variant Selection**: Candidates across ALL sources (JSON-LD, script hydration state, DOM, `srcset`) are grouped by canonical photo key. ONLY the single highest quality variant is selected, strictly discarding super-low thumbnail duplicates (`La1`).
-- **Dynamic Manifest-Driven Version**: `popup.html` and `popup.js` dynamically read `chrome.runtime.getManifest().version` at runtime, ensuring popup footer version label automatically stays synchronized with `manifest.json`.
-- **Packaging & Delivery**: Extension v0.1.9 packaged into `technoreboot-avito-extension-0.1.9.zip` served at `http://localhost:8011/avito/extension/download`.
+### 8. Avito Photo Set Reconciliation & Obsolete Variant Removal (Stage 06A-R8-R8-R5)
+- **Root Cause Proof (H2)**: Audited Product 58 in DB and proved that Extension payload (v0.1.9) sends clean unique best-quality photos (1 per canonical identity). Duplicate low-res photos in DB were caused by stale rows created during earlier import runs (v0.1.8 / pre-dedup), which Core's append/update-only import logic previously retained.
+- **Backend Photo Set Reconciliation (`core/app/routers/integrations.py`)**:
+  - `_get_avito_canonical_identity(url)` & `_get_avito_quality_score(url)`: Extracts canonical photo keys (`avito_photo_{prefix}`) and scores quality variants (`La4+` > `La2` > `La1`/`La3`).
+  - **Obsolete Avito Variant Cleanup**: On re-import, Core groups existing Avito-managed photo rows (`img.avito.st`) by canonical identity. For active photos, it retains ONLY the single best-quality variant row and deletes obsolete lower-quality physical files and DB rows.
+  - **Removed Photo Cleanup**: Any Avito-managed photo whose canonical key is no longer present in the incoming listing is safely removed from DB and disk.
+  - **Manual Photo Safety**: Photos with non-Avito source URLs or manual origins are left completely untouched (`_is_avito_managed` returns `False`).
+  - **Sort Order Normalization**: `sort_order` is renumbered 0..N-1 contiguously after reconciliation.
+
 
 
 
