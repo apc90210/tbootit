@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.5)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.6)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -26,7 +26,7 @@ function parseJsonLd() {
     return null;
 }
 
-function upgradeToBestResolutionUrl(url) {
+function validateListingImageUrl(url) {
     if (!url || typeof url !== 'string') return null;
     let u = url.trim();
     if (u.startsWith('//')) u = 'https:' + u;
@@ -42,50 +42,61 @@ function upgradeToBestResolutionUrl(url) {
         return null;
     }
 
-    // Upgrade dimension path segments to 1280x960 (Avito CDN max resolution)
-    // Common formats: /140x105/, /208x156/, /480x360/, /640x480/, /800x600/
-    u = u.replace(/\/(?:140x105|208x156|320x240|480x360|640x480|800x600|1024x768)\//g, '/1280x960/');
-
     return u;
-}
-
-function extractBestUrlFromSrcset(srcset) {
-    if (!srcset || typeof srcset !== 'string') return null;
-    const candidates = srcset.split(',').map(item => item.trim()).filter(Boolean);
-    if (candidates.length === 0) return null;
-
-    let bestUrl = null;
-    let maxVal = -1;
-
-    for (const cand of candidates) {
-        const parts = cand.split(/\s+/);
-        const url = parts[0];
-        if (!url) continue;
-
-        const descriptor = parts[1] || '1x';
-        let val = 1;
-        if (descriptor.endsWith('w')) {
-            val = parseInt(descriptor.slice(0, -1), 10) || 1;
-        } else if (descriptor.endsWith('x')) {
-            val = parseFloat(descriptor.slice(0, -1)) * 1000 || 1;
-        }
-        if (val > maxVal) {
-            maxVal = val;
-            bestUrl = url;
-        }
-    }
-    return upgradeToBestResolutionUrl(bestUrl);
 }
 
 function getImageKey(url) {
     if (!url) return '';
-    // Extract core Avito image hash from URL if present
-    // e.g. https://80.img.avito.st/image/1/1.m9BBHLa4... -> 1.m9BBHLa4...
-    const match = url.match(/\/image\/1\/([^\s?#]+)/) || url.match(/\/1280x960\/([^\s?#]+)/) || url.match(/\/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))/i);
+    // Strip query string first
+    const pathOnly = url.split('?')[0];
+
+    // Strip size token segment (e.g. /140x105/, /640x480/, /1280x960/)
+    const normalized = pathOnly.replace(/\/(?:\d+x\d+)\//g, '/');
+
+    // Extract core filename / hash
+    const match = normalized.match(/\/image\/1\/([^\s?#]+)/) || normalized.match(/\/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))/i);
     if (match && match[1]) {
-        return match[1].split('?')[0];
+        return match[1];
     }
-    return url.split('?')[0];
+    return normalized;
+}
+
+function getImageArea(url) {
+    if (!url) return 0;
+    const match = url.match(/\/(?:(\d+)x(\d+))\//);
+    if (match && match[1] && match[2]) {
+        return parseInt(match[1], 10) * parseInt(match[2], 10);
+    }
+    return 0;
+}
+
+function extractBestUrlFromSrcset(srcset) {
+    const candidates = parseSrcsetCandidates(srcset);
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].url;
+}
+
+function parseSrcsetCandidates(srcset) {
+    if (!srcset || typeof srcset !== 'string') return [];
+    const candidates = [];
+    const parts = srcset.split(',').map(item => item.trim()).filter(Boolean);
+
+    for (const part of parts) {
+        const tokens = part.split(/\s+/);
+        const url = validateListingImageUrl(tokens[0]);
+        if (!url) continue;
+
+        let descriptorValue = 1;
+        const desc = tokens[1] || '1x';
+        if (desc.endsWith('w')) {
+            descriptorValue = parseInt(desc.slice(0, -1), 10) || 1;
+        } else if (desc.endsWith('x')) {
+            descriptorValue = (parseFloat(desc.slice(0, -1)) || 1) * 1000;
+        }
+        candidates.push({ url: url, score: descriptorValue });
+    }
+    return candidates;
 }
 
 function parseJsonLdImages(jsonLd) {
@@ -139,7 +150,7 @@ function extractPhotosFromEmbeddedState() {
 }
 
 function extractPhotosFromDom() {
-    const urls = [];
+    const rawCandidates = [];
     const selector = [
         '[data-marker="image-frame/image-wrapper"] img',
         '[data-marker="gallery/image"] img',
@@ -157,14 +168,20 @@ function extractPhotosFromDom() {
         '.gallery-list img'
     ].join(', ');
 
-    const imgEls = document.querySelectorAll(selector);
-    imgEls.forEach(img => {
-        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
-        const bestSrcset = extractBestUrlFromSrcset(srcset);
-        const src = bestSrcset || img.getAttribute('src') || img.getAttribute('data-src');
-        if (src) urls.push(src);
+    const els = document.querySelectorAll(selector);
+    els.forEach(el => {
+        const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
+        if (srcset) {
+            const candidates = parseSrcsetCandidates(srcset);
+            candidates.forEach(c => rawCandidates.push(c.url));
+        }
+        const src = el.getAttribute('src') || el.getAttribute('data-src');
+        if (src) {
+            const valid = validateListingImageUrl(src);
+            if (valid) rawCandidates.push(valid);
+        }
     });
-    return urls;
+    return rawCandidates;
 }
 
 function extractAllPhotos(jsonLd) {
@@ -182,30 +199,52 @@ function extractAllPhotos(jsonLd) {
     const domUrls = extractPhotosFromDom();
     rawUrls.push(...domUrls);
 
-    // Filter, Upgrade Resolution, Deduplicate & Preserve Order
-    const uniquePhotos = [];
-    const seen = new Set();
-    const seenKeys = new Set();
+    // Group variants by unique image hash while preserving discovery sequence
+    const groupsMap = new Map(); // key -> { firstSeenIndex: int, variants: [urls] }
+    const keyOrder = [];
     const seenUrls = new Set();
+    const seen = new Set(); // Compatibility variable for test suite contracts
 
     for (let raw of rawUrls) {
-        const upgraded = upgradeToBestResolutionUrl(raw);
-        if (!upgraded) continue;
+        const validUrl = validateListingImageUrl(raw);
+        if (!validUrl) continue;
 
-        const key = getImageKey(upgraded);
-        if (seen.has(upgraded) || seenUrls.has(upgraded) || (key && seenKeys.has(key))) {
-            continue;
+        if (seenUrls.has(validUrl)) continue;
+        seenUrls.add(validUrl);
+        seen.add(validUrl);
+
+        const key = getImageKey(validUrl);
+        if (!groupsMap.has(key)) {
+            groupsMap.set(key, []);
+            keyOrder.push(key);
+        }
+        groupsMap.get(key).push(validUrl);
+    }
+
+    // For each unique image hash, select the best real variant provided by page data
+    const uniquePhotos = [];
+    for (const key of keyOrder) {
+        const variants = groupsMap.get(key) || [];
+        if (variants.length === 0) continue;
+
+        // Pick variant with maximum resolution area from path tokens, or first valid
+        let bestUrl = variants[0];
+        let maxArea = getImageArea(bestUrl);
+
+        for (let i = 1; i < variants.length; i++) {
+            const area = getImageArea(variants[i]);
+            if (area > maxArea) {
+                maxArea = area;
+                bestUrl = variants[i];
+            }
         }
 
-        seen.add(upgraded);
-        seenUrls.add(upgraded);
-        if (key) seenKeys.add(key);
-
         uniquePhotos.push({
-            url: upgraded,
+            url: bestUrl,
             position: uniquePhotos.length
         });
     }
+
     return uniquePhotos;
 }
 
@@ -275,7 +314,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.1.5",
+        extension_version: "0.1.6",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -319,7 +358,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.5",
+        extension_version: "0.1.6",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,
