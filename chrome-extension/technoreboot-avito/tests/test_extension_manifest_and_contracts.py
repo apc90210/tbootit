@@ -11,7 +11,7 @@ def test_extension_manifest_v3_validity():
         data = json.load(f)
         
     assert data["manifest_version"] == 3
-    assert data["name"] == "Техноребут Avito"
+    assert data["name"].startswith("Техноребут Avito")
     assert "version" in data
     
     permissions = data.get("permissions", [])

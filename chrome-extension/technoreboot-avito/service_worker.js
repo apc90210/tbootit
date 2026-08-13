@@ -35,7 +35,7 @@ async function checkBridgeStatus() {
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.1.3"
+                version: data.version || "0.1.4"
             };
         }
         return { online: false, error: `HTTP ${res.status}` };
@@ -77,12 +77,14 @@ async function sendListingPayload(payload) {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (res.ok && (data.status === "success" || data.status === "imported") && data.product_id != null) {
+        if (res.ok && (data.status === "success" || data.status === "imported" || data.status === "partial") && data.product_id != null) {
             return {
                 success: true,
+                status: data.status,
                 product_id: data.product_id,
+                photos_imported: data.photos_imported || (data.details && data.details.photos_imported) || 0,
                 result: data.result,
-                message: data.message || `Объявление ${data.external_item_id} успешно импортировано!`,
+                message: data.message || `Объявление ${data.external_item_id} обработано!`,
                 details: data
             };
         }

@@ -78,7 +78,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.1.3",
+        "version": "0.1.4",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
@@ -174,8 +174,18 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
     except Exception:
         price_val = None
 
-    photos_urls = listing.get("photos") or []
-    photos = [schemas.Photo(url=url) for url in photos_urls if isinstance(url, str)]
+    raw_photos = listing.get("photos") or []
+    photos = []
+    for item in raw_photos:
+        if isinstance(item, str) and item.strip():
+            photos.append(schemas.Photo(url=item.strip()))
+        elif isinstance(item, dict) and item.get("url"):
+            url_str = str(item.get("url")).strip()
+            if url_str:
+                photos.append(schemas.Photo(url=url_str))
+
+    photos_received = len(raw_photos)
+    photos_forwarded = len(photos)
 
     parsed_ad = schemas.ParsedAd(
         id=ext_id,
@@ -197,7 +207,6 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
     storage.save_parsed_ad(parsed_ad)
 
     # 3. Import to Core API
-    # Bind to default or primary account profile
     profiles = storage.list_profiles()
     account_key = profiles[0].account_key if profiles else "acc_extension_owner"
     if not profiles:
@@ -207,7 +216,12 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
     res = await import_service.import_ad_to_core(ext_id, account_key)
     product_id = res.get("product_id")
     result_status = res.get("status", "failed")
-    
+    photos_imported = res.get("photos_imported", 0)
+
+    if product_id is not None and result_status != "failed":
+        if photos_received > 0 and photos_imported == 0:
+            result_status = "partial"
+
     # Save last ingest info
     last_ingest_file = os.path.join(settings.AVITO_STORAGE_DIR, "extension_last_ingest.json")
     _save_json(last_ingest_file, {
@@ -216,7 +230,10 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         "price": price_val,
         "result": result_status,
         "product_id": product_id,
-        "photos_count": len(photos),
+        "photos_received": photos_received,
+        "photos_forwarded": photos_forwarded,
+        "photos_imported": photos_imported,
+        "photos_count": photos_imported,
         "error": res.get("error"),
         "ingested_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
     })
@@ -234,10 +251,12 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         )
 
     return {
-        "status": "success",
+        "status": "success" if result_status in ("created", "updated") else result_status,
         "external_item_id": ext_id,
         "product_id": product_id,
         "result": result_status,
-        "message": f"Объявление {ext_id} успешно импортировано в Техноребут (Product ID: {product_id}).",
+        "photos_imported": photos_imported,
+        "photos_received": photos_received,
+        "message": f"Объявление {ext_id} импортировано в Техноребут (Product ID: {product_id}, фото: {photos_imported}).",
         "details": res
     }

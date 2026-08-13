@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.4)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -19,12 +19,148 @@ function parseJsonLd() {
     for (const script of scripts) {
         try {
             const data = JSON.parse(script.textContent);
-            if (data && (data["@type"] === "Product" || data["@type"] === "Offer" || data.name)) {
+            if (data && (data["@type"] === "Product" || data["@type"] === "Offer" || data.name || data["@graph"])) {
                 return data;
             }
         } catch (e) {}
     }
     return null;
+}
+
+function extractBestUrlFromSrcset(srcset) {
+    if (!srcset || typeof srcset !== 'string') return null;
+    const candidates = srcset.split(',').map(item => item.trim()).filter(Boolean);
+    if (candidates.length === 0) return null;
+    
+    let bestUrl = null;
+    let maxVal = -1;
+    
+    for (const cand of candidates) {
+        const parts = cand.split(/\s+/);
+        const url = parts[0];
+        if (!url) continue;
+        
+        const descriptor = parts[1] || '1x';
+        let val = 1;
+        if (descriptor.endsWith('w')) {
+            val = parseInt(descriptor.slice(0, -1), 10) || 1;
+        } else if (descriptor.endsWith('x')) {
+            val = parseFloat(descriptor.slice(0, -1)) * 1000 || 1;
+        }
+        if (val > maxVal) {
+            maxVal = val;
+            bestUrl = url;
+        }
+    }
+    return bestUrl;
+}
+
+function parseJsonLdImages(jsonLd) {
+    const urls = [];
+    if (!jsonLd) return urls;
+    
+    const nodes = [];
+    if (Array.isArray(jsonLd)) {
+        nodes.push(...jsonLd);
+    } else if (jsonLd['@graph'] && Array.isArray(jsonLd['@graph'])) {
+        nodes.push(...jsonLd['@graph']);
+    } else {
+        nodes.push(jsonLd);
+    }
+    
+    for (const node of nodes) {
+        if (!node) continue;
+        const img = node.image || node.photos || node.photo;
+        if (!img) continue;
+        
+        if (typeof img === 'string') {
+            urls.push(img);
+        } else if (Array.isArray(img)) {
+            img.forEach(item => {
+                if (typeof item === 'string') urls.push(item);
+                else if (item && typeof item === 'object' && item.url) urls.push(item.url);
+                else if (item && typeof item === 'object' && item.contentUrl) urls.push(item.contentUrl);
+            });
+        } else if (typeof img === 'object') {
+            if (img.url) urls.push(img.url);
+            else if (img.contentUrl) urls.push(img.contentUrl);
+        }
+    }
+    return urls;
+}
+
+function extractPhotosFromEmbeddedState() {
+    const urls = [];
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+        const text = script.textContent || '';
+        if (text.includes('__initialData__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__')) {
+            const matches = text.match(/https?:\/\/[^\s"'<>]+\.img\.avito\.st\/image\/1\/[^\s"'<>]+/g);
+            if (matches) {
+                matches.forEach(u => urls.push(u));
+            }
+        }
+    }
+    return urls;
+}
+
+function extractPhotosFromDom() {
+    const urls = [];
+    const selector = [
+        '[data-marker="image-frame/image-wrapper"] img',
+        '[data-marker="gallery/image"] img',
+        '[data-marker="slider-image/image"] img',
+        '.gallery-img',
+        '.image-frame-wrapper img',
+        '.gallery-list img'
+    ].join(', ');
+    
+    const imgEls = document.querySelectorAll(selector);
+    imgEls.forEach(img => {
+        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+        const bestSrcset = extractBestUrlFromSrcset(srcset);
+        const src = bestSrcset || img.getAttribute('src') || img.getAttribute('data-src');
+        if (src) urls.push(src);
+    });
+    return urls;
+}
+
+function extractAllPhotos(jsonLd) {
+    const rawUrls = [];
+    
+    // 1. JSON-LD
+    const jsonLdUrls = parseJsonLdImages(jsonLd);
+    rawUrls.push(...jsonLdUrls);
+    
+    // 2. Embedded State
+    const stateUrls = extractPhotosFromEmbeddedState();
+    rawUrls.push(...stateUrls);
+    
+    // 3. DOM gallery & srcset
+    const domUrls = extractPhotosFromDom();
+    rawUrls.push(...domUrls);
+    
+    // Normalize & Deduplicate
+    const uniquePhotos = [];
+    const seen = new Set();
+    
+    for (let u of rawUrls) {
+        if (!u || typeof u !== 'string') continue;
+        if (u.startsWith('//')) u = 'https:' + u;
+        if (!u.startsWith('http://') && !u.startsWith('https://')) continue;
+        
+        // Skip avatar/icon small SVGs or data URIs
+        if (u.includes('/avatar/') || u.includes('/icons/') || u.startsWith('data:')) continue;
+        
+        if (!seen.has(u)) {
+            seen.add(u);
+            uniquePhotos.push({
+                url: u,
+                position: uniquePhotos.length
+            });
+        }
+    }
+    return uniquePhotos;
 }
 
 function extractListingData() {
@@ -76,16 +212,7 @@ function extractListingData() {
     }
 
     // Photos
-    const photoUrls = [];
-    if (jsonLd && jsonLd.image) {
-        if (Array.isArray(jsonLd.image)) photoUrls.push(...jsonLd.image);
-        else if (typeof jsonLd.image === 'string') photoUrls.push(jsonLd.image);
-    }
-    const imgEls = document.querySelectorAll('[data-marker="image-frame/image-wrapper"] img, .gallery-img, [data-marker="gallery/image"] img');
-    imgEls.forEach(img => {
-        const src = img.getAttribute('src') || img.getAttribute('data-src');
-        if (src && !photoUrls.includes(src)) photoUrls.push(src);
-    });
+    const photos = extractAllPhotos(jsonLd);
 
     // Characteristics
     const characteristics = {};
@@ -102,7 +229,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.1.3",
+        extension_version: "0.1.4",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -116,7 +243,7 @@ function extractListingData() {
             model: characteristics["Модель"] || null,
             status: "active",
             characteristics: characteristics,
-            photos: photoUrls
+            photos: photos
         }
     };
 }
@@ -146,7 +273,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.3",
+        extension_version: "0.1.4",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,

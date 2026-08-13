@@ -3,6 +3,9 @@ import uuid
 import base64
 import hashlib
 import json
+import urllib.parse
+import ipaddress
+import httpx
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,6 +16,50 @@ from app import models, schemas
 from app.config import settings
 
 router = APIRouter()
+
+def is_safe_remote_url(url: str) -> bool:
+    if not url:
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        hostname_lower = hostname.lower()
+        if hostname_lower in ("localhost", "127.0.0.1", "::1"):
+            return False
+        try:
+            ip = ipaddress.ip_address(hostname_lower)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+        except ValueError:
+            pass
+        return True
+    except Exception:
+        return False
+
+def fetch_remote_image_bytes(url: str) -> Optional[bytes]:
+    if not is_safe_remote_url(url):
+        return None
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        with httpx.Client(trust_env=False, timeout=10.0, follow_redirects=True) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return None
+            content_type = resp.headers.get("content-type", "").lower()
+            if not content_type.startswith("image/"):
+                return None
+            content = resp.content
+            if len(content) > 10 * 1024 * 1024:  # 10 MB max
+                return None
+            return content
+    except Exception:
+        return None
 
 def log_audit(db: Session, entity_type: str, entity_id: int, action: str, old_value: Any = None, new_value: Any = None):
     log = models.AuditLog(
@@ -31,7 +78,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     1. Looks up existing ProductExternalListing by (marketplace='avito', external_item_id=payload.external_item_id).
     2. If found: updates linked Product and ProductExternalListing metadata.
     3. If not found: creates a new Product and ProductExternalListing.
-    4. Idempotently imports photos using SHA256 content hash.
+    4. Idempotently imports photos using SHA256 content hash and remote fetch.
     5. Logs audit event: avito.product_imported or avito.product_updated, avito.external_link_created or avito.external_link_updated.
     """
     now = datetime.utcnow()
@@ -147,7 +194,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         ext_link.sync_state = "synced"
         db.flush()
 
-    # 3. Import photos idempotently using content SHA256 / source_url
+    # 3. Import photos idempotently using content SHA256 / source_url / remote fetch
     photos_imported = 0
     photos_skipped = 0
     storage_photos_dir = os.path.join(settings.storage_root, "product_photos")
@@ -157,6 +204,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         photo_bytes = None
         content_hash = None
         source_url = item_photo.url
+        sort_order = item_photo.position if hasattr(item_photo, "position") and item_photo.position is not None else idx
 
         if item_photo.content_base64:
             try:
@@ -164,6 +212,12 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 content_hash = hashlib.sha256(photo_bytes).hexdigest()
             except Exception:
                 pass
+
+        if not photo_bytes and source_url:
+            fetched = fetch_remote_image_bytes(source_url)
+            if fetched:
+                photo_bytes = fetched
+                content_hash = hashlib.sha256(photo_bytes).hexdigest()
 
         if not content_hash and source_url:
             content_hash = hashlib.sha256(source_url.encode("utf-8")).hexdigest()
@@ -182,20 +236,37 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             ).first()
 
         if existing_photo:
+            is_dummy = False
+            if existing_photo.storage_path and os.path.exists(existing_photo.storage_path):
+                try:
+                    if os.path.getsize(existing_photo.storage_path) <= 200:
+                        is_dummy = True
+                except Exception:
+                    pass
+            if is_dummy and photo_bytes and len(photo_bytes) > 200:
+                try:
+                    with open(existing_photo.storage_path, "wb") as f:
+                        f.write(photo_bytes)
+                    existing_photo.content_hash = content_hash
+                    existing_photo.sort_order = sort_order
+                    photos_imported += 1
+                except Exception:
+                    photos_skipped += 1
+            else:
+                photos_skipped += 1
+            continue
+
+        if not photo_bytes:
             photos_skipped += 1
             continue
 
-        # Save photo file if bytes available
+        # Save photo file
         filename = f"{product.id}_{uuid.uuid4().hex[:8]}.jpg"
         storage_path = os.path.join(storage_photos_dir, filename)
         media_url = f"/media/product_photos/{filename}"
 
-        if photo_bytes:
-            with open(storage_path, "wb") as f:
-                f.write(photo_bytes)
-        else:
-            with open(storage_path, "wb") as f:
-                f.write(b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \x1c\x1c(7),01444\x1f'9=82<.342\xFF\xC0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xFF\xC4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xFF\xDA\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xFF\xd9")
+        with open(storage_path, "wb") as f:
+            f.write(photo_bytes)
 
         new_photo = models.ProductPhoto(
             product_id=product.id,
@@ -204,7 +275,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             media_url=media_url,
             source_url=source_url,
             content_hash=content_hash,
-            sort_order=idx
+            sort_order=sort_order
         )
         db.add(new_photo)
         photos_imported += 1

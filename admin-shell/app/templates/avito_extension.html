@@ -55,7 +55,7 @@
         </p>
         <p>Привязанных расширений: <strong>{{ extension_status.active_tokens_count or 0 }}</strong></p>
         
-        <a href="/avito/extension/download" class="btn btn-success">📦 Скачать расширение 0.1.3 (ZIP)</a>
+        <a href="/avito/extension/download" class="btn btn-success">📦 Скачать расширение 0.1.4 (ZIP)</a>
     </div>
 
     <!-- Last Ingest Card -->
@@ -68,11 +68,15 @@
         <p>Статус: 
             {% if last_ingest.result in ['created', 'updated', 'unchanged', 'success'] %}
                 <span class="status-badge badge-connected">✓ {{ last_ingest.result|upper }}</span>
+            {% elif last_ingest.result == 'partial' %}
+                <span class="status-badge badge-disconnected" style="background: #fef3c7; color: #92400e;">⚠️ PARTIAL (Основные данные OK, фото error)</span>
             {% else %}
                 <span class="status-badge badge-disconnected">✕ Ошибка импорта ({{ last_ingest.result or 'failed' }})</span>
             {% endif %}
         </p>
         <p>Product ID в Техноребут: <strong>{{ last_ingest.product_id if last_ingest.product_id else '— (не создан)' }}</strong></p>
+        <p>Фотографий получено: <strong>{{ last_ingest.photos_received if last_ingest.photos_received is not none else (last_ingest.photos_count or 0) }}</strong></p>
+        <p>Фотографий импортировано: <strong>{{ last_ingest.photos_imported if last_ingest.photos_imported is not none else (last_ingest.photos_count or 0) }}</strong></p>
     </div>
     {% endif %}
 

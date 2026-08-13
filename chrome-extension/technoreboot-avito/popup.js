@@ -157,8 +157,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         chrome.runtime.sendMessage({ action: action, payload: currentExtractionData }, res => {
             sendBtn.disabled = false;
             if (res && res.success && res.product_id != null) {
-                resultMsg.className = "msg msg-success";
-                resultMsg.innerHTML = `✓ Объявление импортировано в Техноребут.<br>Product ID: <strong>${res.product_id}</strong><br>Результат: ${res.result || 'Created'}`;
+                const photosCount = (res.details && res.details.photos_imported !== undefined) ? res.details.photos_imported : (res.photos_imported || 0);
+                if (res.status === "partial" || (res.details && res.details.result === "partial")) {
+                    resultMsg.className = "msg msg-warning";
+                    resultMsg.innerHTML = `Основные данные обновлены, но фотографии импортировать не удалось.<br>Product ID: <strong>${res.product_id}</strong>`;
+                } else {
+                    resultMsg.className = "msg msg-success";
+                    resultMsg.innerHTML = `✓ Объявление импортировано.<br>Product ID: <strong>${res.product_id}</strong><br>Фотографий: <strong>${photosCount}</strong>`;
+                }
             } else {
                 resultMsg.className = "msg msg-error";
                 const errDetail = res && res.message ? res.message : "Ошибка импорта товара в Core API.";

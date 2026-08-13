@@ -191,7 +191,14 @@ async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
         return {"status": "failed", "error": f"Parsed ad {ad_id} not found"}
 
     core_url = f"{settings.CORE_API_BASE_URL.rstrip('/')}/api/integrations/avito/import-item"
-    photos = [{"url": p.url} if hasattr(p, "url") and p.url else {"url": str(p)} for p in ad.photos if p]
+    photos = []
+    for idx, p in enumerate(ad.photos):
+        p_url = p.url if hasattr(p, "url") and p.url else (p.get("url") if isinstance(p, dict) else str(p))
+        if p_url:
+            photos.append({
+                "url": p_url,
+                "position": idx
+            })
     
     payload = {
         "account_key": account_key,

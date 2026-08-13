@@ -762,6 +762,7 @@ class ProductExternalListing(ProductExternalListingBase):
 # Avito Item Import Payload Schema
 class AvitoImportPhotoItem(BaseModel):
     url: Optional[str] = None
+    position: Optional[int] = None
     content_base64: Optional[str] = None
     filename: Optional[str] = None
 
