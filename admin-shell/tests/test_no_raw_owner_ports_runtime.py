@@ -8,7 +8,7 @@ client = TestClient(app)
 def test_no_raw_owner_ports_runtime():
     """Verify runtime HTML from admin shell contains 0 raw module ports (8000, 8020, 8030, 8040, 8061)."""
     port_regex = re.compile(r':(8000|8020|8030|8040|8061)\b')
-    for route in ["/", "/avito", "/avito/accounts"]:
+    for route in ["/", "/avito/extension"]:
         res = client.get(route)
         assert res.status_code == 200
         matches = port_regex.findall(res.text)

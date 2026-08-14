@@ -62,7 +62,7 @@
         <a href="/inventory/sales" style="color: #fff; text-decoration: none;">Продажи</a>
         <a href="/inventory/reports/sales" style="color: #fff; text-decoration: none;">Отчёты</a>
         <a href="/repairs/repairs" style="color: #fff; text-decoration: none; font-weight: bold; background: #28a745; padding: 4px 10px; border-radius: 3px;">Ремонты</a>
-        <a href="/avito" style="color: #fff; text-decoration: none; font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Авито</a>
+        <a href="/avito/extension" style="color: #fff; text-decoration: none; font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 3px;">Расширение Avito</a>
     </nav>
 
 
@@ -204,7 +204,6 @@
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('tab-info')">Основное</button>
-            <button class="tab-btn" onclick="switchTab('tab-avito')">Авито</button>
             <button class="tab-btn" onclick="switchTab('tab-site')">Сайт</button>
             <button class="tab-btn" onclick="switchTab('tab-stock')">Остатки</button>
             <button class="tab-btn" onclick="switchTab('tab-history')">История</button>
@@ -236,39 +235,9 @@
                         <tr><td>Маржа</td><td id="iMargin"></td></tr>
                         <tr><td>Доступно</td><td id="iAvailable"></td></tr>
                         <tr><td>На сайте</td><td id="iSiteReady"></td></tr>
-                        <tr><td>На Авито</td><td id="iAvitoReady"></td></tr>
                     </table>
                 </div>
             </div>
-        </div>
-
-        <!-- Tab: Авито -->
-        <div id="tab-avito" class="tab-pane">
-            <h3>Данные для объявления Авито</h3>
-            <table class="info-table" style="margin-bottom:14px;">
-                <tr><td>Заголовок</td><td id="aTitle"></td></tr>
-                <tr><td>Категория</td><td id="aCategoryPath"></td></tr>
-                <tr><td>Тип товара</td><td id="aGoodsType"></td></tr>
-                <tr><td>Состояние</td><td id="aCondition"></td></tr>
-                <tr><td>Цена</td><td id="aPrice"></td></tr>
-                <tr><td>Продавец</td><td id="aContact"></td></tr>
-                <tr><td>Адрес</td><td id="aAddress"></td></tr>
-                <tr><td>Тип продавца</td><td id="aSellerType"></td></tr>
-                <tr><td>Описание</td><td id="aDesc" style="font-size:0.88em;white-space:pre-wrap"></td></tr>
-            </table>
-            <h4>Характеристики (параметры)</h4>
-            <table class="params-table" id="aParamsTable" style="width:auto;">
-                <thead><tr><th>Параметр</th><th>Значение</th></tr></thead>
-                <tbody id="aParamsTbody"></tbody>
-            </table>
-            <hr>
-            <h4>Подготовка к публикации на Авито</h4>
-            <form onsubmit="updateAvitoPublication(event)">
-                <input type="hidden" id="apId">
-                <label><input type="checkbox" id="apCheck"> Готово к публикации</label>
-                <input type="text" id="apTitle" placeholder="Заголовок (можно переопределить)" style="width:300px">
-                <button type="submit" class="btn-primary">Сохранить</button>
-            </form>
         </div>
 
         <!-- Tab: Сайт -->
@@ -540,7 +509,7 @@
         document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        const idx = ['tab-info','tab-avito','tab-site','tab-stock','tab-history'].indexOf(id);
+        const idx = ['tab-info','tab-site','tab-stock','tab-history'].indexOf(id);
         document.querySelectorAll('.tab-btn')[idx].classList.add('active');
     }
 
@@ -571,60 +540,6 @@
         document.getElementById('iMargin').textContent = d.margin ? d.margin + ' ₽' : '—';
         document.getElementById('iAvailable').textContent = d.available_quantity;
         document.getElementById('iSiteReady').textContent = d.site_ready ? '✅ Готово' : '❌ Нет';
-        document.getElementById('iAvitoReady').textContent = d.avito_ready ? '✅ Готово' : '❌ Нет';
-
-        // --- Tab: Авито ---
-        document.getElementById('aTitle').textContent = d.avito_title || '—';
-        let catPath = '—';
-        if (d.avito_category_path) {
-            try { catPath = JSON.parse(d.avito_category_path).join(' → '); } catch { catPath = d.avito_category_path; }
-        }
-        document.getElementById('aCategoryPath').textContent = catPath;
-        document.getElementById('aGoodsType').textContent = d.avito_goods_type || '—';
-        document.getElementById('aCondition').textContent = d.avito_condition || '—';
-        document.getElementById('aPrice').textContent = d.sale_price ? d.sale_price + ' ₽' : '—';
-        document.getElementById('aContact').textContent = d.avito_contact_name || '—';
-        document.getElementById('aAddress').textContent = d.avito_address || '—';
-        document.getElementById('aSellerType').textContent = d.avito_seller_type || '—';
-        document.getElementById('aDesc').textContent = d.avito_description || '—';
-
-        // Params & Dynamic Avito Attributes
-        let avitoAttrs = null;
-        try {
-            avitoAttrs = await apiCall('/admin-api/products/' + id + '/avito-attributes', 'GET');
-        } catch {}
-
-        if (avitoAttrs && avitoAttrs.avito_category) {
-            const catName = avitoAttrs.avito_category.name;
-            const catPath = avitoAttrs.avito_category.path;
-            document.getElementById('aCategoryPath').textContent = (catPath && catPath !== catName) ? `${catName} (${catPath})` : catName;
-        }
-
-        const ptbody = document.getElementById('aParamsTbody');
-        ptbody.innerHTML = '';
-
-        if (avitoAttrs && avitoAttrs.attributes && avitoAttrs.attributes.length > 0) {
-            avitoAttrs.attributes.forEach(attr => {
-                const name = attr.attribute_name || attr.external_key || 'Характеристика';
-                const val = attr.value || attr.raw_value || '—';
-                ptbody.innerHTML += `<tr><td><strong>${name}</strong></td><td>${val}</td></tr>`;
-            });
-        } else if (d.avito_params_json) {
-            try {
-                const params = JSON.parse(d.avito_params_json);
-                Object.entries(params).forEach(([k, v]) => {
-                    ptbody.innerHTML += `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`;
-                });
-            } catch {}
-        }
-
-        if (!ptbody.innerHTML) {
-            ptbody.innerHTML = '<tr><td colspan="2" style="color:#888">Характеристики Avito не импортированы</td></tr>';
-        }
-
-        document.getElementById('apId').value = id;
-        document.getElementById('apCheck').checked = !!d.is_published_avito;
-        document.getElementById('apTitle').value = d.avito_title || '';
 
         // --- Tab: Сайт ---
         document.getElementById('sTitle').textContent = d.site_title || '—';

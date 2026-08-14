@@ -8,9 +8,7 @@ def test_owner_origin_contract_routes():
     """Verify that all core owner-facing dashboard routes are served on origin 8011 without 404."""
     routes = [
         "/",
-        "/avito",
-        "/avito/accounts",
-        "/avito/probe"
+        "/avito/extension"
     ]
     for route in routes:
         response = client.get(route)

@@ -13,7 +13,7 @@ def test_no_raw_module_ports_in_rendered_html():
     """
     raw_port_pattern = re.compile(r'href=["\']http://(localhost|127\.0\.0\.1):(8000|8020|8030|8040|8061)')
     
-    pages = ["/", "/avito", "/avito/accounts", "/avito/probe"]
+    pages = ["/", "/avito/extension"]
     for page in pages:
         response = client.get(page)
         assert response.status_code == 200
