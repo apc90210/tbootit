@@ -193,7 +193,8 @@ def migrate_db():
         prod_columns = [row[1] for row in res_prod]
         prod_updates = [
             ("source_origin", "VARCHAR DEFAULT 'manual'"),
-            ("source_attributes_json", "TEXT")
+            ("source_attributes_json", "TEXT"),
+            ("avito_category_id", "INTEGER")
         ]
         for col_name, col_type in prod_updates:
             if col_name not in prod_columns:
