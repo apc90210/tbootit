@@ -269,6 +269,7 @@ app.mount("/media", StaticFiles(directory=settings.storage_root), name="media")
 
 from app.routers import settings as settings_router
 from app.routers import integrations as integrations_router
+from app.routers import avito_categories as avito_categories_router
 
 app.include_router(health.router)
 app.include_router(products.router, prefix="/api/products", tags=["products"])
@@ -282,3 +283,5 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(settings_router.router, prefix="/api", tags=["settings"])
 app.include_router(integrations_router.router, prefix="/api/integrations", tags=["integrations"])
+app.include_router(avito_categories_router.router)
+app.include_router(avito_categories_router.product_router)

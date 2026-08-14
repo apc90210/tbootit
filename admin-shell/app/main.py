@@ -198,6 +198,28 @@ async def proxy_product_details(product_id: int):
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
 
+@app.get("/admin-api/products/{product_id}/avito-attributes")
+async def proxy_product_avito_attributes(product_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(f"{CORE_API_URL}/api/v1/products/{product_id}/avito-attributes")
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.get("/admin-api/avito/categories/{category_id}/schema")
+async def proxy_avito_category_schema(category_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(f"{CORE_API_URL}/api/v1/avito/categories/{category_id}/schema")
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
 @app.post("/admin-api/products/{product_id}/stock-adjustment")
 async def proxy_stock_adjustment(product_id: int, request: Request):
     data = await request.json()
@@ -458,7 +480,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.1.10"
+    version = "0.1.11"
     filename = f"technoreboot-avito-extension-{version}.zip"
     zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
     if not os.path.exists(zip_path):

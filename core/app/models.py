@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, DateTime, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -12,6 +12,81 @@ class Category(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+class AvitoCategory(Base):
+    __tablename__ = "avito_categories"
+    id = Column(Integer, primary_key=True, index=True)
+    external_category_id = Column(String, index=True, nullable=True)
+    name = Column(String, index=True, nullable=False)
+    parent_external_category_id = Column(String, nullable=True)
+    path = Column(Text, nullable=True)
+    source = Column(String, default="avito", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    observed_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    definitions = relationship("AvitoAttributeDefinition", back_populates="category", cascade="all, delete-orphan")
+    products = relationship("Product", back_populates="avito_category")
+
+class AvitoAttributeDefinition(Base):
+    __tablename__ = "avito_attribute_definitions"
+    __table_args__ = (
+        UniqueConstraint("category_id", "external_key", name="uix_avito_attr_category_key"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("avito_categories.id"), nullable=False, index=True)
+    external_key = Column(String, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    type = Column(String, default="string", nullable=False)
+    required = Column(Boolean, default=False, nullable=False)
+    multiple = Column(Boolean, default=False, nullable=False)
+    unit = Column(String, nullable=True)
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    observed_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    category = relationship("AvitoCategory", back_populates="definitions")
+    options = relationship("AvitoAttributeOption", back_populates="definition", cascade="all, delete-orphan")
+    product_values = relationship("ProductAvitoAttributeValue", back_populates="definition", cascade="all, delete-orphan")
+
+class AvitoAttributeOption(Base):
+    __tablename__ = "avito_attribute_options"
+    __table_args__ = (
+        UniqueConstraint("attribute_definition_id", "value", name="uix_avito_option_attr_val"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    attribute_definition_id = Column(Integer, ForeignKey("avito_attribute_definitions.id"), nullable=False, index=True)
+    external_option_id = Column(String, nullable=True)
+    value = Column(String, nullable=False)
+    label = Column(String, nullable=True)
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    definition = relationship("AvitoAttributeDefinition", back_populates="options")
+
+class ProductAvitoAttributeValue(Base):
+    __tablename__ = "product_avito_attribute_values"
+    __table_args__ = (
+        UniqueConstraint("product_id", "attribute_definition_id", name="uix_prod_avito_attr_val"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    attribute_definition_id = Column(Integer, ForeignKey("avito_attribute_definitions.id"), nullable=False, index=True)
+    option_id = Column(Integer, ForeignKey("avito_attribute_options.id"), nullable=True, index=True)
+    value = Column(Text, nullable=True)
+    raw_value = Column(Text, nullable=True)
+    source = Column(String, default="avito", nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    product = relationship("Product", back_populates="avito_attribute_values")
+    definition = relationship("AvitoAttributeDefinition", back_populates="product_values")
+    option = relationship("AvitoAttributeOption")
+
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
@@ -19,6 +94,7 @@ class Product(Base):
     barcode = Column(String, unique=True, index=True, nullable=True)
     title = Column(String, index=True)
     category_id = Column(Integer, ForeignKey("categories.id"))
+    avito_category_id = Column(Integer, ForeignKey("avito_categories.id"), nullable=True, index=True)
     brand = Column(String, index=True)
     model = Column(String)
     serial_number = Column(String)
@@ -56,6 +132,8 @@ class Product(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     external_listings = relationship("ProductExternalListing", back_populates="product", cascade="all, delete-orphan")
+    avito_category = relationship("AvitoCategory", back_populates="products")
+    avito_attribute_values = relationship("ProductAvitoAttributeValue", back_populates="product", cascade="all, delete-orphan")
 
 class ProductExternalListing(Base):
     __tablename__ = "product_external_listings"

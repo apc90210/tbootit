@@ -588,10 +588,28 @@
         document.getElementById('aSellerType').textContent = d.avito_seller_type || '—';
         document.getElementById('aDesc').textContent = d.avito_description || '—';
 
-        // Params
+        // Params & Dynamic Avito Attributes
+        let avitoAttrs = null;
+        try {
+            avitoAttrs = await apiCall('/admin-api/products/' + id + '/avito-attributes', 'GET');
+        } catch {}
+
+        if (avitoAttrs && avitoAttrs.avito_category) {
+            const catName = avitoAttrs.avito_category.name;
+            const catPath = avitoAttrs.avito_category.path;
+            document.getElementById('aCategoryPath').textContent = (catPath && catPath !== catName) ? `${catName} (${catPath})` : catName;
+        }
+
         const ptbody = document.getElementById('aParamsTbody');
         ptbody.innerHTML = '';
-        if (d.avito_params_json) {
+
+        if (avitoAttrs && avitoAttrs.attributes && avitoAttrs.attributes.length > 0) {
+            avitoAttrs.attributes.forEach(attr => {
+                const name = attr.attribute_name || attr.external_key || 'Характеристика';
+                const val = attr.value || attr.raw_value || '—';
+                ptbody.innerHTML += `<tr><td><strong>${name}</strong></td><td>${val}</td></tr>`;
+            });
+        } else if (d.avito_params_json) {
             try {
                 const params = JSON.parse(d.avito_params_json);
                 Object.entries(params).forEach(([k, v]) => {
@@ -599,7 +617,10 @@
                 });
             } catch {}
         }
-        if (!ptbody.innerHTML) ptbody.innerHTML = '<tr><td colspan="2" style="color:#888">Характеристики не заданы</td></tr>';
+
+        if (!ptbody.innerHTML) {
+            ptbody.innerHTML = '<tr><td colspan="2" style="color:#888">Характеристики Avito не импортированы</td></tr>';
+        }
 
         document.getElementById('apId').value = id;
         document.getElementById('apCheck').checked = !!d.is_published_avito;

@@ -48,32 +48,41 @@ function validateListingImageUrl(url) {
 function getCanonicalAvitoImageIdentity(url) {
     if (!url || typeof url !== 'string') return '';
 
-    // Strip query string first
+    // Strip query string
     const pathOnly = url.split('?')[0];
 
-    // Strip size token path segment (e.g. /140x105/, /640x480/, /1280x960/)
-    const normalized = pathOnly.replace(/\/(?:\d+x\d+)\//g, '/');
+    // Remove protocol and domain e.g. https://10.img.avito.st/
+    let cleanPath = pathOnly.replace(/^https?:\/\/[^\/]+\//i, '');
 
-    // Avito image CDN pattern: 1.{hash_prefix}La{variant_id}{hash_suffix}
-    // Matches prefix before La\d+ regardless of leading subdomains, path numbers, or prefixes (1., 2., etc.)
-    const laMatch = normalized.match(/(?:^|\/|\.)([A-Za-z0-9_-]{3,})La\d+/i);
+    // Remove size path segments or image/1/ prefixes repeatedly
+    cleanPath = cleanPath.replace(/^(?:image\/\d+\/|\d+x\d+\/)+/i, '');
+
+    // Extract filename tail
+    const filename = cleanPath.split('/').pop() || cleanPath;
+
+    // Strip leading numbers and dot e.g. "1." or "2."
+    const token = filename.replace(/^\d+\./, '');
+
+    // Check if token has La descriptor e.g. m9BBHLa6...
+    const laMatch = token.match(/^([A-Za-z0-9_-]{3,})La\d+/i);
     if (laMatch && laMatch[1]) {
-        const cleanPrefix = laMatch[1].replace(/^\d+\./, '');
-        if (cleanPrefix.length >= 3) {
-            return `avito_photo_${cleanPrefix}`;
-        }
+        return `avito_photo_${laMatch[1]}`;
     }
 
-    // Standard Avito CDN pattern /image/\d+/{hash} or filename fallback
-    const match = normalized.match(/\/image\/\d+\/([^\s?#]+)/) || normalized.match(/\/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))/i);
-    if (match && match[1]) {
-        // Strip La\d+ descriptor and any trailing hashes/tokens
-        let cleanName = match[1].replace(/La\d+.*$/i, '').replace(/^\d+\./, '');
-        if (cleanName.length >= 3) {
-            return `avito_photo_${cleanName}`;
-        }
+    const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
+
+    // If token is a long CDN hash (> 10 chars), extract the 5-char Avito hash prefix
+    if (tokenNoExt.length > 10 && /^[A-Za-z0-9_-]{5}/.test(tokenNoExt)) {
+        return `avito_photo_${tokenNoExt.substring(0, 5)}`;
     }
-    return normalized;
+
+    // Standard fallback: clean special characters
+    const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
+    if (cleanName.length >= 3) {
+        return `avito_photo_${cleanName}`;
+    }
+
+    return pathOnly;
 }
 
 function getImageQualityScore(url) {

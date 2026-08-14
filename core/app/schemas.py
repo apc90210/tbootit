@@ -790,3 +790,62 @@ class AvitoItemImportResponse(BaseModel):
     photos_imported: int
     photos_skipped: int = 0
     photos_reconciled: int = 0
+
+# Dynamic Avito Category & Attribute Schemas
+class AvitoAttributeOptionSchema(BaseModel):
+    id: int
+    attribute_definition_id: int
+    external_option_id: Optional[str] = None
+    value: str
+    label: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
+    class Config:
+        from_attributes = True
+
+class AvitoAttributeDefinitionSchema(BaseModel):
+    id: int
+    category_id: int
+    external_key: str
+    name: str
+    type: str = "string"
+    required: bool = False
+    multiple: bool = False
+    unit: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
+    options: List[AvitoAttributeOptionSchema] = []
+    class Config:
+        from_attributes = True
+
+class AvitoCategorySchema(BaseModel):
+    id: int
+    external_category_id: Optional[str] = None
+    name: str
+    parent_external_category_id: Optional[str] = None
+    path: Optional[str] = None
+    source: str = "avito"
+    is_active: bool = True
+    class Config:
+        from_attributes = True
+
+class ProductAvitoAttributeValueSchema(BaseModel):
+    id: int
+    product_id: int
+    attribute_definition_id: int
+    option_id: Optional[int] = None
+    external_key: Optional[str] = None
+    attribute_name: Optional[str] = None
+    value: Optional[str] = None
+    raw_value: Optional[str] = None
+    source: str = "avito"
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class ProductAvitoAttributesResponse(BaseModel):
+    product_id: int
+    avito_category: Optional[AvitoCategorySchema] = None
+    attributes: List[ProductAvitoAttributeValueSchema] = []
+    class Config:
+        from_attributes = True

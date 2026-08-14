@@ -194,6 +194,28 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         ext_link.sync_state = "synced"
         db.flush()
 
+    # 2b. Stage06A-R9 Avito-First Category & Attribute Dynamic Schema Upsert
+    try:
+        from app.services.avito_schema_service import upsert_avito_category_schema, upsert_product_avito_attributes
+        category_name = cat_name or (payload.category_path[-1] if payload.category_path else "Без категории")
+        category_path_str = " / ".join(payload.category_path) if payload.category_path else category_name
+
+        avito_cat = upsert_avito_category_schema(
+            db=db,
+            category_name=category_name,
+            category_path=category_path_str,
+            characteristics=payload.parameters
+        )
+        if avito_cat:
+            upsert_product_avito_attributes(
+                db=db,
+                product_id=product.id,
+                category_id=avito_cat.id,
+                characteristics=payload.parameters
+            )
+    except Exception as e:
+        print(f"Error upserting Avito category/attribute schema: {e}")
+
     # 3. Import photos idempotently using content SHA256 / source_url / remote fetch
     import re as _re
     photos_imported = 0
@@ -202,11 +224,105 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     storage_photos_dir = os.path.join(settings.storage_root, "product_photos")
     os.makedirs(storage_photos_dir, exist_ok=True)
 
+    def _get_avito_canonical_identity(url):
+        """Extract canonical Avito photo identity from source_url."""
+        if not url:
+            return None
+        path_only = url.split("?")[0]
+        clean_path = _re.sub(r"^https?:\/\/[^\/]+\/", "", path_only, flags=_re.IGNORECASE)
+        clean_path = _re.sub(r"^(?:image\/\d+\/|\d+x\d+\/)+", "", clean_path, flags=_re.IGNORECASE)
+        filename = clean_path.split("/")[-1]
+        token = _re.sub(r"^\d+\.", "", filename)
+
+        la_match = _re.search(r"^([A-Za-z0-9_-]{3,})La\d+", token, _re.IGNORECASE)
+        if la_match:
+            return "avito_photo_" + la_match.group(1)
+
+        token_no_ext = _re.sub(r"\.(?:jpg|jpeg|webp|png)$", "", token, flags=_re.IGNORECASE)
+        if len(token_no_ext) > 10 and _re.match(r"^[A-Za-z0-9_-]{5}", token_no_ext):
+            return "avito_photo_" + token_no_ext[:5]
+
+        clean_name = _re.sub(r"[^A-Za-z0-9_-]", "", token_no_ext)
+        if len(clean_name) >= 3:
+            return "avito_photo_" + clean_name
+
+        if "img.avito.st" in url.lower():
+            return path_only
+        return None
+
+    def _get_avito_quality_score(url):
+        """Score Avito image variant quality by La descriptor and resolution path."""
+        if not url:
+            return 0
+        m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
+        la_score = 0
+        if m:
+            v = int(m.group(1))
+            if v == 1:
+                la_score = 100000   # Super low thumbnail (140x105 / 150x110)
+            elif v == 2:
+                la_score = 500000   # Medium thumbnail 208x156
+            elif v == 3:
+                la_score = 2000000  # Mid-high (640x480 / listing image)
+            else:
+                la_score = 4000000 + v * 100000  # High / original (La4, La5, La6, etc.)
+        else:
+            la_score = 1000000  # Unknown variant
+
+        dim_match = _re.search(r"/(?:(\d+)x(\d+))/", url)
+        dim_area = 0
+        if dim_match:
+            try:
+                dim_area = int(dim_match.group(1)) * int(dim_match.group(2))
+            except Exception:
+                pass
+
+        return la_score + dim_area
+
+    def _is_avito_managed(source_url):
+        """Check if a photo is Avito-managed by source_url host."""
+        if not source_url:
+            return False
+        return "img.avito.st" in source_url.lower()
+
+    def _delete_photo_file_and_row(photo_row):
+        """Safely delete stored file if exists and delete DB row."""
+        if photo_row.storage_path and os.path.exists(photo_row.storage_path):
+            try:
+                os.remove(photo_row.storage_path)
+            except Exception:
+                pass
+        db.delete(photo_row)
+
+    # Pre-deduplicate incoming photos by canonical identity, picking ONLY 1 best quality variant per photo key
+    incoming_raw_photos = payload.photos or []
+    grouped_incoming = {}
+    key_sequence = []
+    unkeyed_incoming = []
+
+    for item_photo in incoming_raw_photos:
+        source_url = item_photo.url
+        ckey = _get_avito_canonical_identity(source_url) if source_url else None
+        if ckey:
+            if ckey not in grouped_incoming:
+                grouped_incoming[ckey] = []
+                key_sequence.append(ckey)
+            grouped_incoming[ckey].append(item_photo)
+        else:
+            unkeyed_incoming.append(item_photo)
+
+    effective_photos = []
+    for ckey in key_sequence:
+        candidates = grouped_incoming[ckey]
+        best_item = max(candidates, key=lambda p: _get_avito_quality_score(p.url))
+        effective_photos.append(best_item)
+    effective_photos.extend(unkeyed_incoming)
+
     # Track incoming content hashes and source URLs for reconciliation
     incoming_content_hashes = set()
     incoming_source_urls = set()
 
-    for idx, item_photo in enumerate(payload.photos):
+    for idx, item_photo in enumerate(effective_photos):
         photo_bytes = None
         content_hash = None
         source_url = item_photo.url
@@ -296,71 +412,6 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     # 3b. Avito photo set reconciliation — remove stale Avito-managed variants & obsolete photos
     # Only reconcile if we received at least one photo in the incoming payload
     if len(payload.photos) > 0:
-        def _get_avito_canonical_identity(url):
-            """Extract canonical Avito photo identity from source_url."""
-            if not url:
-                return None
-            path_only = url.split("?")[0]
-            normalized = _re.sub(r"/(?:\d+x\d+)/", "/", path_only)
-            m = _re.search(r"(?:^|\/|\.)([A-Za-z0-9_-]{3,})La\d+", normalized, _re.IGNORECASE)
-            if m and m.group(1):
-                clean_prefix = _re.sub(r"^\d+\.", "", m.group(1))
-                if len(clean_prefix) >= 3:
-                    return "avito_photo_" + clean_prefix
-            # Fallback for standard Avito CDN path /image/\d+/{hash} or filename
-            m2 = _re.search(r"/image/\d+/([^\s?#]+)", normalized) or _re.search(r"/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))", normalized, _re.IGNORECASE)
-            if m2 and m2.group(1):
-                clean_name = _re.sub(r"La\d+.*$", "", m2.group(1), flags=_re.IGNORECASE)
-                clean_name = _re.sub(r"^\d+\.", "", clean_name)
-                if len(clean_name) >= 3:
-                    return "avito_photo_" + clean_name
-            if "img.avito.st" in url.lower():
-                return path_only
-            return None
-
-        def _get_avito_quality_score(url):
-            """Score Avito image variant quality by La descriptor and resolution path."""
-            if not url:
-                return 0
-            m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
-            la_score = 0
-            if m:
-                v = int(m.group(1))
-                if v == 1:
-                    la_score = 100000   # Super low thumbnail (140x105 / 150x110)
-                elif v == 2:
-                    la_score = 500000   # Medium thumbnail 208x156
-                elif v == 3:
-                    la_score = 2000000  # Mid-high (640x480 / listing image)
-                else:
-                    la_score = 4000000 + v * 100000  # High / original (La4, La5, La6, etc.)
-            else:
-                la_score = 1000000  # Unknown variant
-
-            dim_match = _re.search(r"/(?:(\d+)x(\d+))/", url)
-            dim_area = 0
-            if dim_match:
-                try:
-                    dim_area = int(dim_match.group(1)) * int(dim_match.group(2))
-                except Exception:
-                    pass
-
-            return la_score + dim_area
-
-        def _is_avito_managed(source_url):
-            """Check if a photo is Avito-managed by source_url host."""
-            if not source_url:
-                return False
-            return "img.avito.st" in source_url.lower()
-
-        def _delete_photo_file_and_row(photo_row):
-            """Safely delete stored file if exists and delete DB row."""
-            if photo_row.storage_path and os.path.exists(photo_row.storage_path):
-                try:
-                    os.remove(photo_row.storage_path)
-                except Exception:
-                    pass
-            db.delete(photo_row)
 
         # Build incoming set of canonical keys and source URLs
         incoming_canonical_keys = set()
