@@ -301,30 +301,51 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             if not url:
                 return None
             path_only = url.split("?")[0]
-            m = _re.search(r"1\.([A-Za-z0-9_-]+)La\d+", path_only, _re.IGNORECASE)
-            if m and len(m.group(1)) >= 3:
-                return "avito_photo_" + m.group(1)
-            # Fallback for standard Avito CDN path
+            normalized = _re.sub(r"/(?:\d+x\d+)/", "/", path_only)
+            m = _re.search(r"(?:^|\/|\.)([A-Za-z0-9_-]{3,})La\d+", normalized, _re.IGNORECASE)
+            if m and m.group(1):
+                clean_prefix = _re.sub(r"^\d+\.", "", m.group(1))
+                if len(clean_prefix) >= 3:
+                    return "avito_photo_" + clean_prefix
+            # Fallback for standard Avito CDN path /image/\d+/{hash} or filename
+            m2 = _re.search(r"/image/\d+/([^\s?#]+)", normalized) or _re.search(r"/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))", normalized, _re.IGNORECASE)
+            if m2 and m2.group(1):
+                clean_name = _re.sub(r"La\d+.*$", "", m2.group(1), flags=_re.IGNORECASE)
+                clean_name = _re.sub(r"^\d+\.", "", clean_name)
+                if len(clean_name) >= 3:
+                    return "avito_photo_" + clean_name
             if "img.avito.st" in url.lower():
                 return path_only
             return None
 
         def _get_avito_quality_score(url):
-            """Score Avito image variant quality by La descriptor."""
+            """Score Avito image variant quality by La descriptor and resolution path."""
             if not url:
                 return 0
             m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
+            la_score = 0
             if m:
                 v = int(m.group(1))
                 if v == 1:
-                    return 100000   # Super low thumbnail (140x105 / 150x110)
+                    la_score = 100000   # Super low thumbnail (140x105 / 150x110)
                 elif v == 2:
-                    return 500000   # Medium thumbnail 208x156
+                    la_score = 500000   # Medium thumbnail 208x156
                 elif v == 3:
-                    return 2000000  # Mid-high (640x480 / listing image)
+                    la_score = 2000000  # Mid-high (640x480 / listing image)
                 else:
-                    return 4000000 + v * 100000  # High / original (La4, La5, La6, etc.)
-            return 1000000  # Unknown variant
+                    la_score = 4000000 + v * 100000  # High / original (La4, La5, La6, etc.)
+            else:
+                la_score = 1000000  # Unknown variant
+
+            dim_match = _re.search(r"/(?:(\d+)x(\d+))/", url)
+            dim_area = 0
+            if dim_match:
+                try:
+                    dim_area = int(dim_match.group(1)) * int(dim_match.group(2))
+                except Exception:
+                    pass
+
+            return la_score + dim_area
 
         def _is_avito_managed(source_url):
             """Check if a photo is Avito-managed by source_url host."""

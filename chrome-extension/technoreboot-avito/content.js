@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.9)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.10)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -55,22 +55,23 @@ function getCanonicalAvitoImageIdentity(url) {
     const normalized = pathOnly.replace(/\/(?:\d+x\d+)\//g, '/');
 
     // Avito image CDN pattern: 1.{hash_prefix}La{variant_id}{hash_suffix}
-    // e.g. 1.VGk5RLa3-IAZ... vs 1.VGk5RLa1-IAj...
-    // e.g. 1.m9BBHLa4Nzl3... vs 1.m9BBHLa1Nzlb...
-    const avitoLaMatch = normalized.match(/1\.([A-Za-z0-9_-]+)La\d+([A-Za-z0-9_-]*)/i);
-    if (avitoLaMatch) {
-        const prefix = avitoLaMatch[1];
-        if (prefix.length >= 3) {
-            return `avito_photo_${prefix}`;
+    // Matches prefix before La\d+ regardless of leading subdomains, path numbers, or prefixes (1., 2., etc.)
+    const laMatch = normalized.match(/(?:^|\/|\.)([A-Za-z0-9_-]{3,})La\d+/i);
+    if (laMatch && laMatch[1]) {
+        const cleanPrefix = laMatch[1].replace(/^\d+\./, '');
+        if (cleanPrefix.length >= 3) {
+            return `avito_photo_${cleanPrefix}`;
         }
     }
 
-    // Standard Avito CDN pattern /image/1/{hash}
-    const match = normalized.match(/\/image\/1\/([^\s?#]+)/) || normalized.match(/\/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))/i);
+    // Standard Avito CDN pattern /image/\d+/{hash} or filename fallback
+    const match = normalized.match(/\/image\/\d+\/([^\s?#]+)/) || normalized.match(/\/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))/i);
     if (match && match[1]) {
-        // Strip La\d+ token from filename if present as fallback
-        const cleanName = match[1].replace(/La\d+/i, '');
-        return cleanName;
+        // Strip La\d+ descriptor and any trailing hashes/tokens
+        let cleanName = match[1].replace(/La\d+.*$/i, '').replace(/^\d+\./, '');
+        if (cleanName.length >= 3) {
+            return `avito_photo_${cleanName}`;
+        }
     }
     return normalized;
 }
@@ -345,7 +346,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.1.9",
+        extension_version: "0.1.10",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -389,7 +390,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.9",
+        extension_version: "0.1.10",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,

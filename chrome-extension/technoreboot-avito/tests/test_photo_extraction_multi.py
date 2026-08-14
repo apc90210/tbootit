@@ -29,17 +29,18 @@ def get_canonical_avito_image_identity(url):
     path_only = url.split('?')[0]
     normalized = re.sub(r'/(?:\d+x\d+)/', '/', path_only)
 
-    # Avito image CDN pattern: 1.{hash_prefix}La{variant_id}{hash_suffix}
-    avito_la_match = re.search(r'1\.([A-Za-z0-9_-]+)La\d+([A-Za-z0-9_-]*)', normalized, re.IGNORECASE)
-    if avito_la_match:
-        prefix = avito_la_match.group(1)
-        if len(prefix) >= 3:
-            return f"avito_photo_{prefix}"
+    la_match = re.search(r'(?:^|\/|\.)([A-Za-z0-9_-]{3,})La\d+', normalized, re.IGNORECASE)
+    if la_match and la_match.group(1):
+        clean_prefix = re.sub(r'^\d+\.', '', la_match.group(1))
+        if len(clean_prefix) >= 3:
+            return f"avito_photo_{clean_prefix}"
 
-    match = re.search(r'/image/1/([^\s?#]+)', normalized) or re.search(r'/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))', normalized, re.IGNORECASE)
+    match = re.search(r'/image/\d+/([^\s?#]+)', normalized) or re.search(r'/([^\/\s?#]+\.(?:jpg|jpeg|webp|png))', normalized, re.IGNORECASE)
     if match and match.group(1):
-        clean_name = re.sub(r'La\d+', '', match.group(1), flags=re.IGNORECASE)
-        return clean_name
+        clean_name = re.sub(r'La\d+.*$', '', match.group(1), flags=re.IGNORECASE)
+        clean_name = re.sub(r'^\d+\.', '', clean_name)
+        if len(clean_name) >= 3:
+            return f"avito_photo_{clean_name}"
     return normalized
 
 
@@ -187,3 +188,28 @@ def test_same_size_different_images_not_deduped():
     assert len(processed) == 2
     assert processed[0]["position"] == 0
     assert processed[1]["position"] == 1
+
+
+def test_reproduction_7_photo_listing_collapses_to_3_clean_photos():
+    """User reproduction: 3-photo listing passing 7 raw candidates (high, low, and main high duplicate) must collapse to 3 clean high-res photos."""
+    raw_urls = [
+        # Main photo 3 variants (JSON-LD La4, DOM La6 high, DOM La1 low)
+        "https://10.img.avito.st/image/1/1.m9BBHLa4Nzl3tfU8ez6B6VS8NT__vbUxN7g1O_G1PzP3.iJZR3rmCwzP7jxWl7bEwfbEDNCHe_vBDjOHTE2134t8",
+        "https://10.img.avito.st/1280x960/1.m9BBHLa6Nzl3tfU8ez6B6VS8NT__vbUxN7g1O_G1PzP3.iJZR3rmCwzP7jxWl7bEwfbEDNCHe_vBDjOHTE2134t8",
+        "https://10.img.avito.st/image/1/1.m9BBHLa1Nzlbvek6ez6B6VS8NTn_t5k5K741Ow.1qZkpJ27FIn0-3Odn1dgD2ECRKJG9Xzc4iehkcaUoos",
+        # Photo 2 (2 variants: La3 high/mid, La1 low)
+        "https://30.img.avito.st/image/1/1.Z369ULa3y5ed8qdh6W4aNgjzy50DZcj7C_M.toAiKxZzTRuOoGiwuIXzbq40Qr0OTmKLEtvn77R2uSc",
+        "https://30.img.avito.st/image/1/1.Z369ULa1y5en8RWU_xFURqjwyZcD-2WX1_LJlQ.i2zgkdaC3eClsCvVSuJiNUCNBluDplFuOTLHRc7-4II",
+        # Photo 3 (2 variants: La4 high, La1 low)
+        "https://90.img.avito.st/image/1/1.VGk5RLa4-IAZ5pQQdSsrIYzn-IqHcfvsj-c.OUon82lLvM1REM9ZkcbjonIjaoeXuLP4zaYk7mmytMM",
+        "https://90.img.avito.st/image/1/1.VGk5RLa1-IAj5SaDHR02Uyzk-oCH71aAU-b6gg.AEDAd9AKNipQOuLkeUr18PzH3N1c5DILrhVHLmDu960",
+    ]
+    processed = process_extracted_urls(raw_urls)
+    assert len(processed) == 3
+    # Main photo must select 1280x960 La6 variant
+    assert "1280x960" in processed[0]["url"] or "La6" in processed[0]["url"]
+    # Photo 2 must select La3 variant
+    assert "Z369ULa3" in processed[1]["url"]
+    # Photo 3 must select La4 variant
+    assert "VGk5RLa4" in processed[2]["url"]
+
