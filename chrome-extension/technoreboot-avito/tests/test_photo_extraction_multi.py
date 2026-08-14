@@ -51,30 +51,38 @@ def get_image_quality_score(url):
     if not url:
         return 0
 
+    explicit_bonus = 0
+    dim_match = re.search(r'/(?:(\d+)x(\d+))/', url)
+    w = 0
+    h = 0
+    if dim_match and dim_match.group(1) and dim_match.group(2):
+        w = int(dim_match.group(1))
+        h = int(dim_match.group(2))
+        explicit_bonus = 5
+
+    base_area = w * h if (w > 0 and h > 0) else 0
+
+    la_bonus = 0
     la_match = re.search(r'La(\d+)', url, re.IGNORECASE)
-    la_score = 0
     if la_match and la_match.group(1):
         v = int(la_match.group(1))
-        if v == 1:
-            la_score = 100000       # Super low thumbnail (140x105)
-        elif v == 2:
-            la_score = 500000      # Low-mid (208x156)
-        elif v == 3:
-            la_score = 2000000     # Mid-high (640x480)
-        else:
-            la_score = 4000000 + v * 100000 # High / original (La4, La5, La6)
+        la_bonus = v * 10
+        if base_area == 0:
+            if v >= 4:
+                base_area = 1280 * 960
+            elif v == 3:
+                base_area = 640 * 480
+            elif v == 2:
+                base_area = 208 * 156
+            elif v == 1:
+                base_area = 140 * 105
 
-    dim_match = re.search(r'/(?:(\d+)x(\d+))/', url)
-    dim_area = 0
-    if dim_match and dim_match.group(1) and dim_match.group(2):
-        dim_area = int(dim_match.group(1)) * int(dim_match.group(2))
+    if base_area == 0 and '.img.avito.st/image/1/' in url:
+        base_area = 1280 * 960
 
-    if la_score > 0:
-        return la_score + dim_area
-    if dim_area > 0:
-        return dim_area
-    if '.img.avito.st/image/1/' in url:
-        return 3000000
+    if base_area > 0:
+        return base_area + la_bonus + explicit_bonus
+
     return 1
 
 
@@ -254,5 +262,129 @@ def test_owner_user_voice_4_photos_producing_9_raw_collapses_to_exact_4_clean_hi
     # Photo 4 must be high-res (rSZphLa3...)
     assert "rSZphLa3" in processed[3]["url"]
     assert processed[3]["position"] == 3
+
+
+def test_selects_largest_actual_dimensions_regardless_of_candidate_order():
+    urls = [
+        "https://10.img.avito.st/208x156/1.m9BBHLa2test.jpg",
+        "https://10.img.avito.st/1280x960/1.m9BBHLa6test.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "1280x960" in res[0]["url"]
+
+
+def test_high_then_low_returns_high():
+    urls = [
+        "https://10.img.avito.st/image/1/1.m9BBHLa4high.jpg",
+        "https://10.img.avito.st/image/1/1.m9BBHLa1low.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "La4high" in res[0]["url"]
+
+
+def test_low_then_high_returns_high():
+    urls = [
+        "https://10.img.avito.st/image/1/1.m9BBHLa1low.jpg",
+        "https://10.img.avito.st/image/1/1.m9BBHLa4high.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "La4high" in res[0]["url"]
+
+
+def test_three_variants_returns_largest():
+    urls = [
+        "https://10.img.avito.st/image/1/1.m9BBHLa1low.jpg",
+        "https://10.img.avito.st/image/1/1.m9BBHLa3mid.jpg",
+        "https://10.img.avito.st/image/1/1.m9BBHLa5high.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "La5high" in res[0]["url"]
+
+
+def test_same_identity_different_sources_returns_largest():
+    urls = [
+        "https://10.img.avito.st/image/1/1.m9BBHLa2fromdom.jpg",
+        "https://10.img.avito.st/1280x960/1.m9BBHLa4fromjsonld.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "La4fromjsonld" in res[0]["url"]
+
+
+def test_low_only_photo_is_preserved():
+    urls = [
+        "https://10.img.avito.st/image/1/1.onlylowLa1test.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert res[0]["url"] == "https://10.img.avito.st/image/1/1.onlylowLa1test.jpg"
+
+
+def test_quality_selection_does_not_change_gallery_order():
+    urls = [
+        "https://10.img.avito.st/image/1/1.firstphotoLa4.jpg",
+        "https://10.img.avito.st/image/1/1.firstphotoLa1.jpg",
+        "https://20.img.avito.st/image/1/1.secondphotoLa1.jpg",
+        "https://20.img.avito.st/image/1/1.secondphotoLa5.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 2
+    assert "firstphoto" in res[0]["url"]
+    assert res[0]["position"] == 0
+    assert "secondphoto" in res[1]["url"]
+    assert res[1]["position"] == 1
+
+
+def test_main_photo_best_variant_stays_first():
+    urls = [
+        "https://10.img.avito.st/image/1/1.mainphotoLa1.jpg",
+        "https://10.img.avito.st/1280x960/1.mainphotoLa6.jpg",
+        "https://20.img.avito.st/image/1/1.otherphotoLa4.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 2
+    assert "mainphoto" in res[0]["url"]
+    assert "1280x960" in res[0]["url"] or "La6" in res[0]["url"]
+    assert res[0]["position"] == 0
+
+
+def test_intermittent_owner_pattern_all_photos_high():
+    """
+    Regression test for intermittent low-res quality pattern:
+    photo1: high + low
+    photo2: low + high
+    photo3: medium + high + low
+    photo4: only high
+    All 4 returned photos must be high quality variants.
+    """
+    urls = [
+        # Photo 1 (high then low)
+        "https://10.img.avito.st/1280x960/1.p1photoLa6.jpg",
+        "https://10.img.avito.st/image/1/1.p1photoLa1.jpg",
+
+        # Photo 2 (low then high)
+        "https://20.img.avito.st/image/1/1.p2photoLa1.jpg",
+        "https://20.img.avito.st/1280x960/1.p2photoLa5.jpg",
+
+        # Photo 3 (medium then high then low)
+        "https://30.img.avito.st/image/1/1.p3photoLa3.jpg",
+        "https://30.img.avito.st/1280x960/1.p3photoLa4.jpg",
+        "https://30.img.avito.st/image/1/1.p3photoLa1.jpg",
+
+        # Photo 4 (only high)
+        "https://40.img.avito.st/1280x960/1.p4photoLa4.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 4
+
+    assert "p1photo" in res[0]["url"] and ("1280x960" in res[0]["url"] or "La6" in res[0]["url"])
+    assert "p2photo" in res[1]["url"] and ("1280x960" in res[1]["url"] or "La5" in res[1]["url"])
+    assert "p3photo" in res[2]["url"] and ("1280x960" in res[2]["url"] or "La4" in res[2]["url"])
+    assert "p4photo" in res[3]["url"] and ("1280x960" in res[3]["url"] or "La4" in res[3]["url"])
+
 
 

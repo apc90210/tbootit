@@ -251,33 +251,46 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         return None
 
     def _get_avito_quality_score(url):
-        """Score Avito image variant quality by La descriptor and resolution path."""
+        """Score Avito image variant quality by explicit path dimensions, La token, or master CDN."""
         if not url:
             return 0
-        m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
-        la_score = 0
-        if m:
-            v = int(m.group(1))
-            if v == 1:
-                la_score = 100000   # Super low thumbnail (140x105 / 150x110)
-            elif v == 2:
-                la_score = 500000   # Medium thumbnail 208x156
-            elif v == 3:
-                la_score = 2000000  # Mid-high (640x480 / listing image)
-            else:
-                la_score = 4000000 + v * 100000  # High / original (La4, La5, La6, etc.)
-        else:
-            la_score = 1000000  # Unknown variant
 
+        explicit_bonus = 0
         dim_match = _re.search(r"/(?:(\d+)x(\d+))/", url)
-        dim_area = 0
+        w = 0
+        h = 0
         if dim_match:
             try:
-                dim_area = int(dim_match.group(1)) * int(dim_match.group(2))
+                w = int(dim_match.group(1))
+                h = int(dim_match.group(2))
+                explicit_bonus = 5
             except Exception:
                 pass
 
-        return la_score + dim_area
+        base_area = w * h if (w > 0 and h > 0) else 0
+
+        la_bonus = 0
+        m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
+        if m:
+            v = int(m.group(1))
+            la_bonus = v * 10
+            if base_area == 0:
+                if v >= 4:
+                    base_area = 1280 * 960  # 1,228,800
+                elif v == 3:
+                    base_area = 640 * 480   # 307,200
+                elif v == 2:
+                    base_area = 208 * 156   # 32,448
+                elif v == 1:
+                    base_area = 140 * 105   # 14,700
+
+        if base_area == 0 and "img.avito.st/image/1/" in url.lower():
+            base_area = 1280 * 960
+
+        if base_area > 0:
+            return base_area + la_bonus + explicit_bonus
+
+        return 1
 
     def _is_avito_managed(source_url):
         """Check if a photo is Avito-managed by source_url host."""

@@ -74,6 +74,13 @@ Detailed analysis uncovered three contributing root causes across the pipeline:
   - **Manual Photo Safety**: Photos with non-Avito source URLs or manual origins are left completely untouched (`_is_avito_managed` returns `False`).
   - **Sort Order Normalization**: `sort_order` is renumbered 0..N-1 contiguously after reconciliation.
 
+### 9. Hotfix Extension Photo Quality Selection (R1 Actual Dimensions — Extension v0.1.12)
+- **Objective Quality Evidence Model**: Replaced artificial score bonuses with objective pixel area (`pixelArea = width * height`), `srcset` width descriptors (`1280w`), `La` tokens (`La4+` -> 1280x960, `La3` -> 640x480, `La2` -> 208x156, `La1` -> 140x105), and master CDN paths (`.img.avito.st/image/1/`).
+- **Tie-Breaker Formula**: Added tie-breakers (`+ v * 10` for `La` token version and `+ 5` for explicit resolution path segments) to ensure explicit high-res master URLs win over intermediate candidate variants regardless of DOM/metadata candidate extraction order.
+- **Backend Quality Sync**: Synchronized `_get_avito_quality_score(url)` in `core/app/routers/integrations.py` with the extension's objective evidence model.
+- **Version Bump & Delivery**: Extension v0.1.12 packaged into `technoreboot-avito-extension-0.1.12.zip`.
+
+
 
 
 

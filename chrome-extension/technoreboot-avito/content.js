@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.10)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.12)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -85,38 +85,57 @@ function getCanonicalAvitoImageIdentity(url) {
     return pathOnly;
 }
 
-function getImageQualityScore(url) {
+function getImageQualityScore(candidateInput) {
+    const url = typeof candidateInput === 'string' ? candidateInput : ((candidateInput && candidateInput.url) || '');
     if (!url) return 0;
 
-    // Check Avito La\d+ variant descriptor (La4/La5/La6 = high/orig, La3 = mid, La1 = thumbnail)
-    const laMatch = url.match(/La(\d+)/i);
-    let laScore = 0;
-    if (laMatch && laMatch[1]) {
-        const v = parseInt(laMatch[1], 10);
-        if (v === 1) laScore = 100000;       // Super low thumbnail (140x105)
-        else if (v === 2) laScore = 500000;  // Low-mid (208x156)
-        else if (v === 3) laScore = 2000000; // Mid-high (640x480)
-        else laScore = 4000000 + v * 100000; // High / original (La4, La5, La6, etc.)
-    }
+    let w = typeof candidateInput === 'object' ? (candidateInput.width || 0) : 0;
+    let h = typeof candidateInput === 'object' ? (candidateInput.height || 0) : 0;
+    let srcsetW = typeof candidateInput === 'object' ? (candidateInput.srcsetW || 0) : 0;
 
-    // Check explicit dimension in path /640x480/, /1280x960/
+    let explicitBonus = 0;
+
+    // 1. Check path dimensions e.g. /1280x960/ or /640x480/
     const dimMatch = url.match(/\/(?:(\d+)x(\d+))\//);
-    let dimArea = 0;
     if (dimMatch && dimMatch[1] && dimMatch[2]) {
-        dimArea = parseInt(dimMatch[1], 10) * parseInt(dimMatch[2], 10);
+        const pathW = parseInt(dimMatch[1], 10);
+        const pathH = parseInt(dimMatch[2], 10);
+        w = Math.max(w, pathW);
+        h = Math.max(h, pathH);
+        explicitBonus = 5;
     }
 
-    if (laScore > 0) {
-        return laScore + dimArea;
+    let baseArea = 0;
+    if (w > 0 && h > 0) {
+        baseArea = w * h;
+    } else if (srcsetW > 0) {
+        baseArea = srcsetW * Math.round(srcsetW * 0.75);
     }
 
-    if (dimArea > 0) {
-        return dimArea;
+    let laBonus = 0;
+    const laMatch = url.match(/La(\d+)/i);
+    if (laMatch && laMatch[1]) {
+        const laVal = parseInt(laMatch[1], 10);
+        laBonus = laVal * 10;
+        if (baseArea === 0) {
+            if (laVal >= 4) {
+                baseArea = 1280 * 960; // 1,228,800
+            } else if (laVal === 3) {
+                baseArea = 640 * 480;  // 307,200
+            } else if (laVal === 2) {
+                baseArea = 208 * 156;  // 32,448
+            } else if (laVal === 1) {
+                baseArea = 140 * 105;  // 14,700
+            }
+        }
     }
 
-    // Direct CDN image path without thumbnail dimension tokens
-    if (url.includes('.img.avito.st/image/1/')) {
-        return 3000000;
+    if (baseArea === 0 && url.includes('.img.avito.st/image/1/')) {
+        baseArea = 1280 * 960; // 1,228,800
+    }
+
+    if (baseArea > 0) {
+        return baseArea + laBonus + explicitBonus;
     }
 
     return 1;
