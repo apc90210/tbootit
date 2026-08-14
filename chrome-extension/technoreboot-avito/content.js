@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.12)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.13)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -209,10 +209,16 @@ function extractPhotosFromEmbeddedState() {
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
         const text = script.textContent || '';
-        if (text.includes('__initialData__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__')) {
-            const matches = text.match(/https?:\/\/[^\s"'<>]+\.img\.avito\.st\/[^\s"'<>]+/g);
+        if (text.includes('__initialData__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('img.avito.st') || text.includes('avito.st')) {
+            // Unescape JSON escaped slashes and quotes to match escaped URLs in JS objects
+            const unescaped = text.replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
+            const matches = unescaped.match(/https?:\/\/[^\s"'<>\\]+\.img\.avito\.st\/[^\s"'<>\\]+/g);
             if (matches) {
-                matches.forEach(u => urls.push(u));
+                matches.forEach(u => {
+                    const clean = u.replace(/[\"\'\}\]\)\;\,\s]+$/, '');
+                    const valid = validateListingImageUrl(clean);
+                    if (valid) urls.push(valid);
+                });
             }
         }
     }
@@ -235,7 +241,10 @@ function extractPhotosFromDom() {
         'div[class*="image-frame"] img',
         '.gallery-img',
         '.image-frame-wrapper img',
-        '.gallery-list img'
+        '.gallery-list img',
+        'a[data-marker*="image"]',
+        'a[data-marker*="gallery"]',
+        'a[class*="gallery"]'
     ].join(', ');
 
     const els = document.querySelectorAll(selector);
@@ -245,10 +254,20 @@ function extractPhotosFromDom() {
             const candidates = parseSrcsetCandidates(srcset);
             candidates.forEach(c => rawCandidates.push(c.url));
         }
-        const src = el.getAttribute('src') || el.getAttribute('data-src');
-        if (src) {
-            const valid = validateListingImageUrl(src);
-            if (valid) rawCandidates.push(valid);
+        if (el.attributes) {
+            for (let i = 0; i < el.attributes.length; i++) {
+                const attr = el.attributes[i];
+                const val = attr.value;
+                if (val && typeof val === 'string' && val.includes('img.avito.st')) {
+                    if (val.includes(' ')) {
+                        const candidates = parseSrcsetCandidates(val);
+                        candidates.forEach(c => rawCandidates.push(c.url));
+                    } else {
+                        const valid = validateListingImageUrl(val);
+                        if (valid) rawCandidates.push(valid);
+                    }
+                }
+            }
         }
     });
     return rawCandidates;

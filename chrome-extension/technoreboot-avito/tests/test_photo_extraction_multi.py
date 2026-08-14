@@ -387,4 +387,51 @@ def test_intermittent_owner_pattern_all_photos_high():
     assert "p4photo" in res[3]["url"] and ("1280x960" in res[3]["url"] or "La4" in res[3]["url"])
 
 
+def extract_photos_from_embedded_state_simulated(script_text):
+    if not script_text:
+        return []
+    # Unescape JSON escaped slashes and quotes
+    unescaped = script_text.replace(r'\/', '/').replace(r'\"', '"')
+    matches = re.findall(r'https?://[^\s\"\'<>\\]+\.img\.avito\.st/[^\s\"\'<>\\]+', unescaped)
+    cleaned = []
+    for m in matches:
+        clean = re.sub(r'[\"\'\}\]\)\;\,\s]+$', '', m)
+        valid = validate_listing_image_url(clean)
+        if valid:
+            cleaned.append(valid)
+    return cleaned
+
+
+def test_unescaped_json_script_extracts_all_high_res_photos():
+    """Verify script tag containing JSON escaped URLs extracts high-res URLs for all photos."""
+    json_script = r'''
+    window.__initialData__ = {"item":{"images":[
+        {"1280x960":"https:\/\/10.img.avito.st\/image\/1\/1.m9BBHLa6Nzl3tfU8ez6B6VS8NT__vbUxN7g1O_G1PzP3.iJZR3rmCwzP7jxWl7bEwfbEDNCHe_vBDjOHTE2134t8"},
+        {"1280x960":"https:\/\/30.img.avito.st\/image\/1\/1.Z369ULa4y5ed8qdh6W4aNgjzy50DZcj7C_M.toAiKxZzTRuOoGiwuIXzbq40Qr0OTmKLEtvn77R2uSc"},
+        {"1280x960":"https:\/\/90.img.avito.st\/image\/1\/1.VGk5RLa4-IAZ5pQQdSsrIYzn-IqHcfvsj-c.OUon82lLvM1REM9ZkcbjonIjaoeXuLP4zaYk7mmytMM"}
+    ]}};
+    '''
+    extracted = extract_photos_from_embedded_state_simulated(json_script)
+    assert len(extracted) == 3
+    assert "La6" in extracted[0] or "1280x960" in extracted[0]
+    assert "Z369ULa4" in extracted[1]
+    assert "VGk5RLa4" in extracted[2]
+
+    # Process extracted script URLs together with low-res DOM thumbnails
+    dom_thumbnails = [
+        "https://10.img.avito.st/image/1/1.m9BBHLa1low.jpg",
+        "https://30.img.avito.st/image/1/1.Z369ULa1y5en8.jpg",
+        "https://90.img.avito.st/image/1/1.VGk5RLa1-IAj.jpg"
+    ]
+    all_urls = extracted + dom_thumbnails
+    res = process_extracted_urls(all_urls)
+
+    # Every single photo must select the high-res variant extracted from script
+    assert len(res) == 3
+    assert "La6" in res[0]["url"] or "1280x960" in res[0]["url"]
+    assert "Z369ULa4" in res[1]["url"]
+    assert "VGk5RLa4" in res[2]["url"]
+
+
+
 
