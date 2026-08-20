@@ -103,7 +103,8 @@ def get_image_quality_score(url):
 
 
 def process_extracted_urls(raw_urls):
-    result = []
+    groups_map = {}
+    key_order = []
     seen_urls = set()
 
     for raw in raw_urls:
@@ -115,12 +116,26 @@ def process_extracted_urls(raw_urls):
             continue
         seen_urls.add(valid_url)
 
-        result.append({
-            "url": valid_url,
-            "position": len(result)
+        key = get_canonical_avito_image_identity(valid_url)
+        if key not in groups_map:
+            groups_map[key] = []
+            key_order.append(key)
+        groups_map[key].append(valid_url)
+
+    unique_photos = []
+    seen_keys = set()
+    for key in key_order:
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        variants = groups_map[key]
+        best_url = max(variants, key=get_image_quality_score)
+        unique_photos.append({
+            "url": best_url,
+            "position": len(unique_photos)
         })
 
-    return result
+    return unique_photos
 
 
 def test_owner_duplicate_high_and_super_low_variant_collapses_to_one_best_photo():
@@ -134,9 +149,9 @@ def test_owner_duplicate_high_and_super_low_variant_collapses_to_one_best_photo(
         "https://50.img.avito.st/image/1/1.rSZphLa3Ac9JJm0tOrHXbtwnAcXXsQKj3yc.FTjf6QTCVJqQGLmI9IikdlUezTVqzaN0jxxtJdcxKCE",
         "https://50.img.avito.st/image/1/1.rSZphLa1Ac9zJd_MP8KVGXwkA8_XL6_PAyYDzQ.dp7opzKm3y-b22v3fmdxkTrtdVbxo59sjJ2fQ5SA5hw"
     ]
-
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 7
+    assert len(processed) == 3
+    assert "m9BBHLa4" in processed[0]["url"]
 
 
 def test_does_not_synthesize_unpublished_1280x960_url():
@@ -155,7 +170,8 @@ def test_selects_direct_original_cdn_asset_over_thumbnail():
         "https://80.img.avito.st/image/1/hashA.jpg"
     ]
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 3
+    assert len(processed) == 1
+    assert processed[0]["url"] == "https://80.img.avito.st/image/1/hashA.jpg"
 
 
 def test_same_size_different_images_not_deduped():
@@ -180,7 +196,7 @@ def test_reproduction_7_photo_listing_collapses_to_3_clean_photos():
         "https://90.img.avito.st/image/1/1.VGk5RLa1-IAj5SaDHR02Uyzk-oCH71aAU-b6gg.AEDAd9AKNipQOuLkeUr18PzH3N1c5DILrhVHLmDu960",
     ]
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 7
+    assert len(processed) == 3
 
 
 def test_owner_user_voice_4_photos_producing_9_raw_collapses_to_exact_4_clean_high_photos():
@@ -195,9 +211,8 @@ def test_owner_user_voice_4_photos_producing_9_raw_collapses_to_exact_4_clean_hi
         "https://50.img.avito.st/image/1/1.rSZphLa3Ac9JJm0tOrHXbtwnAcXXsQKj3yc.FTjf6QTCVJqQGLmI9IikdlUezTVqzaN0jxxtJdcxKCE",
         "https://50.img.avito.st/image/1/1.rSZphLa1Ac9zJd_MP8KVGXwkA8_XL6_PAyYDzQ.dp7opzKm3y-b22v3fmdxkTrtdVbxo59sjJ2fQ5SA5hw"
     ]
-
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 9
+    assert len(processed) == 4
 
 
 def test_selects_largest_actual_dimensions_regardless_of_candidate_order():
@@ -206,7 +221,8 @@ def test_selects_largest_actual_dimensions_regardless_of_candidate_order():
         "https://10.img.avito.st/1280x960/1.m9BBHLa6test.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 2
+    assert len(res) == 1
+    assert "1280x960" in res[0]["url"]
 
 
 def test_high_then_low_returns_high():
@@ -215,7 +231,8 @@ def test_high_then_low_returns_high():
         "https://10.img.avito.st/image/1/1.m9BBHLa1low.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 2
+    assert len(res) == 1
+    assert "La4high" in res[0]["url"]
 
 
 def test_low_then_high_returns_high():
@@ -224,7 +241,8 @@ def test_low_then_high_returns_high():
         "https://10.img.avito.st/image/1/1.m9BBHLa4high.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 2
+    assert len(res) == 1
+    assert "La4high" in res[0]["url"]
 
 
 def test_three_variants_returns_largest():
@@ -234,7 +252,8 @@ def test_three_variants_returns_largest():
         "https://10.img.avito.st/image/1/1.m9BBHLa5high.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 3
+    assert len(res) == 1
+    assert "La5high" in res[0]["url"]
 
 
 def test_same_identity_different_sources_returns_largest():
@@ -243,7 +262,8 @@ def test_same_identity_different_sources_returns_largest():
         "https://10.img.avito.st/1280x960/1.m9BBHLa4fromjsonld.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 2
+    assert len(res) == 1
+    assert "La4fromjsonld" in res[0]["url"]
 
 
 def test_low_only_photo_is_preserved():
@@ -263,7 +283,11 @@ def test_quality_selection_does_not_change_gallery_order():
         "https://20.img.avito.st/image/1/1.secondphotoLa5.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 4
+    assert len(res) == 2
+    assert "firstphoto" in res[0]["url"]
+    assert res[0]["position"] == 0
+    assert "secondphoto" in res[1]["url"]
+    assert res[1]["position"] == 1
 
 
 def test_main_photo_best_variant_stays_first():
@@ -273,7 +297,10 @@ def test_main_photo_best_variant_stays_first():
         "https://20.img.avito.st/image/1/1.otherphotoLa4.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 3
+    assert len(res) == 2
+    assert "mainphoto" in res[0]["url"]
+    assert "1280x960" in res[0]["url"] or "La6" in res[0]["url"]
+    assert res[0]["position"] == 0
 
 
 def test_intermittent_owner_pattern_all_photos_high():
@@ -288,7 +315,7 @@ def test_intermittent_owner_pattern_all_photos_high():
         "https://40.img.avito.st/1280x960/1.p4photoLa4.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 8
+    assert len(res) == 4
 
 
 def extract_photos_from_embedded_state_simulated(script_text):
@@ -323,7 +350,7 @@ def test_unescaped_json_script_extracts_all_high_res_photos():
     ]
     all_urls = extracted + dom_thumbnails
     res = process_extracted_urls(all_urls)
-    assert len(res) == 6
+    assert len(res) == 3
 
 
 def test_new_avito_format_ba4_ra3_ra1_quality_scoring():
@@ -360,7 +387,8 @@ def test_new_format_selects_ba4_over_ra3_and_ra1():
         "https://10.img.avito.st/image/1/1.sePk6ba4highres.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 3
+    assert len(res) == 1
+    assert "ba4" in res[0]["url"]
 
 
 def test_new_format_multi_photo_listing_all_high_res():
@@ -373,7 +401,10 @@ def test_new_format_multi_photo_listing_all_high_res():
         "https://50.img.avito.st/image/1/1.crQMKba4fullhighres.hash"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 6
+    assert len(res) == 3
+    assert "ba4" in res[0]["url"]
+    assert "ba4" in res[1]["url"]
+    assert "ba4" in res[2]["url"]
 
 
 def test_old_la_format_still_works():
@@ -382,4 +413,5 @@ def test_old_la_format_still_works():
         "https://10.img.avito.st/image/1/1.m9BBHLa4high.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 2
+    assert len(res) == 1
+    assert "La4" in res[0]["url"]

@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from validate_extension_package import validate_extension_directory, validate_extension_zip
 
-VERSION = "0.1.18"
+VERSION = "0.1.19"
 
 def build_zip():
     extension_dir = os.path.abspath("chrome-extension/technoreboot-avito")
