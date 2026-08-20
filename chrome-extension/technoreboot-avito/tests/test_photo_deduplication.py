@@ -9,6 +9,6 @@ def test_content_js_photo_deduplication_and_order():
     with open(content_js_path, "r", encoding="utf-8") as f:
         content_js = f.read()
 
-    assert "seenCanonicalKeys.has(key)" in content_js
-    assert "uniquePhotos.push" in content_js
-    assert "position: uniquePhotos.length" in content_js
+    assert "seenUrls.has(validUrl)" in content_js
+    assert "result.push" in content_js
+    assert "position: result.length" in content_js

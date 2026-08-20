@@ -322,29 +322,8 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 pass
         db.delete(photo_row)
 
-    # Pre-deduplicate incoming photos by canonical identity, picking ONLY 1 best quality variant per photo key
-    incoming_raw_photos = payload.photos or []
-    grouped_incoming = {}
-    key_sequence = []
-    unkeyed_incoming = []
-
-    for item_photo in incoming_raw_photos:
-        source_url = item_photo.url
-        ckey = _get_avito_canonical_identity(source_url) if source_url else None
-        if ckey:
-            if ckey not in grouped_incoming:
-                grouped_incoming[ckey] = []
-                key_sequence.append(ckey)
-            grouped_incoming[ckey].append(item_photo)
-        else:
-            unkeyed_incoming.append(item_photo)
-
-    effective_photos = []
-    for ckey in key_sequence:
-        candidates = grouped_incoming[ckey]
-        best_item = max(candidates, key=lambda p: _get_avito_quality_score(p.url))
-        effective_photos.append(best_item)
-    effective_photos.extend(unkeyed_incoming)
+    # Process ALL incoming photos from payload without dropping any photo variants
+    effective_photos = payload.photos or []
 
     # Track incoming content hashes and source URLs for reconciliation
     incoming_content_hashes = set()
@@ -437,56 +416,19 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         db.add(new_photo)
         photos_imported += 1
 
-    # 3b. Avito photo set reconciliation — remove stale Avito-managed variants & obsolete photos
-    # Only reconcile if we received at least one photo in the incoming payload
+    # 3b. Avito photo set reconciliation — remove obsolete photos no longer in payload
     if len(payload.photos) > 0:
 
-        # Build incoming set of canonical keys and source URLs
-        incoming_canonical_keys = set()
-        for p in payload.photos:
-            if p.url:
-                ckey = _get_avito_canonical_identity(p.url)
-                if ckey:
-                    incoming_canonical_keys.add(ckey)
-
-        # Get ALL current photos for this product after import
         all_photos = db.query(models.ProductPhoto).filter(
             models.ProductPhoto.product_id == product.id
         ).all()
-
-        # Categorize photos
-        avito_groups = {}  # canonical_key -> [photo_rows]
-        unkeyed_avito_photos = []
 
         for photo in all_photos:
             if not _is_avito_managed(photo.source_url):
                 # Manual or non-Avito photo — DO NOT TOUCH!
                 continue
-            key = _get_avito_canonical_identity(photo.source_url)
-            if key:
-                if key not in avito_groups:
-                    avito_groups[key] = []
-                avito_groups[key].append(photo)
-            else:
-                unkeyed_avito_photos.append(photo)
-
-        # Reconcile keyed Avito photo groups
-        for key, variants in avito_groups.items():
-            if key not in incoming_canonical_keys:
-                # Obsolete Avito photo (removed from listing) — delete all variants
-                for variant in variants:
-                    _delete_photo_file_and_row(variant)
-                    photos_reconciled += 1
-            elif len(variants) > 1:
-                # Multiple variants in DB for an active photo — keep only the best quality
-                best = max(variants, key=lambda p: _get_avito_quality_score(p.source_url))
-                for variant in variants:
-                    if variant.id != best.id:
-                        _delete_photo_file_and_row(variant)
-                        photos_reconciled += 1
-
-        # Reconcile unkeyed Avito photos
-        for photo in unkeyed_avito_photos:
+            
+            # If photo content hash and source URL are no longer in incoming payload, delete
             if photo.source_url not in incoming_source_urls and photo.content_hash not in incoming_content_hashes:
                 _delete_photo_file_and_row(photo)
                 photos_reconciled += 1

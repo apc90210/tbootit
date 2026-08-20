@@ -606,54 +606,25 @@ function extractAllPhotos(jsonLd) {
     rawUrls.push(...extractPhotosFromEmbeddedState());
     rawUrls.push(...extractPhotosFromDom());
 
-    const groupsMap = new Map(); // canonicalKey -> [urls]
-    const keyOrder = [];
+    const result = [];
     const seenUrls = new Set();
 
-    for (let raw of rawUrls) {
+    for (let i = 0; i < rawUrls.length; i++) {
+        const raw = rawUrls[i];
         const validUrl = validateListingImageUrl(raw);
         if (!validUrl) continue;
 
+        // Skip exact duplicate URL strings
         if (seenUrls.has(validUrl)) continue;
         seenUrls.add(validUrl);
 
-        const key = getCanonicalAvitoImageIdentity(validUrl);
-        if (!groupsMap.has(key)) {
-            groupsMap.set(key, []);
-            keyOrder.push(key);
-        }
-        groupsMap.get(key).push(validUrl);
-    }
-
-    // Select ONE best resolution variant per unique physical photo identity
-    const uniquePhotos = [];
-    const seenCanonicalKeys = new Set();
-
-    for (const key of keyOrder) {
-        if (seenCanonicalKeys.has(key)) continue;
-        seenCanonicalKeys.add(key);
-
-        const variants = groupsMap.get(key) || [];
-        if (variants.length === 0) continue;
-
-        let bestUrl = variants[0];
-        let maxScore = getImageQualityScore(bestUrl);
-
-        for (let i = 1; i < variants.length; i++) {
-            const score = getImageQualityScore(variants[i]);
-            if (score > maxScore) {
-                maxScore = score;
-                bestUrl = variants[i];
-            }
-        }
-
-        uniquePhotos.push({
-            url: bestUrl,
-            position: uniquePhotos.length
+        result.push({
+            url: validUrl,
+            position: result.length
         });
     }
 
-    return uniquePhotos;
+    return result;
 }
 
 function extractListingData() {
