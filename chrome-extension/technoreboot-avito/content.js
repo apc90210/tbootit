@@ -303,7 +303,7 @@ function parseItemImagesFromJsonObject(data) {
         }
 
         for (const [k, v] of Object.entries(obj)) {
-            if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile' || k === 'widgets' || k === 'popular') {
+            if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile' || k === 'popular') {
                 continue;
             }
             if (Array.isArray(v) && v.length > 0) {
@@ -523,6 +523,28 @@ function extractPhotosFromDom() {
                              document.querySelector('.style-item-view-gallery-') ||
                              document.body;
 
+    // 1. Scan links wrapping gallery images
+    const links = galleryContainer.querySelectorAll('a[href*="img.avito.st"]');
+    links.forEach(a => {
+        if (a.closest && (a.closest('[data-marker="seller-info"]') || a.closest('[data-marker="user-info"]') || a.closest('.seller-info-avatar'))) return;
+        const valid = validateListingImageUrl(a.href);
+        if (valid) rawCandidates.push(valid);
+    });
+
+    // 2. Scan elements with data-url / data-src / data-large / data-full / data-high-res
+    const dataEls = galleryContainer.querySelectorAll('[data-url*="img.avito.st"], [data-src*="img.avito.st"], [data-large*="img.avito.st"], [data-full*="img.avito.st"]');
+    dataEls.forEach(el => {
+        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]'))) return;
+        ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res'].forEach(attr => {
+            const val = el.getAttribute(attr);
+            if (val) {
+                const valid = validateListingImageUrl(val);
+                if (valid) rawCandidates.push(valid);
+            }
+        });
+    });
+
+    // 3. Scan img and picture source elements
     const selector = [
         '[data-marker="image-frame/image-wrapper"] img',
         '[data-marker="gallery/image"] img',
@@ -544,6 +566,12 @@ function extractPhotosFromDom() {
     els.forEach(el => {
         if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar'))) {
             return;
+        }
+
+        const parentLink = el.closest('a');
+        if (parentLink && parentLink.href && parentLink.href.includes('img.avito.st')) {
+            const validLink = validateListingImageUrl(parentLink.href);
+            if (validLink) rawCandidates.push(validLink);
         }
 
         const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
