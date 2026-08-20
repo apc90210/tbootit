@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.14)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.15)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -32,13 +32,15 @@ function validateListingImageUrl(url) {
     if (u.startsWith('//')) u = 'https:' + u;
     if (!u.startsWith('http://') && !u.startsWith('https://')) return null;
 
-    // Filter out non-listing images (avatars, icons, logos, badges, ads, svgs)
+    // Filter out non-listing images (avatars, icons, logos, badges, ads, svgs, profiles)
     const lower = u.toLowerCase();
     if (lower.includes('/avatar/') || lower.includes('/avatars/') ||
         lower.includes('/icons/') || lower.includes('/logos/') ||
         lower.includes('/shop/') || lower.includes('/recom/') ||
-        lower.includes('/banner/') || lower.endsWith('.svg') ||
-        lower.startsWith('data:')) {
+        lower.includes('/banner/') || lower.includes('/profile/') ||
+        lower.includes('/user/') || lower.includes('/seller/') ||
+        lower.includes('rpq-qra') || lower.includes('rpq-qba') ||
+        lower.endsWith('.svg') || lower.startsWith('data:')) {
         return null;
     }
 
@@ -88,9 +90,6 @@ function getCanonicalAvitoImageIdentity(url) {
 }
 
 function extractAvitoResolutionVersion(url) {
-    // Extract resolution version number from Avito CDN URL
-    // New format: token like "sePk6ba4HQr" where the digit after [letter]a is the version
-    // Old format: "m9BBHLa6" with explicit La[digit]
     if (!url) return 0;
     const pathOnly = url.split('?')[0];
     let cleanPath = pathOnly.replace(/^https?:\/\/[^\/]+\//i, '');
@@ -98,7 +97,6 @@ function extractAvitoResolutionVersion(url) {
     const filename = cleanPath.split('/').pop() || cleanPath;
     const token = filename.replace(/^\d+\./, '');
 
-    // Match [letter]a[digit] pattern in token (ba4, ra3, La6, ra1, etc.)
     const m = token.match(/[a-zA-Z]a(\d)/);
     if (m) return parseInt(m[1], 10);
     return 0;
@@ -114,7 +112,6 @@ function getImageQualityScore(candidateInput) {
 
     let explicitBonus = 0;
 
-    // 1. Check path dimensions e.g. /1280x960/ or /640x480/
     const dimMatch = url.match(/\/(?:(\d+)x(\d+))\//);
     if (dimMatch && dimMatch[1] && dimMatch[2]) {
         const pathW = parseInt(dimMatch[1], 10);
@@ -131,23 +128,22 @@ function getImageQualityScore(candidateInput) {
         baseArea = srcsetW * Math.round(srcsetW * 0.75);
     }
 
-    // Extract resolution version from Avito CDN URL (handles both old La4 and new ba4/ra3 formats)
     const laVal = extractAvitoResolutionVersion(url);
     let laBonus = laVal * 10;
     if (laVal > 0 && baseArea === 0) {
         if (laVal >= 4) {
-            baseArea = 1280 * 960; // 1,228,800
+            baseArea = 1280 * 960;
         } else if (laVal === 3) {
-            baseArea = 640 * 480;  // 307,200
+            baseArea = 640 * 480;
         } else if (laVal === 2) {
-            baseArea = 208 * 156;  // 32,448
+            baseArea = 208 * 156;
         } else if (laVal === 1) {
-            baseArea = 140 * 105;  // 14,700
+            baseArea = 140 * 105;
         }
     }
 
     if (baseArea === 0 && url.includes('.img.avito.st/image/1/')) {
-        baseArea = 1280 * 960; // 1,228,800
+        baseArea = 1280 * 960;
     }
 
     if (baseArea > 0) {
@@ -205,19 +201,88 @@ function parseJsonLdImages(jsonLd) {
         if (!img) continue;
 
         if (typeof img === 'string') {
-            urls.push(img);
+            const valid = validateListingImageUrl(img);
+            if (valid) urls.push(valid);
         } else if (Array.isArray(img)) {
             img.forEach(item => {
-                if (typeof item === 'string') urls.push(item);
-                else if (item && typeof item === 'object' && item.url) urls.push(item.url);
-                else if (item && typeof item === 'object' && item.contentUrl) urls.push(item.contentUrl);
+                let u = null;
+                if (typeof item === 'string') u = item;
+                else if (item && typeof item === 'object' && item.url) u = item.url;
+                else if (item && typeof item === 'object' && item.contentUrl) u = item.contentUrl;
+                const valid = validateListingImageUrl(u);
+                if (valid) urls.push(valid);
             });
         } else if (typeof img === 'object') {
-            if (img.url) urls.push(img.url);
-            else if (img.contentUrl) urls.push(img.contentUrl);
+            let u = img.url || img.contentUrl;
+            const valid = validateListingImageUrl(u);
+            if (valid) urls.push(valid);
         }
     }
     return urls;
+}
+
+function getBestResolutionFromImageObject(imgObj) {
+    if (!imgObj || typeof imgObj !== 'object') return null;
+    const priorityKeys = ["1280x960", "1280x1024", "1920x1080", "640x480", "432x324", "208x156", "140x105"];
+    for (const key of priorityKeys) {
+        if (imgObj[key] && typeof imgObj[key] === 'string') {
+            const valid = validateListingImageUrl(imgObj[key]);
+            if (valid) return valid;
+        }
+    }
+    let bestUrl = null;
+    let maxScore = 0;
+    for (const val of Object.values(imgObj)) {
+        if (typeof val === 'string' && val.includes('img.avito.st')) {
+            const valid = validateListingImageUrl(val);
+            if (valid) {
+                const score = getImageQualityScore(valid);
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestUrl = valid;
+                }
+            }
+        }
+    }
+    return bestUrl;
+}
+
+function parseItemImagesFromJsonObject(data) {
+    const photos = [];
+    if (!data || typeof data !== 'object') return photos;
+
+    function findItemObject(obj, depth) {
+        if (!obj || typeof obj !== 'object' || depth > 6) return null;
+        if (obj.item && typeof obj.item === 'object' && (obj.item.images || obj.item.photos)) return obj.item;
+        if (obj['single-item'] && typeof obj['single-item'] === 'object' && (obj['single-item'].images || obj['single-item'].photos)) return obj['single-item'];
+        if (obj.product && typeof obj.product === 'object' && (obj.product.images || obj.product.photos)) return obj.product;
+
+        for (const k of Object.keys(obj)) {
+            if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile') continue;
+            if (typeof obj[k] === 'object' && obj[k]) {
+                const res = findItemObject(obj[k], depth + 1);
+                if (res) return res;
+            }
+        }
+        return null;
+    }
+
+    const item = findItemObject(data, 0);
+    if (item) {
+        const images = item.images || item.photos;
+        if (Array.isArray(images)) {
+            images.forEach(imgObj => {
+                if (typeof imgObj === 'string') {
+                    const valid = validateListingImageUrl(imgObj);
+                    if (valid) photos.push(valid);
+                } else if (typeof imgObj === 'object' && imgObj) {
+                    const best = getBestResolutionFromImageObject(imgObj);
+                    if (best) photos.push(best);
+                }
+            });
+        }
+    }
+    return photos;
 }
 
 function extractPhotosFromEmbeddedState() {
@@ -225,9 +290,45 @@ function extractPhotosFromEmbeddedState() {
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
         const text = script.textContent || '';
-        if (text.includes('__initialData__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('img.avito.st') || text.includes('avito.st')) {
-            // Unescape JSON escaped slashes and quotes to match escaped URLs in JS objects
-            const unescaped = text.replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
+        if (text.includes('img.avito.st') || text.includes('avito.st') || text.includes('__initialData__')) {
+            const unescaped = text
+                .replace(/\\u002F/ig, '/')
+                .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
+
+            // 1. Try structured JSON item.images parsing
+            try {
+                const jsonMatch = unescaped.match(/(?:window\.__initialData__|__initialData__|__INITIAL_STATE__|window\.__state__)\s*=\s*(\{.*?\});?/s) ||
+                                  unescaped.match(/(\{"(?:item|single-item|catalog)".*?\})/s);
+                if (jsonMatch && jsonMatch[1]) {
+                    const parsed = JSON.parse(jsonMatch[1]);
+                    const itemPhotos = parseItemImagesFromJsonObject(parsed);
+                    if (itemPhotos.length > 0) {
+                        return itemPhotos;
+                    }
+                }
+            } catch (e) {}
+
+            // 2. Direct regex match on "images":[ ... ] array
+            const imagesArrayMatch = unescaped.match(/"images"\s*:\s*(\[\s*\{.*?\}\s*\])/s);
+            if (imagesArrayMatch && imagesArrayMatch[1]) {
+                try {
+                    const imagesArr = JSON.parse(imagesArrayMatch[1]);
+                    if (Array.isArray(imagesArr)) {
+                        imagesArr.forEach(imgObj => {
+                            if (typeof imgObj === 'string') {
+                                const valid = validateListingImageUrl(imgObj);
+                                if (valid) urls.push(valid);
+                            } else if (typeof imgObj === 'object' && imgObj) {
+                                const best = getBestResolutionFromImageObject(imgObj);
+                                if (best) urls.push(best);
+                            }
+                        });
+                        if (urls.length > 0) return urls;
+                    }
+                } catch (e) {}
+            }
+
+            // 3. Fallback regex match across script text
             const matches = unescaped.match(/https?:\/\/[^\s"'<>\\]+\.img\.avito\.st\/[^\s"'<>\\]+/g);
             if (matches) {
                 matches.forEach(u => {
@@ -243,6 +344,12 @@ function extractPhotosFromEmbeddedState() {
 
 function extractPhotosFromDom() {
     const rawCandidates = [];
+    const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
+                             document.querySelector('[data-marker="gallery"]') ||
+                             document.querySelector('.gallery-root') ||
+                             document.querySelector('.style-item-view-gallery-') ||
+                             document.body;
+
     const selector = [
         '[data-marker="image-frame/image-wrapper"] img',
         '[data-marker="gallery/image"] img',
@@ -257,14 +364,15 @@ function extractPhotosFromDom() {
         'div[class*="image-frame"] img',
         '.gallery-img',
         '.image-frame-wrapper img',
-        '.gallery-list img',
-        'a[data-marker*="image"]',
-        'a[data-marker*="gallery"]',
-        'a[class*="gallery"]'
+        '.gallery-list img'
     ].join(', ');
 
-    const els = document.querySelectorAll(selector);
+    const els = galleryContainer.querySelectorAll(selector);
     els.forEach(el => {
+        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar'))) {
+            return;
+        }
+
         const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
         if (srcset) {
             const candidates = parseSrcsetCandidates(srcset);
