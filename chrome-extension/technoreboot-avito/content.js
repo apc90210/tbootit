@@ -1,4 +1,36 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.15)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.16)
+
+let pageInitialData = null;
+
+// Listen for direct initial data captured from main world
+document.addEventListener('TechnorebootInitialData', function(e) {
+    if (e && e.detail) {
+        try {
+            pageInitialData = typeof e.detail === 'string' ? JSON.parse(e.detail) : e.detail;
+        } catch (err) {}
+    }
+});
+
+function triggerInitialDataCapture() {
+    try {
+        const script = document.createElement('script');
+        script.textContent = `
+            (function() {
+                try {
+                    var d = window.__initialData__ || window.__INITIAL_STATE__ || window.__state__;
+                    if (d) {
+                        document.dispatchEvent(new CustomEvent('TechnorebootInitialData', { detail: JSON.stringify(d) }));
+                    }
+                } catch(e) {}
+            })();
+        `;
+        (document.head || document.documentElement).appendChild(script);
+        script.remove();
+    } catch (e) {}
+}
+
+// Immediately attempt capture on load
+triggerInitialDataCapture();
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -32,7 +64,6 @@ function validateListingImageUrl(url) {
     if (u.startsWith('//')) u = 'https:' + u;
     if (!u.startsWith('http://') && !u.startsWith('https://')) return null;
 
-    // Filter out non-listing images (avatars, icons, logos, badges, ads, svgs, profiles)
     const lower = u.toLowerCase();
     if (lower.includes('/avatar/') || lower.includes('/avatars/') ||
         lower.includes('/icons/') || lower.includes('/logos/') ||
@@ -50,37 +81,22 @@ function validateListingImageUrl(url) {
 function getCanonicalAvitoImageIdentity(url) {
     if (!url || typeof url !== 'string') return '';
 
-    // Strip query string
     const pathOnly = url.split('?')[0];
-
-    // Remove protocol and domain e.g. https://10.img.avito.st/
     let cleanPath = pathOnly.replace(/^https?:\/\/[^\/]+\//i, '');
-
-    // Remove size path segments or image/1/ prefixes repeatedly
     cleanPath = cleanPath.replace(/^(?:image\/\d+\/|\d+x\d+\/)+/i, '');
-
-    // Extract filename tail
     const filename = cleanPath.split('/').pop() || cleanPath;
-
-    // Strip leading numbers and dot e.g. "1." or "2."
     const token = filename.replace(/^\d+\./, '');
 
-    // New Avito format: token like "sePk6ba4HQr..." where [letter]a[digit] embeds resolution
-    // Old format: "m9BBHLa6..." with explicit La[digit]
-    // Match both: [prefix][letter]a[digit] where the prefix is the photo identity
     const laMatch = token.match(/^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d/i);
     if (laMatch && laMatch[1]) {
         return `avito_photo_${laMatch[1]}`;
     }
 
     const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
-
-    // If token is a long CDN hash (> 10 chars), extract the 5-char Avito hash prefix
     if (tokenNoExt.length > 10 && /^[A-Za-z0-9_-]{5}/.test(tokenNoExt)) {
         return `avito_photo_${tokenNoExt.substring(0, 5)}`;
     }
 
-    // Standard fallback: clean special characters
     const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
     if (cleanName.length >= 3) {
         return `avito_photo_${cleanName}`;
@@ -223,6 +239,29 @@ function parseJsonLdImages(jsonLd) {
 
 function getBestResolutionFromImageObject(imgObj) {
     if (!imgObj || typeof imgObj !== 'object') return null;
+
+    // 1. Check explicit dimension keys (e.g. "1280x960", "640x480", "1920x1080")
+    let bestUrl = null;
+    let maxArea = 0;
+
+    for (const key of Object.keys(imgObj)) {
+        const val = imgObj[key];
+        if (typeof val !== 'string' || !val.includes('img.avito.st')) continue;
+        const valid = validateListingImageUrl(val);
+        if (!valid) continue;
+
+        const dimMatch = key.match(/^(\d+)x(\d+)$/);
+        if (dimMatch) {
+            const area = parseInt(dimMatch[1], 10) * parseInt(dimMatch[2], 10);
+            if (area > maxArea) {
+                maxArea = area;
+                bestUrl = valid;
+            }
+        }
+    }
+    if (bestUrl) return bestUrl;
+
+    // 2. Priority check for standard size keys
     const priorityKeys = ["1280x960", "1280x1024", "1920x1080", "640x480", "432x324", "208x156", "140x105"];
     for (const key of priorityKeys) {
         if (imgObj[key] && typeof imgObj[key] === 'string') {
@@ -230,7 +269,8 @@ function getBestResolutionFromImageObject(imgObj) {
             if (valid) return valid;
         }
     }
-    let bestUrl = null;
+
+    // 3. Score all values in object
     let maxScore = 0;
     for (const val of Object.values(imgObj)) {
         if (typeof val === 'string' && val.includes('img.avito.st')) {
@@ -285,8 +325,115 @@ function parseItemImagesFromJsonObject(data) {
     return photos;
 }
 
+function extractJsonAssignedToVar(text, varName) {
+    const idx = text.indexOf(varName);
+    if (idx === -1) return null;
+
+    const eqIdx = text.indexOf('=', idx);
+    if (eqIdx === -1) return null;
+
+    let startIdx = -1;
+    let isQuotedString = false;
+    for (let i = eqIdx + 1; i < text.length; i++) {
+        const c = text[i];
+        if (c === '{') {
+            startIdx = i;
+            break;
+        }
+        if (c === '"' || c === "'") {
+            startIdx = i;
+            isQuotedString = true;
+            break;
+        }
+        if (c !== ' ' && c !== '\t' && c !== '\r' && c !== '\n') {
+            break;
+        }
+    }
+    if (startIdx === -1) return null;
+
+    if (isQuotedString) {
+        const quoteChar = text[startIdx];
+        let endIdx = -1;
+        let escape = false;
+        for (let i = startIdx + 1; i < text.length; i++) {
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (text[i] === '\\') {
+                escape = true;
+                continue;
+            }
+            if (text[i] === quoteChar) {
+                endIdx = i;
+                break;
+            }
+        }
+        if (endIdx !== -1) {
+            let strVal = text.substring(startIdx + 1, endIdx);
+            try {
+                if (strVal.includes('%7B') || strVal.includes('%22')) {
+                    strVal = decodeURIComponent(strVal);
+                }
+                let parsed = JSON.parse(strVal);
+                if (typeof parsed === 'string') {
+                    parsed = JSON.parse(parsed);
+                }
+                if (typeof parsed === 'object' && parsed) return parsed;
+            } catch (e) {}
+        }
+        return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = startIdx; i < text.length; i++) {
+        const char = text[i];
+        if (escape) {
+            escape = false;
+            continue;
+        }
+        if (char === '\\') {
+            escape = true;
+            continue;
+        }
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+        if (!inString) {
+            if (char === '{') depth++;
+            else if (char === '}') {
+                depth--;
+                if (depth === 0) {
+                    const jsonStr = text.substring(startIdx, i + 1);
+                    try {
+                        return JSON.parse(jsonStr);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
 function extractPhotosFromEmbeddedState() {
     const urls = [];
+
+    // 1. Direct main-world initialData check
+    triggerInitialDataCapture();
+    if (pageInitialData) {
+        const itemPhotos = parseItemImagesFromJsonObject(pageInitialData);
+        if (itemPhotos.length > 0) {
+            return itemPhotos;
+        }
+    }
+
+    // 2. Embedded script tags extraction
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
         const text = script.textContent || '';
@@ -295,20 +442,20 @@ function extractPhotosFromEmbeddedState() {
                 .replace(/\\u002F/ig, '/')
                 .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
 
-            // 1. Try structured JSON item.images parsing
-            try {
-                const jsonMatch = unescaped.match(/(?:window\.__initialData__|__initialData__|__INITIAL_STATE__|window\.__state__)\s*=\s*(\{.*?\});?/s) ||
-                                  unescaped.match(/(\{"(?:item|single-item|catalog)".*?\})/s);
-                if (jsonMatch && jsonMatch[1]) {
-                    const parsed = JSON.parse(jsonMatch[1]);
-                    const itemPhotos = parseItemImagesFromJsonObject(parsed);
-                    if (itemPhotos.length > 0) {
-                        return itemPhotos;
+            // Balanced brace parsing for known state variables
+            for (const varName of ['__initialData__', '__INITIAL_STATE__', 'window.__state__', 'initialData']) {
+                if (unescaped.includes(varName)) {
+                    const parsed = extractJsonAssignedToVar(unescaped, varName);
+                    if (parsed) {
+                        const itemPhotos = parseItemImagesFromJsonObject(parsed);
+                        if (itemPhotos.length > 0) {
+                            return itemPhotos;
+                        }
                     }
                 }
-            } catch (e) {}
+            }
 
-            // 2. Direct regex match on "images":[ ... ] array
+            // Direct regex match on "images":[ ... ] array
             const imagesArrayMatch = unescaped.match(/"images"\s*:\s*(\[\s*\{.*?\}\s*\])/s);
             if (imagesArrayMatch && imagesArrayMatch[1]) {
                 try {
@@ -328,7 +475,7 @@ function extractPhotosFromEmbeddedState() {
                 } catch (e) {}
             }
 
-            // 3. Fallback regex match across script text
+            // Fallback regex match across script text
             const matches = unescaped.match(/https?:\/\/[^\s"'<>\\]+\.img\.avito\.st\/[^\s"'<>\\]+/g);
             if (matches) {
                 matches.forEach(u => {
