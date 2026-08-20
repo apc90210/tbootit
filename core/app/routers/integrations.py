@@ -224,17 +224,35 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     storage_photos_dir = os.path.join(settings.storage_root, "product_photos")
     os.makedirs(storage_photos_dir, exist_ok=True)
 
+    def _extract_avito_resolution_version(url):
+        """Extract resolution version from Avito CDN URL.
+        New format: 'sePk6ba4HQr' -> 4 (ba4), 'rpQ-qra1FH0' -> 1 (ra1)
+        Old format: 'm9BBHLa6' -> 6 (La6)
+        """
+        if not url:
+            return 0
+        path_only = url.split("?")[0]
+        clean_path = _re.sub(r"^https?://[^/]+/", "", path_only, flags=_re.IGNORECASE)
+        clean_path = _re.sub(r"^(?:image/\d+/|\d+x\d+/)+", "", clean_path, flags=_re.IGNORECASE)
+        filename = clean_path.split("/")[-1]
+        token = _re.sub(r"^\d+\.", "", filename)
+        m = _re.search(r"[a-zA-Z]a(\d)", token)
+        if m:
+            return int(m.group(1))
+        return 0
+
     def _get_avito_canonical_identity(url):
         """Extract canonical Avito photo identity from source_url."""
         if not url:
             return None
         path_only = url.split("?")[0]
-        clean_path = _re.sub(r"^https?:\/\/[^\/]+\/", "", path_only, flags=_re.IGNORECASE)
-        clean_path = _re.sub(r"^(?:image\/\d+\/|\d+x\d+\/)+", "", clean_path, flags=_re.IGNORECASE)
+        clean_path = _re.sub(r"^https?://[^/]+/", "", path_only, flags=_re.IGNORECASE)
+        clean_path = _re.sub(r"^(?:image/\d+/|\d+x\d+/)+", "", clean_path, flags=_re.IGNORECASE)
         filename = clean_path.split("/")[-1]
         token = _re.sub(r"^\d+\.", "", filename)
 
-        la_match = _re.search(r"^([A-Za-z0-9_-]{3,})La\d+", token, _re.IGNORECASE)
+        # Match [prefix][letter]a[digit] — both new (ba4, ra3) and old (La6) formats
+        la_match = _re.search(r"^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d", token, _re.IGNORECASE)
         if la_match:
             return "avito_photo_" + la_match.group(1)
 
@@ -251,7 +269,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         return None
 
     def _get_avito_quality_score(url):
-        """Score Avito image variant quality by explicit path dimensions, La token, or master CDN."""
+        """Score Avito image variant quality by explicit path dimensions, resolution version, or master CDN."""
         if not url:
             return 0
 
@@ -269,20 +287,17 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
 
         base_area = w * h if (w > 0 and h > 0) else 0
 
-        la_bonus = 0
-        m = _re.search(r"La(\d+)", url, _re.IGNORECASE)
-        if m:
-            v = int(m.group(1))
-            la_bonus = v * 10
-            if base_area == 0:
-                if v >= 4:
-                    base_area = 1280 * 960  # 1,228,800
-                elif v == 3:
-                    base_area = 640 * 480   # 307,200
-                elif v == 2:
-                    base_area = 208 * 156   # 32,448
-                elif v == 1:
-                    base_area = 140 * 105   # 14,700
+        v = _extract_avito_resolution_version(url)
+        la_bonus = v * 10
+        if v > 0 and base_area == 0:
+            if v >= 4:
+                base_area = 1280 * 960  # 1,228,800
+            elif v == 3:
+                base_area = 640 * 480   # 307,200
+            elif v == 2:
+                base_area = 208 * 156   # 32,448
+            elif v == 1:
+                base_area = 140 * 105   # 14,700
 
         if base_area == 0 and "img.avito.st/image/1/" in url.lower():
             base_area = 1280 * 960

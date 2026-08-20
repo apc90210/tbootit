@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.13)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.14)
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -63,8 +63,10 @@ function getCanonicalAvitoImageIdentity(url) {
     // Strip leading numbers and dot e.g. "1." or "2."
     const token = filename.replace(/^\d+\./, '');
 
-    // Check if token has La descriptor e.g. m9BBHLa6...
-    const laMatch = token.match(/^([A-Za-z0-9_-]{3,})La\d+/i);
+    // New Avito format: token like "sePk6ba4HQr..." where [letter]a[digit] embeds resolution
+    // Old format: "m9BBHLa6..." with explicit La[digit]
+    // Match both: [prefix][letter]a[digit] where the prefix is the photo identity
+    const laMatch = token.match(/^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d/i);
     if (laMatch && laMatch[1]) {
         return `avito_photo_${laMatch[1]}`;
     }
@@ -83,6 +85,23 @@ function getCanonicalAvitoImageIdentity(url) {
     }
 
     return pathOnly;
+}
+
+function extractAvitoResolutionVersion(url) {
+    // Extract resolution version number from Avito CDN URL
+    // New format: token like "sePk6ba4HQr" where the digit after [letter]a is the version
+    // Old format: "m9BBHLa6" with explicit La[digit]
+    if (!url) return 0;
+    const pathOnly = url.split('?')[0];
+    let cleanPath = pathOnly.replace(/^https?:\/\/[^\/]+\//i, '');
+    cleanPath = cleanPath.replace(/^(?:image\/\d+\/|\d+x\d+\/)+/i, '');
+    const filename = cleanPath.split('/').pop() || cleanPath;
+    const token = filename.replace(/^\d+\./, '');
+
+    // Match [letter]a[digit] pattern in token (ba4, ra3, La6, ra1, etc.)
+    const m = token.match(/[a-zA-Z]a(\d)/);
+    if (m) return parseInt(m[1], 10);
+    return 0;
 }
 
 function getImageQualityScore(candidateInput) {
@@ -112,21 +131,18 @@ function getImageQualityScore(candidateInput) {
         baseArea = srcsetW * Math.round(srcsetW * 0.75);
     }
 
-    let laBonus = 0;
-    const laMatch = url.match(/La(\d+)/i);
-    if (laMatch && laMatch[1]) {
-        const laVal = parseInt(laMatch[1], 10);
-        laBonus = laVal * 10;
-        if (baseArea === 0) {
-            if (laVal >= 4) {
-                baseArea = 1280 * 960; // 1,228,800
-            } else if (laVal === 3) {
-                baseArea = 640 * 480;  // 307,200
-            } else if (laVal === 2) {
-                baseArea = 208 * 156;  // 32,448
-            } else if (laVal === 1) {
-                baseArea = 140 * 105;  // 14,700
-            }
+    // Extract resolution version from Avito CDN URL (handles both old La4 and new ba4/ra3 formats)
+    const laVal = extractAvitoResolutionVersion(url);
+    let laBonus = laVal * 10;
+    if (laVal > 0 && baseArea === 0) {
+        if (laVal >= 4) {
+            baseArea = 1280 * 960; // 1,228,800
+        } else if (laVal === 3) {
+            baseArea = 640 * 480;  // 307,200
+        } else if (laVal === 2) {
+            baseArea = 208 * 156;  // 32,448
+        } else if (laVal === 1) {
+            baseArea = 140 * 105;  // 14,700
         }
     }
 

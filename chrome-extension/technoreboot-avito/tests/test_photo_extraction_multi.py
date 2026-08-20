@@ -1,7 +1,7 @@
 import re
 import pytest
 
-# Python simulator of content.js v0.1.9 getCanonicalAvitoImageIdentity & extractAllPhotos
+# Python simulator of content.js v0.1.14 getCanonicalAvitoImageIdentity & extractAllPhotos
 
 def validate_listing_image_url(url):
     if not url or not isinstance(url, str):
@@ -23,16 +23,35 @@ def validate_listing_image_url(url):
     return u
 
 
+def extract_avito_resolution_version(url):
+    """Extract resolution version number from Avito CDN URL.
+    New format: 'sePk6ba4HQr' -> 4, 'rpQ-qra1FH0' -> 1
+    Old format: 'm9BBHLa6' -> 6
+    """
+    if not url:
+        return 0
+    path_only = url.split('?')[0]
+    clean_path = re.sub(r'^https?://[^/]+/', '', path_only, flags=re.IGNORECASE)
+    clean_path = re.sub(r'^(?:image/\d+/|\d+x\d+/)+', '', clean_path, flags=re.IGNORECASE)
+    filename = clean_path.split('/')[-1]
+    token = re.sub(r'^\d+\.', '', filename)
+    m = re.search(r'[a-zA-Z]a(\d)', token)
+    if m:
+        return int(m.group(1))
+    return 0
+
+
 def get_canonical_avito_image_identity(url):
     if not url or not isinstance(url, str):
         return ''
     path_only = url.split('?')[0]
-    clean_path = re.sub(r'^https?:\/\/[^\/]+\/', '', path_only, flags=re.IGNORECASE)
-    clean_path = re.sub(r'^(?:image\/\d+\/|\d+x\d+\/)+', '', clean_path, flags=re.IGNORECASE)
+    clean_path = re.sub(r'^https?://[^/]+/', '', path_only, flags=re.IGNORECASE)
+    clean_path = re.sub(r'^(?:image/\d+/|\d+x\d+/)+', '', clean_path, flags=re.IGNORECASE)
     filename = clean_path.split('/')[-1]
     token = re.sub(r'^\d+\.', '', filename)
 
-    la_match = re.search(r'^([A-Za-z0-9_-]{3,})La\d+', token, re.IGNORECASE)
+    # Match [prefix][letter]a[digit] — both new (ba4, ra3) and old (La6) formats
+    la_match = re.search(r'^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d', token, re.IGNORECASE)
     if la_match and la_match.group(1):
         return f"avito_photo_{la_match.group(1)}"
 
@@ -62,20 +81,17 @@ def get_image_quality_score(url):
 
     base_area = w * h if (w > 0 and h > 0) else 0
 
-    la_bonus = 0
-    la_match = re.search(r'La(\d+)', url, re.IGNORECASE)
-    if la_match and la_match.group(1):
-        v = int(la_match.group(1))
-        la_bonus = v * 10
-        if base_area == 0:
-            if v >= 4:
-                base_area = 1280 * 960
-            elif v == 3:
-                base_area = 640 * 480
-            elif v == 2:
-                base_area = 208 * 156
-            elif v == 1:
-                base_area = 140 * 105
+    v = extract_avito_resolution_version(url)
+    la_bonus = v * 10
+    if v > 0 and base_area == 0:
+        if v >= 4:
+            base_area = 1280 * 960
+        elif v == 3:
+            base_area = 640 * 480
+        elif v == 2:
+            base_area = 208 * 156
+        elif v == 1:
+            base_area = 140 * 105
 
     if base_area == 0 and '.img.avito.st/image/1/' in url:
         base_area = 1280 * 960
@@ -433,5 +449,72 @@ def test_unescaped_json_script_extracts_all_high_res_photos():
     assert "VGk5RLa4" in res[2]["url"]
 
 
+def test_new_avito_format_ba4_ra3_ra1_quality_scoring():
+    """Test that new Avito URL format (ba4/ra3/ra1 instead of La4/La3/La1) is correctly scored."""
+    # Real URLs from production (Product 75 — Avito new format Aug 2026)
+    url_ra1 = "https://30.img.avito.st/image/1/1.rpQ-qra1FH0IDYB7btiJyDsLAH2AAYB7CA0Afw.hash"
+    url_ba4 = "https://00.img.avito.st/image/1/1.sePk6ba4HQrSQN8Piq_ThtxJHwxaSJ8Ckk0fCFRAFQBS.hash"
+    url_ra3 = "https://00.img.avito.st/image/1/1.7e8YVra3QQY49C3kWknRiq31QQymY0JqrvU.hash"
+
+    # Resolution extraction
+    assert extract_avito_resolution_version(url_ra1) == 1
+    assert extract_avito_resolution_version(url_ba4) == 4
+    assert extract_avito_resolution_version(url_ra3) == 3
+
+    # Quality scoring
+    score_ra1 = get_image_quality_score(url_ra1)
+    score_ba4 = get_image_quality_score(url_ba4)
+    score_ra3 = get_image_quality_score(url_ra3)
+    assert score_ba4 > score_ra3 > score_ra1, f"Expected ba4({score_ba4}) > ra3({score_ra3}) > ra1({score_ra1})"
+
+    # Canonical identity - ra1 and ra3 and ra4 variants of DIFFERENT photos must be DIFFERENT keys
+    key_rpQ = get_canonical_avito_image_identity(url_ra1)
+    key_sePk = get_canonical_avito_image_identity(url_ba4)
+    key_7e8 = get_canonical_avito_image_identity(url_ra3)
+    assert key_rpQ != key_sePk
+    assert key_sePk != key_7e8
+    assert key_rpQ != key_7e8
 
 
+def test_new_format_selects_ba4_over_ra3_and_ra1():
+    """With new Avito URL format, ba4/ra4 must always be selected over ra3/ra1 for same photo."""
+    # Same photo, three resolution variants (new format)
+    urls = [
+        "https://10.img.avito.st/image/1/1.sePk6ra1lowres.jpg",
+        "https://10.img.avito.st/image/1/1.sePk6ra3midres.jpg",
+        "https://10.img.avito.st/image/1/1.sePk6ba4highres.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "ba4" in res[0]["url"]
+
+
+def test_new_format_multi_photo_listing_all_high_res():
+    """With new Avito format, a 3-photo listing where each has ra1+ba4 variants must select ba4 for all."""
+    urls = [
+        # Photo 1
+        "https://30.img.avito.st/image/1/1.rpQ-qra1FH0IDYB7btiJ.hash",
+        "https://30.img.avito.st/image/1/1.rpQ-qba4FH0fullhighres.hash",
+        # Photo 2
+        "https://00.img.avito.st/image/1/1.7e8YVra3QQY49C3kWknR.hash",
+        "https://00.img.avito.st/image/1/1.7e8YVba4QQYhighresfull.hash",
+        # Photo 3
+        "https://50.img.avito.st/image/1/1.crQMKra3lowmedium.hash",
+        "https://50.img.avito.st/image/1/1.crQMKba4fullhighres.hash"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 3
+    assert "ba4" in res[0]["url"], f"Photo 1 should be ba4, got: {res[0]['url']}"
+    assert "ba4" in res[1]["url"], f"Photo 2 should be ba4, got: {res[1]['url']}"
+    assert "ba4" in res[2]["url"], f"Photo 3 should be ba4, got: {res[2]['url']}"
+
+
+def test_old_la_format_still_works():
+    """Regression: old La4/La3/La1 format must still work correctly."""
+    urls = [
+        "https://10.img.avito.st/image/1/1.m9BBHLa1low.jpg",
+        "https://10.img.avito.st/image/1/1.m9BBHLa4high.jpg"
+    ]
+    res = process_extracted_urls(urls)
+    assert len(res) == 1
+    assert "La4" in res[0]["url"]
