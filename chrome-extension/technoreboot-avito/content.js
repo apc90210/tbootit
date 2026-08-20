@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.16)
+// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.17)
 
 let pageInitialData = null;
 
@@ -291,37 +291,63 @@ function parseItemImagesFromJsonObject(data) {
     const photos = [];
     if (!data || typeof data !== 'object') return photos;
 
-    function findItemObject(obj, depth) {
-        if (!obj || typeof obj !== 'object' || depth > 6) return null;
-        if (obj.item && typeof obj.item === 'object' && (obj.item.images || obj.item.photos)) return obj.item;
-        if (obj['single-item'] && typeof obj['single-item'] === 'object' && (obj['single-item'].images || obj['single-item'].photos)) return obj['single-item'];
-        if (obj.product && typeof obj.product === 'object' && (obj.product.images || obj.product.photos)) return obj.product;
+    const arrays = [];
 
-        for (const k of Object.keys(obj)) {
-            if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile') continue;
-            if (typeof obj[k] === 'object' && obj[k]) {
-                const res = findItemObject(obj[k], depth + 1);
-                if (res) return res;
+    function collectImageArrays(obj, depth) {
+        if (!obj || typeof obj !== 'object' || depth > 10) return;
+        if (Array.isArray(obj)) {
+            for (const item of obj) {
+                if (typeof item === 'object' && item) collectImageArrays(item, depth + 1);
+            }
+            return;
+        }
+
+        for (const [k, v] of Object.entries(obj)) {
+            if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile' || k === 'widgets' || k === 'popular') {
+                continue;
+            }
+            if (Array.isArray(v) && v.length > 0) {
+                let isPhotoArray = false;
+                for (const elem of v) {
+                    if (typeof elem === 'string' && elem.includes('img.avito.st')) {
+                        isPhotoArray = true;
+                        break;
+                    } else if (typeof elem === 'object' && elem) {
+                        for (const val of Object.values(elem)) {
+                            if (typeof val === 'string' && val.includes('img.avito.st')) {
+                                isPhotoArray = true;
+                                break;
+                            }
+                        }
+                        if (isPhotoArray) break;
+                    }
+                }
+                if (isPhotoArray) {
+                    arrays.push(v);
+                }
+            } else if (typeof v === 'object' && v) {
+                collectImageArrays(v, depth + 1);
             }
         }
-        return null;
     }
 
-    const item = findItemObject(data, 0);
-    if (item) {
-        const images = item.images || item.photos;
-        if (Array.isArray(images)) {
-            images.forEach(imgObj => {
-                if (typeof imgObj === 'string') {
-                    const valid = validateListingImageUrl(imgObj);
-                    if (valid) photos.push(valid);
-                } else if (typeof imgObj === 'object' && imgObj) {
-                    const best = getBestResolutionFromImageObject(imgObj);
-                    if (best) photos.push(best);
-                }
-            });
-        }
+    collectImageArrays(data, 0);
+
+    if (arrays.length > 0) {
+        arrays.sort((a, b) => b.length - a.length);
+        const bestArray = arrays[0];
+
+        bestArray.forEach(imgObj => {
+            if (typeof imgObj === 'string') {
+                const valid = validateListingImageUrl(imgObj);
+                if (valid) photos.push(valid);
+            } else if (typeof imgObj === 'object' && imgObj) {
+                const best = getBestResolutionFromImageObject(imgObj);
+                if (best) photos.push(best);
+            }
+        });
     }
+
     return photos;
 }
 
