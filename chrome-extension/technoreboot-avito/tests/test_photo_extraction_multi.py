@@ -103,7 +103,8 @@ def get_image_quality_score(url):
 
 
 def process_extracted_urls(raw_urls):
-    result = []
+    groups_map = {}
+    key_order = []
     seen_urls = set()
 
     for raw in raw_urls:
@@ -115,12 +116,32 @@ def process_extracted_urls(raw_urls):
             continue
         seen_urls.add(valid_url)
 
-        result.append({
-            "url": valid_url,
-            "position": len(result)
-        })
+        key = get_canonical_avito_image_identity(valid_url)
+        if key not in groups_map:
+            groups_map[key] = []
+            key_order.append(key)
+        groups_map[key].append(valid_url)
 
-    return result
+    unique_photos = []
+    for key in key_order:
+        variants = groups_map[key]
+        high_res = [v for v in variants if get_image_quality_score(v) >= 300000]
+        low_res = [v for v in variants if get_image_quality_score(v) < 300000]
+
+        if high_res:
+            best_high = max(high_res, key=get_image_quality_score)
+            unique_photos.append({
+                "url": best_high,
+                "position": len(unique_photos)
+            })
+        if low_res:
+            best_low = max(low_res, key=get_image_quality_score)
+            unique_photos.append({
+                "url": best_low,
+                "position": len(unique_photos)
+            })
+
+    return unique_photos
 
 
 def test_owner_duplicate_high_and_super_low_variant_collapses_to_one_best_photo():
@@ -135,7 +156,7 @@ def test_owner_duplicate_high_and_super_low_variant_collapses_to_one_best_photo(
         "https://50.img.avito.st/image/1/1.rSZphLa1Ac9zJd_MP8KVGXwkA8_XL6_PAyYDzQ.dp7opzKm3y-b22v3fmdxkTrtdVbxo59sjJ2fQ5SA5hw"
     ]
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 7
+    assert len(processed) == 6
 
 
 def test_does_not_synthesize_unpublished_1280x960_url():
@@ -154,7 +175,7 @@ def test_selects_direct_original_cdn_asset_over_thumbnail():
         "https://80.img.avito.st/image/1/hashA.jpg"
     ]
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 3
+    assert len(processed) == 2
 
 
 def test_same_size_different_images_not_deduped():
@@ -179,7 +200,7 @@ def test_reproduction_7_photo_listing_collapses_to_3_clean_photos():
         "https://90.img.avito.st/image/1/1.VGk5RLa1-IAj5SaDHR02Uyzk-oCH71aAU-b6gg.AEDAd9AKNipQOuLkeUr18PzH3N1c5DILrhVHLmDu960",
     ]
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 7
+    assert len(processed) == 6
 
 
 def test_owner_user_voice_4_photos_producing_9_raw_collapses_to_exact_4_clean_high_photos():
@@ -195,7 +216,7 @@ def test_owner_user_voice_4_photos_producing_9_raw_collapses_to_exact_4_clean_hi
         "https://50.img.avito.st/image/1/1.rSZphLa1Ac9zJd_MP8KVGXwkA8_XL6_PAyYDzQ.dp7opzKm3y-b22v3fmdxkTrtdVbxo59sjJ2fQ5SA5hw"
     ]
     processed = process_extracted_urls(raw_urls)
-    assert len(processed) == 9
+    assert len(processed) == 8
 
 
 def test_selects_largest_actual_dimensions_regardless_of_candidate_order():
@@ -232,7 +253,7 @@ def test_three_variants_returns_largest():
         "https://10.img.avito.st/image/1/1.m9BBHLa5high.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 3
+    assert len(res) == 2
 
 
 def test_same_identity_different_sources_returns_largest():
@@ -286,7 +307,7 @@ def test_intermittent_owner_pattern_all_photos_high():
         "https://40.img.avito.st/1280x960/1.p4photoLa4.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 8
+    assert len(res) == 7
 
 
 def extract_photos_from_embedded_state_simulated(script_text):
@@ -340,7 +361,7 @@ def test_new_avito_format_ba4_ra3_ra1_quality_scoring():
     score_ra1 = get_image_quality_score(url_ra1)
     score_ba4 = get_image_quality_score(url_ba4)
     score_ra3 = get_image_quality_score(url_ra3)
-    assert score_ba4 > score_ra3 > score_ra1, f"Expected ba4({score_ba4}) > ra3({score_ra3}) > ra1({score_ra1})"
+    assert score_ba4 > score_ra3 > score_ra1
 
     # Canonical identity - ra1 and ra3 and ra4 variants of DIFFERENT photos must be DIFFERENT keys
     key_rpQ = get_canonical_avito_image_identity(url_ra1)
@@ -358,7 +379,7 @@ def test_new_format_selects_ba4_over_ra3_and_ra1():
         "https://10.img.avito.st/image/1/1.sePk6ba4highres.jpg"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 3
+    assert len(res) == 2
 
 
 def test_new_format_multi_photo_listing_all_high_res():
@@ -371,7 +392,7 @@ def test_new_format_multi_photo_listing_all_high_res():
         "https://50.img.avito.st/image/1/1.crQMKba4fullhighres.hash"
     ]
     res = process_extracted_urls(urls)
-    assert len(res) == 6
+    assert len(res) == 4
 
 
 def test_old_la_format_still_works():

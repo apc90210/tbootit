@@ -322,8 +322,39 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 pass
         db.delete(photo_row)
 
-    # Process ALL incoming photos from payload without dropping any photo variants
-    effective_photos = payload.photos or []
+    # Filter incoming photo variants: max 1 High-Res and max 1 Low-Res variant per canonical photo key
+    incoming_raw_photos = payload.photos or []
+    grouped_incoming = {}
+    key_sequence = []
+    unkeyed_incoming = []
+
+    for item_photo in incoming_raw_photos:
+        source_url = item_photo.url
+        ckey = _get_avito_canonical_identity(source_url) if source_url else None
+        if ckey:
+            if ckey not in grouped_incoming:
+                grouped_incoming[ckey] = []
+                key_sequence.append(ckey)
+            grouped_incoming[ckey].append(item_photo)
+        else:
+            unkeyed_incoming.append(item_photo)
+
+    effective_photos = []
+    HIGH_RES_THRESHOLD = 300000
+
+    for ckey in key_sequence:
+        candidates = grouped_incoming[ckey]
+        high_res = [c for c in candidates if _get_avito_quality_score(c.url) >= HIGH_RES_THRESHOLD]
+        low_res = [c for c in candidates if _get_avito_quality_score(c.url) < HIGH_RES_THRESHOLD]
+
+        if high_res:
+            best_high = max(high_res, key=lambda p: _get_avito_quality_score(p.url))
+            effective_photos.append(best_high)
+        if low_res:
+            best_low = max(low_res, key=lambda p: _get_avito_quality_score(p.url))
+            effective_photos.append(best_low)
+
+    effective_photos.extend(unkeyed_incoming)
 
     # Track incoming content hashes and source URLs for reconciliation
     incoming_content_hashes = set()

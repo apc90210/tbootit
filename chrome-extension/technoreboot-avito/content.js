@@ -606,25 +606,70 @@ function extractAllPhotos(jsonLd) {
     rawUrls.push(...extractPhotosFromEmbeddedState());
     rawUrls.push(...extractPhotosFromDom());
 
-    const result = [];
+    const groupsMap = new Map(); // canonicalKey -> [urls]
+    const keyOrder = [];
     const seenUrls = new Set();
 
-    for (let i = 0; i < rawUrls.length; i++) {
-        const raw = rawUrls[i];
+    for (let raw of rawUrls) {
         const validUrl = validateListingImageUrl(raw);
         if (!validUrl) continue;
 
-        // Skip exact duplicate URL strings
         if (seenUrls.has(validUrl)) continue;
         seenUrls.add(validUrl);
 
-        result.push({
-            url: validUrl,
-            position: result.length
-        });
+        const key = getCanonicalAvitoImageIdentity(validUrl);
+        if (!groupsMap.has(key)) {
+            groupsMap.set(key, []);
+            keyOrder.push(key);
+        }
+        groupsMap.get(key).push(validUrl);
     }
 
-    return result;
+    // Keep AT MOST 1 High-Res variant (>= 300,000) and AT MOST 1 Low-Res variant (< 300,000) per photo key
+    const uniquePhotos = [];
+    const HIGH_RES_THRESHOLD = 300000;
+
+    for (const key of keyOrder) {
+        const variants = groupsMap.get(key) || [];
+        if (variants.length === 0) continue;
+
+        const highRes = variants.filter(u => getImageQualityScore(u) >= HIGH_RES_THRESHOLD);
+        const lowRes = variants.filter(u => getImageQualityScore(u) < HIGH_RES_THRESHOLD);
+
+        if (highRes.length > 0) {
+            let bestHigh = highRes[0];
+            let maxScore = getImageQualityScore(bestHigh);
+            for (let i = 1; i < highRes.length; i++) {
+                const score = getImageQualityScore(highRes[i]);
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestHigh = highRes[i];
+                }
+            }
+            uniquePhotos.push({
+                url: bestHigh,
+                position: uniquePhotos.length
+            });
+        }
+
+        if (lowRes.length > 0) {
+            let bestLow = lowRes[0];
+            let maxScore = getImageQualityScore(bestLow);
+            for (let i = 1; i < lowRes.length; i++) {
+                const score = getImageQualityScore(lowRes[i]);
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestLow = lowRes[i];
+                }
+            }
+            uniquePhotos.push({
+                url: bestLow,
+                position: uniquePhotos.length
+            });
+        }
+    }
+
+    return uniquePhotos;
 }
 
 function extractListingData() {
