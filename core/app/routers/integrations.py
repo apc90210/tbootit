@@ -322,29 +322,8 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 pass
         db.delete(photo_row)
 
-    # Pre-deduplicate incoming photos by canonical identity, picking ONLY 1 best quality variant per photo key
-    incoming_raw_photos = payload.photos or []
-    grouped_incoming = {}
-    key_sequence = []
-    unkeyed_incoming = []
-
-    for item_photo in incoming_raw_photos:
-        source_url = item_photo.url
-        ckey = _get_avito_canonical_identity(source_url) if source_url else None
-        if ckey:
-            if ckey not in grouped_incoming:
-                grouped_incoming[ckey] = []
-                key_sequence.append(ckey)
-            grouped_incoming[ckey].append(item_photo)
-        else:
-            unkeyed_incoming.append(item_photo)
-
-    effective_photos = []
-    for ckey in key_sequence:
-        candidates = grouped_incoming[ckey]
-        best_item = max(candidates, key=lambda p: _get_avito_quality_score(p.url))
-        effective_photos.append(best_item)
-    effective_photos.extend(unkeyed_incoming)
+    # Process ALL incoming photos from payload without dropping any photo variants
+    effective_photos = payload.photos or []
 
     # Track incoming content hashes and source URLs for reconciliation
     incoming_content_hashes = set()
@@ -477,13 +456,6 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 for variant in variants:
                     _delete_photo_file_and_row(variant)
                     photos_reconciled += 1
-            elif len(variants) > 1:
-                # Multiple variants in DB for an active photo — keep only the best quality
-                best = max(variants, key=lambda p: _get_avito_quality_score(p.source_url))
-                for variant in variants:
-                    if variant.id != best.id:
-                        _delete_photo_file_and_row(variant)
-                        photos_reconciled += 1
 
         # Reconcile unkeyed Avito photos
         for photo in unkeyed_avito_photos:
