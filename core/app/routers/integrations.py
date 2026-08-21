@@ -253,14 +253,13 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
 
         la_match = _re.search(r"^([A-Za-z0-9_-]+?)[a-zA-Z]a\d", token, _re.IGNORECASE)
         if la_match and la_match.group(1):
-            prefix = la_match.group(1)
-            return "avito_photo_" + (prefix[:5] if len(prefix) >= 5 else prefix)
+            return "avito_photo_" + la_match.group(1)
 
         token_no_ext = _re.sub(r"\.(?:jpg|jpeg|webp|png)$", "", token, flags=_re.IGNORECASE)
-        clean_name = _re.sub(r"[^A-Za-z0-9_-]", "", token_no_ext)
-        if len(clean_name) >= 5:
-            return "avito_photo_" + clean_name[:5]
+        if len(token_no_ext) > 10 and _re.match(r"^[A-Za-z0-9_-]{5}", token_no_ext):
+            return "avito_photo_" + token_no_ext[:5]
 
+        clean_name = _re.sub(r"[^A-Za-z0-9_-]", "", token_no_ext)
         if len(clean_name) >= 3:
             return "avito_photo_" + clean_name
 
