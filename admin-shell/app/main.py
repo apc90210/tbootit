@@ -480,7 +480,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.9"
+    version = "0.2.10"
     filename = f"technoreboot-avito-extension-{version}.zip"
     zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
     if not os.path.exists(zip_path):
@@ -675,4 +675,15 @@ async def proxy_repairs(request: Request, path: str):
 @app.api_route("/media/{path:path}", methods=["GET", "HEAD"])
 async def proxy_media(request: Request, path: str):
     return await _proxy_request(request, CORE_API_URL, f"media/{path}", "/media")
+
+
+@app.get("/products/{product_id}")
+async def redirect_products_detail_shortcut(product_id: int):
+    return RedirectResponse(url=f"/inventory/products/{product_id}", status_code=302)
+
+
+@app.get("/products")
+async def redirect_products_list_shortcut():
+    return RedirectResponse(url="/inventory/products", status_code=302)
+
 

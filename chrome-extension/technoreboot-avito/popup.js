@@ -196,7 +196,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     (photosImported + photosSkipped));
 
                 if (openProductBtn && productLinkContainer) {
-                    const targetUrl = `http://localhost:8011/products/${res.product_id}`;
+                    const targetUrl = `http://localhost:8011/inventory/products/${res.product_id}`;
                     openProductBtn.onclick = () => {
                         chrome.tabs.create({ url: targetUrl });
                     };
