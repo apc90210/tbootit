@@ -773,17 +773,29 @@ function extractCharacteristicsFromJsonLd(jsonLd) {
     return characteristics;
 }
 
+function safelyExpandCharacteristicsDom() {
+    try {
+        // Strictly scope to item params containers only - NEVER click links (<a>) or global page elements
+        const paramsContainers = document.querySelectorAll('[data-marker="item-view/item-params"], [data-marker="item-properties/list"], [data-marker="item-params/list"], [class*="params-paramsList"]');
+        paramsContainers.forEach(container => {
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach(btn => {
+                if (btn && btn.tagName && btn.tagName.toLowerCase() === 'button' && !btn.getAttribute('href') && !btn.closest('a')) {
+                    const marker = (btn.getAttribute('data-marker') || '').toLowerCase();
+                    const text = (btn.textContent || '').toLowerCase();
+                    if (marker.includes('expand') || marker.includes('params') || marker.includes('properties') || text.includes('показать все') || text.includes('все характеристики') || text.includes('развернуть')) {
+                        btn.click();
+                    }
+                }
+            });
+        });
+    } catch (e) {}
+}
+
 function extractCharacteristicsFromDom() {
     const characteristics = {};
 
-    try {
-        const expandButtons = document.querySelectorAll('[data-marker*="params/show-all"], [data-marker*="properties/show-all"], [data-marker*="show-all"], [class*="show-all"], [class*="showMore"], button[data-marker="item-properties/expand"]');
-        expandButtons.forEach(btn => {
-            if (btn && typeof btn.click === 'function') {
-                btn.click();
-            }
-        });
-    } catch (e) {}
+    safelyExpandCharacteristicsDom();
 
     function addParam(key, val) {
         if (!key || typeof key !== 'string') return;
@@ -965,7 +977,7 @@ function extractListingData() {
 
     return {
         schema_version: 1,
-        extension_version: "0.2.11",
+        extension_version: "0.2.12",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -1009,7 +1021,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.2.11",
+        extension_version: "0.2.12",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,
@@ -1018,15 +1030,7 @@ function extractMyListingsData() {
 }
 
 async function extractListingDataMultiPass() {
-    // 1. Try expanding parameters and gallery thumbnails
-    try {
-        const expandButtons = document.querySelectorAll('[data-marker*="params/show-all"], [data-marker*="properties/show-all"], [data-marker*="show-all"], [class*="show-all"], [class*="showMore"], button[data-marker="item-properties/expand"]');
-        expandButtons.forEach(btn => {
-            if (btn && typeof btn.click === 'function') {
-                btn.click();
-            }
-        });
-    } catch (e) {}
+    safelyExpandCharacteristicsDom();
 
     let data = extractListingData();
     if (data.error || data.page_type !== "listing") return data;

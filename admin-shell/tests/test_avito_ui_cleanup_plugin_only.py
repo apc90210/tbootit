@@ -32,7 +32,7 @@ class TestAvitoUiCleanupPluginOnly:
         res = client.get("/avito/extension")
         assert res.status_code == 200
         assert "Интеграция через Chrome Extension" in res.text
-        assert "Скачать расширение (ZIP, v0.2.11)" in res.text
+        assert "Скачать расширение (ZIP, v0.2.12)" in res.text
         assert 'href="/avito/accounts"' not in res.text
         assert 'href="/avito/probe"' not in res.text
 
