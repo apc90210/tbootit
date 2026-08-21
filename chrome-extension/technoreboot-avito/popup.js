@@ -104,22 +104,55 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     });
 
+    function sendMessageToTabWithAutoInject(tabId, message, callback) {
+        chrome.tabs.sendMessage(tabId, message, response => {
+            if (chrome.runtime.lastError || !response) {
+                // If content script is missing or disconnected (e.g. extension updated), inject it dynamically
+                if (typeof chrome.scripting !== "undefined" && typeof chrome.scripting.executeScript === "function") {
+                    chrome.scripting.executeScript({
+                        target: { tabId: tabId },
+                        files: ["content.js"]
+                    }, () => {
+                        if (chrome.runtime.lastError) {
+                            callback(null);
+                        } else {
+                            setTimeout(() => {
+                                chrome.tabs.sendMessage(tabId, message, res => {
+                                    if (chrome.runtime.lastError || !res) {
+                                        callback(null);
+                                    } else {
+                                        callback(res);
+                                    }
+                                });
+                            }, 120);
+                        }
+                    });
+                } else {
+                    callback(null);
+                }
+            } else {
+                callback(response);
+            }
+        });
+    }
+
     // Inspect Active Tab
     function inspectActiveTab() {
         if (productLinkContainer) productLinkContainer.style.display = "none";
         chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
             if (!tabs || tabs.length === 0) return;
             const activeTab = tabs[0];
-            if (!activeTab.url || !activeTab.url.includes("avito.ru")) {
+            const tabUrl = activeTab.url || "";
+            if (!tabUrl.includes("avito.ru")) {
                 pageTypeTitle.textContent = "Страница Avito";
-                pageDetectInfo.textContent = "Откройте объявление на сайте avito.ru";
+                pageDetectInfo.textContent = "Откройте карточку товара на avito.ru";
                 sendBtn.disabled = true;
                 return;
             }
 
-            chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
+            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
                 if (!response) {
-                    pageDetectInfo.textContent = "Обновите страницу Avito для активации расширения.";
+                    pageDetectInfo.textContent = "Обновите страницу Avito (F5) для активации расширения.";
                     sendBtn.disabled = true;
                     return;
                 }
@@ -130,9 +163,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                     sendBtn.disabled = true;
                 } else if (response.page_type === "listing") {
                     pageTypeTitle.textContent = "Карточка объявления";
-                    const item = response.listing;
+                    const item = response.listing || {};
                     const detectedPhotosCount = (item.photos && item.photos.length) || 0;
-                    pageDetectInfo.innerHTML = `<strong>${item.title}</strong><br>ID: ${item.external_item_id}<br>Цена: ${item.price ? item.price + ' ₽' : 'Не указана'}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong> <span style="font-size: 11px; color: #888;">(сканирование...)</span>`;
+                    const displayTitle = item.title || "Объявление Avito";
+                    const displayPrice = item.price ? item.price + " ₽" : "Не указана";
+                    pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong>`;
                     
                     if (isPaired) {
                         sendBtn.disabled = false;
@@ -150,12 +185,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                         if (deepResponse && deepResponse.listing) {
                             currentExtractionData = deepResponse;
                             const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
-                            pageDetectInfo.innerHTML = `<strong>${deepResponse.listing.title}</strong><br>ID: ${deepResponse.listing.external_item_id}<br>Цена: ${deepResponse.listing.price ? deepResponse.listing.price + ' ₽' : 'Не указана'}<br>Обнаружено фото: <strong>${deepCount}</strong> ✓`;
+                            const deepTitle = deepResponse.listing.title || displayTitle;
+                            const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
+                            pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount}</strong> ✓`;
+                            if (isPaired) {
+                                sendBtn.disabled = false;
+                            }
                         }
                     });
                 } else if (response.page_type === "my_listings") {
                     pageTypeTitle.textContent = "Мои объявления";
-                    pageDetectInfo.textContent = `Обнаружено объявлений на странице: ${response.listings_count}`;
+                    pageDetectInfo.textContent = `Обнаружено объявлений на странице: ${response.listings_count || 0}`;
                     
                     if (isPaired) {
                         sendBtn.disabled = false;

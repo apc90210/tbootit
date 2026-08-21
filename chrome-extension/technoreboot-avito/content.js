@@ -34,13 +34,30 @@ triggerInitialDataCapture();
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
-    const match = url.match(/_(\d+)(?:\?|$)/) || url.match(/\/(\d{8,12})(?:\?|$)/);
+    const match = url.match(/_(\d+)(?:\?|$)/) || url.match(/\/(\d{8,14})(?:\?|$)/) || url.match(/itemId=(\d+)/i) || url.match(/item_id=(\d+)/i);
     if (match) return match[1];
 
-    const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical && canonical.href) {
-        const canMatch = canonical.href.match(/_(\d+)(?:\?|$)/) || canonical.href.match(/\/(\d{8,12})(?:\?|$)/);
-        if (canMatch) return canMatch[1];
+    try {
+        const canonical = document.querySelector('link[rel="canonical"]');
+        if (canonical && canonical.href) {
+            const canMatch = canonical.href.match(/_(\d+)(?:\?|$)/) || canonical.href.match(/\/(\d{8,14})(?:\?|$)/);
+            if (canMatch) return canMatch[1];
+        }
+        const itemEl = document.querySelector('[data-item-id]');
+        if (itemEl && itemEl.getAttribute('data-item-id')) {
+            return itemEl.getAttribute('data-item-id');
+        }
+        const metaItem = document.querySelector('meta[name="item-id"], meta[property="al:ios:url"], meta[property="al:android:url"]');
+        if (metaItem && metaItem.content) {
+            const m = metaItem.content.match(/\d{8,14}/);
+            if (m) return m[0];
+        }
+    } catch (e) {}
+
+    // Fallback if numbers exist in the item path
+    if (url.includes('/items/') || url.includes('/tovary/') || url.includes('avito.ru')) {
+        const digits = url.match(/\d{6,14}/);
+        if (digits) return digits[0];
     }
     return null;
 }
@@ -929,158 +946,224 @@ function extractAllCharacteristics(jsonLd, itemId) {
 }
 
 function extractListingData() {
-    const url = window.location.href;
-    const itemId = extractAvitoItemId(url, document.documentElement.innerHTML);
+    try {
+        const url = window.location.href;
+        const itemId = extractAvitoItemId(url, document.documentElement.innerHTML) || "unknown";
 
-    if (!itemId && !url.includes('/profile/items') && !url.includes('/my/items')) {
-        return { error: "Не удалось определить Avito ID объявления на этой странице." };
-    }
+        const jsonLd = parseJsonLd();
 
-    const jsonLd = parseJsonLd();
-
-    let title = "";
-    if (jsonLd && jsonLd.name) title = jsonLd.name;
-    if (!title) {
-        const titleEl = document.querySelector('h1[data-marker="item-view/title-info"]') || document.querySelector('h1');
-        if (titleEl) title = titleEl.textContent.trim();
-    }
-
-    let price = null;
-    if (jsonLd && jsonLd.offers && jsonLd.offers.price) {
-        price = parseFloat(jsonLd.offers.price);
-    }
-    if (!price) {
-        const priceEl = document.querySelector('[data-marker="item-view/item-price"]') || document.querySelector('.js-item-price');
-        if (priceEl) {
-            const priceText = priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '');
-            if (priceText) price = parseFloat(priceText);
+        let title = "";
+        if (jsonLd && jsonLd.name) title = jsonLd.name;
+        if (!title) {
+            const titleEl = document.querySelector('h1[data-marker="item-view/title-info"]') || document.querySelector('h1') || document.querySelector('[class*="title-info-title"]');
+            if (titleEl) title = titleEl.textContent.trim();
         }
-    }
-
-    let description = "";
-    if (jsonLd && jsonLd.description) description = jsonLd.description;
-    if (!description) {
-        const descEl = document.querySelector('[data-marker="item-view/item-description"]') || document.querySelector('.item-description-text');
-        if (descEl) description = descEl.textContent.trim();
-    }
-
-    let category = "";
-    const breadcrumbs = Array.from(document.querySelectorAll('[data-marker="breadcrumbs"] a, .breadcrumbs-link'))
-        .map(el => el.textContent.trim())
-        .filter(Boolean);
-    if (breadcrumbs.length > 0) {
-        category = breadcrumbs.join(' / ');
-    }
-
-    const photos = extractAllPhotos(jsonLd);
-    const characteristics = extractAllCharacteristics(jsonLd, itemId);
-
-    return {
-        schema_version: 1,
-        extension_version: "0.2.12",
-        captured_at: new Date().toISOString(),
-        page_type: "listing",
-        listing: {
-            external_item_id: itemId,
-            external_url: url,
-            title: title || "Объявление Avito",
-            price: price,
-            description: description,
-            category: category,
-            brand: characteristics["Производитель"] || characteristics["Бренд"] || characteristics["Марка"] || null,
-            model: characteristics["Модель"] || null,
-            status: "active",
-            characteristics: characteristics,
-            photos: photos
+        if (!title) {
+            title = document.title ? document.title.replace(/\s*—\s*купить.*$/i, '').trim() : "Объявление Avito";
         }
-    };
+
+        let price = null;
+        if (jsonLd && jsonLd.offers && jsonLd.offers.price) {
+            price = parseFloat(jsonLd.offers.price);
+        }
+        if (!price) {
+            const priceEl = document.querySelector('[data-marker="item-view/item-price"]') || document.querySelector('.js-item-price') || document.querySelector('[itemprop="price"]');
+            if (priceEl) {
+                const priceText = priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+                if (priceText) price = parseFloat(priceText);
+            }
+        }
+
+        let description = "";
+        if (jsonLd && jsonLd.description) description = jsonLd.description;
+        if (!description) {
+            const descEl = document.querySelector('[data-marker="item-view/item-description"]') || document.querySelector('.item-description-text') || document.querySelector('[itemprop="description"]');
+            if (descEl) description = descEl.textContent.trim();
+        }
+
+        let category = "";
+        try {
+            const breadcrumbs = Array.from(document.querySelectorAll('[data-marker="breadcrumbs"] a, .breadcrumbs-link, [class*="breadcrumbs-link"]'))
+                .map(el => el.textContent.trim())
+                .filter(Boolean);
+            if (breadcrumbs.length > 0) {
+                category = breadcrumbs.join(' / ');
+            }
+        } catch (e) {}
+
+        let photos = [];
+        try {
+            photos = extractAllPhotos(jsonLd);
+        } catch (e) {}
+
+        let characteristics = {};
+        try {
+            characteristics = extractAllCharacteristics(jsonLd, itemId);
+        } catch (e) {}
+
+        return {
+            schema_version: 1,
+            extension_version: "0.2.13",
+            captured_at: new Date().toISOString(),
+            page_type: "listing",
+            listing: {
+                external_item_id: itemId,
+                external_url: url,
+                title: title || "Объявление Avito",
+                price: price,
+                description: description,
+                category: category,
+                brand: characteristics["Производитель"] || characteristics["Бренд"] || characteristics["Марка"] || null,
+                model: characteristics["Модель"] || null,
+                status: "active",
+                characteristics: characteristics,
+                photos: photos
+            }
+        };
+    } catch (err) {
+        console.error("Technoreboot extractListingData fallback error:", err);
+        return {
+            schema_version: 1,
+            extension_version: "0.2.13",
+            captured_at: new Date().toISOString(),
+            page_type: "listing",
+            listing: {
+                external_item_id: extractAvitoItemId(window.location.href, "") || "item",
+                external_url: window.location.href,
+                title: document.title || "Объявление Avito",
+                price: null,
+                description: "",
+                category: "",
+                status: "active",
+                characteristics: {},
+                photos: []
+            }
+        };
+    }
 }
 
 function extractMyListingsData() {
-    const items = [];
-    const itemEls = document.querySelectorAll('[data-marker="item"], .styles-root-item, .item-snippet');
-    itemEls.forEach(el => {
-        const titleEl = el.querySelector('[data-marker="item-title"], .item-title-link, h3');
-        const linkEl = el.querySelector('a[href*="/"]');
-        const priceEl = el.querySelector('[data-marker="item-price"], .price');
+    try {
+        const items = [];
+        const itemEls = document.querySelectorAll('[data-marker="item"], .styles-root-item, .item-snippet');
+        itemEls.forEach(el => {
+            const titleEl = el.querySelector('[data-marker="item-title"], .item-title-link, h3');
+            const linkEl = el.querySelector('a[href*="/"]');
+            const priceEl = el.querySelector('[data-marker="item-price"], .price');
 
-        if (titleEl && linkEl) {
-            const href = linkEl.getAttribute('href');
-            const fullUrl = href.startsWith('http') ? href : 'https://www.avito.ru' + href;
-            const itemId = extractAvitoItemId(fullUrl, el.innerHTML);
-            const priceText = priceEl ? priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '') : null;
+            if (titleEl && linkEl) {
+                const href = linkEl.getAttribute('href');
+                const fullUrl = href.startsWith('http') ? href : 'https://www.avito.ru' + href;
+                const itemId = extractAvitoItemId(fullUrl, el.innerHTML);
+                const priceText = priceEl ? priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '') : null;
 
-            items.push({
-                external_item_id: itemId,
-                external_url: fullUrl,
-                title: titleEl.textContent.trim(),
-                price: priceText ? parseFloat(priceText) : null,
-                status: "active"
-            });
-        }
-    });
-    return {
-        schema_version: 1,
-        extension_version: "0.2.12",
-        captured_at: new Date().toISOString(),
-        page_type: "my_listings",
-        listings_count: items.length,
-        items: items
-    };
+                items.push({
+                    external_item_id: itemId,
+                    external_url: fullUrl,
+                    title: titleEl.textContent.trim(),
+                    price: priceText ? parseFloat(priceText) : null,
+                    status: "active"
+                });
+            }
+        });
+        return {
+            schema_version: 1,
+            extension_version: "0.2.13",
+            captured_at: new Date().toISOString(),
+            page_type: "my_listings",
+            listings_count: items.length,
+            items: items
+        };
+    } catch (e) {
+        return {
+            schema_version: 1,
+            extension_version: "0.2.13",
+            captured_at: new Date().toISOString(),
+            page_type: "my_listings",
+            listings_count: 0,
+            items: []
+        };
+    }
 }
 
 async function extractListingDataMultiPass() {
-    safelyExpandCharacteristicsDom();
-
-    let data = extractListingData();
-    if (data.error || data.page_type !== "listing") return data;
-
-    triggerInitialDataCapture();
-
     try {
-        const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
-                                 document.querySelector('[data-marker="gallery"]') ||
-                                 document.querySelector('.style-item-view-gallery-') ||
-                                 document.querySelector('[data-marker="gallery/list"]');
-        
-        if (galleryContainer) {
-            const thumbnails = galleryContainer.querySelectorAll('li, img, [data-marker*="image"], [data-marker*="item"]');
-            thumbnails.forEach(thumb => {
-                thumb.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-                thumb.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-            });
+        safelyExpandCharacteristicsDom();
 
-            const list = galleryContainer.querySelector('ul') || galleryContainer;
-            if (list.scrollWidth > list.clientWidth) {
-                list.scrollLeft = list.scrollWidth;
-                list.dispatchEvent(new Event('scroll', { bubbles: true }));
+        let data = extractListingData();
+        if (data.error || data.page_type !== "listing") return data;
+
+        triggerInitialDataCapture();
+
+        try {
+            const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
+                                     document.querySelector('[data-marker="gallery"]') ||
+                                     document.querySelector('.style-item-view-gallery-') ||
+                                     document.querySelector('[data-marker="gallery/list"]');
+            
+            if (galleryContainer) {
+                const thumbnails = galleryContainer.querySelectorAll('li, img, [data-marker*="image"], [data-marker*="item"]');
+                thumbnails.forEach(thumb => {
+                    thumb.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                    thumb.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                });
+
+                const list = galleryContainer.querySelector('ul') || galleryContainer;
+                if (list.scrollWidth > list.clientWidth) {
+                    list.scrollLeft = list.scrollWidth;
+                    list.dispatchEvent(new Event('scroll', { bubbles: true }));
+                }
+            }
+        } catch (e) {}
+
+        await new Promise(resolve => setTimeout(resolve, 350));
+
+        triggerInitialDataCapture();
+        const pass2 = extractListingData();
+        if (pass2 && pass2.listing && pass2.listing.photos) {
+            if (pass2.listing.photos.length >= (data.listing.photos ? data.listing.photos.length : 0)) {
+                data = pass2;
             }
         }
-    } catch (e) {}
 
-    await new Promise(resolve => setTimeout(resolve, 350));
-
-    triggerInitialDataCapture();
-    const pass2 = extractListingData();
-    if (pass2 && pass2.listing && pass2.listing.photos) {
-        if (pass2.listing.photos.length >= (data.listing.photos ? data.listing.photos.length : 0)) {
-            data = pass2;
-        }
+        return data;
+    } catch (e) {
+        return extractListingData();
     }
-
-    return data;
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "extract_current_page") {
-        const url = window.location.href;
-        if (url.includes('/profile/items') || url.includes('/my/items')) {
-            sendResponse(extractMyListingsData());
-        } else if (request.deepScan) {
-            extractListingDataMultiPass().then(data => sendResponse(data));
-            return true;
-        } else {
-            sendResponse(extractListingData());
+    if (request && request.action === "extract_current_page") {
+        try {
+            const url = window.location.href;
+            if (url.includes('/profile/items') || url.includes('/my/items')) {
+                sendResponse(extractMyListingsData());
+            } else if (request.deepScan) {
+                extractListingDataMultiPass()
+                    .then(data => sendResponse(data || extractListingData()))
+                    .catch(() => sendResponse(extractListingData()));
+                return true;
+            } else {
+                sendResponse(extractListingData());
+            }
+        } catch (err) {
+            try {
+                sendResponse(extractListingData());
+            } catch (e2) {
+                sendResponse({
+                    schema_version: 1,
+                    extension_version: "0.2.13",
+                    page_type: "listing",
+                    listing: {
+                        external_item_id: "item",
+                        external_url: window.location.href,
+                        title: document.title || "Объявление Avito",
+                        price: null,
+                        characteristics: {},
+                        photos: []
+                    }
+                });
+            }
         }
     }
     return true;
