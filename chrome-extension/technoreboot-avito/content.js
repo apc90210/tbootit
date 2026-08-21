@@ -288,6 +288,36 @@ function getBestResolutionFromImageObject(imgObj) {
     return bestUrl;
 }
 
+function getAllResolutionsFromImageObject(imgObj) {
+    if (!imgObj || typeof imgObj !== 'object') return [];
+    const results = [];
+
+    // 1. High-Res variant (1280x960, ba4, or largest)
+    const bestHigh = getBestResolutionFromImageObject(imgObj);
+    if (bestHigh) results.push(bestHigh);
+
+    // 2. Low-Res variant (140x105, ra1, 640x480, ra3)
+    let bestLow = imgObj["140x105"] || imgObj["640x480"] || imgObj["208x156"];
+    if (!bestLow) {
+        for (const [k, v] of Object.entries(imgObj)) {
+            if (typeof v === 'string' && v.includes('img.avito.st')) {
+                if (v.includes('ra1') || v.includes('ra3') || v.includes('140x105') || v.includes('640x480')) {
+                    bestLow = v;
+                    break;
+                }
+            }
+        }
+    }
+    if (bestLow) {
+        const validLow = validateListingImageUrl(bestLow);
+        if (validLow && validLow !== bestHigh) {
+            results.push(validLow);
+        }
+    }
+
+    return results;
+}
+
 function parseItemImagesFromJsonObject(data) {
     const photos = [];
     if (!data || typeof data !== 'object') return photos;
@@ -343,8 +373,8 @@ function parseItemImagesFromJsonObject(data) {
                 const valid = validateListingImageUrl(imgObj);
                 if (valid) photos.push(valid);
             } else if (typeof imgObj === 'object' && imgObj) {
-                const best = getBestResolutionFromImageObject(imgObj);
-                if (best) photos.push(best);
+                const variants = getAllResolutionsFromImageObject(imgObj);
+                variants.forEach(v => photos.push(v));
             }
         });
     }
