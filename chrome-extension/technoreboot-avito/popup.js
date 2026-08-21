@@ -124,7 +124,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 } else if (response.page_type === "listing") {
                     pageTypeTitle.textContent = "Карточка объявления";
                     const item = response.listing;
-                    pageDetectInfo.innerHTML = `<strong>${item.title}</strong><br>ID: ${item.external_item_id}<br>Цена: ${item.price ? item.price + ' ₽' : 'Не указана'}`;
+                    const detectedPhotosCount = (item.photos && item.photos.length) || 0;
+                    pageDetectInfo.innerHTML = `<strong>${item.title}</strong><br>ID: ${item.external_item_id}<br>Цена: ${item.price ? item.price + ' ₽' : 'Не указана'}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong>`;
                     
                     if (isPaired) {
                         sendBtn.disabled = false;
@@ -172,7 +173,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         chrome.runtime.sendMessage({ action: action, payload: currentExtractionData }, res => {
             sendBtn.disabled = false;
             if (res && res.success && res.product_id != null) {
-                const photosCount = (res.details && res.details.photos_imported !== undefined) ? res.details.photos_imported : (res.photos_imported || 0);
+                const photosCount = res.photos_total !== undefined ? res.photos_total : 
+                    ((res.details && res.details.photos_total !== undefined) ? res.details.photos_total : 
+                    ((res.photos_imported || 0) + (res.photos_skipped || (res.details && res.details.photos_skipped) || 0)));
+
                 if (res.status === "partial" || (res.details && res.details.result === "partial")) {
                     resultMsg.className = "msg msg-warning";
                     resultMsg.innerHTML = `Основные данные обновлены, но фотографии импортировать не удалось.<br>Product ID: <strong>${res.product_id}</strong>`;

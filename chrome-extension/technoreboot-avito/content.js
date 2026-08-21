@@ -240,51 +240,50 @@ function parseJsonLdImages(jsonLd) {
     return urls;
 }
 
+function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
+    if (!obj || depth > 25) return [];
+    if (typeof obj === 'string') {
+        const valid = validateListingImageUrl(obj);
+        if (valid && !seen.has(valid)) {
+            seen.add(valid);
+            return [valid];
+        }
+        return [];
+    }
+    if (typeof obj !== 'object') return [];
+    if (isVideoEntry(obj)) return [];
+
+    const found = [];
+    if (Array.isArray(obj)) {
+        for (const item of obj) {
+            found.push(...extractAvitoUrlsFromObject(item, depth + 1, seen));
+        }
+        return found;
+    }
+
+    for (const [k, v] of Object.entries(obj)) {
+        if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile' || k === 'popular') {
+            continue;
+        }
+        found.push(...extractAvitoUrlsFromObject(v, depth + 1, seen));
+    }
+    return found;
+}
+
 function getBestResolutionFromImageObject(imgObj) {
     if (!imgObj || typeof imgObj !== 'object') return null;
+    if (isVideoEntry(imgObj)) return null;
 
-    // 1. Check explicit dimension keys (e.g. "1280x960", "640x480", "1920x1080")
-    let bestUrl = null;
-    let maxArea = 0;
+    const urls = extractAvitoUrlsFromObject(imgObj);
+    if (urls.length === 0) return null;
 
-    for (const key of Object.keys(imgObj)) {
-        const val = imgObj[key];
-        if (typeof val !== 'string' || !val.includes('img.avito.st')) continue;
-        const valid = validateListingImageUrl(val);
-        if (!valid) continue;
-
-        const dimMatch = key.match(/^(\d+)x(\d+)$/);
-        if (dimMatch) {
-            const area = parseInt(dimMatch[1], 10) * parseInt(dimMatch[2], 10);
-            if (area > maxArea) {
-                maxArea = area;
-                bestUrl = valid;
-            }
-        }
-    }
-    if (bestUrl) return bestUrl;
-
-    // 2. Priority check for standard size keys
-    const priorityKeys = ["1280x960", "1280x1024", "1920x1080", "640x480", "432x324", "208x156", "140x105"];
-    for (const key of priorityKeys) {
-        if (imgObj[key] && typeof imgObj[key] === 'string') {
-            const valid = validateListingImageUrl(imgObj[key]);
-            if (valid) return valid;
-        }
-    }
-
-    // 3. Score all values in object
-    let maxScore = 0;
-    for (const val of Object.values(imgObj)) {
-        if (typeof val === 'string' && val.includes('img.avito.st')) {
-            const valid = validateListingImageUrl(val);
-            if (valid) {
-                const score = getImageQualityScore(valid);
-                if (score > maxScore) {
-                    maxScore = score;
-                    bestUrl = valid;
-                }
-            }
+    let bestUrl = urls[0];
+    let maxScore = getImageQualityScore(bestUrl);
+    for (let i = 1; i < urls.length; i++) {
+        const score = getImageQualityScore(urls[i]);
+        if (score > maxScore) {
+            maxScore = score;
+            bestUrl = urls[i];
         }
     }
     return bestUrl;
@@ -331,111 +330,33 @@ function isVideoEntry(obj) {
 
 function getAllResolutionsFromImageObject(imgObj) {
     if (!imgObj || typeof imgObj !== 'object') return [];
-    // Skip video entries
     if (isVideoEntry(imgObj)) return [];
+
+    const urls = extractAvitoUrlsFromObject(imgObj);
+    if (urls.length === 0) return [];
+
+    const highRes = urls.filter(u => getImageQualityScore(u) >= 300000);
+    const lowRes = urls.filter(u => getImageQualityScore(u) < 300000);
+
     const results = [];
-
-    // 1. High-Res variant (1280x960, ba4, or largest)
-    const bestHigh = getBestResolutionFromImageObject(imgObj);
-    if (bestHigh) results.push(bestHigh);
-
-    // 2. Low-Res variant (140x105, ra1, 640x480, ra3)
-    let bestLow = imgObj["140x105"] || imgObj["640x480"] || imgObj["208x156"];
-    if (!bestLow) {
-        for (const [k, v] of Object.entries(imgObj)) {
-            if (typeof v === 'string' && v.includes('img.avito.st')) {
-                if (v.includes('ra1') || v.includes('ra3') || v.includes('140x105') || v.includes('640x480')) {
-                    bestLow = v;
-                    break;
-                }
-            }
-        }
+    if (highRes.length > 0) {
+        highRes.sort((a, b) => getImageQualityScore(b) - getImageQualityScore(a));
+        results.push(highRes[0]);
     }
-    if (bestLow) {
-        const validLow = validateListingImageUrl(bestLow);
-        if (validLow && validLow !== bestHigh) {
-            results.push(validLow);
-        }
+    if (lowRes.length > 0) {
+        lowRes.sort((a, b) => getImageQualityScore(b) - getImageQualityScore(a));
+        results.push(lowRes[0]);
+    }
+    if (results.length === 0 && urls.length > 0) {
+        results.push(urls[0]);
     }
 
     return results;
 }
 
 function parseItemImagesFromJsonObject(data) {
-    const photos = [];
-    if (!data || typeof data !== 'object') return photos;
-
-    const arrays = [];
-
-    function collectImageArrays(obj, depth) {
-        if (!obj || typeof obj !== 'object' || depth > 10) return;
-        if (Array.isArray(obj)) {
-            for (const item of obj) {
-                if (typeof item === 'object' && item) collectImageArrays(item, depth + 1);
-            }
-            return;
-        }
-
-        for (const [k, v] of Object.entries(obj)) {
-            if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile' || k === 'popular') {
-                continue;
-            }
-            if (Array.isArray(v) && v.length > 0) {
-                let photoCount = 0;
-                for (const elem of v) {
-                    if (typeof elem === 'string' && elem.includes('img.avito.st')) {
-                        photoCount++;
-                    } else if (typeof elem === 'object' && elem && !isVideoEntry(elem)) {
-                        for (const val of Object.values(elem)) {
-                            if (typeof val === 'string' && val.includes('img.avito.st')) {
-                                photoCount++;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (photoCount > 0) {
-                    arrays.push(v);
-                }
-            } else if (typeof v === 'object' && v) {
-                collectImageArrays(v, depth + 1);
-            }
-        }
-    }
-
-    collectImageArrays(data, 0);
-
-    // Merge photos from ALL discovered arrays, deduplicating by URL
-    const seenUrls = new Set();
-
-    if (arrays.length > 0) {
-        // Process longest array first for best ordering
-        arrays.sort((a, b) => b.length - a.length);
-
-        for (const arr of arrays) {
-            for (const imgObj of arr) {
-                if (typeof imgObj === 'string') {
-                    const valid = validateListingImageUrl(imgObj);
-                    if (valid && !seenUrls.has(valid)) {
-                        seenUrls.add(valid);
-                        photos.push(valid);
-                    }
-                } else if (typeof imgObj === 'object' && imgObj) {
-                    // Skip video entries
-                    if (isVideoEntry(imgObj)) continue;
-                    const variants = getAllResolutionsFromImageObject(imgObj);
-                    for (const v of variants) {
-                        if (!seenUrls.has(v)) {
-                            seenUrls.add(v);
-                            photos.push(v);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return photos;
+    if (!data || typeof data !== 'object') return [];
+    return extractAvitoUrlsFromObject(data);
 }
 
 function extractJsonAssignedToVar(text, varName) {
@@ -536,65 +457,60 @@ function extractJsonAssignedToVar(text, varName) {
 
 function extractPhotosFromEmbeddedState() {
     const urls = [];
+    const seen = new Set();
+
+    function addUrl(u) {
+        const valid = validateListingImageUrl(u);
+        if (valid && !seen.has(valid)) {
+            seen.add(valid);
+            urls.push(valid);
+        }
+    }
 
     // 1. Direct main-world initialData check
     triggerInitialDataCapture();
     if (pageInitialData) {
-        const itemPhotos = parseItemImagesFromJsonObject(pageInitialData);
-        if (itemPhotos.length > 0) {
-            return itemPhotos;
-        }
+        const photos = parseItemImagesFromJsonObject(pageInitialData);
+        photos.forEach(addUrl);
     }
 
-    // 2. Embedded script tags extraction
+    // 2. Scan ALL script tags without early returns
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
         const text = script.textContent || '';
-        if (text.includes('img.avito.st') || text.includes('avito.st') || text.includes('__initialData__')) {
+        if (text.includes('img.avito.st') || text.includes('avito.st') || text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__')) {
             const unescaped = text
                 .replace(/\\u002F/ig, '/')
                 .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
 
             // Balanced brace parsing for known state variables
-            for (const varName of ['__initialData__', '__INITIAL_STATE__', 'window.__state__', 'initialData']) {
+            for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
                 if (unescaped.includes(varName)) {
                     const parsed = extractJsonAssignedToVar(unescaped, varName);
                     if (parsed) {
-                        const itemPhotos = parseItemImagesFromJsonObject(parsed);
-                        if (itemPhotos.length > 0) {
-                            return itemPhotos;
-                        }
+                        const photos = parseItemImagesFromJsonObject(parsed);
+                        photos.forEach(addUrl);
                     }
                 }
             }
 
-            // Direct regex match on "images":[ ... ] array
-            const imagesArrayMatch = unescaped.match(/"images"\s*:\s*(\[\s*\{.*?\}\s*\])/s);
-            if (imagesArrayMatch && imagesArrayMatch[1]) {
+            // If JSON script tag (e.g. __NEXT_DATA__)
+            if (script.type === 'application/json' || script.id === '__NEXT_DATA__') {
                 try {
-                    const imagesArr = JSON.parse(imagesArrayMatch[1]);
-                    if (Array.isArray(imagesArr)) {
-                        imagesArr.forEach(imgObj => {
-                            if (typeof imgObj === 'string') {
-                                const valid = validateListingImageUrl(imgObj);
-                                if (valid) urls.push(valid);
-                            } else if (typeof imgObj === 'object' && imgObj) {
-                                const best = getBestResolutionFromImageObject(imgObj);
-                                if (best) urls.push(best);
-                            }
-                        });
-                        if (urls.length > 0) return urls;
+                    const parsed = JSON.parse(text);
+                    if (parsed) {
+                        const photos = parseItemImagesFromJsonObject(parsed);
+                        photos.forEach(addUrl);
                     }
                 } catch (e) {}
             }
 
-            // Fallback regex match across script text
-            const matches = unescaped.match(/https?:\/\/[^\s"'<>\\]+\.img\.avito\.st\/[^\s"'<>\\]+/g);
+            // Fallback regex match across script text for any img.avito.st URLs
+            const matches = unescaped.match(/https?:\/\/[^\s"'<>\\]+?\.img\.avito\.st\/[^\s"'<>\\]+/g);
             if (matches) {
                 matches.forEach(u => {
                     const clean = u.replace(/[\"\'\}\]\)\;\,\s]+$/, '');
-                    const valid = validateListingImageUrl(clean);
-                    if (valid) urls.push(valid);
+                    addUrl(clean);
                 });
             }
         }
@@ -604,30 +520,30 @@ function extractPhotosFromEmbeddedState() {
 
 function extractPhotosFromDom() {
     const rawCandidates = [];
-    const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
-                             document.querySelector('[data-marker="gallery"]') ||
-                             document.querySelector('.gallery-root') ||
-                             document.querySelector('.style-item-view-gallery-') ||
-                             document.body;
+    const seen = new Set();
+
+    function addUrl(u) {
+        const valid = validateListingImageUrl(u);
+        if (valid && !seen.has(valid)) {
+            seen.add(valid);
+            rawCandidates.push(valid);
+        }
+    }
 
     // 1. Scan links wrapping gallery images
-    const links = galleryContainer.querySelectorAll('a[href*="img.avito.st"]');
+    const links = document.querySelectorAll('a[href*="img.avito.st"]');
     links.forEach(a => {
-        if (a.closest && (a.closest('[data-marker="seller-info"]') || a.closest('[data-marker="user-info"]') || a.closest('.seller-info-avatar'))) return;
-        const valid = validateListingImageUrl(a.href);
-        if (valid) rawCandidates.push(valid);
+        if (a.closest && (a.closest('[data-marker="seller-info"]') || a.closest('[data-marker="user-info"]') || a.closest('.seller-info-avatar') || a.closest('[data-marker="recommendations"]'))) return;
+        addUrl(a.href);
     });
 
-    // 2. Scan elements with data-url / data-src / data-large / data-full / data-high-res
-    const dataEls = galleryContainer.querySelectorAll('[data-url*="img.avito.st"], [data-src*="img.avito.st"], [data-large*="img.avito.st"], [data-full*="img.avito.st"]');
+    // 2. Scan elements with data-url / data-src / data-large / data-full / data-high-res / data-preview
+    const dataEls = document.querySelectorAll('[data-url*="img.avito.st"], [data-src*="img.avito.st"], [data-large*="img.avito.st"], [data-full*="img.avito.st"], [data-high-res*="img.avito.st"], [data-preview*="img.avito.st"], [data-img*="img.avito.st"]');
     dataEls.forEach(el => {
-        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]'))) return;
-        ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res'].forEach(attr => {
+        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar') || el.closest('[data-marker="recommendations"]'))) return;
+        ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res', 'data-preview', 'data-img'].forEach(attr => {
             const val = el.getAttribute(attr);
-            if (val) {
-                const valid = validateListingImageUrl(val);
-                if (valid) rawCandidates.push(valid);
-            }
+            if (val) addUrl(val);
         });
     });
 
@@ -646,26 +562,31 @@ function extractPhotosFromDom() {
         'div[class*="image-frame"] img',
         '.gallery-img',
         '.image-frame-wrapper img',
-        '.gallery-list img'
+        '.gallery-list img',
+        'img[src*="img.avito.st"]',
+        'img[data-src*="img.avito.st"]'
     ].join(', ');
 
-    const els = galleryContainer.querySelectorAll(selector);
+    const els = document.querySelectorAll(selector);
     els.forEach(el => {
-        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar'))) {
+        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar') || el.closest('[data-marker="recommendations"]'))) {
             return;
         }
 
         const parentLink = el.closest('a');
         if (parentLink && parentLink.href && parentLink.href.includes('img.avito.st')) {
-            const validLink = validateListingImageUrl(parentLink.href);
-            if (validLink) rawCandidates.push(validLink);
+            addUrl(parentLink.href);
         }
 
         const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
         if (srcset) {
             const candidates = parseSrcsetCandidates(srcset);
-            candidates.forEach(c => rawCandidates.push(c.url));
+            candidates.forEach(c => addUrl(c.url));
         }
+
+        if (el.src) addUrl(el.src);
+        if (el.dataset && el.dataset.src) addUrl(el.dataset.src);
+
         if (el.attributes) {
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
@@ -673,15 +594,26 @@ function extractPhotosFromDom() {
                 if (val && typeof val === 'string' && val.includes('img.avito.st')) {
                     if (val.includes(' ')) {
                         const candidates = parseSrcsetCandidates(val);
-                        candidates.forEach(c => rawCandidates.push(c.url));
+                        candidates.forEach(c => addUrl(c.url));
                     } else {
-                        const valid = validateListingImageUrl(val);
-                        if (valid) rawCandidates.push(valid);
+                        addUrl(val);
                     }
                 }
             }
         }
     });
+
+    // 4. Scan elements with background-image style
+    const bgEls = document.querySelectorAll('[style*="img.avito.st"]');
+    bgEls.forEach(el => {
+        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar'))) return;
+        const style = el.getAttribute('style') || '';
+        const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+?\.img\.avito\.st[^\'")\s]+)['"]?\)/i);
+        if (match && match[1]) {
+            addUrl(match[1]);
+        }
+    });
+
     return rawCandidates;
 }
 

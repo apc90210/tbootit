@@ -217,9 +217,11 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
     product_id = res.get("product_id")
     result_status = res.get("status", "failed")
     photos_imported = res.get("photos_imported", 0)
+    photos_skipped = res.get("photos_skipped", 0)
+    photos_total = photos_imported + photos_skipped
 
     if product_id is not None and result_status != "failed":
-        if photos_received > 0 and photos_imported == 0:
+        if photos_received > 0 and photos_imported == 0 and photos_skipped == 0:
             result_status = "partial"
 
     # Save last ingest info
@@ -233,7 +235,9 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         "photos_received": photos_received,
         "photos_forwarded": photos_forwarded,
         "photos_imported": photos_imported,
-        "photos_count": photos_imported,
+        "photos_skipped": photos_skipped,
+        "photos_total": photos_total,
+        "photos_count": photos_total,
         "error": res.get("error"),
         "ingested_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
     })
@@ -256,7 +260,9 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         "product_id": product_id,
         "result": result_status,
         "photos_imported": photos_imported,
+        "photos_skipped": photos_skipped,
+        "photos_total": photos_total,
         "photos_received": photos_received,
-        "message": f"Объявление {ext_id} импортировано в Техноребут (Product ID: {product_id}, фото: {photos_imported}).",
+        "message": f"Объявление {ext_id} импортировано в Техноребут (Product ID: {product_id}, фото: {photos_total}).",
         "details": res
     }
