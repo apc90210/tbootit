@@ -299,6 +299,7 @@ class ProductDetails(Product):
     site_ready: bool = False
     avito_category_name: Optional[str] = None
     avito_characteristics: Optional[dict] = None
+    avito_source_url: Optional[str] = None
     class Config:
         from_attributes = True
 

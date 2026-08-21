@@ -347,6 +347,25 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
         except Exception:
             pass
 
+    # Source Avito Link from ProductExternalListing
+    ext_listing = db.query(models.ProductExternalListing).filter(
+        models.ProductExternalListing.product_id == product_id,
+        models.ProductExternalListing.marketplace == "avito"
+    ).first()
+    
+    raw_source_url = ext_listing.external_url if ext_listing and ext_listing.external_url else None
+    avito_source_url = None
+    if raw_source_url and isinstance(raw_source_url, str):
+        url_clean = raw_source_url.strip()
+        if url_clean.startswith("https://") or url_clean.startswith("http://"):
+            try:
+                import urllib.parse
+                parsed = urllib.parse.urlparse(url_clean)
+                if parsed.hostname and (parsed.hostname == "avito.ru" or parsed.hostname.endswith(".avito.ru")):
+                    avito_source_url = url_clean
+            except Exception:
+                pass
+
     # We must convert to dict first because we need to add fields not present in the DB model directly, or use model_validate/dump
     p_dict = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
     p_dict["margin"] = margin
@@ -359,6 +378,7 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
     p_dict["stock_movements"] = movements
     p_dict["avito_category_name"] = avito_cat_name
     p_dict["avito_characteristics"] = avito_characteristics
+    p_dict["avito_source_url"] = avito_source_url
     
     return p_dict
 

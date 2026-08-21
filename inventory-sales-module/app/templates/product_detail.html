@@ -76,14 +76,25 @@
 
         <!-- Блок «Категория и характеристики Avito» -->
         <div id="product-avito-attributes-block" style="margin-top: 20px; background: #fafafa; padding: 15px; border: 1px solid #e0e0e0; border-radius: 4px;">
-            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1.1rem; color: #333; display: flex; align-items: center; gap: 8px;">
-                📋 Характеристики Avito
-                {% if product.avito_category_name %}
-                    <span style="font-size: 0.85rem; font-weight: normal; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px;">
-                        {{ product.avito_category_name }}
-                    </span>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 1.1rem; color: #333; display: flex; align-items: center; gap: 8px;">
+                    📋 Характеристики Avito
+                    {% if product.avito_category_name %}
+                        <span style="font-size: 0.85rem; font-weight: normal; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px;">
+                            {{ product.avito_category_name }}
+                        </span>
+                    {% endif %}
+                </h3>
+
+                {% if product.avito_source_url %}
+                    <div id="avito-source-link-container" style="font-size: 0.9rem;">
+                        <span style="color: #666;">Источник: <strong>Avito</strong></span>
+                        <a href="{{ product.avito_source_url }}" target="_blank" rel="noopener noreferrer" style="margin-left: 8px; color: #0369a1; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
+                            Открыть объявление на Avito ↗
+                        </a>
+                    </div>
                 {% endif %}
-            </h3>
+            </div>
 
             {% if product.avito_characteristics and product.avito_characteristics|length > 0 %}
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background: #fff; border: 1px solid #eee;">

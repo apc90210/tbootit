@@ -64,11 +64,12 @@ def test_extension_payload_contract_and_r9_binding(client, db_session):
     assert val_by_name["Технология печати"].raw_value == "Лазерная"
     assert val_by_name["Технология печати"].source == "avito"
 
-    # 5. Verify ProductDetails endpoint includes avito_category_name and characteristics
+    # 5. Verify ProductDetails endpoint includes avito_category_name, characteristics, and avito_source_url
     details_res = client.get(f"/api/products/{product_id}/details")
     assert details_res.status_code == 200
     details = details_res.json()
     assert details["avito_category_name"] == "Принтеры"
+    assert details["avito_source_url"] == "https://www.avito.ru/items/8313765236"
     assert details["avito_characteristics"] == {
         "Состояние": "Б/у",
         "Тип устройства": "Принтер",
@@ -168,9 +169,60 @@ def test_manual_product_without_avito_attributes(client, db_session):
     details = details_res.json()
     assert details["avito_category_name"] is None
     assert details["avito_characteristics"] == {}
+    assert details["avito_source_url"] is None
 
     r9_res = client.get(f"/api/v1/products/{prod.id}/avito-attributes")
     assert r9_res.status_code == 200
     r9_data = r9_res.json()
     assert r9_data["avito_category"] is None
     assert r9_data["attributes"] == []
+
+def test_rich_monitor_attribute_validation(client, db_session):
+    """Synthetic test validating a rich 12-attribute monitor dataset."""
+    rich_monitor_params = {
+        "Состояние": "Б/у",
+        "Диагональ": "27 дюймов",
+        "Разрешение": "2560x1440 (QHD)",
+        "Тип матрицы": "IPS",
+        "Частота обновления": "144 Гц",
+        "Соотношение сторон": "16:9",
+        "Яркость": "350 кд/м²",
+        "Время отклика": "1 мс",
+        "Интерфейсы": "HDMI, DisplayPort",
+        "Регулировка по высоте": "Да",
+        "Встроенные динамики": "Есть",
+        "Цвет": "Черный"
+    }
+
+    payload = {
+        "account_key": "acc_extension_owner",
+        "external_item_id": "9988776655",
+        "external_url": "https://www.avito.ru/ekaterinburg/tovary_dlya_kompyutera/monitor_27_ips_144hz_9988776655",
+        "title": "Монитор 27\" IPS 144Hz 2K",
+        "price": 18500.0,
+        "category_path": ["Товары для компьютера", "Мониторы"],
+        "brand": "LG",
+        "model": "27GL850",
+        "condition": "Б/у",
+        "parameters": rich_monitor_params,
+        "photos": []
+    }
+
+    res = client.post("/api/integrations/avito/ingest-parsed-ad", json=payload)
+    assert res.status_code == 200, res.text
+    pid = res.json()["product_id"]
+
+    details_res = client.get(f"/api/products/{pid}/details")
+    assert details_res.status_code == 200
+    details = details_res.json()
+    assert details["avito_category_name"] == "Мониторы"
+    assert details["avito_source_url"] == "https://www.avito.ru/ekaterinburg/tovary_dlya_kompyutera/monitor_27_ips_144hz_9988776655"
+    assert len(details["avito_characteristics"]) == 12
+    assert details["avito_characteristics"]["Частота обновления"] == "144 Гц"
+    assert details["avito_characteristics"]["Разрешение"] == "2560x1440 (QHD)"
+
+    r9_res = client.get(f"/api/v1/products/{pid}/avito-attributes")
+    assert r9_res.status_code == 200
+    r9_data = r9_res.json()
+    assert len(r9_data["attributes"]) == 12
+
