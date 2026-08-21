@@ -204,8 +204,8 @@ def test_characteristics_survive_final_extension_payload():
     }
     payload = {
         "schema_version": 1,
-        "extension_version": "0.2.11",
-        "captured_at": "2026-08-21T17:40:00Z",
+        "extension_version": "0.2.14",
+        "captured_at": "2026-08-21T18:20:00Z",
         "page_type": "listing",
         "listing": {
             "external_item_id": "8999888777",
@@ -221,4 +221,45 @@ def test_characteristics_survive_final_extension_payload():
     }
     assert "characteristics" in payload["listing"]
     assert len(payload["listing"]["characteristics"]) == 3
-    assert payload["extension_version"] == "0.2.11"
+    assert payload["extension_version"] == "0.2.14"
+
+def test_motherboard_model_without_colon_and_stats_excluded():
+    """Verify model formatted as <span>Модель</span>H510M is extracted and seller stats are excluded."""
+    html = """
+    <div data-marker="item-view/main">
+        <div data-marker="item-view/item-params">
+            <ul>
+                <li class="params-item"><span class="noaccent">Состояние</span>Б/у</li>
+                <li class="params-item"><span class="noaccent">Производитель</span>ASRock</li>
+                <li class="params-item"><span class="noaccent">Модель</span>H510M-H2/M.2 SE</li>
+            </ul>
+        </div>
+        <div data-marker="item-view/seller-info" class="stats-root">
+            <div class="stat-item"><span class="stat-title">Показы:</span> 136</div>
+            <div class="stat-item"><span class="stat-title">Просмотры:</span> 42</div>
+            <div class="stat-item"><span class="stat-title">Избранное:</span> 0</div>
+            <div class="stat-item"><span class="stat-title">Контакты:</span> 0</div>
+            <div class="stat-item"><span class="stat-title">Расходы:</span> 79,2 ₽</div>
+        </div>
+    </div>
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    STATS_BLACKLIST = {'показы', 'просмотры', 'избранное', 'контакты', 'расходы', 'продвижение'}
+    characteristics = {}
+    
+    for li in soup.select('[data-marker="item-view/item-params"] li'):
+        label_el = li.select_one('.noaccent')
+        if label_el:
+            lbl = label_el.get_text().strip().rstrip(':')
+            val = li.get_text().replace(label_el.get_text(), '').strip()
+            if lbl.lower() not in STATS_BLACKLIST:
+                characteristics[lbl] = val
+
+    assert "Состояние" in characteristics
+    assert characteristics["Состояние"] == "Б/у"
+    assert characteristics["Производитель"] == "ASRock"
+    assert characteristics["Модель"] == "H510M-H2/M.2 SE"
+    assert "Показы" not in characteristics
+    assert "Просмотры" not in characteristics
+    assert "Расходы" not in characteristics
+

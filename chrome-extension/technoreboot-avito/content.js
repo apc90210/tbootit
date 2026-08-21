@@ -94,6 +94,23 @@ function validateListingImageUrl(url) {
     return u;
 }
 
+function upgradeAvitoImageUrlToMaxQuality(url) {
+    if (!url || typeof url !== 'string') return url;
+    let u = url;
+
+    // If it has small dimension path like /140x105/ or /640x480/, upgrade to /1280x960/
+    if (u.match(/\/\d+x\d+\//)) {
+        u = u.replace(/\/\d+x\d+\//, '/1280x960/');
+    }
+
+    // If it has low-res version tag ra1, ra2, ra3, upgrade to ra4
+    if (u.includes('/image/1/')) {
+        u = u.replace(/([a-zA-Z]a)[123]/, '$14');
+    }
+
+    return u;
+}
+
 function getCanonicalAvitoImageIdentity(url) {
     if (!url || typeof url !== 'string') return '';
 
@@ -103,15 +120,22 @@ function getCanonicalAvitoImageIdentity(url) {
     const filename = cleanPath.split('/').pop() || cleanPath;
     const token = filename.replace(/^\d+\./, '');
 
+    // Format 1: 1.YIZY7ra4... -> prefix is YIZY7
     const laMatch = token.match(/^([A-Za-z0-9_-]+?)[a-zA-Z]a\d/i);
-    if (laMatch && laMatch[1]) {
-        const prefix = laMatch[1];
-        return `avito_photo_${prefix}`;
+    if (laMatch && laMatch[1] && laMatch[1].length >= 4) {
+        return `avito_photo_${laMatch[1]}`;
     }
 
+    // Format 2: dimension filenames like 123456789.jpg
     const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
-    if (tokenNoExt.length > 10 && /^[A-Za-z0-9_-]{5}/.test(tokenNoExt)) {
-        return `avito_photo_${tokenNoExt.substring(0, 5)}`;
+    if (/^\d{6,}$/.test(tokenNoExt)) {
+        return `avito_photo_${tokenNoExt}`;
+    }
+
+    // Format 3: hash tokens with dots: 1.TOKEN.HASH -> take first full segment
+    const parts = tokenNoExt.split('.');
+    if (parts.length >= 2) {
+        return `avito_photo_${parts[0]}_${parts[1].substring(0, 16)}`;
     }
 
     const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
@@ -608,8 +632,11 @@ function extractAllPhotos(jsonLd) {
     const seenUrls = new Set();
 
     for (let raw of rawUrls) {
-        const validUrl = validateListingImageUrl(raw);
+        let validUrl = validateListingImageUrl(raw);
         if (!validUrl) continue;
+
+        // Upgrade low-res dimension/version tags to maximum quality
+        validUrl = upgradeAvitoImageUrlToMaxQuality(validUrl);
 
         if (seenUrls.has(validUrl)) continue;
         seenUrls.add(validUrl);
@@ -622,48 +649,27 @@ function extractAllPhotos(jsonLd) {
         groupsMap.get(key).push(validUrl);
     }
 
-    // Keep AT MOST 1 High-Res variant (>= 300,000) and AT MOST 1 Low-Res variant (< 300,000) per photo key
+    // Pick EXACTLY ONE single highest-quality variant for each distinct photo key (NO DUPLICATES)
     const uniquePhotos = [];
-    const HIGH_RES_THRESHOLD = 300000;
 
     for (const key of keyOrder) {
         const variants = groupsMap.get(key) || [];
         if (variants.length === 0) continue;
 
-        const highRes = variants.filter(u => getImageQualityScore(u) >= HIGH_RES_THRESHOLD);
-        const lowRes = variants.filter(u => getImageQualityScore(u) < HIGH_RES_THRESHOLD);
-
-        if (highRes.length > 0) {
-            let bestHigh = highRes[0];
-            let maxScore = getImageQualityScore(bestHigh);
-            for (let i = 1; i < highRes.length; i++) {
-                const score = getImageQualityScore(highRes[i]);
-                if (score > maxScore) {
-                    maxScore = score;
-                    bestHigh = highRes[i];
-                }
+        let bestVariant = variants[0];
+        let maxScore = getImageQualityScore(bestVariant);
+        for (let i = 1; i < variants.length; i++) {
+            const score = getImageQualityScore(variants[i]);
+            if (score > maxScore) {
+                maxScore = score;
+                bestVariant = variants[i];
             }
-            uniquePhotos.push({
-                url: bestHigh,
-                position: uniquePhotos.length
-            });
         }
 
-        if (lowRes.length > 0) {
-            let bestLow = lowRes[0];
-            let maxScore = getImageQualityScore(bestLow);
-            for (let i = 1; i < lowRes.length; i++) {
-                const score = getImageQualityScore(lowRes[i]);
-                if (score > maxScore) {
-                    maxScore = score;
-                    bestLow = lowRes[i];
-                }
-            }
-            uniquePhotos.push({
-                url: bestLow,
-                position: uniquePhotos.length
-            });
-        }
+        uniquePhotos.push({
+            url: bestVariant,
+            position: uniquePhotos.length
+        });
     }
 
     return uniquePhotos;
@@ -814,10 +820,23 @@ function extractCharacteristicsFromDom() {
 
     safelyExpandCharacteristicsDom();
 
+    const STATS_BLACKLIST = new Set([
+        'показы', 'просмотры', 'избранное', 'контакты', 'расходы', 'продвижение',
+        'статистика', 'размещено', 'обновлено', 'номер объявления', 'продвинуть',
+        'снять с публикации', 'редактировать', 'сообщения', 'звонки', 'доставка',
+        'купить с доставкой', 'оплата', 'гарантия'
+    ]);
+
     function addParam(key, val) {
         if (!key || typeof key !== 'string') return;
         const cleanKey = key.trim().replace(/:$/, '');
         const cleanVal = typeof val === 'string' ? val.trim() : String(val || '').trim();
+        const lowerKey = cleanKey.toLowerCase();
+        
+        if (STATS_BLACKLIST.has(lowerKey) || lowerKey.startsWith('показ') || lowerKey.startsWith('просмотр') || lowerKey.startsWith('расход')) {
+            return;
+        }
+
         if (cleanKey && cleanVal && !characteristics[cleanKey]) {
             if (!cleanKey.startsWith('Показать') && !cleanKey.startsWith('Написать') && cleanKey.length < 100 && cleanVal.length < 500) {
                 characteristics[cleanKey] = cleanVal;
@@ -845,7 +864,7 @@ function extractCharacteristicsFromDom() {
         '[data-marker="item-view/main"] [class*="param"] li'
     ].join(', ');
 
-    const excludedContainers = '[data-marker="seller-info"], [data-marker="recommendations"], [data-marker="similar-items"], [data-marker="seller-items"], .recommendations-root, .similar-items';
+    const excludedContainers = '[data-marker="seller-info"], [data-marker*="seller"], [data-marker*="stats"], [class*="stats"], [class*="vas-"], [data-marker*="vas"], [data-marker="recommendations"], [data-marker="similar-items"], [data-marker="seller-items"], .recommendations-root, .similar-items';
 
     const elements = document.querySelectorAll(itemSelectors);
     elements.forEach(el => {
@@ -860,6 +879,11 @@ function extractCharacteristicsFromDom() {
         if (labelEl && valueEl && labelEl !== valueEl) {
             key = labelEl.textContent.trim().replace(/:$/, '');
             val = valueEl.textContent.trim();
+        } else if (labelEl) {
+            const labelText = labelEl.textContent.trim();
+            key = labelText.replace(/:$/, '').trim();
+            const rawVal = el.textContent.replace(labelText, '').trim();
+            val = rawVal.replace(/^[—–:\s]+/, '').trim();
         }
 
         if (!key || !val) {
@@ -983,11 +1007,25 @@ function extractListingData() {
 
         let category = "";
         try {
-            const breadcrumbs = Array.from(document.querySelectorAll('[data-marker="breadcrumbs"] a, .breadcrumbs-link, [class*="breadcrumbs-link"]'))
-                .map(el => el.textContent.trim())
-                .filter(Boolean);
-            if (breadcrumbs.length > 0) {
-                category = breadcrumbs.join(' / ');
+            const breadcrumbContainers = document.querySelectorAll('[data-marker="breadcrumbs"], nav[aria-label="Хлебные крошки"], .breadcrumbs-root');
+            let crumbs = [];
+            if (breadcrumbContainers.length > 0) {
+                const links = breadcrumbContainers[0].querySelectorAll('a, span[class*="link"], span[itemprop="name"]');
+                links.forEach(el => {
+                    const t = el.textContent.trim();
+                    if (t && t !== '…' && t !== '...' && t !== 'Главная' && !crumbs.includes(t)) {
+                        crumbs.push(t);
+                    }
+                });
+            }
+            if (crumbs.length === 0) {
+                const allLinks = Array.from(document.querySelectorAll('[data-marker="breadcrumbs"] a, .breadcrumbs-link'))
+                    .map(el => el.textContent.trim())
+                    .filter(t => t && t !== '…' && t !== '...' && t !== 'Главная');
+                crumbs = Array.from(new Set(allLinks));
+            }
+            if (crumbs.length > 0) {
+                category = crumbs.join(' / ');
             }
         } catch (e) {}
 
@@ -1003,7 +1041,7 @@ function extractListingData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.13",
+            extension_version: "0.2.14",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1024,7 +1062,7 @@ function extractListingData() {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.13",
+            extension_version: "0.2.14",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1068,7 +1106,7 @@ function extractMyListingsData() {
         });
         return {
             schema_version: 1,
-            extension_version: "0.2.13",
+            extension_version: "0.2.14",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -1152,7 +1190,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.13",
+                    extension_version: "0.2.14",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
