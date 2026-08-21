@@ -764,14 +764,58 @@ function extractMyListingsData() {
     };
 }
 
+async function extractListingDataMultiPass() {
+    let data = extractListingData();
+    if (data.error || data.page_type !== "listing") return data;
+
+    triggerInitialDataCapture();
+
+    try {
+        const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
+                                 document.querySelector('[data-marker="gallery"]') ||
+                                 document.querySelector('.style-item-view-gallery-') ||
+                                 document.querySelector('[data-marker="gallery/list"]');
+        
+        if (galleryContainer) {
+            const thumbnails = galleryContainer.querySelectorAll('li, img, [data-marker*="image"], [data-marker*="item"]');
+            thumbnails.forEach(thumb => {
+                thumb.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                thumb.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+            });
+
+            const list = galleryContainer.querySelector('ul') || galleryContainer;
+            if (list.scrollWidth > list.clientWidth) {
+                list.scrollLeft = list.scrollWidth;
+                list.dispatchEvent(new Event('scroll', { bubbles: true }));
+            }
+        }
+    } catch (e) {}
+
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    triggerInitialDataCapture();
+    const pass2 = extractListingData();
+    if (pass2 && pass2.listing && pass2.listing.photos) {
+        if (pass2.listing.photos.length >= (data.listing.photos ? data.listing.photos.length : 0)) {
+            data = pass2;
+        }
+    }
+
+    return data;
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "extract_current_page") {
         const url = window.location.href;
         if (url.includes('/profile/items') || url.includes('/my/items')) {
             sendResponse(extractMyListingsData());
+        } else if (request.deepScan) {
+            extractListingDataMultiPass().then(data => sendResponse(data));
+            return true;
         } else {
             sendResponse(extractListingData());
         }
     }
     return true;
 });
+
