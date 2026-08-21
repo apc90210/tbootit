@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pageTypeTitle = document.getElementById("pageTypeTitle");
     const pageDetectInfo = document.getElementById("pageDetectInfo");
     const sendBtn = document.getElementById("sendBtn");
+    const productLinkContainer = document.getElementById("productLinkContainer");
+    const openProductBtn = document.getElementById("openProductBtn");
     const resultMsg = document.getElementById("resultMsg");
     const versionLabel = document.getElementById("versionLabel");
 
@@ -40,57 +42,61 @@ document.addEventListener("DOMContentLoaded", async () => {
             isPaired = false;
             connBadge.className = "badge badge-offline";
             connBadge.textContent = "Offline";
-            statusMsg.textContent = "✕ Нет подключения к локальному серверу Техноребут (localhost:8011). Запустите Техноребут.";
+            statusMsg.textContent = "Сервер Техноребут недоступен (проверьте, запущен ли контейнер core / admin-shell).";
             pairSection.style.display = "none";
             actionSection.style.display = "none";
+            if (productLinkContainer) productLinkContainer.style.display = "none";
             return;
-        }
-
-        isServerOnline = true;
-        isPaired = response.paired === true;
-
-        if (isPaired) {
-            // STATE D: Server Reachable & Paired
-            connBadge.className = "badge badge-paired";
-            connBadge.textContent = "Расширение привязано";
-            statusMsg.textContent = "✓ Сервер доступен. Расширение привязано к Техноребут.";
-            pairSection.style.display = "none";
-            actionSection.style.display = "block";
-            inspectActiveTab();
-        } else {
-            // STATE B/C: Server Reachable, UNPAIRED
-            connBadge.className = "badge badge-online";
-            connBadge.textContent = "Сервер доступен";
-            statusMsg.textContent = response.has_token ? 
-                "✕ Привязка устарела. Введите новый код подключения." : 
-                "✓ Сервер Техноребут доступен. Введите код для подключения расширения.";
+        } else if (!response.paired) {
+            // STATE B: Online, Unpaired
+            isServerOnline = true;
+            isPaired = false;
+            connBadge.className = "badge badge-offline";
+            connBadge.textContent = "Не привязан";
+            statusMsg.textContent = "Сервер Техноребут в сети. Требуется привязка расширения.";
             pairSection.style.display = "block";
             actionSection.style.display = "block";
+            if (productLinkContainer) productLinkContainer.style.display = "none";
+            inspectActiveTab();
+        } else {
+            // STATE C: Online, Paired
+            isServerOnline = true;
+            isPaired = true;
+            connBadge.className = "badge badge-online";
+            connBadge.textContent = "Подключен";
+            statusMsg.textContent = "Расширение успешно привязано и готово к передаче данных.";
+            pairSection.style.display = "none";
+            actionSection.style.display = "block";
+            if (productLinkContainer) productLinkContainer.style.display = "none";
             inspectActiveTab();
         }
     });
 
-    // Pair button click
+    // Pair Button click
     pairBtn.addEventListener("click", () => {
         const rawCode = pairCodeInput.value ? pairCodeInput.value.trim() : "";
         const cleanCode = rawCode.replace(/\D/g, "");
 
         if (!cleanCode || cleanCode.length !== 6) {
             pairMsg.className = "msg msg-error";
-            pairMsg.textContent = "Введите ровно 6 цифр кода подключения.";
+            pairMsg.textContent = "Введите 6-значный цифровой код.";
             return;
         }
 
         pairMsg.className = "msg";
-        pairMsg.textContent = "Проверка кода...";
+        pairMsg.textContent = "Подключение...";
         pairBtn.disabled = true;
 
         chrome.runtime.sendMessage({ action: "pair", code: cleanCode }, res => {
             pairBtn.disabled = false;
             if (res && res.success) {
-                pairMsg.className = "msg msg-success";
-                pairMsg.textContent = res.message;
-                setTimeout(() => window.location.reload(), 800);
+                isPaired = true;
+                connBadge.className = "badge badge-online";
+                connBadge.textContent = "Подключен";
+                statusMsg.textContent = "Расширение успешно привязано и готово к передаче данных.";
+                pairSection.style.display = "none";
+                pairMsg.textContent = "";
+                inspectActiveTab();
             } else {
                 pairMsg.className = "msg msg-error";
                 pairMsg.textContent = (res && res.message) || "Ошибка привязки кода.";
@@ -100,6 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Inspect Active Tab
     function inspectActiveTab() {
+        if (productLinkContainer) productLinkContainer.style.display = "none";
         chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
             if (!tabs || tabs.length === 0) return;
             const activeTab = tabs[0];
@@ -187,6 +194,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const photosTotal = res.photos_total !== undefined ? res.photos_total : 
                     ((res.details && res.details.photos_total !== undefined) ? res.details.photos_total : 
                     (photosImported + photosSkipped));
+
+                if (openProductBtn && productLinkContainer) {
+                    const targetUrl = `http://localhost:8011/products/${res.product_id}`;
+                    openProductBtn.onclick = () => {
+                        chrome.tabs.create({ url: targetUrl });
+                    };
+                    productLinkContainer.style.display = "block";
+                }
 
                 if (res.status === "partial" || (res.details && res.details.result === "partial")) {
                     resultMsg.className = "msg msg-warning";

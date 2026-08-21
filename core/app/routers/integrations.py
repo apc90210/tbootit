@@ -358,6 +358,8 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     # Track incoming content hashes and source URLs for reconciliation
     incoming_content_hashes = set()
     incoming_source_urls = set()
+    seen_content_hashes_in_batch = set()
+    seen_source_urls_in_batch = set()
 
     for idx, item_photo in enumerate(effective_photos):
         photo_bytes = None
@@ -381,10 +383,20 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         if not content_hash and source_url:
             content_hash = hashlib.sha256(source_url.encode("utf-8")).hexdigest()
 
+        # Deduplicate identical byte content or URLs within the same batch
+        if content_hash and content_hash in seen_content_hashes_in_batch:
+            photos_skipped += 1
+            continue
+        if source_url and source_url in seen_source_urls_in_batch:
+            photos_skipped += 1
+            continue
+
         if content_hash:
             incoming_content_hashes.add(content_hash)
+            seen_content_hashes_in_batch.add(content_hash)
         if source_url:
             incoming_source_urls.add(source_url)
+            seen_source_urls_in_batch.add(source_url)
 
         # Check existing photo by content_hash or source_url for this product
         existing_photo = None
