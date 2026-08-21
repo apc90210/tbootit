@@ -104,3 +104,77 @@ def test_product_detail_rich_monitor_attributes_ui():
         assert "Частота обновления" in res.text
         assert "144 Гц" in res.text
         assert "Открыть объявление на Avito ↗" in res.text
+
+def test_product_detail_motherboard_attributes_ui():
+    """Verify realistic motherboard characteristics render in UI table."""
+    mock_product = {
+        "id": 160,
+        "title": "Материнская плата ASUS TUF GAMING B550-PLUS",
+        "sale_price": 8500.0,
+        "status": "draft",
+        "storage_location": "store",
+        "quantity": 1,
+        "description": "Плата AM4",
+        "photos": [],
+        "avito_category_name": "Материнские платы",
+        "avito_source_url": "https://www.avito.ru/items/8999888777",
+        "avito_characteristics": {
+            "Производитель": "ASUS",
+            "Модель": "TUF GAMING B550-PLUS",
+            "Сокет": "AM4",
+            "Чипсет": "AMD B550",
+            "Форм-фактор": "Standard-ATX",
+            "Количество слотов памяти": "4",
+            "Тип памяти": "DDR4",
+            "Максимальный объем памяти": "128 ГБ"
+        }
+    }
+    with patch("app.routers.products.core_client.get_product_details", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_product
+        res = client.get("/products/160")
+        assert res.status_code == 200
+        assert "Материнские платы" in res.text
+        assert "Сокет" in res.text
+        assert "AM4" in res.text
+        assert "Чипсет" in res.text
+        assert "AMD B550" in res.text
+        assert "Форм-фактор" in res.text
+        assert "Standard-ATX" in res.text
+
+def test_product_detail_computer_attributes_ui():
+    """Verify realistic computer / system unit characteristics render in UI table."""
+    mock_product = {
+        "id": 170,
+        "title": "Системный блок i5-10400F / 16GB / GTX 1660 Super",
+        "sale_price": 42000.0,
+        "status": "draft",
+        "storage_location": "store",
+        "quantity": 1,
+        "description": "Игровой ПК",
+        "photos": [],
+        "avito_category_name": "Системные блоки",
+        "avito_source_url": "https://www.avito.ru/items/8111222333",
+        "avito_characteristics": {
+            "Тип компьютера": "Системный блок",
+            "Процессор": "Intel Core i5-10400F",
+            "Оперативная память": "16 ГБ",
+            "Объем SSD": "512 ГБ",
+            "Объем HDD": "1 ТБ",
+            "Видеокарта": "NVIDIA GeForce GTX 1660 Super",
+            "Объем видеопамяти": "6 ГБ",
+            "Операционная система": "Windows 10 Pro",
+            "Состояние": "Б/у"
+        }
+    }
+    with patch("app.routers.products.core_client.get_product_details", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_product
+        res = client.get("/products/170")
+        assert res.status_code == 200
+        assert "Системные блоки" in res.text
+        assert "Процессор" in res.text
+        assert "Intel Core i5-10400F" in res.text
+        assert "Видеокарта" in res.text
+        assert "NVIDIA GeForce GTX 1660 Super" in res.text
+        assert "Оперативная память" in res.text
+        assert "16 ГБ" in res.text
+

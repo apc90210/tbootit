@@ -226,3 +226,77 @@ def test_rich_monitor_attribute_validation(client, db_session):
     r9_data = r9_res.json()
     assert len(r9_data["attributes"]) == 12
 
+def test_realistic_motherboard_r9_binding(client, db_session):
+    """Verify realistic 8-attribute motherboard binds to Core R9 models and details API."""
+    mb_params = {
+        "Производитель": "ASUS",
+        "Модель": "TUF GAMING B550-PLUS",
+        "Сокет": "AM4",
+        "Чипсет": "AMD B550",
+        "Форм-фактор": "Standard-ATX",
+        "Количество слотов памяти": "4",
+        "Тип памяти": "DDR4",
+        "Максимальный объем памяти": "128 ГБ"
+    }
+    payload = {
+        "account_key": "acc_extension_owner",
+        "external_item_id": "8999888777",
+        "external_url": "https://www.avito.ru/ekaterinburg/tovary_dlya_kompyutera/materinskaya_plata_am4_8999888777",
+        "title": "Материнская плата ASUS TUF GAMING B550-PLUS",
+        "price": 8500.0,
+        "category_path": ["Товары для компьютера", "Комплектующие", "Материнские платы"],
+        "brand": "ASUS",
+        "model": "TUF GAMING B550-PLUS",
+        "parameters": mb_params,
+        "photos": []
+    }
+    res = client.post("/api/integrations/avito/ingest-parsed-ad", json=payload)
+    assert res.status_code == 200, res.text
+    pid = res.json()["product_id"]
+
+    details_res = client.get(f"/api/products/{pid}/details")
+    assert details_res.status_code == 200
+    details = details_res.json()
+    assert details["avito_category_name"] == "Материнские платы"
+    assert len(details["avito_characteristics"]) == 8
+    assert details["avito_characteristics"]["Сокет"] == "AM4"
+    assert details["avito_characteristics"]["Чипсет"] == "AMD B550"
+
+def test_realistic_computer_r9_binding(client, db_session):
+    """Verify realistic 9-attribute computer / system unit binds to Core R9 models."""
+    pc_params = {
+        "Тип компьютера": "Системный блок",
+        "Процессор": "Intel Core i5-10400F",
+        "Оперативная память": "16 ГБ",
+        "Объем SSD": "512 ГБ",
+        "Объем HDD": "1 ТБ",
+        "Видеокарта": "NVIDIA GeForce GTX 1660 Super",
+        "Объем видеопамяти": "6 ГБ",
+        "Операционная система": "Windows 10 Pro",
+        "Состояние": "Б/у"
+    }
+    payload = {
+        "account_key": "acc_extension_owner",
+        "external_item_id": "8111222333",
+        "external_url": "https://www.avito.ru/ekaterinburg/nastolnye_kompyutery/sistemnyy_blok_i5_16gb_gtx1660_8111222333",
+        "title": "Системный блок i5-10400F / 16GB / GTX 1660 Super",
+        "price": 42000.0,
+        "category_path": ["Бытовая электроника", "Настольные компьютеры", "Системные блоки"],
+        "brand": "Intel",
+        "model": "Custom i5",
+        "parameters": pc_params,
+        "photos": []
+    }
+    res = client.post("/api/integrations/avito/ingest-parsed-ad", json=payload)
+    assert res.status_code == 200, res.text
+    pid = res.json()["product_id"]
+
+    details_res = client.get(f"/api/products/{pid}/details")
+    assert details_res.status_code == 200
+    details = details_res.json()
+    assert details["avito_category_name"] == "Системные блоки"
+    assert len(details["avito_characteristics"]) == 9
+    assert details["avito_characteristics"]["Процессор"] == "Intel Core i5-10400F"
+    assert details["avito_characteristics"]["Видеокарта"] == "NVIDIA GeForce GTX 1660 Super"
+
+

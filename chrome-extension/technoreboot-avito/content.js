@@ -652,6 +652,270 @@ function extractAllPhotos(jsonLd) {
     return uniquePhotos;
 }
 
+function extractCharacteristicsFromJsonObject(obj, itemId) {
+    const characteristics = {};
+    if (!obj || typeof obj !== 'object') return characteristics;
+
+    function addParam(key, val) {
+        if (!key || typeof key !== 'string') return;
+        const cleanKey = key.trim().replace(/:$/, '');
+        if (!cleanKey) return;
+        
+        let cleanVal = '';
+        if (typeof val === 'string') {
+            cleanVal = val.trim();
+        } else if (typeof val === 'number' || typeof val === 'boolean') {
+            cleanVal = String(val);
+        } else if (Array.isArray(val)) {
+            cleanVal = val.map(v => typeof v === 'object' && v ? (v.title || v.name || v.value || JSON.stringify(v)) : String(v)).filter(Boolean).join(', ');
+        } else if (val && typeof val === 'object') {
+            cleanVal = val.title || val.name || val.value || val.description || val.text || '';
+        }
+        
+        if (cleanKey && cleanVal && !characteristics[cleanKey]) {
+            if (!cleanKey.startsWith('Показать') && !cleanKey.startsWith('Написать') && cleanKey.length < 100 && cleanVal.length < 500) {
+                characteristics[cleanKey] = cleanVal;
+            }
+        }
+    }
+
+    function processParamsArray(arr) {
+        if (!Array.isArray(arr)) return;
+        for (const item of arr) {
+            if (!item || typeof item !== 'object') continue;
+            const k = item.title || item.name || item.key || item.label || item.propertyName;
+            const v = item.value !== undefined ? item.value : (item.description || item.text || item.values || item.propertyValue);
+            if (k && v !== undefined) {
+                addParam(k, v);
+            }
+        }
+    }
+
+    function processParamsDict(dict) {
+        if (!dict || typeof dict !== 'object' || Array.isArray(dict)) return;
+        for (const [k, v] of Object.entries(dict)) {
+            if (typeof v === 'string' || typeof v === 'number' || Array.isArray(v)) {
+                addParam(k, v);
+            } else if (v && typeof v === 'object' && (v.title || v.name || v.value || v.description)) {
+                addParam(k, v.value || v.title || v.name || v.description);
+            }
+        }
+    }
+
+    function traverse(node, depth) {
+        if (!node || typeof node !== 'object' || depth > 10) return;
+
+        if (node.params && Array.isArray(node.params)) processParamsArray(node.params);
+        else if (node.params && typeof node.params === 'object') processParamsDict(node.params);
+
+        if (node.parameters && Array.isArray(node.parameters)) processParamsArray(node.parameters);
+        else if (node.parameters && typeof node.parameters === 'object') processParamsDict(node.parameters);
+
+        if (node.properties && Array.isArray(node.properties)) processParamsArray(node.properties);
+        else if (node.properties && typeof node.properties === 'object') processParamsDict(node.properties);
+
+        if (node.characteristics && Array.isArray(node.characteristics)) processParamsArray(node.characteristics);
+        else if (node.characteristics && typeof node.characteristics === 'object') processParamsDict(node.characteristics);
+
+        if (node.itemParams && Array.isArray(node.itemParams)) processParamsArray(node.itemParams);
+        else if (node.itemParams && typeof node.itemParams === 'object') processParamsDict(node.itemParams);
+
+        if (node.paramsList && Array.isArray(node.paramsList)) processParamsArray(node.paramsList);
+        else if (node.paramsList && typeof node.paramsList === 'object') processParamsDict(node.paramsList);
+
+        if (node.shortParams && Array.isArray(node.shortParams)) processParamsArray(node.shortParams);
+        if (node.fullParams && Array.isArray(node.fullParams)) processParamsArray(node.fullParams);
+
+        if (Array.isArray(node)) {
+            for (const item of node) {
+                traverse(item, depth + 1);
+            }
+        } else {
+            for (const [key, val] of Object.entries(node)) {
+                if (key.includes('recommendation') || key.includes('similar') || key.includes('seller') || key.includes('banner')) continue;
+                if (typeof val === 'object' && val !== null) {
+                    traverse(val, depth + 1);
+                }
+            }
+        }
+    }
+
+    traverse(obj, 0);
+    return characteristics;
+}
+
+function extractCharacteristicsFromJsonLd(jsonLd) {
+    const characteristics = {};
+    if (!jsonLd) return characteristics;
+
+    if (Array.isArray(jsonLd.additionalProperty)) {
+        for (const prop of jsonLd.additionalProperty) {
+            if (prop && prop.name && prop.value !== undefined) {
+                characteristics[String(prop.name).trim()] = String(prop.value).trim();
+            }
+        }
+    }
+
+    if (jsonLd.disambiguatingDescription && typeof jsonLd.disambiguatingDescription === 'string') {
+        const lines = jsonLd.disambiguatingDescription.split('\n');
+        for (const line of lines) {
+            if (line.includes(':')) {
+                const idx = line.indexOf(':');
+                const k = line.slice(0, idx).trim();
+                const v = line.slice(idx + 1).trim();
+                if (k && v && !characteristics[k]) {
+                    characteristics[k] = v;
+                }
+            }
+        }
+    }
+
+    return characteristics;
+}
+
+function extractCharacteristicsFromDom() {
+    const characteristics = {};
+
+    try {
+        const expandButtons = document.querySelectorAll('[data-marker*="params/show-all"], [data-marker*="properties/show-all"], [data-marker*="show-all"], [class*="show-all"], [class*="showMore"], button[data-marker="item-properties/expand"]');
+        expandButtons.forEach(btn => {
+            if (btn && typeof btn.click === 'function') {
+                btn.click();
+            }
+        });
+    } catch (e) {}
+
+    function addParam(key, val) {
+        if (!key || typeof key !== 'string') return;
+        const cleanKey = key.trim().replace(/:$/, '');
+        const cleanVal = typeof val === 'string' ? val.trim() : String(val || '').trim();
+        if (cleanKey && cleanVal && !characteristics[cleanKey]) {
+            if (!cleanKey.startsWith('Показать') && !cleanKey.startsWith('Написать') && cleanKey.length < 100 && cleanVal.length < 500) {
+                characteristics[cleanKey] = cleanVal;
+            }
+        }
+    }
+
+    const itemSelectors = [
+        '[data-marker="item-view/item-params"] li',
+        '[data-marker="item-view/item-params"] [class*="params-item"]',
+        '[data-marker="item-properties/list"] li',
+        '[data-marker="item-properties/item"]',
+        '[data-marker="item-params/list"] li',
+        '[data-marker*="params"] li',
+        '[data-marker*="properties"] li',
+        '[data-marker*="characteristics"] li',
+        'ul[class*="params-paramsList"] li',
+        'li[class*="params-paramsList__item"]',
+        'li[class*="item-params-list-item"]',
+        'li[class*="styles-module-root-"]',
+        'div[class*="params-paramsList"] > div',
+        'div[class*="params-item"]',
+        'div[class*="item-params"]',
+        '[data-marker="item-view/main"] [data-marker*="param"] li',
+        '[data-marker="item-view/main"] [class*="param"] li'
+    ].join(', ');
+
+    const excludedContainers = '[data-marker="seller-info"], [data-marker="recommendations"], [data-marker="similar-items"], [data-marker="seller-items"], .recommendations-root, .similar-items';
+
+    const elements = document.querySelectorAll(itemSelectors);
+    elements.forEach(el => {
+        if (el.closest && el.closest(excludedContainers)) return;
+
+        let key = '';
+        let val = '';
+
+        const labelEl = el.querySelector('[class*="noaccent"], [class*="label"], [class*="title"], [class*="key"], [data-marker*="label"], [data-marker*="name"]');
+        const valueEl = el.querySelector('[class*="accent"], [class*="value"], [class*="description"], [data-marker*="val"], [data-marker*="value"]');
+        
+        if (labelEl && valueEl && labelEl !== valueEl) {
+            key = labelEl.textContent.trim().replace(/:$/, '');
+            val = valueEl.textContent.trim();
+        }
+
+        if (!key || !val) {
+            const children = Array.from(el.children).filter(c => c.textContent.trim());
+            if (children.length >= 2) {
+                key = children[0].textContent.trim().replace(/:$/, '');
+                val = children.slice(1).map(c => c.textContent.trim()).filter(Boolean).join(', ');
+            }
+        }
+
+        if (!key || !val) {
+            const text = el.textContent.trim();
+            if (text.includes(':')) {
+                const idx = text.indexOf(':');
+                key = text.slice(0, idx).trim();
+                val = text.slice(idx + 1).trim();
+            } else if (text.includes(' — ') || text.includes(' – ')) {
+                const sep = text.includes(' — ') ? ' — ' : ' – ';
+                const idx = text.indexOf(sep);
+                key = text.slice(0, idx).trim();
+                val = text.slice(idx + sep.length).trim();
+            }
+        }
+
+        if (key && val) {
+            addParam(key, val);
+        }
+    });
+
+    const dts = document.querySelectorAll('dl dt');
+    dts.forEach(dt => {
+        if (dt.closest && dt.closest(excludedContainers)) return;
+        const dd = dt.nextElementSibling;
+        if (dd && dd.tagName && dd.tagName.toLowerCase() === 'dd') {
+            addParam(dt.textContent, dd.textContent);
+        }
+    });
+
+    return characteristics;
+}
+
+function extractAllCharacteristics(jsonLd, itemId) {
+    const combined = {};
+
+    triggerInitialDataCapture();
+    if (pageInitialData) {
+        const stateParams = extractCharacteristicsFromJsonObject(pageInitialData, itemId);
+        Object.assign(combined, stateParams);
+    }
+
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+        const text = script.textContent || '';
+        if (text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('initialData')) {
+            const unescaped = text
+                .replace(/\\u002F/ig, '/')
+                .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
+
+            for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
+                if (unescaped.includes(varName)) {
+                    const parsed = extractJsonAssignedToVar(unescaped, varName);
+                    if (parsed) {
+                        const scriptParams = extractCharacteristicsFromJsonObject(parsed, itemId);
+                        for (const [k, v] of Object.entries(scriptParams)) {
+                            if (!combined[k]) combined[k] = v;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    const jsonLdParams = extractCharacteristicsFromJsonLd(jsonLd);
+    for (const [k, v] of Object.entries(jsonLdParams)) {
+        if (!combined[k]) combined[k] = v;
+    }
+
+    const domParams = extractCharacteristicsFromDom();
+    for (const [k, v] of Object.entries(domParams)) {
+        if (!combined[k]) combined[k] = v;
+    }
+
+    return combined;
+}
+
 function extractListingData() {
     const url = window.location.href;
     const itemId = extractAvitoItemId(url, document.documentElement.innerHTML);
@@ -697,22 +961,11 @@ function extractListingData() {
     }
 
     const photos = extractAllPhotos(jsonLd);
-
-    const characteristics = {};
-    const paramEls = document.querySelectorAll('[data-marker="item-params/list"] li, .item-params-list-item');
-    paramEls.forEach(el => {
-        const text = el.textContent.trim();
-        if (text.includes(':')) {
-            const parts = text.split(':');
-            const key = parts[0].trim();
-            const val = parts.slice(1).join(':').trim();
-            if (key && val) characteristics[key] = val;
-        }
-    });
+    const characteristics = extractAllCharacteristics(jsonLd, itemId);
 
     return {
         schema_version: 1,
-        extension_version: "0.1.10",
+        extension_version: "0.2.11",
         captured_at: new Date().toISOString(),
         page_type: "listing",
         listing: {
@@ -722,7 +975,7 @@ function extractListingData() {
             price: price,
             description: description,
             category: category,
-            brand: characteristics["Бренд"] || characteristics["Марка"] || null,
+            brand: characteristics["Производитель"] || characteristics["Бренд"] || characteristics["Марка"] || null,
             model: characteristics["Модель"] || null,
             status: "active",
             characteristics: characteristics,
@@ -756,7 +1009,7 @@ function extractMyListingsData() {
     });
     return {
         schema_version: 1,
-        extension_version: "0.1.10",
+        extension_version: "0.2.11",
         captured_at: new Date().toISOString(),
         page_type: "my_listings",
         listings_count: items.length,
@@ -765,6 +1018,16 @@ function extractMyListingsData() {
 }
 
 async function extractListingDataMultiPass() {
+    // 1. Try expanding parameters and gallery thumbnails
+    try {
+        const expandButtons = document.querySelectorAll('[data-marker*="params/show-all"], [data-marker*="properties/show-all"], [data-marker*="show-all"], [class*="show-all"], [class*="showMore"], button[data-marker="item-properties/expand"]');
+        expandButtons.forEach(btn => {
+            if (btn && typeof btn.click === 'function') {
+                btn.click();
+            }
+        });
+    } catch (e) {}
+
     let data = extractListingData();
     if (data.error || data.page_type !== "listing") return data;
 
