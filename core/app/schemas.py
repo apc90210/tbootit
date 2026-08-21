@@ -297,6 +297,8 @@ class ProductDetails(Product):
     stock_movements: List[StockMovement] = []
     avito_ready: bool = False
     site_ready: bool = False
+    avito_category_name: Optional[str] = None
+    avito_characteristics: Optional[dict] = None
     class Config:
         from_attributes = True
 

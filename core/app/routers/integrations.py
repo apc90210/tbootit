@@ -72,6 +72,7 @@ def log_audit(db: Session, entity_type: str, entity_id: int, action: str, old_va
     db.add(log)
 
 @router.post("/avito/import-item", response_model=schemas.AvitoItemImportResponse, status_code=200)
+@router.post("/avito/ingest-parsed-ad", response_model=schemas.AvitoItemImportResponse, status_code=200)
 def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Depends(get_db)):
     """
     Idempotent upsert of an Avito listing into Technoreboot catalog.
@@ -197,7 +198,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     # 2b. Stage06A-R9 Avito-First Category & Attribute Dynamic Schema Upsert
     try:
         from app.services.avito_schema_service import upsert_avito_category_schema, upsert_product_avito_attributes
-        category_name = cat_name or (payload.category_path[-1] if payload.category_path else "Без категории")
+        category_name = (payload.category_path[-1] if payload.category_path else None) or "Без категории"
         category_path_str = " / ".join(payload.category_path) if payload.category_path else category_name
 
         avito_cat = upsert_avito_category_schema(

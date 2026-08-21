@@ -332,6 +332,21 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
         
     available = (db_product.quantity or 0) - (db_product.reserved_quantity or 0)
     
+    # Avito Category and Characteristics
+    avito_cat_name = db_product.avito_category.name if db_product.avito_category else db_product.avito_category_path
+    avito_characteristics = {}
+    if db_product.avito_attribute_values:
+        for val_row in db_product.avito_attribute_values:
+            if val_row.definition and val_row.definition.name:
+                avito_characteristics[val_row.definition.name] = val_row.value or val_row.raw_value
+    elif db_product.avito_params_json:
+        try:
+            legacy_p = json.loads(db_product.avito_params_json)
+            if isinstance(legacy_p, dict):
+                avito_characteristics = legacy_p
+        except Exception:
+            pass
+
     # We must convert to dict first because we need to add fields not present in the DB model directly, or use model_validate/dump
     p_dict = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
     p_dict["margin"] = margin
@@ -342,6 +357,8 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
     p_dict["photos"] = photos
     p_dict["events"] = events
     p_dict["stock_movements"] = movements
+    p_dict["avito_category_name"] = avito_cat_name
+    p_dict["avito_characteristics"] = avito_characteristics
     
     return p_dict
 
