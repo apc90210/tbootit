@@ -67,10 +67,7 @@ function validateListingImageUrl(url) {
     const lower = u.toLowerCase();
     if (lower.includes('/avatar/') || lower.includes('/avatars/') ||
         lower.includes('/icons/') || lower.includes('/logos/') ||
-        lower.includes('/shop/') || lower.includes('/recom/') ||
-        lower.includes('/banner/') || lower.includes('/profile/') ||
-        lower.includes('/user/') || lower.includes('/seller/') ||
-        lower.includes('rpq-qra') || lower.includes('rpq-qba') ||
+        lower.includes('/banner/') ||
         lower.endsWith('.svg') || lower.startsWith('data:') ||
         lower.endsWith('.mp4') || lower.endsWith('.m3u8') || lower.endsWith('.webm') ||
         lower.includes('video.avito.st') || lower.includes('/video/')) {
@@ -147,57 +144,64 @@ function getImageQualityScore(candidateInput) {
         baseArea = srcsetW * Math.round(srcsetW * 0.75);
     }
 
-    const laVal = extractAvitoResolutionVersion(url);
-    let laBonus = laVal * 10;
-    if (laVal > 0 && baseArea === 0) {
-        if (laVal >= 4) {
-            baseArea = 1280 * 960;
-        } else if (laVal === 3) {
-            baseArea = 640 * 480;
-        } else if (laVal === 2) {
-            baseArea = 208 * 156;
-        } else if (laVal === 1) {
-            baseArea = 140 * 105;
-        }
+    const version = extractAvitoResolutionVersion(url);
+    const laBonus = version * 10;
+
+    if (version > 0 && baseArea === 0) {
+        if (version >= 4) baseArea = 1280 * 960;
+        else if (version === 3) baseArea = 640 * 480;
+        else if (version === 2) baseArea = 208 * 156;
+        else if (version === 1) baseArea = 140 * 105;
     }
 
     if (baseArea === 0 && url.includes('.img.avito.st/image/1/')) {
         baseArea = 1280 * 960;
     }
 
-    if (baseArea > 0) {
-        return baseArea + laBonus + explicitBonus;
+    if (baseArea === 0 && url.includes('.img.avito.st/')) {
+        baseArea = 640 * 480;
     }
 
-    return 1;
+    return baseArea + explicitBonus + laBonus;
 }
 
 function extractBestUrlFromSrcset(srcset) {
     const candidates = parseSrcsetCandidates(srcset);
     if (candidates.length === 0) return null;
-    candidates.sort((a, b) => b.score - a.score);
     return candidates[0].url;
 }
 
 function parseSrcsetCandidates(srcset) {
     if (!srcset || typeof srcset !== 'string') return [];
+    const entries = srcset.split(',');
     const candidates = [];
-    const parts = srcset.split(',').map(item => item.trim()).filter(Boolean);
 
-    for (const part of parts) {
-        const tokens = part.split(/\s+/);
-        const url = validateListingImageUrl(tokens[0]);
-        if (!url) continue;
+    for (const entry of entries) {
+        const trimmed = entry.trim();
+        if (!trimmed) continue;
+        const parts = trimmed.split(/\s+/);
+        if (parts.length === 0) continue;
+        const rawUrl = parts[0];
+        const valid = validateListingImageUrl(rawUrl);
+        if (!valid) continue;
 
-        let descriptorValue = 1;
-        const desc = tokens[1] || '1x';
-        if (desc.endsWith('w')) {
-            descriptorValue = parseInt(desc.slice(0, -1), 10) || 1;
-        } else if (desc.endsWith('x')) {
-            descriptorValue = (parseFloat(desc.slice(0, -1)) || 1) * 1000;
+        let width = 0;
+        let descriptor = parts[1] || '';
+        if (descriptor.endsWith('w')) {
+            width = parseInt(descriptor.slice(0, -1), 10) || 0;
+        } else if (descriptor.endsWith('x')) {
+            const mult = parseFloat(descriptor.slice(0, -1)) || 1;
+            width = Math.round(mult * 640);
         }
-        candidates.push({ url: url, score: descriptorValue });
+
+        candidates.push({
+            url: valid,
+            srcsetW: width,
+            score: getImageQualityScore({ url: valid, srcsetW: width })
+        });
     }
+
+    candidates.sort((a, b) => b.score - a.score);
     return candidates;
 }
 
@@ -205,40 +209,60 @@ function parseJsonLdImages(jsonLd) {
     const urls = [];
     if (!jsonLd) return urls;
 
-    const nodes = [];
-    if (Array.isArray(jsonLd)) {
-        nodes.push(...jsonLd);
-    } else if (jsonLd['@graph'] && Array.isArray(jsonLd['@graph'])) {
-        nodes.push(...jsonLd['@graph']);
-    } else {
-        nodes.push(jsonLd);
+    function addCandidate(raw) {
+        const valid = validateListingImageUrl(raw);
+        if (valid && !urls.includes(valid)) {
+            urls.push(valid);
+        }
     }
 
-    for (const node of nodes) {
-        if (!node) continue;
-        const img = node.image || node.photos || node.photo;
-        if (!img) continue;
+    const items = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
+    for (const node of items) {
+        if (!node || typeof node !== 'object') continue;
 
-        if (typeof img === 'string') {
-            const valid = validateListingImageUrl(img);
-            if (valid) urls.push(valid);
-        } else if (Array.isArray(img)) {
-            img.forEach(item => {
-                let u = null;
-                if (typeof item === 'string') u = item;
-                else if (item && typeof item === 'object' && item.url) u = item.url;
-                else if (item && typeof item === 'object' && item.contentUrl) u = item.contentUrl;
-                const valid = validateListingImageUrl(u);
-                if (valid) urls.push(valid);
+        if (node.image) {
+            if (typeof node.image === 'string') {
+                addCandidate(node.image);
+            } else if (Array.isArray(node.image)) {
+                node.image.forEach(item => {
+                    if (typeof item === 'string') addCandidate(item);
+                    else if (item && item.contentUrl) addCandidate(item.contentUrl);
+                    else if (item && item.url) addCandidate(item.url);
+                });
+            } else if (typeof node.image === 'object') {
+                if (node.image.contentUrl) addCandidate(node.image.contentUrl);
+                if (node.image.url) addCandidate(node.image.url);
+            }
+        }
+
+        if (Array.isArray(node['@graph'])) {
+            node['@graph'].forEach(gNode => {
+                if (gNode && gNode.image) {
+                    if (typeof gNode.image === 'string') addCandidate(gNode.image);
+                    else if (Array.isArray(gNode.image)) {
+                        gNode.image.forEach(item => {
+                            if (typeof item === 'string') addCandidate(item);
+                            else if (item && item.contentUrl) addCandidate(item.contentUrl);
+                            else if (item && item.url) addCandidate(item.url);
+                        });
+                    } else if (typeof gNode.image === 'object') {
+                        if (gNode.image.contentUrl) addCandidate(gNode.image.contentUrl);
+                        if (gNode.image.url) addCandidate(gNode.image.url);
+                    }
+                }
             });
-        } else if (typeof img === 'object') {
-            let u = img.url || img.contentUrl;
-            const valid = validateListingImageUrl(u);
-            if (valid) urls.push(valid);
         }
     }
     return urls;
 }
+
+const EXCLUDED_DATA_KEYS = new Set([
+    'recommendations', 'similar', 'similaritems', 'similar-items', 'recommendationitems',
+    'seller', 'selleritems', 'author', 'user', 'profile', 'popular',
+    'related', 'relateditems', 'otheritems', 'other-items',
+    'buyerprotection', 'buyer-protection', 'ads', 'promo', 'banner', 'banners',
+    'serp', 'catalog', 'vip', 'vas'
+]);
 
 function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
     if (!obj || depth > 25) return [];
@@ -251,7 +275,6 @@ function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
         return [];
     }
     if (typeof obj !== 'object') return [];
-    if (isVideoEntry(obj)) return [];
 
     const found = [];
     if (Array.isArray(obj)) {
@@ -262,7 +285,8 @@ function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
     }
 
     for (const [k, v] of Object.entries(obj)) {
-        if (k === 'recommendations' || k === 'similar' || k === 'seller' || k === 'author' || k === 'user' || k === 'profile' || k === 'popular') {
+        const lowerK = k.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (EXCLUDED_DATA_KEYS.has(lowerK) || lowerK.includes('recommend') || lowerK.includes('similar') || lowerK.includes('seller') || lowerK.includes('otheritem')) {
             continue;
         }
         found.push(...extractAvitoUrlsFromObject(v, depth + 1, seen));
@@ -270,93 +294,39 @@ function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
     return found;
 }
 
-function getBestResolutionFromImageObject(imgObj) {
-    if (!imgObj || typeof imgObj !== 'object') return null;
-    if (isVideoEntry(imgObj)) return null;
-
-    const urls = extractAvitoUrlsFromObject(imgObj);
-    if (urls.length === 0) return null;
-
-    let bestUrl = urls[0];
-    let maxScore = getImageQualityScore(bestUrl);
-    for (let i = 1; i < urls.length; i++) {
-        const score = getImageQualityScore(urls[i]);
-        if (score > maxScore) {
-            maxScore = score;
-            bestUrl = urls[i];
-        }
-    }
-    return bestUrl;
-}
-
-function isVideoEntry(obj) {
-    if (!obj || typeof obj !== 'object') return false;
-    // Explicit type markers
-    if (obj.type === 'video' || obj.type === 'VIDEO') return true;
-    if (obj.isVideo === true) return true;
-    // Video-specific keys
-    const videoKeys = ['videoId', 'videoUrl', 'video_url', 'video_id', 'playerId', 'playerUrl'];
-    for (const vk of videoKeys) {
-        if (vk in obj) return true;
-    }
-    // Has 'sources' array with video MIME types
-    if (Array.isArray(obj.sources)) {
-        for (const src of obj.sources) {
-            if (src && typeof src === 'object') {
-                const t = (src.type || src.mimeType || '').toLowerCase();
-                if (t.startsWith('video/')) return true;
-            }
-            if (typeof src === 'string' && (src.includes('.mp4') || src.includes('.m3u8') || src.includes('.webm'))) return true;
-        }
-    }
-    // Has duration (number) but no image dimension keys — likely a video
-    if (typeof obj.duration === 'number' && obj.duration > 0) {
-        const hasImageDim = Object.keys(obj).some(k => /^\d+x\d+$/.test(k));
-        if (!hasImageDim) return true;
-    }
-    // URL values pointing to video hosts
-    for (const val of Object.values(obj)) {
-        if (typeof val === 'string') {
-            const lower = val.toLowerCase();
-            if (lower.includes('video.avito.st') ||
-                (lower.includes('.mp4') && !lower.includes('img.avito.st')) ||
-                lower.includes('.m3u8')) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-function getAllResolutionsFromImageObject(imgObj) {
-    if (!imgObj || typeof imgObj !== 'object') return [];
-    if (isVideoEntry(imgObj)) return [];
-
-    const urls = extractAvitoUrlsFromObject(imgObj);
-    if (urls.length === 0) return [];
-
-    const highRes = urls.filter(u => getImageQualityScore(u) >= 300000);
-    const lowRes = urls.filter(u => getImageQualityScore(u) < 300000);
-
-    const results = [];
-    if (highRes.length > 0) {
-        highRes.sort((a, b) => getImageQualityScore(b) - getImageQualityScore(a));
-        results.push(highRes[0]);
-    }
-    if (lowRes.length > 0) {
-        lowRes.sort((a, b) => getImageQualityScore(b) - getImageQualityScore(a));
-        results.push(lowRes[0]);
-    }
-    if (results.length === 0 && urls.length > 0) {
-        results.push(urls[0]);
-    }
-
-    return results;
-}
-
 function parseItemImagesFromJsonObject(data) {
     if (!data || typeof data !== 'object') return [];
-    return extractAvitoUrlsFromObject(data);
+    const urls = [];
+    const seen = new Set();
+
+    // 1. Check item node (data.item, data.state.item, data.props.pageProps.item)
+    const itemNode = data.item || (data.state && data.state.item) || (data.props && data.props.pageProps && data.props.pageProps.item);
+    if (itemNode && typeof itemNode === 'object') {
+        const itemPhotos = extractAvitoUrlsFromObject(itemNode, 0, seen);
+        urls.push(...itemPhotos);
+    }
+
+    // 2. Check gallery widgets specifically
+    const widgets = data.widgets || (data.state && data.state.widgets) || (data.props && data.props.pageProps && data.props.pageProps.widgets);
+    if (widgets && typeof widgets === 'object') {
+        for (const [wKey, wVal] of Object.entries(widgets)) {
+            const lowerWKey = wKey.toLowerCase();
+            if (lowerWKey.includes('gallery') || lowerWKey.includes('image-frame') || lowerWKey.includes('item-view')) {
+                if (!lowerWKey.includes('recommend') && !lowerWKey.includes('similar') && !lowerWKey.includes('seller')) {
+                    const widgetPhotos = extractAvitoUrlsFromObject(wVal, 0, seen);
+                    urls.push(...widgetPhotos);
+                }
+            }
+        }
+    }
+
+    // 3. Fallback only if no item or gallery widgets found
+    if (urls.length === 0) {
+        const fallbackPhotos = extractAvitoUrlsFromObject(data, 0, seen);
+        urls.push(...fallbackPhotos);
+    }
+
+    return urls;
 }
 
 function extractJsonAssignedToVar(text, varName) {
@@ -474,11 +444,11 @@ function extractPhotosFromEmbeddedState() {
         photos.forEach(addUrl);
     }
 
-    // 2. Scan ALL script tags without early returns
+    // 2. Parse structured JSON from script tags
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
         const text = script.textContent || '';
-        if (text.includes('img.avito.st') || text.includes('avito.st') || text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__')) {
+        if (text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('initialData')) {
             const unescaped = text
                 .replace(/\\u002F/ig, '/')
                 .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
@@ -492,26 +462,6 @@ function extractPhotosFromEmbeddedState() {
                         photos.forEach(addUrl);
                     }
                 }
-            }
-
-            // If JSON script tag (e.g. __NEXT_DATA__)
-            if (script.type === 'application/json' || script.id === '__NEXT_DATA__') {
-                try {
-                    const parsed = JSON.parse(text);
-                    if (parsed) {
-                        const photos = parseItemImagesFromJsonObject(parsed);
-                        photos.forEach(addUrl);
-                    }
-                } catch (e) {}
-            }
-
-            // Fallback regex match across script text for any img.avito.st URLs
-            const matches = unescaped.match(/https?:\/\/[^\s"'<>\\]+?\.img\.avito\.st\/[^\s"'<>\\]+/g);
-            if (matches) {
-                matches.forEach(u => {
-                    const clean = u.replace(/[\"\'\}\]\)\;\,\s]+$/, '');
-                    addUrl(clean);
-                });
             }
         }
     }
@@ -530,24 +480,52 @@ function extractPhotosFromDom() {
         }
     }
 
+    // Strictly scope to the listing gallery container
+    const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
+                             document.querySelector('[data-marker="gallery"]') ||
+                             document.querySelector('.style-item-view-gallery-') ||
+                             document.querySelector('.gallery-root') ||
+                             document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                             document.querySelector('[data-marker="gallery/list"]') ||
+                             document.querySelector('[data-marker="item-view/main"] [data-marker*="gallery"]') ||
+                             document.querySelector('[data-marker="item-view/main"]');
+
+    if (!galleryContainer) {
+        return rawCandidates;
+    }
+
+    function isInsideExcluded(el) {
+        if (!el || !el.closest) return false;
+        return !!(el.closest('[data-marker="seller-info"]') ||
+                  el.closest('[data-marker="user-info"]') ||
+                  el.closest('.seller-info-avatar') ||
+                  el.closest('[data-marker="recommendations"]') ||
+                  el.closest('[data-marker="similar-items"]') ||
+                  el.closest('[data-marker="items-carousel"]') ||
+                  el.closest('[data-marker="seller-items"]') ||
+                  el.closest('.similar-items') ||
+                  el.closest('.recommendations-root') ||
+                  el.closest('.serp-item'));
+    }
+
     // 1. Scan links wrapping gallery images
-    const links = document.querySelectorAll('a[href*="img.avito.st"]');
+    const links = galleryContainer.querySelectorAll('a[href*="img.avito.st"]');
     links.forEach(a => {
-        if (a.closest && (a.closest('[data-marker="seller-info"]') || a.closest('[data-marker="user-info"]') || a.closest('.seller-info-avatar') || a.closest('[data-marker="recommendations"]'))) return;
+        if (isInsideExcluded(a)) return;
         addUrl(a.href);
     });
 
     // 2. Scan elements with data-url / data-src / data-large / data-full / data-high-res / data-preview
-    const dataEls = document.querySelectorAll('[data-url*="img.avito.st"], [data-src*="img.avito.st"], [data-large*="img.avito.st"], [data-full*="img.avito.st"], [data-high-res*="img.avito.st"], [data-preview*="img.avito.st"], [data-img*="img.avito.st"]');
+    const dataEls = galleryContainer.querySelectorAll('[data-url*="img.avito.st"], [data-src*="img.avito.st"], [data-large*="img.avito.st"], [data-full*="img.avito.st"], [data-high-res*="img.avito.st"], [data-preview*="img.avito.st"], [data-img*="img.avito.st"]');
     dataEls.forEach(el => {
-        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar') || el.closest('[data-marker="recommendations"]'))) return;
+        if (isInsideExcluded(el)) return;
         ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res', 'data-preview', 'data-img'].forEach(attr => {
             const val = el.getAttribute(attr);
             if (val) addUrl(val);
         });
     });
 
-    // 3. Scan img and picture source elements
+    // 3. Scan img and picture source elements inside gallery
     const selector = [
         '[data-marker="image-frame/image-wrapper"] img',
         '[data-marker="gallery/image"] img',
@@ -567,14 +545,12 @@ function extractPhotosFromDom() {
         'img[data-src*="img.avito.st"]'
     ].join(', ');
 
-    const els = document.querySelectorAll(selector);
+    const els = galleryContainer.querySelectorAll(selector);
     els.forEach(el => {
-        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar') || el.closest('[data-marker="recommendations"]'))) {
-            return;
-        }
+        if (isInsideExcluded(el)) return;
 
         const parentLink = el.closest('a');
-        if (parentLink && parentLink.href && parentLink.href.includes('img.avito.st')) {
+        if (parentLink && parentLink.href && parentLink.href.includes('img.avito.st') && !isInsideExcluded(parentLink)) {
             addUrl(parentLink.href);
         }
 
@@ -586,27 +562,12 @@ function extractPhotosFromDom() {
 
         if (el.src) addUrl(el.src);
         if (el.dataset && el.dataset.src) addUrl(el.dataset.src);
-
-        if (el.attributes) {
-            for (let i = 0; i < el.attributes.length; i++) {
-                const attr = el.attributes[i];
-                const val = attr.value;
-                if (val && typeof val === 'string' && val.includes('img.avito.st')) {
-                    if (val.includes(' ')) {
-                        const candidates = parseSrcsetCandidates(val);
-                        candidates.forEach(c => addUrl(c.url));
-                    } else {
-                        addUrl(val);
-                    }
-                }
-            }
-        }
     });
 
-    // 4. Scan elements with background-image style
-    const bgEls = document.querySelectorAll('[style*="img.avito.st"]');
+    // 4. Scan elements with background-image style inside gallery
+    const bgEls = galleryContainer.querySelectorAll('[style*="img.avito.st"]');
     bgEls.forEach(el => {
-        if (el.closest && (el.closest('[data-marker="seller-info"]') || el.closest('[data-marker="user-info"]') || el.closest('.seller-info-avatar'))) return;
+        if (isInsideExcluded(el)) return;
         const style = el.getAttribute('style') || '';
         const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+?\.img\.avito\.st[^\'")\s]+)['"]?\)/i);
         if (match && match[1]) {

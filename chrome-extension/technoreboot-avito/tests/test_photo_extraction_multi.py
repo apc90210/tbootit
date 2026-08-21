@@ -510,3 +510,67 @@ def test_video_url_not_counted_as_photo():
     processed = process_extracted_urls(raw_urls)
     assert len(processed) == 1
     assert 'realphoto' in processed[0]['url']
+
+
+def test_all_8_physical_photos_extracted_without_omissions():
+    """Verify that all 8 distinct physical photos in a listing gallery are properly extracted and preserved."""
+    raw_urls = []
+    for i in range(1, 9):
+        # Each photo has a high-res (1280x960 / ba4) and low-res (140x105 / ra1) variant
+        raw_urls.append(f"https://10.img.avito.st/1280x960/1.photo{i}ba4_unique_token_data.jpg")
+        raw_urls.append(f"https://10.img.avito.st/140x105/1.photo{i}ra1_unique_token_data.jpg")
+
+    processed = process_extracted_urls(raw_urls)
+    # 8 physical photos × 2 variants = 16 entries
+    assert len(processed) == 16
+    unique_identities = set(get_canonical_avito_image_identity(p['url']) for p in processed)
+    assert len(unique_identities) == 8
+
+
+def test_recommendation_monitors_excluded_from_state_extraction():
+    """Verify that recommendation widgets and similar monitors are strictly excluded."""
+    excluded_keys = {'recommendations', 'similar', 'similaritems', 'seller', 'user', 'profile', 'otheritems'}
+    
+    def extract_urls_scoped(obj, depth=0):
+        if depth > 20 or not obj:
+            return []
+        found = []
+        if isinstance(obj, str):
+            if 'img.avito.st' in obj:
+                found.append(obj)
+        elif isinstance(obj, list):
+            for it in obj:
+                found.extend(extract_urls_scoped(it, depth + 1))
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                if k.lower() in excluded_keys:
+                    continue
+                found.extend(extract_urls_scoped(v, depth + 1))
+        return found
+
+    state = {
+        'item': {
+            'images': [
+                {'1280x960': f'https://10.img.avito.st/1280x960/1.listing_monitor_{i}_ba4'}
+                for i in range(1, 9)
+            ]
+        },
+        'widgets': {
+            '@item/similar-items': {
+                'items': [
+                    {'image': f'https://20.img.avito.st/640x480/1.other_monitor_{j}'}
+                    for j in range(1, 39)
+                ]
+            },
+            '@seller/profile': {
+                'avatar': 'https://30.img.avito.st/avatar/seller_photo'
+            }
+        }
+    }
+
+    item_urls = extract_urls_scoped(state['item'])
+    # Only the 8 listing photos should be returned
+    assert len(item_urls) == 8
+    assert all('listing_monitor' in u for u in item_urls)
+    assert not any('other_monitor' in u for u in item_urls)
+
