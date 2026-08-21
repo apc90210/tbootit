@@ -87,17 +87,18 @@ function getCanonicalAvitoImageIdentity(url) {
     const filename = cleanPath.split('/').pop() || cleanPath;
     const token = filename.replace(/^\d+\./, '');
 
-    const laMatch = token.match(/^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d/i);
+    const laMatch = token.match(/^([A-Za-z0-9_-]+?)[a-zA-Z]a\d/i);
     if (laMatch && laMatch[1]) {
-        return `avito_photo_${laMatch[1]}`;
+        const prefix = laMatch[1];
+        return `avito_photo_${prefix.length >= 5 ? prefix.substring(0, 5) : prefix}`;
     }
 
     const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
-    if (tokenNoExt.length > 10 && /^[A-Za-z0-9_-]{5}/.test(tokenNoExt)) {
-        return `avito_photo_${tokenNoExt.substring(0, 5)}`;
+    const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
+    if (cleanName.length >= 5) {
+        return `avito_photo_${cleanName.substring(0, 5)}`;
     }
 
-    const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
     if (cleanName.length >= 3) {
         return `avito_photo_${cleanName}`;
     }
