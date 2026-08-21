@@ -17,7 +17,9 @@ def validate_listing_image_url(url):
         '/icons/' in lower or '/logos/' in lower or
         '/shop/' in lower or '/recom/' in lower or
         '/banner/' in lower or lower.endswith('.svg') or
-        lower.startswith('data:')):
+        lower.startswith('data:') or
+        lower.endswith('.mp4') or lower.endswith('.m3u8') or lower.endswith('.webm') or
+        'video.avito.st' in lower or '/video/' in lower):
         return None
 
     return u
@@ -402,3 +404,109 @@ def test_old_la_format_still_works():
     ]
     res = process_extracted_urls(urls)
     assert len(res) == 2
+
+
+# --- Video detection tests ---
+
+def is_video_entry(obj):
+    """Python simulator of content.js isVideoEntry() function."""
+    if not isinstance(obj, dict):
+        return False
+    if obj.get('type') in ('video', 'VIDEO'):
+        return True
+    if obj.get('isVideo') is True:
+        return True
+    video_keys = ['videoId', 'videoUrl', 'video_url', 'video_id', 'playerId', 'playerUrl']
+    for vk in video_keys:
+        if vk in obj:
+            return True
+    if isinstance(obj.get('sources'), list):
+        for src in obj['sources']:
+            if isinstance(src, dict):
+                t = (src.get('type') or src.get('mimeType') or '').lower()
+                if t.startswith('video/'):
+                    return True
+            if isinstance(src, str) and ('.mp4' in src or '.m3u8' in src or '.webm' in src):
+                return True
+    if isinstance(obj.get('duration'), (int, float)) and obj['duration'] > 0:
+        has_dim = any(re.match(r'^\d+x\d+$', k) for k in obj.keys())
+        if not has_dim:
+            return True
+    for val in obj.values():
+        if isinstance(val, str):
+            lower = val.lower()
+            if 'video.avito.st' in lower or ('.mp4' in lower and 'img.avito.st' not in lower) or '.m3u8' in lower:
+                return True
+    return False
+
+
+def test_video_entry_detected_by_type():
+    assert is_video_entry({'type': 'video', 'id': '123', 'duration': 30}) is True
+    assert is_video_entry({'type': 'VIDEO', 'videoUrl': 'https://video.avito.st/v1.mp4'}) is True
+
+
+def test_video_entry_detected_by_isVideo():
+    assert is_video_entry({'isVideo': True, 'poster': {'1280x960': 'https://10.img.avito.st/image/1/1.poster.jpg'}}) is True
+
+
+def test_video_entry_detected_by_videoId():
+    assert is_video_entry({'videoId': 'abc123', '1280x960': 'https://10.img.avito.st/image/1/poster.jpg'}) is True
+
+
+def test_video_entry_detected_by_sources_array():
+    assert is_video_entry({'sources': [{'type': 'video/mp4', 'url': 'https://cdn.avito.st/video.mp4'}]}) is True
+    assert is_video_entry({'sources': ['https://cdn.avito.st/video.mp4']}) is True
+
+
+def test_video_entry_detected_by_duration_without_dimensions():
+    assert is_video_entry({'duration': 45, 'poster': 'https://img.avito.st/poster.jpg'}) is True
+
+
+def test_photo_entry_not_detected_as_video():
+    photo = {'1280x960': 'https://10.img.avito.st/image/1/1.sePk6ba4high.jpg', '140x105': 'https://10.img.avito.st/image/1/1.sePk6ra1low.jpg'}
+    assert is_video_entry(photo) is False
+
+
+def test_photo_with_duration_and_dimensions_not_video():
+    # Edge case: some image objects might have a duration field but also dimension keys
+    obj = {'1280x960': 'https://10.img.avito.st/image/1/1.test.jpg', 'duration': 5}
+    assert is_video_entry(obj) is False
+
+
+def test_video_url_filtered_by_validate():
+    assert validate_listing_image_url('https://video.avito.st/v1.mp4') is None
+    assert validate_listing_image_url('https://cdn.avito.st/clip.m3u8') is None
+    assert validate_listing_image_url('https://cdn.avito.st/clip.webm') is None
+    assert validate_listing_image_url('https://10.img.avito.st/image/1/photo.jpg') is not None
+
+
+def test_gallery_with_video_extracts_only_photos():
+    """Simulate a gallery array with 5 photos + 1 video. Only photos should be extracted."""
+    raw_urls = [
+        "https://10.img.avito.st/image/1/1.photoAba4high.jpg",
+        "https://10.img.avito.st/image/1/1.photoAra1low.jpg",
+        "https://20.img.avito.st/image/1/1.photoBba4high.jpg",
+        "https://20.img.avito.st/image/1/1.photoBra1low.jpg",
+        "https://30.img.avito.st/image/1/1.photoCba4high.jpg",
+        "https://30.img.avito.st/image/1/1.photoCra1low.jpg",
+        "https://40.img.avito.st/image/1/1.photoDba4high.jpg",
+        "https://40.img.avito.st/image/1/1.photoDra1low.jpg",
+        "https://50.img.avito.st/image/1/1.photoEba4high.jpg",
+        "https://50.img.avito.st/image/1/1.photoEra1low.jpg",
+        # Video poster should NOT be included if filtered at extraction level
+    ]
+    processed = process_extracted_urls(raw_urls)
+    # 5 photos × 2 variants (high + low) = 10
+    assert len(processed) == 10
+
+
+def test_video_url_not_counted_as_photo():
+    """Video URLs (mp4, m3u8, video.avito.st) should be filtered out."""
+    raw_urls = [
+        "https://10.img.avito.st/image/1/1.realphotoLa4.jpg",
+        "https://video.avito.st/v1/clip.mp4",
+        "https://cdn.avito.st/stream.m3u8",
+    ]
+    processed = process_extracted_urls(raw_urls)
+    assert len(processed) == 1
+    assert 'realphoto' in processed[0]['url']

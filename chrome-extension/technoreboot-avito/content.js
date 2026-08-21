@@ -71,7 +71,9 @@ function validateListingImageUrl(url) {
         lower.includes('/banner/') || lower.includes('/profile/') ||
         lower.includes('/user/') || lower.includes('/seller/') ||
         lower.includes('rpq-qra') || lower.includes('rpq-qba') ||
-        lower.endsWith('.svg') || lower.startsWith('data:')) {
+        lower.endsWith('.svg') || lower.startsWith('data:') ||
+        lower.endsWith('.mp4') || lower.endsWith('.m3u8') || lower.endsWith('.webm') ||
+        lower.includes('video.avito.st') || lower.includes('/video/')) {
         return null;
     }
 
@@ -288,8 +290,49 @@ function getBestResolutionFromImageObject(imgObj) {
     return bestUrl;
 }
 
+function isVideoEntry(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    // Explicit type markers
+    if (obj.type === 'video' || obj.type === 'VIDEO') return true;
+    if (obj.isVideo === true) return true;
+    // Video-specific keys
+    const videoKeys = ['videoId', 'videoUrl', 'video_url', 'video_id', 'playerId', 'playerUrl'];
+    for (const vk of videoKeys) {
+        if (vk in obj) return true;
+    }
+    // Has 'sources' array with video MIME types
+    if (Array.isArray(obj.sources)) {
+        for (const src of obj.sources) {
+            if (src && typeof src === 'object') {
+                const t = (src.type || src.mimeType || '').toLowerCase();
+                if (t.startsWith('video/')) return true;
+            }
+            if (typeof src === 'string' && (src.includes('.mp4') || src.includes('.m3u8') || src.includes('.webm'))) return true;
+        }
+    }
+    // Has duration (number) but no image dimension keys — likely a video
+    if (typeof obj.duration === 'number' && obj.duration > 0) {
+        const hasImageDim = Object.keys(obj).some(k => /^\d+x\d+$/.test(k));
+        if (!hasImageDim) return true;
+    }
+    // URL values pointing to video hosts
+    for (const val of Object.values(obj)) {
+        if (typeof val === 'string') {
+            const lower = val.toLowerCase();
+            if (lower.includes('video.avito.st') ||
+                (lower.includes('.mp4') && !lower.includes('img.avito.st')) ||
+                lower.includes('.m3u8')) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function getAllResolutionsFromImageObject(imgObj) {
     if (!imgObj || typeof imgObj !== 'object') return [];
+    // Skip video entries
+    if (isVideoEntry(imgObj)) return [];
     const results = [];
 
     // 1. High-Res variant (1280x960, ba4, or largest)
@@ -338,22 +381,20 @@ function parseItemImagesFromJsonObject(data) {
                 continue;
             }
             if (Array.isArray(v) && v.length > 0) {
-                let isPhotoArray = false;
+                let photoCount = 0;
                 for (const elem of v) {
                     if (typeof elem === 'string' && elem.includes('img.avito.st')) {
-                        isPhotoArray = true;
-                        break;
-                    } else if (typeof elem === 'object' && elem) {
+                        photoCount++;
+                    } else if (typeof elem === 'object' && elem && !isVideoEntry(elem)) {
                         for (const val of Object.values(elem)) {
                             if (typeof val === 'string' && val.includes('img.avito.st')) {
-                                isPhotoArray = true;
+                                photoCount++;
                                 break;
                             }
                         }
-                        if (isPhotoArray) break;
                     }
                 }
-                if (isPhotoArray) {
+                if (photoCount > 0) {
                     arrays.push(v);
                 }
             } else if (typeof v === 'object' && v) {
@@ -364,19 +405,34 @@ function parseItemImagesFromJsonObject(data) {
 
     collectImageArrays(data, 0);
 
-    if (arrays.length > 0) {
-        arrays.sort((a, b) => b.length - a.length);
-        const bestArray = arrays[0];
+    // Merge photos from ALL discovered arrays, deduplicating by URL
+    const seenUrls = new Set();
 
-        bestArray.forEach(imgObj => {
-            if (typeof imgObj === 'string') {
-                const valid = validateListingImageUrl(imgObj);
-                if (valid) photos.push(valid);
-            } else if (typeof imgObj === 'object' && imgObj) {
-                const variants = getAllResolutionsFromImageObject(imgObj);
-                variants.forEach(v => photos.push(v));
+    if (arrays.length > 0) {
+        // Process longest array first for best ordering
+        arrays.sort((a, b) => b.length - a.length);
+
+        for (const arr of arrays) {
+            for (const imgObj of arr) {
+                if (typeof imgObj === 'string') {
+                    const valid = validateListingImageUrl(imgObj);
+                    if (valid && !seenUrls.has(valid)) {
+                        seenUrls.add(valid);
+                        photos.push(valid);
+                    }
+                } else if (typeof imgObj === 'object' && imgObj) {
+                    // Skip video entries
+                    if (isVideoEntry(imgObj)) continue;
+                    const variants = getAllResolutionsFromImageObject(imgObj);
+                    for (const v of variants) {
+                        if (!seenUrls.has(v)) {
+                            seenUrls.add(v);
+                            photos.push(v);
+                        }
+                    }
+                }
             }
-        });
+        }
     }
 
     return photos;
