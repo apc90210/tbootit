@@ -87,6 +87,97 @@ class ProductAvitoAttributeValue(Base):
     definition = relationship("AvitoAttributeDefinition", back_populates="product_values")
     option = relationship("AvitoAttributeOption")
 
+class AvitoCanonicalCategory(Base):
+    __tablename__ = "avito_canonical_categories"
+    id = Column(Integer, primary_key=True, index=True)
+    internal_key = Column(String, unique=True, index=True, nullable=False)
+    display_name = Column(String, index=True, nullable=False)
+    observed_category_id = Column(Integer, ForeignKey("avito_categories.id"), nullable=True, index=True)
+    official_slug = Column(String, nullable=True, index=True)
+    official_source = Column(String, nullable=True)
+    capability_source = Column(String, default="observed", nullable=False)  # observed, official_api, manual
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    observed_category = relationship("AvitoCategory", foreign_keys=[observed_category_id])
+    fields = relationship("AvitoCanonicalField", back_populates="category", cascade="all, delete-orphan")
+    products = relationship("Product", back_populates="canonical_category")
+
+class AvitoCanonicalField(Base):
+    __tablename__ = "avito_canonical_fields"
+    __table_args__ = (
+        UniqueConstraint("category_id", "internal_key", name="uix_avito_canonical_field_cat_key"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("avito_canonical_categories.id"), nullable=False, index=True)
+    internal_key = Column(String, index=True, nullable=False)
+    display_name = Column(String, nullable=False)
+    official_tag = Column(String, nullable=True, index=True)
+    official_source = Column(String, nullable=True)
+    data_type = Column(String, nullable=True)  # string, integer, float
+    field_type = Column(String, nullable=True)  # input, select, checkbox
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    category = relationship("AvitoCanonicalCategory", back_populates="fields")
+    rules = relationship("AvitoCanonicalFieldRule", back_populates="field", cascade="all, delete-orphan")
+    values = relationship("AvitoCanonicalFieldValue", back_populates="field", cascade="all, delete-orphan")
+    mappings = relationship("AvitoObservedFieldMapping", back_populates="canonical_field")
+
+class AvitoCanonicalFieldRule(Base):
+    __tablename__ = "avito_canonical_field_rules"
+    id = Column(Integer, primary_key=True, index=True)
+    field_id = Column(Integer, ForeignKey("avito_canonical_fields.id"), nullable=False, index=True)
+    ordinal = Column(Integer, default=0, nullable=False)
+    rule_source = Column(String, default="official_api", nullable=False)  # official_api, manual, inferred_disabled
+    required = Column(Boolean, nullable=True)
+    required_by_dependency = Column(Boolean, nullable=True)
+    dependencies_json = Column(Text, nullable=True)
+    values_range_json = Column(Text, nullable=True)
+    raw_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    field = relationship("AvitoCanonicalField", back_populates="rules")
+    values = relationship("AvitoCanonicalFieldValue", back_populates="rule")
+
+class AvitoCanonicalFieldValue(Base):
+    __tablename__ = "avito_canonical_field_values"
+    id = Column(Integer, primary_key=True, index=True)
+    field_id = Column(Integer, ForeignKey("avito_canonical_fields.id"), nullable=False, index=True)
+    rule_id = Column(Integer, ForeignKey("avito_canonical_field_rules.id"), nullable=True, index=True)
+    value = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    official_value = Column(String, nullable=True)
+    source = Column(String, default="inline", nullable=False)  # inline, linked_json, manual, observed
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    field = relationship("AvitoCanonicalField", back_populates="values")
+    rule = relationship("AvitoCanonicalFieldRule", back_populates="values")
+
+class AvitoObservedFieldMapping(Base):
+    __tablename__ = "avito_observed_field_mappings"
+    __table_args__ = (
+        UniqueConstraint("category_id", "observed_name_normalized", name="uix_avito_observed_mapping_cat_name"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("avito_categories.id"), nullable=False, index=True)
+    observed_name = Column(String, nullable=False)
+    observed_name_normalized = Column(String, index=True, nullable=False)
+    canonical_field_id = Column(Integer, ForeignKey("avito_canonical_fields.id"), nullable=True, index=True)
+    mapping_source = Column(String, default="exact_label", nullable=False)  # exact_label, manual, official_tag_match
+    confidence = Column(Float, default=1.0, nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    observed_category = relationship("AvitoCategory")
+    canonical_field = relationship("AvitoCanonicalField", back_populates="mappings")
+
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
@@ -95,6 +186,7 @@ class Product(Base):
     title = Column(String, index=True)
     category_id = Column(Integer, ForeignKey("categories.id"))
     avito_category_id = Column(Integer, ForeignKey("avito_categories.id"), nullable=True, index=True)
+    canonical_category_id = Column(Integer, ForeignKey("avito_canonical_categories.id"), nullable=True, index=True)
     brand = Column(String, index=True)
     model = Column(String)
     serial_number = Column(String)
@@ -131,9 +223,12 @@ class Product(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    category = relationship("Category")
     external_listings = relationship("ProductExternalListing", back_populates="product", cascade="all, delete-orphan")
     avito_category = relationship("AvitoCategory", back_populates="products")
+    canonical_category = relationship("AvitoCanonicalCategory", back_populates="products")
     avito_attribute_values = relationship("ProductAvitoAttributeValue", back_populates="product", cascade="all, delete-orphan")
+    photos = relationship("ProductPhoto", back_populates="product", cascade="all, delete-orphan")
 
 class ProductExternalListing(Base):
     __tablename__ = "product_external_listings"
@@ -204,6 +299,8 @@ class ProductPhoto(Base):
     content_hash = Column(String, nullable=True, index=True)
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    product = relationship("Product", back_populates="photos")
 
 class Customer(Base):
     __tablename__ = "customers"

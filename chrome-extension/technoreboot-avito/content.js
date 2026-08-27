@@ -75,6 +75,8 @@ function parseJsonLd() {
     return null;
 }
 
+const HIGH_RES_THRESHOLD = 800;
+
 function validateListingImageUrl(url) {
     if (!url || typeof url !== 'string') return null;
     let u = url.trim();

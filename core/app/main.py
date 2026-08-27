@@ -44,7 +44,8 @@ def migrate_db():
             ("source_json", "TEXT"),
             ("source_type", "VARCHAR"),
             ("last_imported_at", "DATETIME"),
-            ("barcode", "VARCHAR")
+            ("barcode", "VARCHAR"),
+            ("canonical_category_id", "INTEGER")
         ]
         
         for col_name, col_type in updates:

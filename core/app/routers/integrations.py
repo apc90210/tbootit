@@ -218,6 +218,9 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 category_id=avito_cat.id,
                 characteristics=payload.parameters
             )
+            # Stage 06A-R10A: Sync observed category into canonical projection
+            from app.services.avito_canonical_service import sync_observed_category_to_canonical
+            sync_observed_category_to_canonical(db=db, observed_category_id=avito_cat.id)
     except Exception as e:
         print(f"Error upserting Avito category/attribute schema: {e}")
 
@@ -538,3 +541,22 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         photos_skipped=photos_skipped,
         photos_reconciled=photos_reconciled
     )
+
+@router.get("/avito/capabilities")
+def get_capabilities_endpoint(db: Session = Depends(get_db)):
+    """Return runtime and configuration capabilities for Avito integration."""
+    from app.services.avito_capability_service import get_avito_capabilities
+    return get_avito_capabilities(db)
+
+@router.get("/avito/products/{product_id}/preflight")
+def get_product_preflight_endpoint(product_id: int, db: Session = Depends(get_db)):
+    """Return transport-neutral and official publication preflight validation for a product."""
+    from app.services.avito_preflight_service import preflight_product_for_avito
+    return preflight_product_for_avito(db, product_id)
+
+@router.get("/avito/products/{product_id}/publication-package")
+def get_product_publication_package_endpoint(product_id: int, db: Session = Depends(get_db)):
+    """Return prepared publication package for a product."""
+    from app.services.avito_preflight_service import build_avito_publication_package
+    return build_avito_publication_package(db, product_id)
+
