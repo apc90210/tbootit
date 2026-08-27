@@ -167,7 +167,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     const detectedPhotosCount = (item.photos && item.photos.length) || 0;
                     const displayTitle = item.title || "Объявление Avito";
                     const displayPrice = item.price ? item.price + " ₽" : "Не указана";
-                    pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong>`;
+                    pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`;
                     
                     if (isPaired) {
                         sendBtn.disabled = false;
@@ -180,14 +180,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                         resultMsg.textContent = "Передача станет доступна после привязки расширения (введите код выше).";
                     }
 
-                    // Run asynchronous deep multi-pass scan
+                    // Run asynchronous deep multi-pass scan (active gallery walker)
                     chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
                         if (deepResponse && deepResponse.listing) {
                             currentExtractionData = deepResponse;
                             const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
                             const deepTitle = deepResponse.listing.title || displayTitle;
                             const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
-                            pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount}</strong> ✓`;
+                            pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
                             if (isPaired) {
                                 sendBtn.disabled = false;
                             }
@@ -219,48 +219,68 @@ document.addEventListener("DOMContentLoaded", async () => {
             resultMsg.textContent = "Расширение не привязано. Введите код подключения выше.";
             return;
         }
-        if (!currentExtractionData) return;
 
         sendBtn.disabled = true;
         resultMsg.className = "msg";
-        resultMsg.textContent = "Передача данных...";
+        resultMsg.textContent = "Сбор фото в HD и передача в Техноребут...";
 
-        const action = currentExtractionData.page_type === "listing" ? "ingest_listing" : "ingest_my_listings";
-        chrome.runtime.sendMessage({ action: action, payload: currentExtractionData }, res => {
-            sendBtn.disabled = false;
-            if (res && res.success && res.product_id != null) {
-                const photosImported = res.photos_imported || (res.details && res.details.photos_imported) || 0;
-                const photosSkipped = res.photos_skipped || (res.details && res.details.photos_skipped) || 0;
-                const photosTotal = res.photos_total !== undefined ? res.photos_total : 
-                    ((res.details && res.details.photos_total !== undefined) ? res.details.photos_total : 
-                    (photosImported + photosSkipped));
-
-                if (openProductBtn && productLinkContainer) {
-                    const targetUrl = `http://localhost:8011/inventory/products/${res.product_id}`;
-                    openProductBtn.onclick = () => {
-                        chrome.tabs.create({ url: targetUrl });
-                    };
-                    productLinkContainer.style.display = "block";
-                }
-
-                if (res.status === "partial" || (res.details && res.details.result === "partial")) {
-                    resultMsg.className = "msg msg-warning";
-                    resultMsg.innerHTML = `Основные данные обновлены, но фотографии импортировать не удалось.<br>Product ID: <strong>${res.product_id}</strong>`;
-                } else {
-                    resultMsg.className = "msg msg-success";
-                    if (photosImported > 0 && photosSkipped > 0) {
-                        resultMsg.innerHTML = `✓ Объявление обновлено.<br>Product ID: <strong>${res.product_id}</strong><br>Добавлено новых фото: <strong>${photosImported}</strong> (всего в товаре: <strong>${photosTotal}</strong>)`;
-                    } else if (photosImported === 0 && photosSkipped > 0) {
-                        resultMsg.innerHTML = `✓ Карточка актуальна.<br>Product ID: <strong>${res.product_id}</strong><br>Все фотографии синхронизированы (всего: <strong>${photosTotal}</strong>)`;
-                    } else {
-                        resultMsg.innerHTML = `✓ Объявление импортировано.<br>Product ID: <strong>${res.product_id}</strong><br>Фотографий: <strong>${photosTotal}</strong>`;
-                    }
-                }
-            } else {
+        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+            if (!tabs || tabs.length === 0) {
+                sendBtn.disabled = false;
                 resultMsg.className = "msg msg-error";
-                const errDetail = res && res.message ? res.message : "Ошибка импорта товара в Core API.";
-                resultMsg.innerHTML = `✕ Объявление получено, но импорт товара завершился ошибкой.<br>${errDetail}`;
+                resultMsg.textContent = "Активная вкладка не найдена.";
+                return;
             }
+            const activeTab = tabs[0];
+
+            // Perform deep multi-pass capture before sending to guarantee all photos are collected in HD
+            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
+                const payloadToSend = (deepResponse && (deepResponse.listing || deepResponse.items)) ? deepResponse : currentExtractionData;
+                if (!payloadToSend) {
+                    sendBtn.disabled = false;
+                    resultMsg.className = "msg msg-error";
+                    resultMsg.textContent = "Не удалось извлечь данные со страницы.";
+                    return;
+                }
+
+                const action = payloadToSend.page_type === "listing" ? "ingest_listing" : "ingest_my_listings";
+                chrome.runtime.sendMessage({ action: action, payload: payloadToSend }, res => {
+                    sendBtn.disabled = false;
+                    if (res && res.success && res.product_id != null) {
+                        const photosImported = res.photos_imported || (res.details && res.details.photos_imported) || 0;
+                        const photosSkipped = res.photos_skipped || (res.details && res.details.photos_skipped) || 0;
+                        const photosTotal = res.photos_total !== undefined ? res.photos_total : 
+                            ((res.details && res.details.photos_total !== undefined) ? res.details.photos_total : 
+                            (photosImported + photosSkipped));
+
+                        if (openProductBtn && productLinkContainer) {
+                            const targetUrl = `http://localhost:8011/inventory/products/${res.product_id}`;
+                            openProductBtn.onclick = () => {
+                                chrome.tabs.create({ url: targetUrl });
+                            };
+                            productLinkContainer.style.display = "block";
+                        }
+
+                        if (res.status === "partial" || (res.details && res.details.result === "partial")) {
+                            resultMsg.className = "msg msg-warning";
+                            resultMsg.innerHTML = `Основные данные обновлены, но фотографии импортировать не удалось.<br>Product ID: <strong>${res.product_id}</strong>`;
+                        } else {
+                            resultMsg.className = "msg msg-success";
+                            if (photosImported > 0 && photosSkipped > 0) {
+                                resultMsg.innerHTML = `✓ Объявление обновлено.<br>Product ID: <strong>${res.product_id}</strong><br>Добавлено новых фото: <strong>${photosImported}</strong> (всего в товаре: <strong>${photosTotal}</strong>)`;
+                            } else if (photosImported === 0 && photosSkipped > 0) {
+                                resultMsg.innerHTML = `✓ Карточка актуальна.<br>Product ID: <strong>${res.product_id}</strong><br>Все фотографии синхронизированы (всего: <strong>${photosTotal}</strong>)`;
+                            } else {
+                                resultMsg.innerHTML = `✓ Объявление импортировано.<br>Product ID: <strong>${res.product_id}</strong><br>Фотографий: <strong>${photosTotal}</strong>`;
+                            }
+                        }
+                    } else {
+                        resultMsg.className = "msg msg-error";
+                        const errDetail = res && res.message ? res.message : "Ошибка импорта товара в Core API.";
+                        resultMsg.innerHTML = `✕ Объявление получено, но импорт товара завершился ошибкой.<br>${errDetail}`;
+                    }
+                });
+            });
         });
     });
 });

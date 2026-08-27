@@ -118,7 +118,7 @@ function getCanonicalAvitoImageIdentity(url) {
 
     // Format 1: 1.YIZY7ra4... -> prefix is YIZY7
     const laMatch = token.match(/^([A-Za-z0-9_-]+?)[a-zA-Z]a\d/i);
-    if (laMatch && laMatch[1] && laMatch[1].length >= 4) {
+    if (laMatch && laMatch[1] && laMatch[1].length >= 2) {
         return `avito_photo_${laMatch[1]}`;
     }
 
@@ -135,7 +135,7 @@ function getCanonicalAvitoImageIdentity(url) {
     }
 
     const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
-    if (cleanName.length >= 3) {
+    if (cleanName.length >= 2) {
         return `avito_photo_${cleanName}`;
     }
 
@@ -620,13 +620,16 @@ function extractPhotosFromDom() {
     return rawCandidates;
 }
 
-function extractAllPhotos(jsonLd) {
+function extractAllPhotos(jsonLd, extraUrls = []) {
     const rawUrls = [];
 
-    // Collect ALL photos from JSON-LD, embedded state, and DOM gallery
+    // Collect ALL photos from JSON-LD, embedded state, DOM gallery, and active walker
     rawUrls.push(...parseJsonLdImages(jsonLd));
     rawUrls.push(...extractPhotosFromEmbeddedState());
     rawUrls.push(...extractPhotosFromDom());
+    if (Array.isArray(extraUrls) && extraUrls.length > 0) {
+        rawUrls.push(...extraUrls);
+    }
 
     const groupsMap = new Map(); // canonicalKey -> [urls]
     const keyOrder = [];
@@ -981,7 +984,125 @@ function extractAllCharacteristics(jsonLd, itemId) {
     return combined;
 }
 
-function extractListingData() {
+async function walkAndCollectAllGalleryPhotos() {
+    const collectedHighResUrls = new Set();
+
+    function inspectAndCollectFromMainFrame() {
+        const mainFrame = document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                          document.querySelector('[data-marker="image-frame"]') ||
+                          document.querySelector('.style-item-view-gallery-') ||
+                          document.querySelector('.gallery-root') ||
+                          document.querySelector('[data-marker="item-view/gallery"]') ||
+                          document.querySelector('[data-marker="item-view/main"]');
+        if (!mainFrame) return;
+
+        // 1. Check sources in picture
+        const sources = mainFrame.querySelectorAll('source[srcset], source[data-srcset]');
+        sources.forEach(s => {
+            const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
+            if (srcset) {
+                const candidates = parseSrcsetCandidates(srcset);
+                if (candidates.length > 0) {
+                    collectedHighResUrls.add(candidates[0].url);
+                }
+            }
+        });
+
+        // 2. Check main images
+        const imgs = mainFrame.querySelectorAll('img');
+        imgs.forEach(img => {
+            const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+            if (srcset) {
+                const candidates = parseSrcsetCandidates(srcset);
+                if (candidates.length > 0) {
+                    collectedHighResUrls.add(candidates[0].url);
+                }
+            }
+            if (img.src && !img.src.startsWith('data:') && validateListingImageUrl(img.src)) {
+                collectedHighResUrls.add(img.src);
+            }
+            if (img.dataset && img.dataset.src && validateListingImageUrl(img.dataset.src)) {
+                collectedHighResUrls.add(img.dataset.src);
+            }
+        });
+    }
+
+    // Initial capture from main frame
+    inspectAndCollectFromMainFrame();
+
+    // Find all thumbnail elements in gallery list
+    const thumbSelectors = [
+        'ul[data-marker="gallery/list"] li',
+        'ul[data-marker="gallery/list"] > *',
+        '[data-marker="gallery/list"] [data-marker*="image"]',
+        '[data-marker="gallery/preview-item"]',
+        '[data-marker*="preview"]',
+        '[data-marker="item-view/gallery"] ul li',
+        '[data-marker="gallery"] ul li',
+        'div[class*="gallery-list"] > *',
+        'div[class*="style-gallery-list"] li',
+        'ul[class*="gallery-list"] li'
+    ].join(', ');
+
+    const thumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
+        if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
+            return false;
+        }
+        return true;
+    });
+
+    if (thumbs.length > 0) {
+        for (let i = 0; i < thumbs.length; i++) {
+            const thumb = thumbs[i];
+            try {
+                if (typeof thumb.scrollIntoView === 'function') {
+                    thumb.scrollIntoView({ block: 'nearest', inline: 'center' });
+                }
+                const clickTarget = thumb.querySelector('button, img, a') || thumb;
+                clickTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                if (typeof clickTarget.click === 'function') {
+                    clickTarget.click();
+                }
+            } catch (e) {}
+
+            await new Promise(r => setTimeout(r, 120));
+            inspectAndCollectFromMainFrame();
+        }
+
+        // Restore first thumbnail
+        try {
+            const firstTarget = thumbs[0].querySelector('button, img, a') || thumbs[0];
+            if (typeof firstTarget.click === 'function') firstTarget.click();
+        } catch (e) {}
+    } else {
+        // Arrow-based fallback if no list items
+        const nextBtn = document.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
+        if (nextBtn) {
+            for (let step = 0; step < 15; step++) {
+                try {
+                    nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                    if (typeof nextBtn.click === 'function') nextBtn.click();
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 140));
+                const prevCount = collectedHighResUrls.size;
+                inspectAndCollectFromMainFrame();
+                if (collectedHighResUrls.size === prevCount && step > 2) {
+                    break;
+                }
+            }
+        }
+    }
+
+    return Array.from(collectedHighResUrls);
+}
+
+function extractListingData(extraPhotos = []) {
     try {
         const url = window.location.href;
         const itemId = extractAvitoItemId(url, document.documentElement.innerHTML) || "unknown";
@@ -1043,7 +1164,7 @@ function extractListingData() {
 
         let photos = [];
         try {
-            photos = extractAllPhotos(jsonLd);
+            photos = extractAllPhotos(jsonLd, extraPhotos);
         } catch (e) {}
 
         let characteristics = {};
@@ -1070,7 +1191,7 @@ function extractListingData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.16",
+            extension_version: "0.2.17",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1091,7 +1212,7 @@ function extractListingData() {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.16",
+            extension_version: "0.2.17",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1135,7 +1256,7 @@ function extractMyListingsData() {
         });
         return {
             schema_version: 1,
-            extension_version: "0.2.16",
+            extension_version: "0.2.17",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -1144,7 +1265,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.16",
+            extension_version: "0.2.17",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -1157,42 +1278,16 @@ async function extractListingDataMultiPass() {
     try {
         safelyExpandCharacteristicsDom();
 
-        let data = extractListingData();
-        if (data.error || data.page_type !== "listing") return data;
-
-        triggerInitialDataCapture();
-
+        // 1. Actively click through all gallery thumbnails to force Avito to load high-res photos
+        let walkedPhotos = [];
         try {
-            const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
-                                     document.querySelector('[data-marker="gallery"]') ||
-                                     document.querySelector('.style-item-view-gallery-') ||
-                                     document.querySelector('[data-marker="gallery/list"]');
-            
-            if (galleryContainer) {
-                const thumbnails = galleryContainer.querySelectorAll('li, img, [data-marker*="image"], [data-marker*="item"]');
-                thumbnails.forEach(thumb => {
-                    thumb.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-                    thumb.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-                });
-
-                const list = galleryContainer.querySelector('ul') || galleryContainer;
-                if (list.scrollWidth > list.clientWidth) {
-                    list.scrollLeft = list.scrollWidth;
-                    list.dispatchEvent(new Event('scroll', { bubbles: true }));
-                }
-            }
-        } catch (e) {}
-
-        await new Promise(resolve => setTimeout(resolve, 350));
+            walkedPhotos = await walkAndCollectAllGalleryPhotos();
+        } catch (err) {}
 
         triggerInitialDataCapture();
-        const pass2 = extractListingData();
-        if (pass2 && pass2.listing && pass2.listing.photos) {
-            if (pass2.listing.photos.length >= (data.listing.photos ? data.listing.photos.length : 0)) {
-                data = pass2;
-            }
-        }
 
+        // 2. Extract listing data with the actively collected high-res photos
+        let data = extractListingData(walkedPhotos);
         return data;
     } catch (e) {
         return extractListingData();
@@ -1219,7 +1314,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.16",
+                    extension_version: "0.2.17",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -1235,4 +1330,3 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return true;
 });
-

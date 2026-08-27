@@ -257,7 +257,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         token = _re.sub(r"^\d+\.", "", filename)
 
         la_match = _re.search(r"^([A-Za-z0-9_-]+?)[a-zA-Z]a\d", token, _re.IGNORECASE)
-        if la_match and la_match.group(1) and len(la_match.group(1)) >= 4:
+        if la_match and la_match.group(1) and len(la_match.group(1)) >= 2:
             return "avito_photo_" + la_match.group(1)
 
         token_no_ext = _re.sub(r"\.(?:jpg|jpeg|webp|png)$", "", token, flags=_re.IGNORECASE)
@@ -269,7 +269,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             return f"avito_photo_{parts[0]}_{parts[1][:16]}"
 
         clean_name = _re.sub(r"[^A-Za-z0-9_-]", "", token_no_ext)
-        if len(clean_name) >= 3:
+        if len(clean_name) >= 2:
             return "avito_photo_" + clean_name
 
         if "img.avito.st" in url.lower():
