@@ -367,6 +367,7 @@ function parseItemImagesFromJsonObject(data) {
 }
 
 function extractJsonAssignedToVar(text, varName) {
+    if (!text || typeof text !== 'string') return null;
     const idx = text.indexOf(varName);
     if (idx === -1) return null;
 
@@ -413,7 +414,7 @@ function extractJsonAssignedToVar(text, varName) {
         if (endIdx !== -1) {
             let strVal = text.substring(startIdx + 1, endIdx);
             try {
-                if (strVal.includes('%7B') || strVal.includes('%22')) {
+                if (strVal.includes('%7B') || strVal.includes('%22') || strVal.includes('%3A')) {
                     strVal = decodeURIComponent(strVal);
                 }
                 let parsed = JSON.parse(strVal);
@@ -421,39 +422,48 @@ function extractJsonAssignedToVar(text, varName) {
                     parsed = JSON.parse(parsed);
                 }
                 if (typeof parsed === 'object' && parsed) return parsed;
-            } catch (e) {}
+            } catch (e) {
+                try {
+                    let cleaned = strVal.replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\\//g, '/');
+                    let parsed = JSON.parse(cleaned);
+                    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+                    if (typeof parsed === 'object' && parsed) return parsed;
+                } catch (e2) {}
+            }
         }
-        return null;
     }
 
-    let depth = 0;
-    let inString = false;
-    let escape = false;
+    // Direct balanced brace object parser
+    let firstBrace = text.indexOf('{', eqIdx);
+    if (firstBrace !== -1) {
+        let depth = 0;
+        let inString = false;
+        let escape = false;
 
-    for (let i = startIdx; i < text.length; i++) {
-        const char = text[i];
-        if (escape) {
-            escape = false;
-            continue;
-        }
-        if (char === '\\') {
-            escape = true;
-            continue;
-        }
-        if (char === '"') {
-            inString = !inString;
-            continue;
-        }
-        if (!inString) {
-            if (char === '{') depth++;
-            else if (char === '}') {
-                depth--;
-                if (depth === 0) {
-                    const jsonStr = text.substring(startIdx, i + 1);
-                    try {
-                        return JSON.parse(jsonStr);
-                    } catch (e) {
-                        return null;
+        for (let i = firstBrace; i < text.length; i++) {
+            const char = text[i];
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (char === '\\') {
+                escape = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (!inString) {
+                if (char === '{') depth++;
+                else if (char === '}') {
+                    depth--;
+                    if (depth === 0) {
+                        const jsonStr = text.substring(firstBrace, i + 1);
+                        try {
+                            return JSON.parse(jsonStr);
+                        } catch (e) {}
+                        break;
                     }
                 }
             }
@@ -486,14 +496,9 @@ function extractPhotosFromEmbeddedState() {
     for (const script of scripts) {
         const text = script.textContent || '';
         if (text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('initialData')) {
-            const unescaped = text
-                .replace(/\\u002F/ig, '/')
-                .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
-
-            // Balanced brace parsing for known state variables
             for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
-                if (unescaped.includes(varName)) {
-                    const parsed = extractJsonAssignedToVar(unescaped, varName);
+                if (text.includes(varName)) {
+                    const parsed = extractJsonAssignedToVar(text, varName);
                     if (parsed) {
                         const photos = parseItemImagesFromJsonObject(parsed);
                         photos.forEach(addUrl);
@@ -882,6 +887,20 @@ function extractCharacteristicsFromDom() {
             val = rawVal.replace(/^[—–:\s]+/, '').trim();
         }
 
+        // 2. If no labelEl found by class, check if first child is span/strong/b/a
+        if (!key || !val) {
+            const firstChild = el.firstElementChild;
+            if (firstChild && firstChild.textContent.trim()) {
+                const fText = firstChild.textContent.trim();
+                const totalText = el.textContent.trim();
+                if (totalText.length > fText.length) {
+                    key = fText.replace(/:$/, '').trim();
+                    val = totalText.replace(fText, '').trim().replace(/^[—–:\s]+/, '').trim();
+                }
+            }
+        }
+
+        // 3. Children array fallback
         if (!key || !val) {
             const children = Array.from(el.children).filter(c => c.textContent.trim());
             if (children.length >= 2) {
@@ -890,6 +909,7 @@ function extractCharacteristicsFromDom() {
             }
         }
 
+        // 4. Colon / Dash separator fallback
         if (!key || !val) {
             const text = el.textContent.trim();
             if (text.includes(':')) {
@@ -934,13 +954,9 @@ function extractAllCharacteristics(jsonLd, itemId) {
     for (const script of scripts) {
         const text = script.textContent || '';
         if (text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('initialData')) {
-            const unescaped = text
-                .replace(/\\u002F/ig, '/')
-                .replace(/\\\/|\\"/g, m => m === '\\/' ? '/' : '"');
-
             for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
-                if (unescaped.includes(varName)) {
-                    const parsed = extractJsonAssignedToVar(unescaped, varName);
+                if (text.includes(varName)) {
+                    const parsed = extractJsonAssignedToVar(text, varName);
                     if (parsed) {
                         const scriptParams = extractCharacteristicsFromJsonObject(parsed, itemId);
                         for (const [k, v] of Object.entries(scriptParams)) {
@@ -1035,9 +1051,26 @@ function extractListingData() {
             characteristics = extractAllCharacteristics(jsonLd, itemId);
         } catch (e) {}
 
+        let brand = characteristics["Производитель"] || characteristics["Бренд"] || characteristics["Марка"] || null;
+        let model = characteristics["Модель"] || null;
+
+        // Model fallback from title if characteristics missed it
+        if (!model && title) {
+            const modelMatch = title.match(/(?:ASRock|Asus|Gigabyte|MSI|Intel|AMD|HP|Dell|Lenovo|Acer|Sinto|Huawei|Xiaomi|Apple|Samsung)\s+([A-Za-z0-9\-\.\/]+(?:\s+[A-Za-z0-9\-\.\/]+)*)/i);
+            if (modelMatch && modelMatch[1]) {
+                const candidateModel = modelMatch[1].replace(/\s+на\s+запчасти.*$/i, '').replace(/\s+б\/у.*$/i, '').trim();
+                if (candidateModel && candidateModel.length >= 2 && candidateModel.length < 50) {
+                    model = candidateModel;
+                    if (!characteristics["Модель"]) {
+                        characteristics["Модель"] = candidateModel;
+                    }
+                }
+            }
+        }
+
         return {
             schema_version: 1,
-            extension_version: "0.2.15",
+            extension_version: "0.2.16",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1047,8 +1080,8 @@ function extractListingData() {
                 price: price,
                 description: description,
                 category: category,
-                brand: characteristics["Производитель"] || characteristics["Бренд"] || characteristics["Марка"] || null,
-                model: characteristics["Модель"] || null,
+                brand: brand,
+                model: model,
                 status: "active",
                 characteristics: characteristics,
                 photos: photos
@@ -1058,7 +1091,7 @@ function extractListingData() {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.15",
+            extension_version: "0.2.16",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1102,7 +1135,7 @@ function extractMyListingsData() {
         });
         return {
             schema_version: 1,
-            extension_version: "0.2.15",
+            extension_version: "0.2.16",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -1111,7 +1144,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.15",
+            extension_version: "0.2.16",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -1186,7 +1219,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.15",
+                    extension_version: "0.2.16",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

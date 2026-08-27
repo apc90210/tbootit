@@ -120,9 +120,9 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             sku=sku,
             title=payload.title,
             category_id=category_id,
-            brand=payload.brand or (payload.parameters.get("Производитель") or payload.parameters.get("Бренд")),
-            model=payload.model or payload.parameters.get("Модель"),
-            condition=payload.condition or payload.parameters.get("Состояние", "Б/у"),
+            brand=payload.brand or (payload.parameters.get("Производитель") or payload.parameters.get("Бренд") or payload.parameters.get("Марка") if payload.parameters else None),
+            model=payload.model or (payload.parameters.get("Модель") if payload.parameters else None),
+            condition=payload.condition or (payload.parameters.get("Состояние", "Б/у") if payload.parameters else "Б/у"),
             description=payload.description or "",
             sale_price=payload.price or 0.0,
             status="draft",
@@ -147,12 +147,16 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             product.sale_price = payload.price
         if payload.description:
             product.description = payload.description
-        if payload.brand:
-            product.brand = payload.brand
-        if payload.model:
-            product.model = payload.model
+        brand_val = payload.brand or (payload.parameters.get("Производитель") or payload.parameters.get("Бренд") or payload.parameters.get("Марка") if payload.parameters else None)
+        if brand_val:
+            product.brand = brand_val
+        model_val = payload.model or (payload.parameters.get("Модель") if payload.parameters else None)
+        if model_val:
+            product.model = model_val
         if payload.condition:
             product.condition = payload.condition
+        elif payload.parameters and payload.parameters.get("Состояние"):
+            product.condition = payload.parameters.get("Состояние")
         product.avito_title = payload.title
         product.avito_description = payload.description
         if payload.parameters:

@@ -209,7 +209,7 @@ async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
         "price": ad.price,
         "description": ad.description or "",
         "category_path": ad.category_path or [],
-        "brand": ad.parameters.get("Бренд") or ad.parameters.get("Марка") if isinstance(ad.parameters, dict) else None,
+        "brand": ad.parameters.get("Производитель") or ad.parameters.get("Бренд") or ad.parameters.get("Марка") if isinstance(ad.parameters, dict) else None,
         "model": ad.parameters.get("Модель") if isinstance(ad.parameters, dict) else None,
         "condition": ad.parameters.get("Состояние") if isinstance(ad.parameters, dict) else None,
         "parameters": ad.parameters if isinstance(ad.parameters, dict) else {},
