@@ -98,16 +98,12 @@ function upgradeAvitoImageUrlToMaxQuality(url) {
     if (!url || typeof url !== 'string') return url;
     let u = url;
 
-    // If it has small dimension path like /140x105/ or /640x480/, upgrade to /1280x960/
+    // Only dimension path prefix /140x105/ or /640x480/ can be upgraded to /1280x960/
     if (u.match(/\/\d+x\d+\//)) {
         u = u.replace(/\/\d+x\d+\//, '/1280x960/');
     }
 
-    // If it has low-res version tag ra1, ra2, ra3, upgrade to ra4
-    if (u.includes('/image/1/')) {
-        u = u.replace(/([a-zA-Z]a)[123]/, '$14');
-    }
-
+    // NEVER regex replace /image/1/ signed hash tokens!
     return u;
 }
 
@@ -1041,7 +1037,7 @@ function extractListingData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.14",
+            extension_version: "0.2.15",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1062,7 +1058,7 @@ function extractListingData() {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.14",
+            extension_version: "0.2.15",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1106,7 +1102,7 @@ function extractMyListingsData() {
         });
         return {
             schema_version: 1,
-            extension_version: "0.2.14",
+            extension_version: "0.2.15",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -1115,7 +1111,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.13",
+            extension_version: "0.2.15",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -1190,7 +1186,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.14",
+                    extension_version: "0.2.15",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

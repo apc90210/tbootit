@@ -204,8 +204,8 @@ def test_characteristics_survive_final_extension_payload():
     }
     payload = {
         "schema_version": 1,
-        "extension_version": "0.2.14",
-        "captured_at": "2026-08-21T18:20:00Z",
+        "extension_version": "0.2.15",
+        "captured_at": "2026-08-27T19:35:00Z",
         "page_type": "listing",
         "listing": {
             "external_item_id": "8999888777",
@@ -221,7 +221,7 @@ def test_characteristics_survive_final_extension_payload():
     }
     assert "characteristics" in payload["listing"]
     assert len(payload["listing"]["characteristics"]) == 3
-    assert payload["extension_version"] == "0.2.14"
+    assert payload["extension_version"] == "0.2.15"
 
 def test_motherboard_model_without_colon_and_stats_excluded():
     """Verify model formatted as <span>Модель</span>H510M is extracted and seller stats are excluded."""
