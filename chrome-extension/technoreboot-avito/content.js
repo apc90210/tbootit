@@ -1335,14 +1335,38 @@ function normalizeFieldLabel(label) {
 
 function isElementVisible(el) {
     if (!el) return false;
+    if (el.tagName === 'INPUT' && (el.type === 'radio' || el.type === 'checkbox')) {
+        const parentLabel = el.closest('label, [role="radio"], [role="checkbox"], [class*="radio"], [class*="chip"], div');
+        if (parentLabel && parentLabel !== el) {
+            return isElementVisible(parentLabel);
+        }
+    }
     if (el.offsetParent === null && el.tagName !== 'BODY') return false;
     try {
         const style = window.getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+        if (style.display === 'none' || style.visibility === 'hidden') {
+            return false;
+        }
+        if (style.opacity === '0' && el.tagName !== 'INPUT') {
             return false;
         }
     } catch (e) {}
     return true;
+}
+
+function normalizeConditionValue(val) {
+    if (!val) return '';
+    const clean = normalizeFieldLabel(String(val));
+    if (clean.includes('б/у') || clean.includes('бу') || clean.includes('б / у') || clean.includes('подержанн') || clean.includes('бывш') || clean.includes('used')) {
+        return 'б/у';
+    }
+    if (clean.includes('нов') || clean.includes('new')) {
+        return 'новое';
+    }
+    if (clean.includes('запчаст') || clean.includes('разбор') || clean.includes('parts')) {
+        return 'на запчасти';
+    }
+    return clean;
 }
 
 function isDangerousControl(el) {
@@ -1479,7 +1503,7 @@ function fillAvitoPublicationForm(packageData) {
     const filledCharacteristicKeys = new Set();
     const filledCoreRoles = new Set();
 
-    // Collect all candidates on page
+    // 1. Collect all standard input candidates on page
     const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"], [role="radiogroup"], [role="listbox"]'));
 
     for (const el of inputElements) {
@@ -1559,14 +1583,23 @@ function fillAvitoPublicationForm(packageData) {
             if (inputType === 'radio') {
                 // Radio button matching: match option text/value
                 const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
-                const normTargetVal = normalizeFieldLabel(targetValue);
-                if (optionText.includes(normTargetVal) || normTargetVal.includes(optionText)) {
+                let isMatch = false;
+
+                if (sourceRoleName === 'condition' || normLabel.includes('состояни')) {
+                    isMatch = normalizeConditionValue(optionText) === normalizeConditionValue(targetValue);
+                } else {
+                    const normTargetVal = normalizeFieldLabel(targetValue);
+                    isMatch = (optionText.includes(normTargetVal) || normTargetVal.includes(optionText));
+                }
+
+                if (isMatch) {
                     if (el.checked) {
-                        report.skipped_nonempty.push({ target: normLabel, existing_value: el.value });
+                        report.skipped_nonempty.push({ target: normLabel, existing_value: el.value || optionText });
                     } else {
                         el.click();
                         el.dispatchEvent(new Event('change', { bubbles: true }));
                         report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'radio' });
+                        if (sourceRoleName) filledCoreRoles.add(sourceRoleName);
                     }
                 }
             } else if (inputType === 'checkbox') {
@@ -1599,7 +1632,12 @@ function fillAvitoPublicationForm(packageData) {
 
             for (const opt of Array.from(el.options)) {
                 const optText = normalizeFieldLabel(opt.text || opt.value || '');
-                if (optText === normTargetVal || optText.includes(normTargetVal) || normTargetVal.includes(optText)) {
+                if (sourceRoleName === 'condition' || normLabel.includes('состояни')) {
+                    if (normalizeConditionValue(optText) === normalizeConditionValue(targetValue)) {
+                        matchedOption = opt;
+                        break;
+                    }
+                } else if (optText === normTargetVal || optText.includes(normTargetVal) || normTargetVal.includes(optText)) {
                     matchedOption = opt;
                     break;
                 }
@@ -1614,9 +1652,147 @@ function fillAvitoPublicationForm(packageData) {
                     el.value = matchedOption.value;
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                     report.filled.push({ source: sourceRoleName, target: normLabel, value: matchedOption.text, type: 'select' });
+                    if (sourceRoleName) filledCoreRoles.add(sourceRoleName);
                 }
             } else {
                 report.unresolved_options.push({ key: normLabel, expected: targetValue });
+            }
+        }
+    }
+
+    // 2. Scan segmented button groups / chip selectors (e.g. "Состояние", "Вид товара", "Тип", etc.)
+    const groupContainers = Array.from(document.querySelectorAll(
+        'fieldset, [role="radiogroup"], [data-marker*="param"], [data-marker*="condition"], [class*="param"], [class*="field"], [class*="group"], [class*="chips"]'
+    ));
+
+    for (const container of groupContainers) {
+        if (!isElementVisible(container)) continue;
+        if (isDangerousControl(container)) continue;
+
+        // Find group title / label
+        const titleEl = container.querySelector('legend, h3, h4, h5, [class*="title"], [class*="label"], [class*="name"], [data-marker*="title"], span');
+        const groupLabel = resolveFieldLabel(titleEl || container);
+        const normGroupLabel = normalizeFieldLabel(groupLabel);
+        if (!normGroupLabel) continue;
+
+        const coreRole = matchCoreFieldRole(normGroupLabel);
+        let targetValue = null;
+        let sourceRoleName = null;
+
+        if (coreRole) {
+            if (coreRole === 'condition' && packageData.condition) {
+                targetValue = packageData.condition;
+                sourceRoleName = 'condition';
+            } else if (coreRole === 'brand' && packageData.brand) {
+                targetValue = packageData.brand;
+                sourceRoleName = 'brand';
+            } else if (coreRole === 'model' && packageData.model) {
+                targetValue = packageData.model;
+                sourceRoleName = 'model';
+            }
+        }
+
+        if (!targetValue) {
+            for (const [charKey, charVal] of Object.entries(characteristics)) {
+                const normCharKey = normalizeFieldLabel(charKey);
+                if (normCharKey === normGroupLabel) {
+                    targetValue = String(charVal);
+                    sourceRoleName = charKey;
+                    break;
+                }
+            }
+        }
+
+        if (!targetValue) continue;
+
+        // Find candidate buttons/chips in this container
+        const candidateButtons = Array.from(container.querySelectorAll('button, [role="radio"], [role="button"], label, [data-marker*="item"]'))
+            .filter(b => b !== container && b.getAttribute('role') !== 'radiogroup' && b.tagName !== 'FIELDSET' && b.tagName !== 'DIV');
+        for (const btn of candidateButtons) {
+            if (!isElementVisible(btn)) continue;
+            if (isDangerousControl(btn)) continue;
+
+            let rawText = '';
+            const span = btn.querySelector('span, [class*="text"], [class*="label"]');
+            if (span && span.innerText) {
+                rawText = span.innerText;
+            } else {
+                rawText = btn.innerText || btn.textContent || btn.getAttribute('aria-label') || btn.getAttribute('data-marker') || '';
+            }
+            const btnText = rawText.trim();
+            const normBtnText = normalizeFieldLabel(btnText);
+            if (!normBtnText) continue;
+
+            let isMatch = false;
+            if (sourceRoleName === 'condition' || normGroupLabel.includes('состояни')) {
+                isMatch = normalizeConditionValue(normBtnText) === normalizeConditionValue(targetValue);
+            } else {
+                const normTarget = normalizeFieldLabel(targetValue);
+                isMatch = (normBtnText === normTarget || normBtnText.includes(normTarget) || normTarget.includes(normBtnText));
+            }
+
+            if (isMatch) {
+                const isSelected = (
+                    btn.getAttribute('aria-checked') === 'true' ||
+                    btn.getAttribute('aria-pressed') === 'true' ||
+                    btn.classList.contains('active') ||
+                    btn.classList.contains('selected') ||
+                    btn.classList.contains('checked') ||
+                    (btn.querySelector('input[type="radio"]:checked') !== null)
+                );
+
+                if (isSelected) {
+                    report.skipped_nonempty.push({ target: normGroupLabel, existing_value: btnText });
+                } else {
+                    btn.click();
+                    btn.dispatchEvent(new Event('change', { bubbles: true }));
+                    btn.dispatchEvent(new Event('input', { bubbles: true }));
+                    report.filled.push({ source: sourceRoleName, target: normGroupLabel, value: btnText || targetValue, type: 'button-chip' });
+                    if (sourceRoleName) {
+                        filledCoreRoles.add(sourceRoleName);
+                        if (sourceRoleName === 'condition') {
+                            filledCharacteristicKeys.add('Состояние');
+                            filledCharacteristicKeys.add('состояние');
+                        } else {
+                            filledCharacteristicKeys.add(sourceRoleName);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // 3. Fallback: Standalone condition buttons by data-marker or text
+    if (packageData.condition && !filledCoreRoles.has('condition')) {
+        const normCond = normalizeConditionValue(packageData.condition);
+        const conditionButtons = Array.from(document.querySelectorAll('button[data-marker*="condition"], [role="radio"][data-marker*="condition"], button, [role="radio"]'))
+            .filter(b => b.tagName !== 'DIV' && b.tagName !== 'FIELDSET' && b.tagName !== 'FORM' && b.getAttribute('role') !== 'radiogroup');
+        for (const cBtn of conditionButtons) {
+            if (!isElementVisible(cBtn)) continue;
+            if (isDangerousControl(cBtn)) continue;
+
+            let rawText = '';
+            const span = cBtn.querySelector('span, [class*="text"], [class*="label"]');
+            if (span && span.innerText) {
+                rawText = span.innerText;
+            } else {
+                rawText = cBtn.innerText || cBtn.textContent || cBtn.getAttribute('data-marker') || '';
+            }
+            const btnText = rawText.trim();
+            const marker = cBtn.getAttribute('data-marker') || '';
+
+            if (normalizeConditionValue(btnText) === normCond || (marker && marker.toLowerCase().includes(normCond))) {
+                const isSelected = cBtn.getAttribute('aria-checked') === 'true' || cBtn.getAttribute('aria-pressed') === 'true' || cBtn.classList.contains('active') || cBtn.classList.contains('selected');
+                if (!isSelected) {
+                    cBtn.click();
+                    cBtn.dispatchEvent(new Event('change', { bubbles: true }));
+                    report.filled.push({ source: 'condition', target: 'состояние', value: btnText || packageData.condition, type: 'button-chip' });
+                    filledCoreRoles.add('condition');
+                    filledCharacteristicKeys.add('Состояние');
+                    filledCharacteristicKeys.add('состояние');
+                    break;
+                }
             }
         }
     }

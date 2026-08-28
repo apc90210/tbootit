@@ -47,3 +47,14 @@ def test_field_aliases_coverage():
     assert '"состояние"' in content
     assert '"производитель"' in content
     assert '"модель"' in content
+
+def test_condition_chip_button_matching():
+    """Verify content.js normalizes condition values and supports button/chip selectors."""
+    content_js_path = os.path.abspath("chrome-extension/technoreboot-avito/content.js")
+    with open(content_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "normalizeConditionValue" in content
+    assert "button-chip" in content
+    assert "data-marker*=\"condition\"" in content or "data-marker*=\\\"condition\\\"" in content
+
