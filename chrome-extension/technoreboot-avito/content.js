@@ -1521,37 +1521,53 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', bubbles: true }));
 
-    // 4. Wait for suggestion dropdown listbox to mount
-    await delay(200);
-
-    // 5. Look for matching suggestion option in DOM
+    // 4. Poll for suggestion dropdown listbox to mount (up to 800ms)
     const normTarget = normalizeFieldLabel(targetValue);
     const targetTokens = normTarget.split(/[\s\-_\/]+/).filter(t => t.length >= 2);
 
-    const optionSelectors = [
-        '[role="listbox"] [role="option"]',
-        '[role="listbox"] li',
-        '[role="listbox"] div',
-        '[data-marker*="suggest-item"]',
-        '[data-marker*="option"]',
-        '[class*="suggest-item"]',
-        '[class*="suggestions-item"]',
-        '[class*="dropdown-item"]',
-        '[class*="select-item"]',
-        '[class*="option-item"]',
-        '[class*="popup"] [role="option"]',
-        '[class*="popup"] li',
-        'ul[class*="list"] li',
-        'div[class*="list"] [class*="item"]'
-    ];
+    let candidateOptions = [];
+    for (let wait = 0; wait < 8; wait++) {
+        await delay(100);
 
-    const candidateOptions = Array.from(document.querySelectorAll(optionSelectors.join(',')))
-        .filter(isElementVisible)
-        .filter(o => !isDangerousControl(o));
+        // Search scope: parent container first, or listbox/dropdown containers on page
+        const parentContainer = inputEl.closest('[class*="field"], [class*="param"], [class*="item"], [data-marker*="param"], fieldset, form') || document;
+        const optionSelectors = [
+            '[role="listbox"] [role="option"]',
+            '[role="listbox"] li',
+            '[data-marker*="suggest-item"]',
+            '[data-marker*="option-item"]',
+            '[class*="suggest-item"]',
+            '[class*="suggestions-item"]',
+            '[class*="dropdown-item"]',
+            '[class*="select-item"]',
+            '[class*="options-item"]',
+            '[class*="popup"] [role="option"]',
+            '[class*="popup"] li'
+        ];
+
+        candidateOptions = Array.from(parentContainer.querySelectorAll(optionSelectors.join(',')))
+            .filter(isElementVisible)
+            .filter(o => !isDangerousControl(o))
+            .filter(o => {
+                // HARD SAFETY GUARD: Never click <a> navigation links to other ads or header elements!
+                if (o.tagName === 'A' || o.getAttribute('href') || o.closest('a[href]')) return false;
+                if (o.closest('header, nav, [data-marker*="header"], [data-marker*="search-form"]')) return false;
+                return true;
+            });
+
+        if (candidateOptions.length > 0) break;
+    }
 
     let bestMatch = null;
     for (const opt of candidateOptions) {
-        const optText = normalizeFieldLabel(opt.innerText || opt.textContent || opt.getAttribute('data-marker') || '');
+        let rawText = '';
+        const span = opt.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+        if (span && span.innerText) {
+            rawText = span.innerText;
+        } else {
+            rawText = opt.innerText || opt.textContent || opt.getAttribute('data-marker') || '';
+        }
+        const optText = normalizeFieldLabel(rawText);
         if (!optText) continue;
 
         // Exact match
@@ -1582,15 +1598,17 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
         bestMatch.click();
         inputEl.dispatchEvent(new Event('change', { bubbles: true }));
         inputEl.dispatchEvent(new Event('blur', { bubbles: true }));
+        await delay(300);
         return true;
     }
 
-    // If no option item found in list, press Enter on the input
+    // Fallback: press Enter on the input
     inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
     inputEl.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
     inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
     inputEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    await delay(200);
     return true;
 }
 
@@ -1610,6 +1628,11 @@ const CATEGORY_HARDWARE_KEYWORDS = {
 function matchCategorySuggestion(categoryText, packageData) {
     if (!categoryText || !packageData) return false;
     const normText = normalizeFieldLabel(categoryText);
+
+    // 0. Top-level category card matching on /additem (e.g. "Электроника")
+    if (normText === 'электроника' || normText === 'товары' || normText === 'бытовая электроника' || normText === 'электроника и техника') {
+        return true;
+    }
 
     // 1. Direct match with packageData category display_name or observed_path
     if (packageData.category) {
