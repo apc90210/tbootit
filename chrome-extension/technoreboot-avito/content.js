@@ -1296,7 +1296,6 @@ async function extractListingDataMultiPass() {
     }
 }
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // ============================================================================
 // STAGE 06A-R10B: SAFE BROWSER-ASSISTED AVITO PUBLICATION FORM ADAPTER
 // ============================================================================
