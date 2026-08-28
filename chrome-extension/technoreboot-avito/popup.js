@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const fillTitle = document.getElementById("fillTitle");
     const fillDetectInfo = document.getElementById("fillDetectInfo");
     const fillActionsContainer = document.getElementById("fillActionsContainer");
+    const fillAutoBtn = document.getElementById("fillAutoBtn");
     const fillStepBtn = document.getElementById("fillStepBtn");
     const clearDraftFromAvitoBtn = document.getElementById("clearDraftFromAvitoBtn");
     const fillReportContainer = document.getElementById("fillReportContainer");
@@ -324,59 +325,123 @@ document.addEventListener("DOMContentLoaded", async () => {
                     fillActionsContainer.style.display = "block";
                     fillMsg.textContent = "";
 
-                    // Fill Current Step Button Click (Explicit Action)
+                    function combineReports(r1, r2) {
+                        const filled = [...(r1.filled || []), ...(r2.filled || [])];
+                        const skipped = [...(r1.skipped_nonempty || []), ...(r2.skipped_nonempty || [])];
+                        const filledKeys = new Set(filled.map(f => f.source));
+                        const unresFields = (r2.unresolved_fields || []).filter(u => !filledKeys.has(u.key));
+                        const unresOptions = [...(r1.unresolved_options || []), ...(r2.unresolved_options || [])];
+                        return {
+                            product_id: r2.product_id || r1.product_id,
+                            filled,
+                            skipped_nonempty: skipped,
+                            unresolved_fields: unresFields,
+                            unresolved_options: unresOptions
+                        };
+                    }
+
+                    function displayReport(report) {
+                        fillReportContainer.style.display = "block";
+                        const filledCount = (report.filled || []).length;
+                        const skippedCount = (report.skipped_nonempty || []).length;
+                        const unresFieldsCount = (report.unresolved_fields || []).length;
+                        const unresOptionsCount = (report.unresolved_options || []).length;
+
+                        fillSummary.innerHTML = `
+                            <strong>Результат заполнения:</strong><br>
+                            • Заполнено полей: <strong>${filledCount}</strong><br>
+                            • Пропущено (уже заполнено): <strong>${skippedCount}</strong><br>
+                            • Ожидают ввода / не найдены: <strong>${unresFieldsCount}</strong><br>
+                            • Не совпали варианты: <strong>${unresOptionsCount}</strong>
+                        `;
+
+                        let detailsHtml = "";
+                        if (filledCount > 0) {
+                            detailsHtml += "<strong>Заполненные:</strong><br>" + report.filled.map(f => `✓ ${f.target}: ${f.value}`).join("<br>") + "<br><br>";
+                        }
+                        if (skippedCount > 0) {
+                            detailsHtml += "<strong>Уже были заполнены:</strong><br>" + report.skipped_nonempty.map(s => `- ${s.target}: ${s.existing_value}`).join("<br>") + "<br><br>";
+                        }
+                        if (unresFieldsCount > 0) {
+                            detailsHtml += "<strong>Не сопоставлены:</strong><br>" + report.unresolved_fields.map(u => `? ${u.key}: ${u.value}`).join("<br>");
+                        }
+
+                        fillDetails.innerHTML = detailsHtml;
+                        if (detailsHtml) {
+                            toggleDetailsBtn.style.display = "block";
+                            toggleDetailsBtn.onclick = () => {
+                                if (fillDetails.style.display === "none") {
+                                    fillDetails.style.display = "block";
+                                    toggleDetailsBtn.textContent = "Скрыть подробности";
+                                } else {
+                                    fillDetails.style.display = "none";
+                                    toggleDetailsBtn.textContent = "Подробнее...";
+                                }
+                            };
+                        }
+                    }
+
+                    // 1. AUTO FILL ALL STEPS (Title -> Category -> Parameters -> Characteristics)
+                    if (fillAutoBtn) {
+                        fillAutoBtn.onclick = () => {
+                            fillAutoBtn.disabled = true;
+                            fillStepBtn.disabled = true;
+                            fillMsg.className = "msg";
+                            fillMsg.textContent = "⚡ Шаг 1: Заполнение названия и выбор категории...";
+
+                            sendMessageToTabWithAutoInject(activeTab.id, { action: "fill_avito_form", package: pkg }, step1Report => {
+                                if (!step1Report) {
+                                    fillAutoBtn.disabled = false;
+                                    fillStepBtn.disabled = false;
+                                    fillMsg.className = "msg msg-error";
+                                    fillMsg.textContent = "Не удалось связаться со страницей формы. Обновите страницу (F5).";
+                                    return;
+                                }
+
+                                const categoryFilled = (step1Report.filled || []).some(f => f.type === 'category-tile' || f.source === 'category');
+
+                                if (categoryFilled) {
+                                    fillMsg.textContent = "⚡ Шаг 2: Категория выбрана. Ожидание формы параметров...";
+                                    setTimeout(() => {
+                                        fillMsg.textContent = "⚡ Шаг 2: Заполнение цены, состояния, описания и характеристик...";
+                                        sendMessageToTabWithAutoInject(activeTab.id, { action: "fill_avito_form", package: pkg }, step2Report => {
+                                            fillAutoBtn.disabled = false;
+                                            fillStepBtn.disabled = false;
+                                            const combined = combineReports(step1Report, step2Report || { filled: [], skipped_nonempty: [], unresolved_fields: [], unresolved_options: [] });
+                                            displayReport(combined);
+                                            fillMsg.className = "msg msg-success";
+                                            fillMsg.innerHTML = "✓ Все доступные шаги выполнены: название, категория, цена, состояние и характеристики заполнены!";
+                                        });
+                                    }, 1200);
+                                } else {
+                                    fillAutoBtn.disabled = false;
+                                    fillStepBtn.disabled = false;
+                                    displayReport(step1Report);
+                                    fillMsg.className = "msg msg-success";
+                                    fillMsg.innerHTML = "✓ Поля текущего шага заполнены.<br><small>Проверьте данные и при необходимости перейдите к следующему шагу.</small>";
+                                }
+                            });
+                        };
+                    }
+
+                    // 2. FILL CURRENT STEP ONLY (Single Pass)
                     fillStepBtn.onclick = () => {
                         fillStepBtn.disabled = true;
+                        if (fillAutoBtn) fillAutoBtn.disabled = true;
                         fillMsg.className = "msg";
                         fillMsg.textContent = "Заполнение видимых полей формы...";
 
                         sendMessageToTabWithAutoInject(activeTab.id, { action: "fill_avito_form", package: pkg }, report => {
                             fillStepBtn.disabled = false;
+                            if (fillAutoBtn) fillAutoBtn.disabled = false;
                             if (!report) {
                                 fillMsg.className = "msg msg-error";
                                 fillMsg.textContent = "Не удалось связаться со страницей формы. Обновите страницу (F5).";
                                 return;
                             }
 
-                            fillReportContainer.style.display = "block";
-                            const filledCount = (report.filled || []).length;
-                            const skippedCount = (report.skipped_nonempty || []).length;
-                            const unresFieldsCount = (report.unresolved_fields || []).length;
-                            const unresOptionsCount = (report.unresolved_options || []).length;
+                            displayReport(report);
                             const categoryFilled = (report.filled || []).some(f => f.type === 'category-tile' || f.source === 'category');
-
-                            fillSummary.innerHTML = `
-                                <strong>Результат заполнения:</strong><br>
-                                • Заполнено полей: <strong>${filledCount}</strong><br>
-                                • Пропущено (уже заполнено): <strong>${skippedCount}</strong><br>
-                                • Не сопоставлено на этом шаге: <strong>${unresFieldsCount}</strong><br>
-                                • Не совпали варианты: <strong>${unresOptionsCount}</strong>
-                            `;
-
-                            let detailsHtml = "";
-                            if (filledCount > 0) {
-                                detailsHtml += "<strong>Заполненные:</strong><br>" + report.filled.map(f => `✓ ${f.target}: ${f.value}`).join("<br>") + "<br><br>";
-                            }
-                            if (skippedCount > 0) {
-                                detailsHtml += "<strong>Уже были заполнены:</strong><br>" + report.skipped_nonempty.map(s => `- ${s.target}: ${s.existing_value}`).join("<br>") + "<br><br>";
-                            }
-                            if (unresFieldsCount > 0) {
-                                detailsHtml += "<strong>Ожидают следующего шага:</strong><br>" + report.unresolved_fields.map(u => `? ${u.key}: ${u.value}`).join("<br>");
-                            }
-
-                            fillDetails.innerHTML = detailsHtml;
-                            if (detailsHtml) {
-                                toggleDetailsBtn.style.display = "block";
-                                toggleDetailsBtn.onclick = () => {
-                                    if (fillDetails.style.display === "none") {
-                                        fillDetails.style.display = "block";
-                                        toggleDetailsBtn.textContent = "Скрыть подробности";
-                                    } else {
-                                        fillDetails.style.display = "none";
-                                        toggleDetailsBtn.textContent = "Подробнее...";
-                                    }
-                                };
-                            }
 
                             fillMsg.className = "msg msg-success";
                             if (categoryFilled) {
