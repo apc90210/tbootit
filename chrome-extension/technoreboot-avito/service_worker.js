@@ -172,6 +172,29 @@ async function sendMyListingsPayload(payload) {
     }
 }
 
+async function fetchPublicationPackage(productId) {
+    const token = await getStoredToken();
+    if (!token) {
+        return { success: false, message: "Расширение не привязано к Техноребут." };
+    }
+    try {
+        const res = await fetch(`${BRIDGE_BASE_URL}/publication-package/${productId}`, {
+            method: "GET",
+            headers: {
+                "X-Extension-Token": token,
+                "Accept": "application/json"
+            }
+        });
+        const parsed = await parseJsonResponseSafely(res);
+        if (parsed.ok) {
+            return { success: true, package: parsed.data };
+        }
+        return { success: false, message: parsed.error, details: parsed.data };
+    } catch (e) {
+        return { success: false, message: `Ошибка связи с сервером: ${e.message}` };
+    }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "get_status") {
         checkBridgeStatus().then(sendResponse);
@@ -189,5 +212,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendMyListingsPayload(request.payload).then(sendResponse);
         return true;
     }
+    if (request.action === "fetch_publication_package") {
+        fetchPublicationPackage(request.product_id).then(sendResponse);
+        return true;
+    }
     return true;
 });
+

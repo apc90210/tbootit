@@ -88,6 +88,9 @@ input[type="text"] {
 
 .btn-success { background-color: #16a34a; color: white; }
 .btn-success:hover { background-color: #15803d; }
+.btn-secondary { background-color: #64748b; color: white; }
+.btn-secondary:hover { background-color: #475569; }
+.btn-link { background: none; border: none; color: #2563eb; cursor: pointer; text-decoration: underline; }
 
 .btn-block { width: 100%; margin-top: 8px; }
 
@@ -102,9 +105,33 @@ input[type="text"] {
 }
 .msg-success { color: #166534; }
 .msg-error { color: #991b1b; }
+.msg-warning { color: #854d0e; }
+
+.fill-report {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px;
+}
+.fill-summary {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #1e293b;
+}
+.fill-details {
+    max-height: 120px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    padding: 6px;
+    color: #334155;
+    line-height: 1.4;
+}
 
 .footer {
     text-align: center;
     color: #94a3b8;
     margin-top: 10px;
 }
+

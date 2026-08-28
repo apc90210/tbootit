@@ -26,7 +26,37 @@
         <p id="pairMsg" class="msg"></p>
     </div>
 
-    <!-- Main Ingest Section -->
+    <!-- Technoreboot Product Preparation Section -->
+    <div class="card" id="prepareSection" style="display:none;">
+        <h3 id="prepareTitle">Подготовка для Avito</h3>
+        <p id="prepareDetectInfo">Обнаружен товар в Техноребут...</p>
+
+        <button id="prepareBtn" class="btn btn-primary btn-block">📦 Подготовить для Avito</button>
+        <div id="draftReadyControls" style="display:none; margin-top:8px;">
+            <button id="openAvitoBtn" class="btn btn-success btn-block">↗ Открыть форму Avito</button>
+            <button id="clearDraftBtn" class="btn btn-secondary btn-block" style="margin-top:6px;">✕ Очистить черновик</button>
+        </div>
+        <p id="prepareMsg" class="msg" style="margin-top:10px;"></p>
+    </div>
+
+    <!-- Avito Form Fill Section -->
+    <div class="card" id="fillSection" style="display:none;">
+        <h3 id="fillTitle">Заполнение формы Avito</h3>
+        <p id="fillDetectInfo">Проверка активного черновика...</p>
+
+        <div id="fillActionsContainer" style="display:none;">
+            <button id="fillStepBtn" class="btn btn-success btn-block">✍ Заполнить текущий шаг</button>
+            <button id="clearDraftFromAvitoBtn" class="btn btn-secondary btn-block" style="margin-top:6px;">✕ Очистить черновик</button>
+        </div>
+        <div id="fillReportContainer" style="display:none; margin-top:10px;" class="fill-report">
+            <div id="fillSummary" class="fill-summary"></div>
+            <div id="fillDetails" class="fill-details" style="display:none; margin-top:6px; font-size:11px;"></div>
+            <button id="toggleDetailsBtn" class="btn btn-link" style="padding:2px 0; font-size:11px; display:none;">Подробнее...</button>
+        </div>
+        <p id="fillMsg" class="msg" style="margin-top:10px;"></p>
+    </div>
+
+    <!-- Main Ingest Section (Avito Listing -> Technoreboot) -->
     <div class="card" id="actionSection" style="display:none;">
         <h3 id="pageTypeTitle">Страница Avito</h3>
         <p id="pageDetectInfo">Загрузка информации со страницы...</p>

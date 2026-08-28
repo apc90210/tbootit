@@ -266,3 +266,67 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         "message": f"Объявление {ext_id} импортировано в Техноребут (Product ID: {product_id}, фото: {photos_total}).",
         "details": res
     }
+
+@router.get("/publication-package/{product_id}")
+async def get_extension_publication_package(
+    product_id: int,
+    token: str = Depends(verify_extension_token)
+):
+    """
+    Fetch transport-neutral publication package and preflight validation for a product.
+    Requires paired extension token.
+    Queries Core internal API:
+    - GET http://core:8000/api/integrations/avito/products/{product_id}/publication-package
+    - GET http://core:8000/api/integrations/avito/products/{product_id}/preflight
+    """
+    import datetime
+    import urllib.request
+    import urllib.error
+
+    core_base = settings.CORE_API_BASE_URL.rstrip('/')
+    pkg_url = f"{core_base}/api/integrations/avito/products/{product_id}/publication-package"
+    preflight_url = f"{core_base}/api/integrations/avito/products/{product_id}/preflight"
+
+    try:
+        req_pkg = urllib.request.Request(pkg_url)
+        with urllib.request.urlopen(req_pkg, timeout=10) as resp_pkg:
+            pkg_data = json.loads(resp_pkg.read().decode('utf-8'))
+
+        req_pre = urllib.request.Request(preflight_url)
+        with urllib.request.urlopen(req_pre, timeout=10) as resp_pre:
+            pre_data = json.loads(resp_pre.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise HTTPException(status_code=404, detail=f"Product {product_id} not found in Technoreboot Core")
+        raise HTTPException(status_code=502, detail=f"Error querying Core API: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Core API connection failed: {e}")
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    expires_iso = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
+
+    return {
+        "schema_version": 1,
+        "product_id": product_id,
+        "prepared_at": now_iso,
+        "expires_at": expires_iso,
+        "title": pkg_data.get("title") or "",
+        "description": pkg_data.get("description") or "",
+        "price": pkg_data.get("price") or 0.0,
+        "category": {
+            "display_name": pkg_data.get("category") or "Товары",
+            "observed_path": [pkg_data.get("category")] if pkg_data.get("category") else [],
+            "official_slug": pre_data.get("official_slug")
+        },
+        "condition": pkg_data.get("condition") or "Б/у",
+        "brand": pkg_data.get("brand"),
+        "model": pkg_data.get("model"),
+        "characteristics": pkg_data.get("characteristics") or {},
+        "photos": pkg_data.get("photos") or [],
+        "preflight": {
+            "ready_for_browser_assisted": pre_data.get("ready_for_browser_assisted", True),
+            "errors": pre_data.get("errors", []),
+            "warnings": pre_data.get("warnings", [])
+        }
+    }
+

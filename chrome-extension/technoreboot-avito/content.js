@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (Pure DOM/Metadata Extractor v0.1.17)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.18)
 
 let pageInitialData = null;
 
@@ -1297,7 +1297,346 @@ async function extractListingDataMultiPass() {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request && request.action === "extract_current_page") {
+// ============================================================================
+// STAGE 06A-R10B: SAFE BROWSER-ASSISTED AVITO PUBLICATION FORM ADAPTER
+// ============================================================================
+
+const DANGEROUS_ACTION_KEYWORDS = [
+    "разместить",
+    "опубликовать",
+    "подать объявление",
+    "отправить",
+    "подтвердить",
+    "оплатить",
+    "купить",
+    "продолжить",
+    "далее",
+    "готово",
+    "сохранить и опубликовать"
+];
+
+const CORE_FIELD_ALIASES = {
+    title: ["название", "заголовок", "название товара", "заголовок объявления"],
+    description: ["описание", "описание товара", "текст объявления"],
+    price: ["цена", "стоимость", "цена товара"],
+    condition: ["состояние", "состояние товара"],
+    brand: ["бренд", "производитель", "марка"],
+    model: ["модель", "модель материнской платы", "модель устройства", "модель процессора", "модель видеокарты"]
+};
+
+function normalizeFieldLabel(label) {
+    if (!label || typeof label !== 'string') return '';
+    return label
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/:$/, '');
+}
+
+function isElementVisible(el) {
+    if (!el) return false;
+    if (el.offsetParent === null && el.tagName !== 'BODY') return false;
+    try {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            return false;
+        }
+    } catch (e) {}
+    return true;
+}
+
+function isDangerousControl(el) {
+    if (!el) return false;
+    const text = (
+        (el.innerText || '') + ' ' +
+        (el.textContent || '') + ' ' +
+        (el.value || '') + ' ' +
+        (el.getAttribute('aria-label') || '') + ' ' +
+        (el.getAttribute('title') || '') + ' ' +
+        (el.getAttribute('data-marker') || '')
+    );
+    const norm = normalizeFieldLabel(text);
+    for (const kw of DANGEROUS_ACTION_KEYWORDS) {
+        if (norm.includes(kw)) return true;
+    }
+    return false;
+}
+
+function resolveFieldLabel(inputEl) {
+    if (!inputEl) return '';
+
+    // 1. Associated <label for="id">
+    if (inputEl.id) {
+        const labelEl = document.querySelector(`label[for="${inputEl.id}"]`);
+        if (labelEl && labelEl.innerText) {
+            const clean = normalizeFieldLabel(labelEl.innerText);
+            if (clean) return clean;
+        }
+    }
+
+    // 2. Enclosing <label> text
+    const parentLabel = inputEl.closest('label');
+    if (parentLabel && parentLabel.innerText) {
+        const clean = normalizeFieldLabel(parentLabel.innerText);
+        if (clean) return clean;
+    }
+
+    // 3. aria-label or aria-labelledby
+    const ariaLabel = inputEl.getAttribute('aria-label');
+    if (ariaLabel) {
+        const clean = normalizeFieldLabel(ariaLabel);
+        if (clean) return clean;
+    }
+
+    const ariaLabelledby = inputEl.getAttribute('aria-labelledby');
+    if (ariaLabelledby) {
+        const refEl = document.getElementById(ariaLabelledby);
+        if (refEl && refEl.innerText) {
+            const clean = normalizeFieldLabel(refEl.innerText);
+            if (clean) return clean;
+        }
+    }
+
+    // 4. Stable data-marker attribute
+    const dataMarker = inputEl.getAttribute('data-marker');
+    if (dataMarker) {
+        const clean = normalizeFieldLabel(dataMarker.replace(/-/g, ' '));
+        if (clean && !clean.includes('input') && !clean.includes('field')) return clean;
+    }
+
+    // 5. Meaningful name attribute
+    const nameAttr = inputEl.getAttribute('name');
+    if (nameAttr) {
+        const clean = normalizeFieldLabel(nameAttr.replace(/[-_]/g, ' '));
+        if (clean && clean.length > 2) return clean;
+    }
+
+    // 6. Nearby title or legend in parent container
+    const container = inputEl.closest('[class*="field"], [class*="item"], [class*="param"], [class*="row"], fieldset, div');
+    if (container) {
+        const headerEl = container.querySelector('legend, h3, h4, h5, [class*="title"], [class*="label"], [class*="name"], [data-marker*="title"], span');
+        if (headerEl && headerEl !== inputEl && headerEl.innerText) {
+            const clean = normalizeFieldLabel(headerEl.innerText);
+            if (clean && clean.length < 50) return clean;
+        }
+    }
+
+    return '';
+}
+
+function setReactInputValue(el, value) {
+    if (!el) return;
+    const strVal = String(value);
+
+    // Set value on DOM element using prototype descriptor to notify React/Vue/Angular state
+    try {
+        const prototype = Object.getPrototypeOf(el);
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value') || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+        if (descriptor && descriptor.set) {
+            descriptor.set.call(el, strVal);
+        } else {
+            el.value = strVal;
+        }
+    } catch (e) {
+        el.value = strVal;
+    }
+
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+}
+
+function matchCoreFieldRole(normalizedLabel) {
+    if (!normalizedLabel) return null;
+    for (const [role, aliases] of Object.entries(CORE_FIELD_ALIASES)) {
+        for (const alias of aliases) {
+            if (normalizedLabel === alias || normalizedLabel.startsWith(alias + ' ') || normalizedLabel.endsWith(' ' + alias)) {
+                return role;
+            }
+        }
+    }
+    return null;
+}
+
+function fillAvitoPublicationForm(packageData) {
+    const report = {
+        product_id: packageData ? packageData.product_id : null,
+        page_url: window.location.href,
+        filled: [],
+        skipped_nonempty: [],
+        unresolved_fields: [],
+        unresolved_options: [],
+        protected_actions: [],
+        errors: []
+    };
+
+    if (!packageData) {
+        report.errors.push("Missing publication package");
+        return report;
+    }
+
+    const characteristics = packageData.characteristics || {};
+    const filledCharacteristicKeys = new Set();
+    const filledCoreRoles = new Set();
+
+    // Collect all candidates on page
+    const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"], [role="radiogroup"], [role="listbox"]'));
+
+    for (const el of inputElements) {
+        if (!isElementVisible(el)) continue;
+
+        // HARD SAFETY GUARD: Never touch submit/continue buttons or dangerous actions
+        if (isDangerousControl(el)) {
+            report.protected_actions.push({
+                element: el.tagName,
+                marker: el.getAttribute('data-marker') || el.name || el.innerText || 'dangerous_action'
+            });
+            continue;
+        }
+
+        // HARD SAFETY GUARD: Never touch file upload inputs in R10B
+        if (el.tagName === 'INPUT' && el.type === 'file') {
+            continue;
+        }
+
+        // HARD SAFETY GUARD: Never touch password or hidden inputs
+        if (el.tagName === 'INPUT' && (el.type === 'password' || el.type === 'hidden')) {
+            continue;
+        }
+
+        const label = resolveFieldLabel(el);
+        const normLabel = normalizeFieldLabel(label);
+        if (!normLabel) continue;
+
+        // Check if field matches a core field role (title, description, price, brand, model, condition)
+        const coreRole = matchCoreFieldRole(normLabel);
+        let targetValue = null;
+        let sourceRoleName = null;
+
+        if (coreRole) {
+            if (coreRole === 'title' && packageData.title) {
+                targetValue = packageData.title;
+                sourceRoleName = 'title';
+            } else if (coreRole === 'description' && packageData.description) {
+                targetValue = packageData.description;
+                sourceRoleName = 'description';
+            } else if (coreRole === 'price' && packageData.price) {
+                targetValue = String(packageData.price);
+                sourceRoleName = 'price';
+            } else if (coreRole === 'brand' && packageData.brand) {
+                targetValue = packageData.brand;
+                sourceRoleName = 'brand';
+            } else if (coreRole === 'model' && packageData.model) {
+                targetValue = packageData.model;
+                sourceRoleName = 'model';
+            } else if (coreRole === 'condition' && packageData.condition) {
+                targetValue = packageData.condition;
+                sourceRoleName = 'condition';
+            }
+        }
+
+        // Check if field matches a specific characteristic key (exact normalized matching)
+        if (!targetValue) {
+            for (const [charKey, charVal] of Object.entries(characteristics)) {
+                const normCharKey = normalizeFieldLabel(charKey);
+                if (normCharKey === normLabel) {
+                    targetValue = String(charVal);
+                    sourceRoleName = charKey;
+                    filledCharacteristicKeys.add(charKey);
+                    break;
+                }
+            }
+        }
+
+        if (!targetValue) continue;
+
+        // FILL_EMPTY_ONLY discipline
+        const tagName = el.tagName.toUpperCase();
+
+        if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
+            const inputType = (el.getAttribute('type') || 'text').toLowerCase();
+
+            if (inputType === 'radio') {
+                // Radio button matching: match option text/value
+                const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
+                const normTargetVal = normalizeFieldLabel(targetValue);
+                if (optionText.includes(normTargetVal) || normTargetVal.includes(optionText)) {
+                    if (el.checked) {
+                        report.skipped_nonempty.push({ target: normLabel, existing_value: el.value });
+                    } else {
+                        el.click();
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'radio' });
+                    }
+                }
+            } else if (inputType === 'checkbox') {
+                const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
+                const normTargetVal = normalizeFieldLabel(targetValue);
+                if (optionText.includes(normTargetVal) || normTargetVal.includes(optionText)) {
+                    if (el.checked) {
+                        report.skipped_nonempty.push({ target: normLabel, existing_value: 'checked' });
+                    } else {
+                        el.click();
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'checkbox' });
+                    }
+                }
+            } else {
+                // Text, Number, Textarea
+                const currentVal = (el.value || '').trim();
+                if (currentVal !== '') {
+                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                } else {
+                    setReactInputValue(el, targetValue);
+                    report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: inputType });
+                    if (sourceRoleName) filledCoreRoles.add(sourceRoleName);
+                }
+            }
+        } else if (tagName === 'SELECT') {
+            const currentVal = (el.value || '').trim();
+            const normTargetVal = normalizeFieldLabel(targetValue);
+            let matchedOption = null;
+
+            for (const opt of Array.from(el.options)) {
+                const optText = normalizeFieldLabel(opt.text || opt.value || '');
+                if (optText === normTargetVal || optText.includes(normTargetVal) || normTargetVal.includes(optText)) {
+                    matchedOption = opt;
+                    break;
+                }
+            }
+
+            if (matchedOption) {
+                if (el.selectedIndex > 0 && currentVal !== '' && currentVal === matchedOption.value) {
+                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                } else if (el.selectedIndex > 0 && currentVal !== '' && el.selectedIndex !== 0) {
+                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                } else {
+                    el.value = matchedOption.value;
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    report.filled.push({ source: sourceRoleName, target: normLabel, value: matchedOption.text, type: 'select' });
+                }
+            } else {
+                report.unresolved_options.push({ key: normLabel, expected: targetValue });
+            }
+        }
+    }
+
+    // Record unresolved characteristics that had no matching field mounted on this step
+    for (const [charKey, charVal] of Object.entries(characteristics)) {
+        if (!filledCharacteristicKeys.has(charKey)) {
+            report.unresolved_fields.push({ key: charKey, value: charVal });
+        }
+    }
+
+    return report;
+}
+
+// Runtime message dispatcher
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (!request) return true;
+
+    if (request.action === "extract_current_page") {
         try {
             const url = window.location.href;
             if (url.includes('/profile/items') || url.includes('/my/items')) {
@@ -1316,7 +1655,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.17",
+                    extension_version: "0.2.18",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -1329,6 +1668,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         }
+    } else if (request.action === "fill_avito_form") {
+        try {
+            const report = fillAvitoPublicationForm(request.package);
+            sendResponse(report);
+        } catch (err) {
+            sendResponse({
+                product_id: request.package ? request.package.product_id : null,
+                page_url: window.location.href,
+                filled: [],
+                skipped_nonempty: [],
+                unresolved_fields: [],
+                unresolved_options: [],
+                protected_actions: [],
+                errors: [String(err)]
+            });
+        }
     }
     return true;
 });
+

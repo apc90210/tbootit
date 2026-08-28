@@ -1,13 +1,36 @@
-// Technoreboot Avito Popup Script
+// Technoreboot Avito Popup Script (v0.2.18)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
     const statusMsg = document.getElementById("statusMsg");
     const pairSection = document.getElementById("pairSection");
-    const actionSection = document.getElementById("actionSection");
     const pairCodeInput = document.getElementById("pairCodeInput");
     const pairBtn = document.getElementById("pairBtn");
     const pairMsg = document.getElementById("pairMsg");
+
+    // Sections
+    const prepareSection = document.getElementById("prepareSection");
+    const prepareTitle = document.getElementById("prepareTitle");
+    const prepareDetectInfo = document.getElementById("prepareDetectInfo");
+    const prepareBtn = document.getElementById("prepareBtn");
+    const draftReadyControls = document.getElementById("draftReadyControls");
+    const openAvitoBtn = document.getElementById("openAvitoBtn");
+    const clearDraftBtn = document.getElementById("clearDraftBtn");
+    const prepareMsg = document.getElementById("prepareMsg");
+
+    const fillSection = document.getElementById("fillSection");
+    const fillTitle = document.getElementById("fillTitle");
+    const fillDetectInfo = document.getElementById("fillDetectInfo");
+    const fillActionsContainer = document.getElementById("fillActionsContainer");
+    const fillStepBtn = document.getElementById("fillStepBtn");
+    const clearDraftFromAvitoBtn = document.getElementById("clearDraftFromAvitoBtn");
+    const fillReportContainer = document.getElementById("fillReportContainer");
+    const fillSummary = document.getElementById("fillSummary");
+    const fillDetails = document.getElementById("fillDetails");
+    const toggleDetailsBtn = document.getElementById("toggleDetailsBtn");
+    const fillMsg = document.getElementById("fillMsg");
+
+    const actionSection = document.getElementById("actionSection");
     const pageTypeTitle = document.getElementById("pageTypeTitle");
     const pageDetectInfo = document.getElementById("pageDetectInfo");
     const sendBtn = document.getElementById("sendBtn");
@@ -18,7 +41,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.1.9";
+        let manifestVer = "0.2.18";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -34,45 +57,102 @@ document.addEventListener("DOMContentLoaded", async () => {
     let isPaired = false;
     let isServerOnline = false;
 
-    // Check status on popup open
+    // --- Session Storage Draft Helpers (30 min TTL) ---
+    async function getSessionDraft() {
+        return new Promise(resolve => {
+            if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
+                chrome.storage.session.get(["avito_publication_draft"], res => {
+                    const draft = res ? res.avito_publication_draft : null;
+                    if (!draft) return resolve(null);
+                    // Check TTL
+                    const now = Date.now();
+                    const expiresAt = draft.expires_at ? new Date(draft.expires_at).getTime() : 0;
+                    if (expiresAt && now > expiresAt) {
+                        // Expired
+                        chrome.storage.session.remove(["avito_publication_draft"]);
+                        return resolve(null);
+                    }
+                    resolve(draft);
+                });
+            } else if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+                // Fallback to local storage if session storage is unavailable
+                chrome.storage.local.get(["avito_publication_draft"], res => {
+                    const draft = res ? res.avito_publication_draft : null;
+                    if (!draft) return resolve(null);
+                    const now = Date.now();
+                    const expiresAt = draft.expires_at ? new Date(draft.expires_at).getTime() : 0;
+                    if (expiresAt && now > expiresAt) {
+                        chrome.storage.local.remove(["avito_publication_draft"]);
+                        return resolve(null);
+                    }
+                    resolve(draft);
+                });
+            } else {
+                resolve(null);
+            }
+        });
+    }
+
+    async function saveSessionDraft(draftData) {
+        return new Promise(resolve => {
+            const storageArea = (chrome.storage && chrome.storage.session) ? chrome.storage.session : chrome.storage.local;
+            storageArea.set({ avito_publication_draft: draftData }, () => resolve());
+        });
+    }
+
+    async function clearSessionDraft() {
+        return new Promise(resolve => {
+            if (chrome.storage && chrome.storage.session) {
+                chrome.storage.session.remove(["avito_publication_draft"], () => {
+                    if (chrome.storage.local) chrome.storage.local.remove(["avito_publication_draft"]);
+                    resolve();
+                });
+            } else if (chrome.storage && chrome.storage.local) {
+                chrome.storage.local.remove(["avito_publication_draft"], () => resolve());
+            } else {
+                resolve();
+            }
+        });
+    }
+
+    // --- Status Check ---
     chrome.runtime.sendMessage({ action: "get_status" }, response => {
         if (!response || !response.online) {
-            // STATE A: Server Offline
             isServerOnline = false;
             isPaired = false;
             connBadge.className = "badge badge-offline";
             connBadge.textContent = "Offline";
-            statusMsg.textContent = "Сервер Техноребут недоступен (проверьте, запущен ли контейнер core / admin-shell).";
-            pairSection.style.display = "none";
-            actionSection.style.display = "none";
-            if (productLinkContainer) productLinkContainer.style.display = "none";
-            return;
+            statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу контейнеров).";
+            hideAllCards();
         } else if (!response.paired) {
-            // STATE B: Online, Unpaired
             isServerOnline = true;
             isPaired = false;
             connBadge.className = "badge badge-offline";
             connBadge.textContent = "Не привязан";
-            statusMsg.textContent = "Сервер Техноребут в сети. Требуется привязка расширения.";
+            statusMsg.textContent = "Сервер Техноребут в сети. Введите код для привязки.";
+            hideAllCards();
             pairSection.style.display = "block";
-            actionSection.style.display = "block";
-            if (productLinkContainer) productLinkContainer.style.display = "none";
             inspectActiveTab();
         } else {
-            // STATE C: Online, Paired
             isServerOnline = true;
             isPaired = true;
             connBadge.className = "badge badge-online";
             connBadge.textContent = "Подключен";
-            statusMsg.textContent = "Расширение успешно привязано и готово к передаче данных.";
-            pairSection.style.display = "none";
-            actionSection.style.display = "block";
-            if (productLinkContainer) productLinkContainer.style.display = "none";
+            statusMsg.textContent = "Расширение подключено к Техноребут.";
+            hideAllCards();
             inspectActiveTab();
         }
     });
 
-    // Pair Button click
+    function hideAllCards() {
+        pairSection.style.display = "none";
+        prepareSection.style.display = "none";
+        fillSection.style.display = "none";
+        actionSection.style.display = "none";
+        if (productLinkContainer) productLinkContainer.style.display = "none";
+    }
+
+    // --- Pairing Handler ---
     pairBtn.addEventListener("click", () => {
         const rawCode = pairCodeInput.value ? pairCodeInput.value.trim() : "";
         const cleanCode = rawCode.replace(/\D/g, "");
@@ -93,7 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 isPaired = true;
                 connBadge.className = "badge badge-online";
                 connBadge.textContent = "Подключен";
-                statusMsg.textContent = "Расширение успешно привязано и готово к передаче данных.";
+                statusMsg.textContent = "Расширение успешно привязано к серверу.";
                 pairSection.style.display = "none";
                 pairMsg.textContent = "";
                 inspectActiveTab();
@@ -107,7 +187,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     function sendMessageToTabWithAutoInject(tabId, message, callback) {
         chrome.tabs.sendMessage(tabId, message, response => {
             if (chrome.runtime.lastError || !response) {
-                // If content script is missing or disconnected (e.g. extension updated), inject it dynamically
                 if (typeof chrome.scripting !== "undefined" && typeof chrome.scripting.executeScript === "function") {
                     chrome.scripting.executeScript({
                         target: { tabId: tabId },
@@ -136,83 +215,258 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Inspect Active Tab
-    function inspectActiveTab() {
-        if (productLinkContainer) productLinkContainer.style.display = "none";
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    // --- Active Tab Inspector ---
+    async function inspectActiveTab() {
+        hideAllCards();
+        if (!isPaired) {
+            pairSection.style.display = "block";
+        }
+
+        chrome.tabs.query({ active: true, currentWindow: true }, async tabs => {
             if (!tabs || tabs.length === 0) return;
             const activeTab = tabs[0];
             const tabUrl = activeTab.url || "";
-            if (!tabUrl.includes("avito.ru")) {
-                pageTypeTitle.textContent = "Страница Avito";
-                pageDetectInfo.textContent = "Откройте карточку товара на avito.ru";
-                sendBtn.disabled = true;
+
+            // Check URL patterns
+            const productMatch = tabUrl.match(/\/inventory\/products\/(\d+)/) || tabUrl.match(/\/products\/(\d+)/);
+            const isAvitoHost = tabUrl.includes("avito.ru");
+            const isAvitoAddItem = isAvitoHost && (tabUrl.includes("/additem") || tabUrl.includes("/add_item"));
+
+            // 1. CONTEXT A: Technoreboot Product Card
+            if (productMatch) {
+                const productId = parseInt(productMatch[1], 10);
+                prepareSection.style.display = "block";
+                prepareTitle.textContent = `Товар #${productId}`;
+                prepareDetectInfo.innerHTML = `Страница товара в Техноребут.<br>ID: <strong>${productId}</strong>`;
+
+                const activeDraft = await getSessionDraft();
+                if (activeDraft && activeDraft.product_id === productId) {
+                    draftReadyControls.style.display = "block";
+                    prepareBtn.textContent = "🔄 Обновить черновик";
+                    prepareMsg.className = "msg msg-success";
+                    prepareMsg.innerHTML = `✓ Черновик готов для публикации.<br>Заголовок: <strong>${activeDraft.title || 'Товар'}</strong>`;
+                } else {
+                    draftReadyControls.style.display = "none";
+                    prepareBtn.textContent = "📦 Подготовить для Avito";
+                    prepareMsg.textContent = "";
+                }
+
+                // Prepare Button Click
+                prepareBtn.onclick = () => {
+                    prepareBtn.disabled = true;
+                    prepareMsg.className = "msg";
+                    prepareMsg.textContent = "Получение пакета публикации...";
+
+                    chrome.runtime.sendMessage({ action: "fetch_publication_package", product_id: productId }, async res => {
+                        prepareBtn.disabled = false;
+                        if (res && res.success && res.package) {
+                            const pkg = res.package;
+                            const preflight = pkg.preflight || {};
+
+                            if (preflight.ready_for_browser_assisted === false) {
+                                prepareMsg.className = "msg msg-error";
+                                const errs = (preflight.errors || []).join("<br>");
+                                prepareMsg.innerHTML = `✕ Товар не готов к публикации:<br>${errs}`;
+                                return;
+                            }
+
+                            const draftObj = {
+                                product_id: productId,
+                                title: pkg.title,
+                                prepared_at: pkg.prepared_at || new Date().toISOString(),
+                                expires_at: pkg.expires_at || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+                                package: pkg
+                            };
+
+                            await saveSessionDraft(draftObj);
+                            draftReadyControls.style.display = "block";
+                            prepareBtn.textContent = "🔄 Обновить черновик";
+                            prepareMsg.className = "msg msg-success";
+                            const photoCount = (pkg.photos && pkg.photos.length) || 0;
+                            const charCount = Object.keys(pkg.characteristics || {}).length;
+                            prepareMsg.innerHTML = `✓ Черновик подготовлен!<br>Заголовок: <strong>${pkg.title}</strong><br>Цена: <strong>${pkg.price} ₽</strong><br>Характеристик: <strong>${charCount}</strong>, фото: <strong>${photoCount}</strong>`;
+                        } else {
+                            prepareMsg.className = "msg msg-error";
+                            prepareMsg.textContent = (res && res.message) || "Ошибка получения пакета публикации.";
+                        }
+                    });
+                };
+
+                // Open Avito Button Click (Explicit Action)
+                openAvitoBtn.onclick = () => {
+                    chrome.tabs.create({ url: "https://www.avito.ru/additem" });
+                };
+
+                // Clear Draft Button Click
+                clearDraftBtn.onclick = async () => {
+                    await clearSessionDraft();
+                    draftReadyControls.style.display = "none";
+                    prepareBtn.textContent = "📦 Подготовить для Avito";
+                    prepareMsg.className = "msg";
+                    prepareMsg.textContent = "Черновик очищен.";
+                };
                 return;
             }
 
-            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
-                if (!response) {
-                    pageDetectInfo.textContent = "Обновите страницу Avito (F5) для активации расширения.";
-                    sendBtn.disabled = true;
-                    return;
-                }
+            // 2. CONTEXT B: Avito Add-Item Form
+            if (isAvitoAddItem) {
+                fillSection.style.display = "block";
+                const activeDraft = await getSessionDraft();
 
-                currentExtractionData = response;
-                if (response.error) {
-                    pageDetectInfo.textContent = response.error;
-                    sendBtn.disabled = true;
-                } else if (response.page_type === "listing") {
-                    pageTypeTitle.textContent = "Карточка объявления";
-                    const item = response.listing || {};
-                    const detectedPhotosCount = (item.photos && item.photos.length) || 0;
-                    const displayTitle = item.title || "Объявление Avito";
-                    const displayPrice = item.price ? item.price + " ₽" : "Не указана";
-                    pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`;
-                    
-                    if (isPaired) {
-                        sendBtn.disabled = false;
-                        sendBtn.textContent = "Передать объявление в Техноребут";
-                        resultMsg.textContent = "";
-                    } else {
-                        sendBtn.disabled = true;
-                        sendBtn.textContent = "Передать объявление в Техноребут";
-                        resultMsg.className = "msg msg-error";
-                        resultMsg.textContent = "Передача станет доступна после привязки расширения (введите код выше).";
-                    }
+                if (activeDraft && activeDraft.package) {
+                    const pkg = activeDraft.package;
+                    const charCount = Object.keys(pkg.characteristics || {}).length;
+                    const photoCount = (pkg.photos && pkg.photos.length) || 0;
 
-                    // Run asynchronous deep multi-pass scan (active gallery walker)
-                    chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
-                        if (deepResponse && deepResponse.listing) {
-                            currentExtractionData = deepResponse;
-                            const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
-                            const deepTitle = deepResponse.listing.title || displayTitle;
-                            const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
-                            pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
-                            if (isPaired) {
-                                sendBtn.disabled = false;
+                    fillTitle.textContent = "Черновик Техноребута";
+                    fillDetectInfo.innerHTML = `Товар: <strong>${pkg.title || 'Без названия'}</strong><br>ID: <strong>${pkg.product_id}</strong> | Цена: <strong>${pkg.price} ₽</strong><br>Характеристик: <strong>${charCount}</strong> | Фото: <strong>${photoCount}</strong><br><small style="color:#666;">Автозагрузка фото будет отдельным этапом.</small>`;
+                    fillActionsContainer.style.display = "block";
+                    fillMsg.textContent = "";
+
+                    // Fill Current Step Button Click (Explicit Action)
+                    fillStepBtn.onclick = () => {
+                        fillStepBtn.disabled = true;
+                        fillMsg.className = "msg";
+                        fillMsg.textContent = "Заполнение видимых полей формы...";
+
+                        sendMessageToTabWithAutoInject(activeTab.id, { action: "fill_avito_form", package: pkg }, report => {
+                            fillStepBtn.disabled = false;
+                            if (!report) {
+                                fillMsg.className = "msg msg-error";
+                                fillMsg.textContent = "Не удалось связаться со страницей формы. Обновите страницу (F5).";
+                                return;
                             }
-                        }
-                    });
-                } else if (response.page_type === "my_listings") {
-                    pageTypeTitle.textContent = "Мои объявления";
-                    pageDetectInfo.textContent = `Обнаружено объявлений на странице: ${response.listings_count || 0}`;
-                    
-                    if (isPaired) {
-                        sendBtn.disabled = false;
-                        sendBtn.textContent = "Передать список в Техноребут";
-                        resultMsg.textContent = "";
-                    } else {
-                        sendBtn.disabled = true;
-                        sendBtn.textContent = "Передать список в Техноребут";
-                        resultMsg.className = "msg msg-error";
-                        resultMsg.textContent = "Передача станет доступна после привязки расширения.";
-                    }
+
+                            fillReportContainer.style.display = "block";
+                            const filledCount = (report.filled || []).length;
+                            const skippedCount = (report.skipped_nonempty || []).length;
+                            const unresFieldsCount = (report.unresolved_fields || []).length;
+                            const unresOptionsCount = (report.unresolved_options || []).length;
+
+                            fillSummary.innerHTML = `
+                                <strong>Результат заполнения:</strong><br>
+                                • Заполнено полей: <strong>${filledCount}</strong><br>
+                                • Пропущено (уже заполнено): <strong>${skippedCount}</strong><br>
+                                • Не сопоставлено на этом шаге: <strong>${unresFieldsCount}</strong><br>
+                                • Не совпали варианты: <strong>${unresOptionsCount}</strong>
+                            `;
+
+                            let detailsHtml = "";
+                            if (filledCount > 0) {
+                                detailsHtml += "<strong>Заполненные:</strong><br>" + report.filled.map(f => `✓ ${f.target}: ${f.value}`).join("<br>") + "<br><br>";
+                            }
+                            if (skippedCount > 0) {
+                                detailsHtml += "<strong>Уже были заполнены:</strong><br>" + report.skipped_nonempty.map(s => `- ${s.target}: ${s.existing_value}`).join("<br>") + "<br><br>";
+                            }
+                            if (unresFieldsCount > 0) {
+                                detailsHtml += "<strong>Ожидают следующего шага:</strong><br>" + report.unresolved_fields.map(u => `? ${u.key}: ${u.value}`).join("<br>");
+                            }
+
+                            fillDetails.innerHTML = detailsHtml;
+                            if (detailsHtml) {
+                                toggleDetailsBtn.style.display = "block";
+                                toggleDetailsBtn.onclick = () => {
+                                    if (fillDetails.style.display === "none") {
+                                        fillDetails.style.display = "block";
+                                        toggleDetailsBtn.textContent = "Скрыть подробности";
+                                    } else {
+                                        fillDetails.style.display = "none";
+                                        toggleDetailsBtn.textContent = "Подробнее...";
+                                    }
+                                };
+                            }
+
+                            fillMsg.className = "msg msg-success";
+                            fillMsg.innerHTML = `✓ Поля текущего шага заполнены.<br><small>Проверьте данные и при необходимости вручную перейдите к следующему шагу.</small>`;
+                        });
+                    };
+
+                    // Clear Draft from Avito Button
+                    clearDraftFromAvitoBtn.onclick = async () => {
+                        await clearSessionDraft();
+                        fillActionsContainer.style.display = "none";
+                        fillReportContainer.style.display = "none";
+                        fillTitle.textContent = "Форма подачи Avito";
+                        fillDetectInfo.innerHTML = "Черновик очищен.<br>Откройте карточку товара в Техноребут для создания нового черновика.";
+                        fillMsg.textContent = "";
+                    };
+                } else {
+                    fillTitle.textContent = "Форма подачи Avito";
+                    fillDetectInfo.innerHTML = "Нет активного черновика.<br>Откройте карточку товара в Техноребут (<code>/inventory/products/{id}</code>) и нажмите <strong>«Подготовить для Avito»</strong>.";
+                    fillActionsContainer.style.display = "none";
+                    fillReportContainer.style.display = "none";
                 }
-            });
+                return;
+            }
+
+            // 3. CONTEXT C: Avito Listing Page (Standard Ingestion)
+            if (isAvitoHost) {
+                actionSection.style.display = "block";
+                sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
+                    if (!response) {
+                        pageDetectInfo.textContent = "Обновите страницу Avito (F5) для активации расширения.";
+                        sendBtn.disabled = true;
+                        return;
+                    }
+
+                    currentExtractionData = response;
+                    if (response.error) {
+                        pageDetectInfo.textContent = response.error;
+                        sendBtn.disabled = true;
+                    } else if (response.page_type === "listing") {
+                        pageTypeTitle.textContent = "Карточка объявления";
+                        const item = response.listing || {};
+                        const detectedPhotosCount = (item.photos && item.photos.length) || 0;
+                        const displayTitle = item.title || "Объявление Avito";
+                        const displayPrice = item.price ? item.price + " ₽" : "Не указана";
+                        pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`;
+                        
+                        if (isPaired) {
+                            sendBtn.disabled = false;
+                            sendBtn.textContent = "Передать объявление в Техноребут";
+                            resultMsg.textContent = "";
+                        } else {
+                            sendBtn.disabled = true;
+                            sendBtn.textContent = "Передать объявление в Техноребут";
+                            resultMsg.className = "msg msg-error";
+                            resultMsg.textContent = "Передача станет доступна после привязки расширения.";
+                        }
+
+                        // Run deep multi-pass scan (active gallery walker)
+                        chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
+                            if (deepResponse && deepResponse.listing) {
+                                currentExtractionData = deepResponse;
+                                const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
+                                const deepTitle = deepResponse.listing.title || displayTitle;
+                                const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
+                                pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
+                                if (isPaired) {
+                                    sendBtn.disabled = false;
+                                }
+                            }
+                        });
+                    } else if (response.page_type === "my_listings") {
+                        pageTypeTitle.textContent = "Мои объявления";
+                        pageDetectInfo.textContent = `Обнаружено объявлений на странице: ${response.listings_count || 0}`;
+                        if (isPaired) {
+                            sendBtn.disabled = false;
+                            sendBtn.textContent = "Передать список в Техноребут";
+                            resultMsg.textContent = "";
+                        }
+                    }
+                });
+                return;
+            }
+
+            // 4. CONTEXT D: Generic / Other Pages
+            actionSection.style.display = "block";
+            pageTypeTitle.textContent = "Техноребут Avito";
+            pageDetectInfo.innerHTML = "Откройте карточку товара в <strong>Техноребут</strong> (для публикации) или объявление на <strong>avito.ru</strong> (для импорта).";
+            sendBtn.disabled = true;
         });
     }
 
-    // Send Button click
+    // Send Button click (Ingestion)
     sendBtn.addEventListener("click", () => {
         if (!isPaired) {
             resultMsg.className = "msg msg-error";
@@ -233,7 +487,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             const activeTab = tabs[0];
 
-            // Perform deep multi-pass capture before sending to guarantee all photos are collected in HD
             sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
                 const payloadToSend = (deepResponse && (deepResponse.listing || deepResponse.items)) ? deepResponse : currentExtractionData;
                 if (!payloadToSend) {
