@@ -1315,12 +1315,12 @@ const DANGEROUS_ACTION_KEYWORDS = [
 ];
 
 const CORE_FIELD_ALIASES = {
-    title: ["название", "заголовок", "название товара", "заголовок объявления"],
-    description: ["описание", "описание товара", "текст объявления"],
-    price: ["цена", "стоимость", "цена товара"],
-    condition: ["состояние", "состояние товара"],
-    brand: ["бренд", "производитель", "марка"],
-    model: ["модель", "модель материнской платы", "модель устройства", "модель процессора", "модель видеокарты"]
+    title: ["название", "заголовок", "название товара", "заголовок объявления", "что вы продаете", "что продаете", "что вы продаёте", "что продаёте", "title", "title input", "наименование"],
+    description: ["описание", "описание товара", "текст объявления", "description"],
+    price: ["цена", "стоимость", "цена товара", "price"],
+    condition: ["состояние", "состояние товара", "condition"],
+    brand: ["бренд", "производитель", "марка", "brand"],
+    model: ["модель", "модель материнской платы", "модель устройства", "модель процессора", "модель видеокарты", "model"]
 };
 
 function normalizeFieldLabel(label) {
@@ -1389,7 +1389,17 @@ function isDangerousControl(el) {
 function resolveFieldLabel(inputEl) {
     if (!inputEl) return '';
 
-    // 0. Direct text if inputEl is a title/legend/heading/span element
+    // 0. Placeholder check
+    const placeholder = normalizeFieldLabel(inputEl.getAttribute('placeholder') || '');
+    if (placeholder) {
+        if (placeholder.includes('что вы прода') || placeholder.includes('что прода') || placeholder.includes('название') || placeholder.includes('заголовок')) {
+            return 'название';
+        }
+        if (placeholder.includes('описание')) return 'описание';
+        if (placeholder.includes('цена') || placeholder.includes('стоимость')) return 'цена';
+    }
+
+    // 0.1. Direct text if inputEl is a title/legend/heading/span element
     if (['LEGEND', 'H3', 'H4', 'H5', 'SPAN', 'P'].includes(inputEl.tagName)) {
         const direct = (inputEl.innerText || inputEl.textContent || '').trim();
         if (direct && direct.length >= 2 && direct.length <= 60) {
@@ -1584,6 +1594,59 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     return true;
 }
 
+const CATEGORY_HARDWARE_KEYWORDS = {
+    printer: ['принтер', 'мфу', 'оргтехник', 'расходник', 'сканер', 'картридж', 'печать', 'струйн', 'лазерн'],
+    motherboard: ['материнск', 'motherboard', 'системная плата', 'комплектующ'],
+    computer: ['компьютер', 'системный блок', 'пк', 'моноблок', 'десктоп', 'настольн'],
+    laptop: ['ноутбук', 'laptop', 'нетбук', 'ультрабук'],
+    storage: ['жестк', 'ssd', 'hdd', 'накопител', 'диск'],
+    gpu: ['видеокарт', 'gpu', 'graphics'],
+    cpu: ['процессор', 'cpu'],
+    ram: ['оперативн', 'памят', 'ram', 'ddr'],
+    monitor: ['монитор', 'экран', 'дисплей'],
+    network: ['роутер', 'маршрутизатор', 'коммутатор', 'сетев']
+};
+
+function matchCategorySuggestion(categoryText, packageData) {
+    if (!categoryText || !packageData) return false;
+    const normText = normalizeFieldLabel(categoryText);
+
+    // 1. Direct match with packageData category display_name or observed_path
+    if (packageData.category) {
+        if (packageData.category.display_name) {
+            const normCatName = normalizeFieldLabel(packageData.category.display_name);
+            if (normText.includes(normCatName) || normCatName.includes(normText)) return true;
+        }
+        if (Array.isArray(packageData.category.observed_path)) {
+            for (const pathItem of packageData.category.observed_path) {
+                const normPath = normalizeFieldLabel(pathItem);
+                if (normPath && (normText.includes(normPath) || normPath.includes(normText))) return true;
+            }
+        }
+    }
+
+    // 2. Direct match with characteristics["Категория"] or characteristics["Вид товара"]
+    const characteristics = packageData.characteristics || {};
+    for (const [key, val] of Object.entries(characteristics)) {
+        if (key.toLowerCase().includes('категор') || key.toLowerCase().includes('вид товара') || key.toLowerCase().includes('тип')) {
+            const normVal = normalizeFieldLabel(String(val));
+            if (normVal && (normText.includes(normVal) || normVal.includes(normText))) return true;
+        }
+    }
+
+    // 3. Keyword heuristic match against title
+    const title = normalizeFieldLabel(packageData.title || '');
+    for (const [catKey, keywords] of Object.entries(CATEGORY_HARDWARE_KEYWORDS)) {
+        const titleMatches = keywords.some(kw => title.includes(kw));
+        if (titleMatches) {
+            const catMatches = keywords.some(kw => normText.includes(kw));
+            if (catMatches) return true;
+        }
+    }
+
+    return false;
+}
+
 async function fillAvitoPublicationFormAsync(packageData) {
     const report = {
         product_id: packageData ? packageData.product_id : null,
@@ -1609,6 +1672,36 @@ async function fillAvitoPublicationFormAsync(packageData) {
     // Multi-pass cascading filling loop
     for (let pass = 0; pass < maxPasses; pass++) {
         let passChanges = 0;
+
+        // 0. Check for initial Suggested Categories list (on /additem initial step)
+        const categorySuggestTiles = Array.from(document.querySelectorAll(
+            '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button'
+        )).filter(isElementVisible).filter(t => !isDangerousControl(t));
+
+        if (categorySuggestTiles.length > 0) {
+            for (const tile of categorySuggestTiles) {
+                let rawCatText = '';
+                const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+                if (span && span.innerText) {
+                    rawCatText = span.innerText;
+                } else {
+                    rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
+                }
+                const cleanCatText = rawCatText.trim();
+                if (matchCategorySuggestion(cleanCatText, packageData)) {
+                    tile.click();
+                    report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
+                    passChanges++;
+                    filledCoreRoles.add('category');
+                    filledCharacteristicKeys.add('Категория');
+                    filledCharacteristicKeys.add('категория');
+                    filledCharacteristicKeys.add('Вид товара');
+                    filledCharacteristicKeys.add('вид товара');
+                    await delay(450);
+                    break;
+                }
+            }
+        }
 
         // 1. Scan standard inputs, textareas, selects, and comboboxes
         const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"]'));
@@ -1786,6 +1879,36 @@ async function fillAvitoPublicationFormAsync(packageData) {
                         if (sourceRoleName) {
                             filledCoreRoles.add(sourceRoleName);
                             filledCharacteristicKeys.add(sourceRoleName);
+                        }
+
+                        if (sourceRoleName === 'title') {
+                            await delay(350);
+                            const immediateCategoryTiles = Array.from(document.querySelectorAll(
+                                '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button'
+                            )).filter(isElementVisible).filter(t => !isDangerousControl(t));
+
+                            for (const tile of immediateCategoryTiles) {
+                                let rawCatText = '';
+                                const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+                                if (span && span.innerText) {
+                                    rawCatText = span.innerText;
+                                } else {
+                                    rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
+                                }
+                                const cleanCatText = rawCatText.trim();
+                                if (matchCategorySuggestion(cleanCatText, packageData)) {
+                                    tile.click();
+                                    report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
+                                    passChanges++;
+                                    filledCoreRoles.add('category');
+                                    filledCharacteristicKeys.add('Категория');
+                                    filledCharacteristicKeys.add('категория');
+                                    filledCharacteristicKeys.add('Вид товара');
+                                    filledCharacteristicKeys.add('вид товара');
+                                    await delay(450);
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

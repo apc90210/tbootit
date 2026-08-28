@@ -70,4 +70,16 @@ def test_cascading_multi_pass_combobox_engine():
     assert "role=\"combobox\"" in content or "role=\\\"combobox\\\"" in content
     assert "role=\"listbox\"" in content or "role=\\\"listbox\\\"" in content
 
+def test_category_suggestion_matching_and_step_flow():
+    """Verify content.js contains category keywords and suggested category tile selection."""
+    content_js_path = os.path.abspath("chrome-extension/technoreboot-avito/content.js")
+    with open(content_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "matchCategorySuggestion" in content
+    assert "CATEGORY_HARDWARE_KEYWORDS" in content
+    assert "category-tile" in content
+    assert "suggested-category" in content
+
+
 

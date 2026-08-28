@@ -317,9 +317,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     const pkg = activeDraft.package;
                     const charCount = Object.keys(pkg.characteristics || {}).length;
                     const photoCount = (pkg.photos && pkg.photos.length) || 0;
+                    const catName = (pkg.category && pkg.category.display_name) || (pkg.characteristics && pkg.characteristics['Категория']) || 'Авто';
 
                     fillTitle.textContent = "Черновик Техноребута";
-                    fillDetectInfo.innerHTML = `Товар: <strong>${pkg.title || 'Без названия'}</strong><br>ID: <strong>${pkg.product_id}</strong> | Цена: <strong>${pkg.price} ₽</strong><br>Характеристик: <strong>${charCount}</strong> | Фото: <strong>${photoCount}</strong><br><small style="color:#666;">Автозагрузка фото будет отдельным этапом.</small>`;
+                    fillDetectInfo.innerHTML = `Товар: <strong>${pkg.title || 'Без названия'}</strong><br>Категория: <strong>${catName}</strong><br>ID: <strong>${pkg.product_id}</strong> | Цена: <strong>${pkg.price} ₽</strong> | Состояние: <strong>${pkg.condition || 'Б/у'}</strong><br>Характеристик: <strong>${charCount}</strong> | Фото: <strong>${photoCount}</strong>`;
                     fillActionsContainer.style.display = "block";
                     fillMsg.textContent = "";
 
@@ -342,6 +343,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             const skippedCount = (report.skipped_nonempty || []).length;
                             const unresFieldsCount = (report.unresolved_fields || []).length;
                             const unresOptionsCount = (report.unresolved_options || []).length;
+                            const categoryFilled = (report.filled || []).some(f => f.type === 'category-tile' || f.source === 'category');
 
                             fillSummary.innerHTML = `
                                 <strong>Результат заполнения:</strong><br>
@@ -377,7 +379,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                             }
 
                             fillMsg.className = "msg msg-success";
-                            fillMsg.innerHTML = `✓ Поля текущего шага заполнены.<br><small>Проверьте данные и при необходимости вручную перейдите к следующему шагу.</small>`;
+                            if (categoryFilled) {
+                                fillMsg.innerHTML = `✓ Название заполнено и выбрана категория <strong>${catName}</strong>.<br><small>На следующем шаге параметров нажмите «Заполнить текущий шаг» для ввода цены, состояния и характеристик.</small>`;
+                            } else {
+                                fillMsg.innerHTML = `✓ Поля текущего шага заполнены.<br><small>Проверьте данные и при необходимости перейдите к следующему шагу.</small>`;
+                            }
                         });
                     };
 
