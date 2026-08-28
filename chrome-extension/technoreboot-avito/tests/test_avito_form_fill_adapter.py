@@ -58,3 +58,16 @@ def test_condition_chip_button_matching():
     assert "button-chip" in content
     assert "data-marker*=\"condition\"" in content or "data-marker*=\\\"condition\\\"" in content
 
+def test_cascading_multi_pass_combobox_engine():
+    """Verify content.js contains multi-pass cascading combobox and suggest selection engine."""
+    content_js_path = os.path.abspath("chrome-extension/technoreboot-avito/content.js")
+    with open(content_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "fillAvitoPublicationFormAsync" in content
+    assert "selectDropdownSuggestion" in content
+    assert "maxPasses" in content
+    assert "role=\"combobox\"" in content or "role=\\\"combobox\\\"" in content
+    assert "role=\"listbox\"" in content or "role=\\\"listbox\\\"" in content
+
+

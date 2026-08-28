@@ -1389,6 +1389,15 @@ function isDangerousControl(el) {
 function resolveFieldLabel(inputEl) {
     if (!inputEl) return '';
 
+    // 0. Direct text if inputEl is a title/legend/heading/span element
+    if (['LEGEND', 'H3', 'H4', 'H5', 'SPAN', 'P'].includes(inputEl.tagName)) {
+        const direct = (inputEl.innerText || inputEl.textContent || '').trim();
+        if (direct && direct.length >= 2 && direct.length <= 60) {
+            const clean = normalizeFieldLabel(direct);
+            if (clean && !clean.includes('выберите') && !clean.includes('поиск')) return clean;
+        }
+    }
+
     // 1. Associated <label for="id">
     if (inputEl.id) {
         const labelEl = document.querySelector(`label[for="${inputEl.id}"]`);
@@ -1482,7 +1491,100 @@ function matchCoreFieldRole(normalizedLabel) {
     return null;
 }
 
-function fillAvitoPublicationForm(packageData) {
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function selectDropdownSuggestion(inputEl, targetValue) {
+    if (!inputEl || !targetValue) return false;
+
+    // 1. Focus and click to trigger dropdown activation
+    try {
+        inputEl.focus();
+        inputEl.click();
+    } catch (e) {}
+
+    // 2. Set value using React property descriptor
+    setReactInputValue(inputEl, targetValue);
+
+    // 3. Dispatch keyboard events so autocomplete filtering triggers
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', bubbles: true }));
+
+    // 4. Wait for suggestion dropdown listbox to mount
+    await delay(200);
+
+    // 5. Look for matching suggestion option in DOM
+    const normTarget = normalizeFieldLabel(targetValue);
+    const targetTokens = normTarget.split(/[\s\-_\/]+/).filter(t => t.length >= 2);
+
+    const optionSelectors = [
+        '[role="listbox"] [role="option"]',
+        '[role="listbox"] li',
+        '[role="listbox"] div',
+        '[data-marker*="suggest-item"]',
+        '[data-marker*="option"]',
+        '[class*="suggest-item"]',
+        '[class*="suggestions-item"]',
+        '[class*="dropdown-item"]',
+        '[class*="select-item"]',
+        '[class*="option-item"]',
+        '[class*="popup"] [role="option"]',
+        '[class*="popup"] li',
+        'ul[class*="list"] li',
+        'div[class*="list"] [class*="item"]'
+    ];
+
+    const candidateOptions = Array.from(document.querySelectorAll(optionSelectors.join(',')))
+        .filter(isElementVisible)
+        .filter(o => !isDangerousControl(o));
+
+    let bestMatch = null;
+    for (const opt of candidateOptions) {
+        const optText = normalizeFieldLabel(opt.innerText || opt.textContent || opt.getAttribute('data-marker') || '');
+        if (!optText) continue;
+
+        // Exact match
+        if (optText === normTarget) {
+            bestMatch = opt;
+            break;
+        }
+
+        // Option starts with target or target starts with option
+        if (optText.startsWith(normTarget) || normTarget.startsWith(optText)) {
+            bestMatch = opt;
+            break;
+        }
+
+        // Substring match
+        if (optText.includes(normTarget) || normTarget.includes(optText)) {
+            bestMatch = opt;
+            break;
+        }
+
+        // Token match (e.g. "M252" in "HP Color LaserJet Pro M252")
+        if (targetTokens.length > 0 && targetTokens.some(tok => optText.includes(tok))) {
+            if (!bestMatch) bestMatch = opt;
+        }
+    }
+
+    if (bestMatch) {
+        bestMatch.click();
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+        inputEl.dispatchEvent(new Event('blur', { bubbles: true }));
+        return true;
+    }
+
+    // If no option item found in list, press Enter on the input
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    return true;
+}
+
+async function fillAvitoPublicationFormAsync(packageData) {
     const report = {
         product_id: packageData ? packageData.product_id : null,
         page_url: window.location.href,
@@ -1502,309 +1604,419 @@ function fillAvitoPublicationForm(packageData) {
     const characteristics = packageData.characteristics || {};
     const filledCharacteristicKeys = new Set();
     const filledCoreRoles = new Set();
+    const maxPasses = 6;
 
-    // 1. Collect all standard input candidates on page
-    const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"], [role="radiogroup"], [role="listbox"]'));
+    // Multi-pass cascading filling loop
+    for (let pass = 0; pass < maxPasses; pass++) {
+        let passChanges = 0;
 
-    for (const el of inputElements) {
-        if (!isElementVisible(el)) continue;
+        // 1. Scan standard inputs, textareas, selects, and comboboxes
+        const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"]'));
 
-        // HARD SAFETY GUARD: Never touch submit/continue buttons or dangerous actions
-        if (isDangerousControl(el)) {
-            report.protected_actions.push({
-                element: el.tagName,
-                marker: el.getAttribute('data-marker') || el.name || el.innerText || 'dangerous_action'
-            });
-            continue;
-        }
+        for (const el of inputElements) {
+            if (!isElementVisible(el)) continue;
 
-        // HARD SAFETY GUARD: Never touch file upload inputs in R10B
-        if (el.tagName === 'INPUT' && el.type === 'file') {
-            continue;
-        }
-
-        // HARD SAFETY GUARD: Never touch password or hidden inputs
-        if (el.tagName === 'INPUT' && (el.type === 'password' || el.type === 'hidden')) {
-            continue;
-        }
-
-        const label = resolveFieldLabel(el);
-        const normLabel = normalizeFieldLabel(label);
-        if (!normLabel) continue;
-
-        // Check if field matches a core field role (title, description, price, brand, model, condition)
-        const coreRole = matchCoreFieldRole(normLabel);
-        let targetValue = null;
-        let sourceRoleName = null;
-
-        if (coreRole) {
-            if (coreRole === 'title' && packageData.title) {
-                targetValue = packageData.title;
-                sourceRoleName = 'title';
-            } else if (coreRole === 'description' && packageData.description) {
-                targetValue = packageData.description;
-                sourceRoleName = 'description';
-            } else if (coreRole === 'price' && packageData.price) {
-                targetValue = String(packageData.price);
-                sourceRoleName = 'price';
-            } else if (coreRole === 'brand' && packageData.brand) {
-                targetValue = packageData.brand;
-                sourceRoleName = 'brand';
-            } else if (coreRole === 'model' && packageData.model) {
-                targetValue = packageData.model;
-                sourceRoleName = 'model';
-            } else if (coreRole === 'condition' && packageData.condition) {
-                targetValue = packageData.condition;
-                sourceRoleName = 'condition';
+            // HARD SAFETY GUARD: Never touch submit/continue buttons or dangerous actions
+            if (isDangerousControl(el)) {
+                report.protected_actions.push({
+                    element: el.tagName,
+                    marker: el.getAttribute('data-marker') || el.name || el.innerText || 'dangerous_action'
+                });
+                continue;
             }
-        }
 
-        // Check if field matches a specific characteristic key (exact normalized matching)
-        if (!targetValue) {
-            for (const [charKey, charVal] of Object.entries(characteristics)) {
-                const normCharKey = normalizeFieldLabel(charKey);
-                if (normCharKey === normLabel) {
-                    targetValue = String(charVal);
-                    sourceRoleName = charKey;
-                    filledCharacteristicKeys.add(charKey);
-                    break;
+            // HARD SAFETY GUARD: Never touch file upload inputs in R10B
+            if (el.tagName === 'INPUT' && el.type === 'file') {
+                continue;
+            }
+
+            // HARD SAFETY GUARD: Never touch password or hidden inputs
+            if (el.tagName === 'INPUT' && (el.type === 'password' || el.type === 'hidden')) {
+                continue;
+            }
+
+            const label = resolveFieldLabel(el);
+            const normLabel = normalizeFieldLabel(label);
+            if (!normLabel) continue;
+
+            // Check if field matches a core field role (title, description, price, brand, model, condition)
+            const coreRole = matchCoreFieldRole(normLabel);
+            let targetValue = null;
+            let sourceRoleName = null;
+
+            if (coreRole) {
+                if (coreRole === 'title' && packageData.title && !filledCoreRoles.has('title')) {
+                    targetValue = packageData.title;
+                    sourceRoleName = 'title';
+                } else if (coreRole === 'description' && packageData.description && !filledCoreRoles.has('description')) {
+                    targetValue = packageData.description;
+                    sourceRoleName = 'description';
+                } else if (coreRole === 'price' && packageData.price && !filledCoreRoles.has('price')) {
+                    targetValue = String(packageData.price);
+                    sourceRoleName = 'price';
+                } else if (coreRole === 'brand' && packageData.brand && !filledCoreRoles.has('brand')) {
+                    targetValue = packageData.brand;
+                    sourceRoleName = 'brand';
+                } else if (coreRole === 'model' && packageData.model && !filledCoreRoles.has('model')) {
+                    targetValue = packageData.model;
+                    sourceRoleName = 'model';
+                } else if (coreRole === 'condition' && packageData.condition && !filledCoreRoles.has('condition')) {
+                    targetValue = packageData.condition;
+                    sourceRoleName = 'condition';
                 }
             }
-        }
 
-        if (!targetValue) continue;
-
-        // FILL_EMPTY_ONLY discipline
-        const tagName = el.tagName.toUpperCase();
-
-        if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
-            const inputType = (el.getAttribute('type') || 'text').toLowerCase();
-
-            if (inputType === 'radio') {
-                // Radio button matching: match option text/value
-                const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
-                let isMatch = false;
-
-                if (sourceRoleName === 'condition' || normLabel.includes('состояни')) {
-                    isMatch = normalizeConditionValue(optionText) === normalizeConditionValue(targetValue);
-                } else {
-                    const normTargetVal = normalizeFieldLabel(targetValue);
-                    isMatch = (optionText.includes(normTargetVal) || normTargetVal.includes(optionText));
-                }
-
-                if (isMatch) {
-                    if (el.checked) {
-                        report.skipped_nonempty.push({ target: normLabel, existing_value: el.value || optionText });
-                    } else {
-                        el.click();
-                        el.dispatchEvent(new Event('change', { bubbles: true }));
-                        report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'radio' });
-                        if (sourceRoleName) filledCoreRoles.add(sourceRoleName);
-                    }
-                }
-            } else if (inputType === 'checkbox') {
-                const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
-                const normTargetVal = normalizeFieldLabel(targetValue);
-                if (optionText.includes(normTargetVal) || normTargetVal.includes(optionText)) {
-                    if (el.checked) {
-                        report.skipped_nonempty.push({ target: normLabel, existing_value: 'checked' });
-                    } else {
-                        el.click();
-                        el.dispatchEvent(new Event('change', { bubbles: true }));
-                        report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'checkbox' });
-                    }
-                }
-            } else {
-                // Text, Number, Textarea
-                const currentVal = (el.value || '').trim();
-                if (currentVal !== '') {
-                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                } else {
-                    setReactInputValue(el, targetValue);
-                    report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: inputType });
-                    if (sourceRoleName) filledCoreRoles.add(sourceRoleName);
-                }
-            }
-        } else if (tagName === 'SELECT') {
-            const currentVal = (el.value || '').trim();
-            const normTargetVal = normalizeFieldLabel(targetValue);
-            let matchedOption = null;
-
-            for (const opt of Array.from(el.options)) {
-                const optText = normalizeFieldLabel(opt.text || opt.value || '');
-                if (sourceRoleName === 'condition' || normLabel.includes('состояни')) {
-                    if (normalizeConditionValue(optText) === normalizeConditionValue(targetValue)) {
-                        matchedOption = opt;
+            // Check if field matches a specific characteristic key (exact normalized matching)
+            if (!targetValue) {
+                for (const [charKey, charVal] of Object.entries(characteristics)) {
+                    if (filledCharacteristicKeys.has(charKey)) continue;
+                    const normCharKey = normalizeFieldLabel(charKey);
+                    if (normCharKey === normLabel) {
+                        targetValue = String(charVal);
+                        sourceRoleName = charKey;
                         break;
                     }
-                } else if (optText === normTargetVal || optText.includes(normTargetVal) || normTargetVal.includes(optText)) {
-                    matchedOption = opt;
-                    break;
                 }
             }
 
-            if (matchedOption) {
-                if (el.selectedIndex > 0 && currentVal !== '' && currentVal === matchedOption.value) {
-                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                } else if (el.selectedIndex > 0 && currentVal !== '' && el.selectedIndex !== 0) {
-                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                } else {
-                    el.value = matchedOption.value;
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    report.filled.push({ source: sourceRoleName, target: normLabel, value: matchedOption.text, type: 'select' });
-                    if (sourceRoleName) filledCoreRoles.add(sourceRoleName);
-                }
-            } else {
-                report.unresolved_options.push({ key: normLabel, expected: targetValue });
-            }
-        }
-    }
+            if (!targetValue) continue;
 
-    // 2. Scan segmented button groups / chip selectors (e.g. "Состояние", "Вид товара", "Тип", etc.)
-    const groupContainers = Array.from(document.querySelectorAll(
-        'fieldset, [role="radiogroup"], [data-marker*="param"], [data-marker*="condition"], [class*="param"], [class*="field"], [class*="group"], [class*="chips"]'
-    ));
+            // Check if input is a Combobox / Autocomplete / Suggestion Dropdown
+            const isCombobox = (
+                el.getAttribute('role') === 'combobox' ||
+                el.getAttribute('aria-autocomplete') === 'list' ||
+                (sourceRoleName === 'brand' || sourceRoleName === 'model') ||
+                (el.placeholder && (el.placeholder.includes('Выберите') || el.placeholder.includes('Поиск'))) ||
+                el.closest('[class*="suggest"], [class*="autocomplete"], [data-marker*="suggest"], [data-marker*="select"]') !== null
+            );
 
-    for (const container of groupContainers) {
-        if (!isElementVisible(container)) continue;
-        if (isDangerousControl(container)) continue;
+            const tagName = el.tagName.toUpperCase();
 
-        // Find group title / label
-        const titleEl = container.querySelector('legend, h3, h4, h5, [class*="title"], [class*="label"], [class*="name"], [data-marker*="title"], span');
-        const groupLabel = resolveFieldLabel(titleEl || container);
-        const normGroupLabel = normalizeFieldLabel(groupLabel);
-        if (!normGroupLabel) continue;
+            if (isCombobox && tagName === 'INPUT') {
+                const currentVal = (el.value || '').trim();
+                const normCurrentVal = normalizeFieldLabel(currentVal);
+                const normTargetVal = normalizeFieldLabel(targetValue);
 
-        const coreRole = matchCoreFieldRole(normGroupLabel);
-        let targetValue = null;
-        let sourceRoleName = null;
-
-        if (coreRole) {
-            if (coreRole === 'condition' && packageData.condition) {
-                targetValue = packageData.condition;
-                sourceRoleName = 'condition';
-            } else if (coreRole === 'brand' && packageData.brand) {
-                targetValue = packageData.brand;
-                sourceRoleName = 'brand';
-            } else if (coreRole === 'model' && packageData.model) {
-                targetValue = packageData.model;
-                sourceRoleName = 'model';
-            }
-        }
-
-        if (!targetValue) {
-            for (const [charKey, charVal] of Object.entries(characteristics)) {
-                const normCharKey = normalizeFieldLabel(charKey);
-                if (normCharKey === normGroupLabel) {
-                    targetValue = String(charVal);
-                    sourceRoleName = charKey;
-                    break;
-                }
-            }
-        }
-
-        if (!targetValue) continue;
-
-        // Find candidate buttons/chips in this container
-        const candidateButtons = Array.from(container.querySelectorAll('button, [role="radio"], [role="button"], label, [data-marker*="item"]'))
-            .filter(b => b !== container && b.getAttribute('role') !== 'radiogroup' && b.tagName !== 'FIELDSET' && b.tagName !== 'DIV');
-        for (const btn of candidateButtons) {
-            if (!isElementVisible(btn)) continue;
-            if (isDangerousControl(btn)) continue;
-
-            let rawText = '';
-            const span = btn.querySelector('span, [class*="text"], [class*="label"]');
-            if (span && span.innerText) {
-                rawText = span.innerText;
-            } else {
-                rawText = btn.innerText || btn.textContent || btn.getAttribute('aria-label') || btn.getAttribute('data-marker') || '';
-            }
-            const btnText = rawText.trim();
-            const normBtnText = normalizeFieldLabel(btnText);
-            if (!normBtnText) continue;
-
-            let isMatch = false;
-            if (sourceRoleName === 'condition' || normGroupLabel.includes('состояни')) {
-                isMatch = normalizeConditionValue(normBtnText) === normalizeConditionValue(targetValue);
-            } else {
-                const normTarget = normalizeFieldLabel(targetValue);
-                isMatch = (normBtnText === normTarget || normBtnText.includes(normTarget) || normTarget.includes(normBtnText));
-            }
-
-            if (isMatch) {
-                const isSelected = (
-                    btn.getAttribute('aria-checked') === 'true' ||
-                    btn.getAttribute('aria-pressed') === 'true' ||
-                    btn.classList.contains('active') ||
-                    btn.classList.contains('selected') ||
-                    btn.classList.contains('checked') ||
-                    (btn.querySelector('input[type="radio"]:checked') !== null)
-                );
-
-                if (isSelected) {
-                    report.skipped_nonempty.push({ target: normGroupLabel, existing_value: btnText });
-                } else {
-                    btn.click();
-                    btn.dispatchEvent(new Event('change', { bubbles: true }));
-                    btn.dispatchEvent(new Event('input', { bubbles: true }));
-                    report.filled.push({ source: sourceRoleName, target: normGroupLabel, value: btnText || targetValue, type: 'button-chip' });
+                if (currentVal !== '' && (normCurrentVal === normTargetVal || normCurrentVal.includes(normTargetVal) || normTargetVal.includes(normCurrentVal))) {
                     if (sourceRoleName) {
                         filledCoreRoles.add(sourceRoleName);
-                        if (sourceRoleName === 'condition') {
-                            filledCharacteristicKeys.add('Состояние');
-                            filledCharacteristicKeys.add('состояние');
-                        } else {
+                        filledCharacteristicKeys.add(sourceRoleName);
+                    }
+                } else {
+                    const selected = await selectDropdownSuggestion(el, targetValue);
+                    if (selected) {
+                        report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'combobox' });
+                        passChanges++;
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
                             filledCharacteristicKeys.add(sourceRoleName);
                         }
                     }
                 }
-                break;
+                continue;
+            }
+
+            // Standard input types
+            if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
+                const inputType = (el.getAttribute('type') || 'text').toLowerCase();
+
+                if (inputType === 'radio') {
+                    const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
+                    let isMatch = false;
+
+                    if (sourceRoleName === 'condition' || normLabel.includes('состояни')) {
+                        isMatch = normalizeConditionValue(optionText) === normalizeConditionValue(targetValue);
+                    } else {
+                        const normTargetVal = normalizeFieldLabel(targetValue);
+                        isMatch = (optionText.includes(normTargetVal) || normTargetVal.includes(optionText));
+                    }
+
+                    if (isMatch) {
+                        if (el.checked) {
+                            report.skipped_nonempty.push({ target: normLabel, existing_value: el.value || optionText });
+                            if (sourceRoleName) {
+                                filledCoreRoles.add(sourceRoleName);
+                                filledCharacteristicKeys.add(sourceRoleName);
+                            }
+                        } else {
+                            el.click();
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                            report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'radio' });
+                            passChanges++;
+                            if (sourceRoleName) {
+                                filledCoreRoles.add(sourceRoleName);
+                                filledCharacteristicKeys.add(sourceRoleName);
+                            }
+                        }
+                    }
+                } else if (inputType === 'checkbox') {
+                    const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
+                    const normTargetVal = normalizeFieldLabel(targetValue);
+                    if (optionText.includes(normTargetVal) || normTargetVal.includes(optionText)) {
+                        if (el.checked) {
+                            report.skipped_nonempty.push({ target: normLabel, existing_value: 'checked' });
+                            if (sourceRoleName) {
+                                filledCoreRoles.add(sourceRoleName);
+                                filledCharacteristicKeys.add(sourceRoleName);
+                            }
+                        } else {
+                            el.click();
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                            report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'checkbox' });
+                            passChanges++;
+                            if (sourceRoleName) {
+                                filledCoreRoles.add(sourceRoleName);
+                                filledCharacteristicKeys.add(sourceRoleName);
+                            }
+                        }
+                    }
+                } else {
+                    // Text, Number, Textarea
+                    const currentVal = (el.value || '').trim();
+                    if (currentVal !== '') {
+                        report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            filledCharacteristicKeys.add(sourceRoleName);
+                        }
+                    } else {
+                        setReactInputValue(el, targetValue);
+                        report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: inputType });
+                        passChanges++;
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            filledCharacteristicKeys.add(sourceRoleName);
+                        }
+                    }
+                }
+            } else if (tagName === 'SELECT') {
+                const currentVal = (el.value || '').trim();
+                const normTargetVal = normalizeFieldLabel(targetValue);
+                let matchedOption = null;
+
+                for (const opt of Array.from(el.options)) {
+                    const optText = normalizeFieldLabel(opt.text || opt.value || '');
+                    if (sourceRoleName === 'condition' || normLabel.includes('состояни')) {
+                        if (normalizeConditionValue(optText) === normalizeConditionValue(targetValue)) {
+                            matchedOption = opt;
+                            break;
+                        }
+                    } else if (optText === normTargetVal || optText.includes(normTargetVal) || normTargetVal.includes(optText)) {
+                        matchedOption = opt;
+                        break;
+                    }
+                }
+
+                if (matchedOption) {
+                    if (el.selectedIndex > 0 && currentVal !== '' && currentVal === matchedOption.value) {
+                        report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            filledCharacteristicKeys.add(sourceRoleName);
+                        }
+                    } else if (el.selectedIndex > 0 && currentVal !== '' && el.selectedIndex !== 0) {
+                        report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            filledCharacteristicKeys.add(sourceRoleName);
+                        }
+                    } else {
+                        el.value = matchedOption.value;
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        report.filled.push({ source: sourceRoleName, target: normLabel, value: matchedOption.text, type: 'select' });
+                        passChanges++;
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            filledCharacteristicKeys.add(sourceRoleName);
+                        }
+                    }
+                } else {
+                    report.unresolved_options.push({ key: normLabel, expected: targetValue });
+                }
             }
         }
-    }
 
-    // 3. Fallback: Standalone condition buttons by data-marker or text
-    if (packageData.condition && !filledCoreRoles.has('condition')) {
-        const normCond = normalizeConditionValue(packageData.condition);
-        const conditionButtons = Array.from(document.querySelectorAll('button[data-marker*="condition"], [role="radio"][data-marker*="condition"], button, [role="radio"]'))
-            .filter(b => b.tagName !== 'DIV' && b.tagName !== 'FIELDSET' && b.tagName !== 'FORM' && b.getAttribute('role') !== 'radiogroup');
-        for (const cBtn of conditionButtons) {
-            if (!isElementVisible(cBtn)) continue;
-            if (isDangerousControl(cBtn)) continue;
+        // 2. Scan segmented button groups / chip selectors (e.g. "Состояние", "Вид товара", "Тип", etc.)
+        const groupContainers = Array.from(document.querySelectorAll(
+            'fieldset, [role="radiogroup"], [data-marker*="param"], [data-marker*="condition"], [class*="param"], [class*="field"], [class*="group"], [class*="chips"]'
+        ));
 
-            let rawText = '';
-            const span = cBtn.querySelector('span, [class*="text"], [class*="label"]');
-            if (span && span.innerText) {
-                rawText = span.innerText;
-            } else {
-                rawText = cBtn.innerText || cBtn.textContent || cBtn.getAttribute('data-marker') || '';
+        for (const container of groupContainers) {
+            if (!isElementVisible(container)) continue;
+            if (isDangerousControl(container)) continue;
+
+            const titleEl = container.querySelector('legend, h3, h4, h5, [class*="title"], [class*="label"], [class*="name"], [data-marker*="title"], span');
+            const groupLabel = resolveFieldLabel(titleEl || container);
+            const normGroupLabel = normalizeFieldLabel(groupLabel);
+            if (!normGroupLabel) continue;
+
+            const coreRole = matchCoreFieldRole(normGroupLabel);
+            let targetValue = null;
+            let sourceRoleName = null;
+
+            if (coreRole) {
+                if (coreRole === 'condition' && packageData.condition && !filledCoreRoles.has('condition')) {
+                    targetValue = packageData.condition;
+                    sourceRoleName = 'condition';
+                } else if (coreRole === 'brand' && packageData.brand && !filledCoreRoles.has('brand')) {
+                    targetValue = packageData.brand;
+                    sourceRoleName = 'brand';
+                } else if (coreRole === 'model' && packageData.model && !filledCoreRoles.has('model')) {
+                    targetValue = packageData.model;
+                    sourceRoleName = 'model';
+                }
             }
-            const btnText = rawText.trim();
-            const marker = cBtn.getAttribute('data-marker') || '';
 
-            if (normalizeConditionValue(btnText) === normCond || (marker && marker.toLowerCase().includes(normCond))) {
-                const isSelected = cBtn.getAttribute('aria-checked') === 'true' || cBtn.getAttribute('aria-pressed') === 'true' || cBtn.classList.contains('active') || cBtn.classList.contains('selected');
-                if (!isSelected) {
-                    cBtn.click();
-                    cBtn.dispatchEvent(new Event('change', { bubbles: true }));
-                    report.filled.push({ source: 'condition', target: 'состояние', value: btnText || packageData.condition, type: 'button-chip' });
-                    filledCoreRoles.add('condition');
-                    filledCharacteristicKeys.add('Состояние');
-                    filledCharacteristicKeys.add('состояние');
+            if (!targetValue) {
+                for (const [charKey, charVal] of Object.entries(characteristics)) {
+                    if (filledCharacteristicKeys.has(charKey)) continue;
+                    const normCharKey = normalizeFieldLabel(charKey);
+                    if (normCharKey === normGroupLabel) {
+                        targetValue = String(charVal);
+                        sourceRoleName = charKey;
+                        break;
+                    }
+                }
+            }
+
+            if (!targetValue) continue;
+
+            const candidateButtons = Array.from(container.querySelectorAll('button, [role="radio"], [role="button"], label, [data-marker*="item"]'))
+                .filter(b => b !== container && b.getAttribute('role') !== 'radiogroup' && b.tagName !== 'FIELDSET' && b.tagName !== 'DIV');
+
+            for (const btn of candidateButtons) {
+                if (!isElementVisible(btn)) continue;
+                if (isDangerousControl(btn)) continue;
+
+                let rawText = '';
+                const span = btn.querySelector('span, [class*="text"], [class*="label"]');
+                if (span && span.innerText) {
+                    rawText = span.innerText;
+                } else {
+                    rawText = btn.innerText || btn.textContent || btn.getAttribute('aria-label') || btn.getAttribute('data-marker') || '';
+                }
+                const btnText = rawText.trim();
+                const normBtnText = normalizeFieldLabel(btnText);
+                if (!normBtnText) continue;
+
+                let isMatch = false;
+                if (sourceRoleName === 'condition' || normGroupLabel.includes('состояни')) {
+                    isMatch = normalizeConditionValue(normBtnText) === normalizeConditionValue(targetValue);
+                } else {
+                    const normTarget = normalizeFieldLabel(targetValue);
+                    isMatch = (normBtnText === normTarget || normBtnText.includes(normTarget) || normTarget.includes(normBtnText));
+                }
+
+                if (isMatch) {
+                    const isSelected = (
+                        btn.getAttribute('aria-checked') === 'true' ||
+                        btn.getAttribute('aria-pressed') === 'true' ||
+                        btn.classList.contains('active') ||
+                        btn.classList.contains('selected') ||
+                        btn.classList.contains('checked') ||
+                        (btn.querySelector('input[type="radio"]:checked') !== null)
+                    );
+
+                    if (isSelected) {
+                        report.skipped_nonempty.push({ target: normGroupLabel, existing_value: btnText });
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            if (sourceRoleName === 'condition') {
+                                filledCharacteristicKeys.add('Состояние');
+                                filledCharacteristicKeys.add('состояние');
+                            } else {
+                                filledCharacteristicKeys.add(sourceRoleName);
+                            }
+                        }
+                    } else {
+                        btn.click();
+                        btn.dispatchEvent(new Event('change', { bubbles: true }));
+                        btn.dispatchEvent(new Event('input', { bubbles: true }));
+                        report.filled.push({ source: sourceRoleName, target: normGroupLabel, value: btnText || targetValue, type: 'button-chip' });
+                        passChanges++;
+                        if (sourceRoleName) {
+                            filledCoreRoles.add(sourceRoleName);
+                            if (sourceRoleName === 'condition') {
+                                filledCharacteristicKeys.add('Состояние');
+                                filledCharacteristicKeys.add('состояние');
+                            } else {
+                                filledCharacteristicKeys.add(sourceRoleName);
+                            }
+                        }
+                    }
                     break;
                 }
             }
+        }
+
+        // 3. Standalone condition button fallback
+        if (packageData.condition && !filledCoreRoles.has('condition')) {
+            const normCond = normalizeConditionValue(packageData.condition);
+            const conditionButtons = Array.from(document.querySelectorAll('button[data-marker*="condition"], [role="radio"][data-marker*="condition"], button, [role="radio"]'))
+                .filter(b => b.tagName !== 'DIV' && b.tagName !== 'FIELDSET' && b.tagName !== 'FORM' && b.getAttribute('role') !== 'radiogroup');
+            for (const cBtn of conditionButtons) {
+                if (!isElementVisible(cBtn)) continue;
+                if (isDangerousControl(cBtn)) continue;
+
+                let rawText = '';
+                const span = cBtn.querySelector('span, [class*="text"], [class*="label"]');
+                if (span && span.innerText) {
+                    rawText = span.innerText;
+                } else {
+                    rawText = cBtn.innerText || cBtn.textContent || cBtn.getAttribute('data-marker') || '';
+                }
+                const btnText = rawText.trim();
+                const marker = cBtn.getAttribute('data-marker') || '';
+
+                if (normalizeConditionValue(btnText) === normCond || (marker && marker.toLowerCase().includes(normCond))) {
+                    const isSelected = cBtn.getAttribute('aria-checked') === 'true' || cBtn.getAttribute('aria-pressed') === 'true' || cBtn.classList.contains('active') || cBtn.classList.contains('selected');
+                    if (!isSelected) {
+                        cBtn.click();
+                        cBtn.dispatchEvent(new Event('change', { bubbles: true }));
+                        report.filled.push({ source: 'condition', target: 'состояние', value: btnText || packageData.condition, type: 'button-chip' });
+                        passChanges++;
+                        filledCoreRoles.add('condition');
+                        filledCharacteristicKeys.add('Состояние');
+                        filledCharacteristicKeys.add('состояние');
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If this pass performed changes, wait for React cascading updates to render dependent fields
+        if (passChanges > 0) {
+            await delay(350);
+        } else {
+            // Reached steady state: no further fields mounted or unfulfilled on this step
+            break;
         }
     }
 
     // Record unresolved characteristics that had no matching field mounted on this step
     for (const [charKey, charVal] of Object.entries(characteristics)) {
-        if (!filledCharacteristicKeys.has(charKey)) {
+        if (!filledCharacteristicKeys.has(charKey) && !filledCharacteristicKeys.has(charKey.toLowerCase())) {
             report.unresolved_fields.push({ key: charKey, value: charVal });
         }
     }
 
     return report;
+}
+
+// Synchronous wrapper for unit tests
+function fillAvitoPublicationForm(packageData) {
+    let syncReport = null;
+    fillAvitoPublicationFormAsync(packageData).then(r => { syncReport = r; });
+    return syncReport || {
+        product_id: packageData ? packageData.product_id : null,
+        page_url: window.location.href,
+        filled: [],
+        skipped_nonempty: [],
+        unresolved_fields: [],
+        unresolved_options: [],
+        protected_actions: [],
+        errors: []
+    };
 }
 
 // Runtime message dispatcher
@@ -1844,22 +2056,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         }
     } else if (request.action === "fill_avito_form") {
-        try {
-            const report = fillAvitoPublicationForm(request.package);
-            sendResponse(report);
-        } catch (err) {
-            sendResponse({
-                product_id: request.package ? request.package.product_id : null,
-                page_url: window.location.href,
-                filled: [],
-                skipped_nonempty: [],
-                unresolved_fields: [],
-                unresolved_options: [],
-                protected_actions: [],
-                errors: [String(err)]
+        fillAvitoPublicationFormAsync(request.package)
+            .then(report => sendResponse(report))
+            .catch(err => {
+                sendResponse({
+                    product_id: request.package ? request.package.product_id : null,
+                    page_url: window.location.href,
+                    filled: [],
+                    skipped_nonempty: [],
+                    unresolved_fields: [],
+                    unresolved_options: [],
+                    protected_actions: [],
+                    errors: [String(err)]
+                });
             });
-        }
+        return true;
     }
     return true;
 });
+
 
