@@ -1,10 +1,10 @@
-import re
 import json
 import urllib.parse
+import urllib.request
+import urllib.error
+import time
 from typing import Optional, Dict, Any, List, Tuple
-from sqlalchemy.orm import Session
 from app.config import settings
-from app import models
 
 ALLOWED_AVITO_HOSTS = {
     "api.avito.ru",
@@ -14,8 +14,9 @@ ALLOWED_AVITO_HOSTS = {
 
 class OfficialAvitoAutoloadSchemaProvider:
     """
-    Optional adapter for official Avito Autoload Schema endpoints.
-    Enabled strictly when API credentials (client_id + client_secret) are configured.
+    Official Avito Autoload Schema Provider.
+    Owned strictly by avito-module (never Core).
+    Handles external Avito OAuth, category tree, and fields discovery.
     """
     def __init__(
         self,
@@ -23,27 +24,20 @@ class OfficialAvitoAutoloadSchemaProvider:
         client_secret: Optional[str] = None,
         api_base: Optional[str] = None
     ):
-        self.client_id = client_id or settings.avito_client_id
-        self.client_secret = client_secret or settings.avito_client_secret
-        self.api_base = (api_base or settings.avito_api_base or "https://api.avito.ru").rstrip('/')
+        self.client_id = client_id or settings.AVITO_CLIENT_ID
+        self.client_secret = client_secret or settings.AVITO_CLIENT_SECRET
+        self.api_base = (api_base or settings.AVITO_API_BASE or "https://api.avito.ru").rstrip('/')
         self._token: Optional[str] = None
         self._token_expires_at: Optional[float] = None
-        self._tree_cache: Dict[str, Any] = {}
-        self._fields_cache: Dict[str, Any] = {}
 
     @property
     def is_configured(self) -> bool:
         return bool(self.client_id and self.client_secret)
 
     def authenticate(self) -> Dict[str, Any]:
-        """
-        Authenticate via POST /token using client_credentials grant.
-        """
+        """Authenticate via POST /token using client_credentials grant."""
         if not self.is_configured:
             raise ValueError("Official Avito API is not configured: missing client_id or client_secret")
-
-        import urllib.request
-        import time
 
         url = f"{self.api_base}/token"
         data = urllib.parse.urlencode({
@@ -70,15 +64,9 @@ class OfficialAvitoAutoloadSchemaProvider:
             }
 
     def fetch_tree(self, if_modified_since: Optional[str] = None) -> Tuple[int, Dict[str, Any], Optional[str]]:
-        """
-        Fetch official category tree from GET /autoload/v1/user-docs/tree.
-        Supports 304 Not Modified.
-        """
+        """Fetch official category tree from GET /autoload/v1/user-docs/tree."""
         if not self.is_configured:
             raise ValueError("Official Avito API is not configured")
-
-        import urllib.request
-        import urllib.error
 
         headers = {
             "Authorization": f"Bearer {self._token}" if self._token else "",
@@ -102,15 +90,9 @@ class OfficialAvitoAutoloadSchemaProvider:
             raise
 
     def fetch_node_fields(self, node_slug: str, if_modified_since: Optional[str] = None) -> Tuple[int, Dict[str, Any], Optional[str]]:
-        """
-        Fetch fields schema for a category node from GET /autoload/v1/user-docs/node/{node_slug}/fields.
-        Supports 304 Not Modified.
-        """
+        """Fetch fields schema for a category node from GET /autoload/v1/user-docs/node/{node_slug}/fields."""
         if not self.is_configured:
             raise ValueError("Official Avito API is not configured")
-
-        import urllib.request
-        import urllib.error
 
         headers = {
             "Authorization": f"Bearer {self._token}" if self._token else "",
@@ -135,9 +117,7 @@ class OfficialAvitoAutoloadSchemaProvider:
 
     @staticmethod
     def parse_content_rules(field_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Parse raw content rules from an Avito API field payload without flattening.
-        """
+        """Parse raw content rules from field payload without destructive flattening."""
         rules = []
         contents = field_data.get("content") or []
         if isinstance(contents, dict):
@@ -172,13 +152,10 @@ class OfficialAvitoAutoloadSchemaProvider:
         return parsed.hostname in ALLOWED_AVITO_HOSTS
 
     def fetch_linked_json_values(self, url: str) -> List[Dict[str, Any]]:
-        """
-        Fetch linked values from Avito CDN with host allowlist and size limit.
-        """
+        """Fetch linked values from Avito CDN with host allowlist and size limit."""
         if not self.validate_linked_json_url(url):
             raise ValueError(f"Insecure or non-allowed Avito host for linked values: {url}")
 
-        import urllib.request
         headers = {
             "Accept": "application/json"
         }
@@ -187,7 +164,6 @@ class OfficialAvitoAutoloadSchemaProvider:
 
         req = urllib.request.Request(url, headers=headers, method="GET")
         with urllib.request.urlopen(req, timeout=10) as resp:
-            # 5MB size limit protection
             raw_bytes = resp.read(5 * 1024 * 1024 + 1)
             if len(raw_bytes) > 5 * 1024 * 1024:
                 raise ValueError("Response payload exceeded 5MB size limit")
@@ -198,100 +174,56 @@ class OfficialAvitoAutoloadSchemaProvider:
                 return data.get("values") or [data]
             return []
 
-    def sync_official_category_to_db(
+    def build_normalized_schema_payload(
         self,
-        db: Session,
         node_slug: str,
         category_name: str,
         fields_payload: Dict[str, Any]
-    ) -> models.AvitoCanonicalCategory:
+    ) -> Dict[str, Any]:
         """
-        Sync fetched official category fields into Canonical models in Core DB.
+        Convert official Avito fields payload into normalized schema payload for Core ingestion.
+        Contains ZERO credentials, tokens, or secrets.
         """
-        import datetime
-        now = datetime.datetime.now(datetime.timezone.utc)
+        normalized_fields = []
+        raw_fields = fields_payload.get("fields") or []
 
-        internal_key = f"official_{node_slug.replace('-', '_')}"
-        canonical_cat = db.query(models.AvitoCanonicalCategory).filter(
-            (models.AvitoCanonicalCategory.official_slug == node_slug) |
-            (models.AvitoCanonicalCategory.internal_key == internal_key)
-        ).first()
+        for f_item in raw_fields:
+            tag = f_item.get("tag") or f_item.get("id") or "Unknown"
+            label = f_item.get("label") or tag
+            rules = self.parse_content_rules(f_item)
 
-        if not canonical_cat:
-            canonical_cat = models.AvitoCanonicalCategory(
-                internal_key=internal_key,
-                display_name=category_name,
-                official_slug=node_slug,
-                official_source="autoload_api",
-                capability_source="official_api",
-                active=True,
-                created_at=now
-            )
-            db.add(canonical_cat)
-            db.flush()
-        else:
-            canonical_cat.official_slug = node_slug
-            canonical_cat.official_source = "autoload_api"
-            canonical_cat.capability_source = "official_api"
-            canonical_cat.updated_at = now
-            db.flush()
+            normalized_fields.append({
+                "official_tag": tag,
+                "display_name": label,
+                "internal_key": tag.lower().replace("-", "_"),
+                "rules": rules
+            })
 
-        fields_list = fields_payload.get("fields") or []
-        for field_item in fields_list:
-            tag = field_item.get("tag") or field_item.get("id") or "Unknown"
-            label = field_item.get("label") or tag
-            field_key = tag.lower().replace("-", "_")
+        return {
+            "official_slug": node_slug,
+            "category_name": category_name,
+            "fields": normalized_fields
+        }
 
-            field = db.query(models.AvitoCanonicalField).filter(
-                models.AvitoCanonicalField.category_id == canonical_cat.id,
-                models.AvitoCanonicalField.internal_key == field_key
-            ).first()
+    def sync_schema_to_core(
+        self,
+        core_base_url: str,
+        node_slug: str,
+        category_name: str,
+        fields_payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Transmit normalized schema payload to Core internal HTTP endpoint.
+        """
+        payload = self.build_normalized_schema_payload(node_slug, category_name, fields_payload)
+        url = f"{core_base_url.rstrip('/')}/api/integrations/avito/autoload-schema/import"
+        body_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
-            if not field:
-                field = models.AvitoCanonicalField(
-                    category_id=canonical_cat.id,
-                    internal_key=field_key,
-                    display_name=label,
-                    official_tag=tag,
-                    official_source="autoload_api",
-                    active=True,
-                    created_at=now
-                )
-                db.add(field)
-                db.flush()
-
-            # Parse content rules
-            parsed_rules = self.parse_content_rules(field_item)
-            for r_data in parsed_rules:
-                rule = models.AvitoCanonicalFieldRule(
-                    field_id=field.id,
-                    ordinal=r_data["ordinal"],
-                    rule_source="official_api",
-                    required=r_data["required"],
-                    required_by_dependency=r_data["required_by_dependency"],
-                    dependencies_json=json.dumps(r_data["dependencies"], ensure_ascii=False) if r_data["dependencies"] else None,
-                    values_range_json=json.dumps(r_data["values_range"], ensure_ascii=False) if r_data["values_range"] else None,
-                    raw_json=r_data["raw_json"],
-                    created_at=now
-                )
-                db.add(rule)
-                db.flush()
-
-                # Add inline values
-                for v in r_data["values"]:
-                    val_str = str(v.get("value") if isinstance(v, dict) else v).strip()
-                    desc_str = str(v.get("description") if isinstance(v, dict) else "") or None
-                    if val_str:
-                        db.add(models.AvitoCanonicalFieldValue(
-                            field_id=field.id,
-                            rule_id=rule.id,
-                            value=val_str,
-                            description=desc_str,
-                            official_value=val_str,
-                            source="inline",
-                            active=True,
-                            created_at=now
-                        ))
-
-        db.flush()
-        return canonical_cat
+        req = urllib.request.Request(
+            url,
+            data=body_bytes,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))

@@ -39,9 +39,9 @@ class OfficialAutoloadTransport(AvitoPublicationTransport):
         caps = get_avito_capabilities(db)
         return {
             "transport": "official_autoload",
-            "available": caps.get("autoload_schema_read", False),
+            "available": caps.get("autoload_schema_present", False),
             "supports_xml_feed": True,
-            "supports_api_upload": False  # Disabled
+            "supports_api_upload": False  # Disabled in R10A
         }
 
     def prepare(self, db: Session, product_id: int) -> Dict[str, Any]:

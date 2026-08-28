@@ -1,26 +1,31 @@
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-from app.config import settings
+from app import models
 
 def get_avito_capabilities(db: Optional[Session] = None) -> Dict[str, Any]:
     """
-    Capability-based detection for Avito integration.
-    Never assumes paid or official API availability.
-    Provides transport-neutral status flags.
+    Domain-level capability detection for Avito integration within Core.
+    Does not require or check external Avito API credentials.
+    Provides transport-neutral status flags based on DB state.
     """
-    api_configured = bool(settings.avito_client_id and settings.avito_client_secret)
-    
-    canonical_schema_source = "observed_only"
-    if api_configured:
-        canonical_schema_source = "official_api_ready"
-    
+    has_official_schemas = False
+    if db is not None:
+        try:
+            has_official_schemas = db.query(models.AvitoCanonicalCategory).filter(
+                models.AvitoCanonicalCategory.official_slug.isnot(None),
+                models.AvitoCanonicalCategory.active == True
+            ).first() is not None
+        except Exception:
+            has_official_schemas = False
+
+    canonical_schema_source = "official_schema_persisted" if has_official_schemas else "observed_only"
+
     return {
         "browser_bridge": True,
         "browser_assisted_available": True,
         "manual_available": True,
-        "api_configured": api_configured,
-        "api_authenticated": False,
-        "autoload_schema_read": api_configured,
-        "autoload_publish": False,  # Publishing is disabled in Stage 06A-R10A
-        "canonical_schema_source": canonical_schema_source
+        "canonical_schema_source": canonical_schema_source,
+        "autoload_schema_present": has_official_schemas,
+        "autoload_publish": False
     }
+

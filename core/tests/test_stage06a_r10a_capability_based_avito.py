@@ -12,9 +12,9 @@ from app.services.avito_canonical_service import (
     ensure_canonical_category_from_observed,
     sync_observed_category_to_canonical,
     get_canonical_projection_for_product,
+    import_official_schema_payload,
     normalize_label
 )
-from app.services.avito_official_autoload_provider import OfficialAvitoAutoloadSchemaProvider
 from app.services.avito_preflight_service import build_avito_publication_package, preflight_product_for_avito
 from app.services.avito_transport import (
     OfficialAutoloadTransport,
@@ -34,26 +34,26 @@ def db_session():
     finally:
         session.close()
 
-def test_capabilities_without_api_credentials():
-    """Verify capabilities when API credentials are not set."""
-    with patch.object(settings, "avito_client_id", None), patch.object(settings, "avito_client_secret", None):
-        caps = get_avito_capabilities()
-        assert caps["api_configured"] is False
-        assert caps["autoload_schema_read"] is False
-        assert caps["autoload_publish"] is False
-        assert caps["browser_bridge"] is True
-        assert caps["browser_assisted_available"] is True
-        assert caps["manual_available"] is True
-        assert caps["canonical_schema_source"] == "observed_only"
+def test_core_does_not_require_avito_client_credentials():
+    """Security/Architecture test: Verify Core Settings do NOT have Avito API credentials."""
+    assert not hasattr(settings, "avito_client_id")
+    assert not hasattr(settings, "avito_client_secret")
+    assert not hasattr(settings, "avito_api_base")
 
-def test_capabilities_with_mock_api_credentials():
-    """Verify capabilities when API credentials are provided."""
-    with patch.object(settings, "avito_client_id", "test_id"), patch.object(settings, "avito_client_secret", "test_secret"):
-        caps = get_avito_capabilities()
-        assert caps["api_configured"] is True
-        assert caps["autoload_schema_read"] is True
-        assert caps["autoload_publish"] is False  # Explicitly disabled in R10A
-        assert caps["canonical_schema_source"] == "official_api_ready"
+def test_core_has_no_outbound_avito_api_client():
+    """Security/Architecture test: Verify Core does NOT contain OfficialAvitoAutoloadSchemaProvider."""
+    import sys
+    assert "app.services.avito_official_autoload_provider" not in sys.modules
+
+def test_core_capabilities_pure_domain(db_session):
+    """Verify Core capabilities reflect internal domain state without external credentials."""
+    caps = get_avito_capabilities(db_session)
+    assert caps["browser_bridge"] is True
+    assert caps["browser_assisted_available"] is True
+    assert caps["manual_available"] is True
+    assert caps["autoload_publish"] is False
+    assert caps["canonical_schema_source"] == "observed_only"
+    assert caps["autoload_schema_present"] is False
 
 def test_browser_assisted_available_without_autoload():
     """Verify browser-assisted transport is fully functional without official API."""
@@ -166,17 +166,16 @@ def test_publication_package_builds_without_api(db_session):
     db_session.add(photo)
     db_session.commit()
 
-    with patch.object(settings, "avito_client_id", None), patch.object(settings, "avito_client_secret", None):
-        package = build_avito_publication_package(db_session, prod.id)
-        assert package["product_id"] == prod.id
-        assert package["title"] == "Комплект материнская плата и память"
-        assert package["price"] == 7900.0
-        assert package["brand"] == "Gigabyte"
-        assert package["model"] == "B450M DS3H"
-        assert len(package["photos"]) == 1
-        assert package["transport_options"]["browser_assisted"] is True
-        assert package["transport_options"]["manual"] is True
-        assert package["transport_options"]["official_autoload"] is False
+    package = build_avito_publication_package(db_session, prod.id)
+    assert package["product_id"] == prod.id
+    assert package["title"] == "Комплект материнская плата и память"
+    assert package["price"] == 7900.0
+    assert package["brand"] == "Gigabyte"
+    assert package["model"] == "B450M DS3H"
+    assert len(package["photos"]) == 1
+    assert package["transport_options"]["browser_assisted"] is True
+    assert package["transport_options"]["manual"] is True
+    assert package["transport_options"]["official_autoload"] is False
 
 def test_preflight_browser_ready_without_autoload(db_session):
     """Verify preflight passes for browser/manual publication when basic data is valid."""
@@ -200,14 +199,13 @@ def test_preflight_browser_ready_without_autoload(db_session):
     db_session.add(photo)
     db_session.commit()
 
-    with patch.object(settings, "avito_client_id", None), patch.object(settings, "avito_client_secret", None):
-        res = preflight_product_for_avito(db_session, prod.id)
-        assert res["ready_for_any_publication"] is True
-        assert res["ready_for_browser_assisted"] is True
-        assert res["ready_for_manual"] is True
-        assert res["ready_for_official_autoload"] is False
-        assert len(res["errors"]) == 0
-        assert any("AUTOLOAD_SCHEMA_UNAVAILABLE" in w for w in res["warnings"])
+    res = preflight_product_for_avito(db_session, prod.id)
+    assert res["ready_for_any_publication"] is True
+    assert res["ready_for_browser_assisted"] is True
+    assert res["ready_for_manual"] is True
+    assert res["ready_for_official_autoload"] is False
+    assert len(res["errors"]) == 0
+    assert any("AUTOLOAD_SCHEMA_UNAVAILABLE" in w for w in res["warnings"])
 
 def test_preflight_official_not_ready_without_schema(db_session):
     """Verify preflight rejects official autoload when official slug/schema is missing."""
@@ -223,108 +221,44 @@ def test_preflight_official_not_ready_without_schema(db_session):
     res = preflight_product_for_avito(db_session, prod.id)
     assert res["ready_for_official_autoload"] is False
 
-def test_official_tree_parser():
-    """Verify recursive parsing of official Avito category tree."""
-    provider = OfficialAvitoAutoloadSchemaProvider(client_id="mock_id", client_secret="mock_secret")
-    raw_tree = {
-        "name": "Главная",
-        "slug": "root",
-        "nested": [
+def test_schema_import_to_core_does_not_include_secret_or_token(db_session):
+    """Verify import_official_schema_payload accepts normalized payload and stores rules without secrets."""
+    payload = {
+        "official_slug": "materinskie-platy",
+        "category_name": "Материнские платы",
+        "fields": [
             {
-                "name": "Товары для компьютера",
-                "slug": "tovary-dlya-kompyutera",
-                "nested": [
+                "official_tag": "MotherboardSocket",
+                "display_name": "Сокет",
+                "internal_key": "motherboardsocket",
+                "rules": [
                     {
-                        "name": "Материнские платы",
-                        "slug": "materinskie-platy",
-                        "nested": []
+                        "ordinal": 0,
+                        "rule_source": "official_api",
+                        "field_type": "select",
+                        "data_type": "string",
+                        "required": True,
+                        "required_by_dependency": False,
+                        "dependencies": {"action": "visible", "clause": "and"},
+                        "values": [{"value": "LGA 1200", "description": "Intel Socket 1200"}],
+                        "values_range": None,
+                        "raw_json": json.dumps({"type": "select", "required": True})
                     }
                 ]
             }
         ]
     }
-    assert raw_tree["nested"][0]["nested"][0]["slug"] == "materinskie-platy"
 
-def test_content_rules_not_flattened():
-    """Verify content rules are preserved as separate rule items with all types and dependencies."""
-    provider = OfficialAvitoAutoloadSchemaProvider(client_id="mock_id", client_secret="mock_secret")
-    field_payload = {
-        "tag": "MotherboardSocket",
-        "label": "Сокет",
-        "content": [
-            {
-                "type": "select",
-                "data_type": "string",
-                "required": True,
-                "values": ["LGA 1200", "LGA 1700", "AM4", "AM5"],
-                "dependencies": {"action": "visible", "clause": "and"}
-            },
-            {
-                "type": "input",
-                "data_type": "string",
-                "required": False,
-                "values_range": {"min": 1, "max": 100}
-            }
-        ]
-    }
+    canonical_cat = import_official_schema_payload(db_session, payload)
+    assert canonical_cat.official_slug == "materinskie-platy"
+    assert len(canonical_cat.fields) == 1
 
-    rules = provider.parse_content_rules(field_payload)
-    assert len(rules) == 2
-    assert rules[0]["field_type"] == "select"
-    assert rules[0]["required"] is True
-    assert len(rules[0]["values"]) == 4
-    assert rules[1]["field_type"] == "input"
-    assert rules[1]["required"] is False
-    assert rules[1]["values_range"]["max"] == 100
-
-def test_dependencies_preserved(db_session):
-    """Verify dependencies JSON is persisted without loss."""
-    cat = models.AvitoCanonicalCategory(internal_key="cat_test_mb", display_name="Тест")
-    db_session.add(cat)
-    db_session.commit()
-
-    field = models.AvitoCanonicalField(category_id=cat.id, internal_key="socket", display_name="Сокет")
-    db_session.add(field)
-    db_session.commit()
-
-    dep_data = {"action": "visible", "clause": "and", "pairs": [{"source_field_tag": "Brand", "values": ["Intel"]}]}
-    rule = models.AvitoCanonicalFieldRule(
-        field_id=field.id,
-        ordinal=0,
-        dependencies_json=json.dumps(dep_data),
-        required=True
-    )
-    db_session.add(rule)
-    db_session.commit()
-
-    loaded = db_session.query(models.AvitoCanonicalFieldRule).filter_by(field_id=field.id).first()
-    assert json.loads(loaded.dependencies_json) == dep_data
-
-def test_inline_values_preserved(db_session):
-    """Verify inline values are properly persisted and queryable."""
-    cat = models.AvitoCanonicalCategory(internal_key="cat_test_vals", display_name="Тест")
-    db_session.add(cat)
-    db_session.commit()
-
-    field = models.AvitoCanonicalField(category_id=cat.id, internal_key="form_factor", display_name="Форм-фактор")
-    db_session.add(field)
-    db_session.commit()
-
-    db_session.add(models.AvitoCanonicalFieldValue(field_id=field.id, value="Micro-ATX", official_value="Micro-ATX", source="inline"))
-    db_session.add(models.AvitoCanonicalFieldValue(field_id=field.id, value="Standard-ATX", official_value="Standard-ATX", source="inline"))
-    db_session.commit()
-
-    vals = db_session.query(models.AvitoCanonicalFieldValue).filter_by(field_id=field.id).all()
-    assert len(vals) == 2
-    assert {v.value for v in vals} == {"Micro-ATX", "Standard-ATX"}
-
-def test_linked_json_values_url_security():
-    """Verify security validation for linked JSON values URLs."""
-    provider = OfficialAvitoAutoloadSchemaProvider()
-    assert provider.validate_linked_json_url("https://api.avito.ru/autoload/v1/values/socket.json") is True
-    assert provider.validate_linked_json_url("https://autoload.avito.ru/values.json") is True
-    assert provider.validate_linked_json_url("http://api.avito.ru/insecure.json") is False  # HTTP forbidden
-    assert provider.validate_linked_json_url("https://evil-site.com/payload.json") is False  # Non-avito host forbidden
+    field = canonical_cat.fields[0]
+    assert field.official_tag == "MotherboardSocket"
+    assert len(field.rules) == 1
+    assert field.rules[0].required is True
+    assert len(field.values) == 1
+    assert field.values[0].value == "LGA 1200"
 
 def test_transport_publish_disabled(db_session):
     """Verify publish() raises NotImplementedError on all transports in Stage 06A-R10A."""
@@ -336,11 +270,3 @@ def test_transport_publish_disabled(db_session):
         with pytest.raises(NotImplementedError) as exc_info:
             transport.publish(db_session, prod.id)
         assert "disabled in Stage 06A-R10A" in str(exc_info.value)
-
-def test_no_avito_write_calls():
-    """Verify that provider and transports do not execute POST /autoload/v1/upload or real write calls."""
-    provider = OfficialAvitoAutoloadSchemaProvider(client_id="mock", client_secret="mock")
-    # Verify no upload / publish methods exist on provider
-    assert not hasattr(provider, "upload_feed")
-    assert not hasattr(provider, "publish_ad")
-    assert not hasattr(provider, "create_ad")

@@ -1,97 +1,96 @@
-# Stage 06A-R10A V2 — Capability-Based Avito Integration Architecture
+# Stage 06A-R10A / R10A-R1 — Capability-Based Avito Integration Architecture
 
 ## 1. Core Principle & Philosophy
 
 Technoreboot **must never strictly depend on paid Avito tariffs or official APIs**.
 The official Avito Autoload/API may be unavailable, restricted by subscription tiers, or absent for small businesses.
 
-Therefore, the system follows a **Capability-Based Multi-Transport Architecture**:
+Therefore, the system follows a **Capability-Based Multi-Transport Architecture** with strict module boundaries:
 
-```
-                  ┌───────────────────────────────┐
-                  │       CORE DATA MODEL         │
-                  │ (Product, Photos, Parameters) │
-                  └───────────────┬───────────────┘
-                                  │
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │  CANONICAL AVITO PROJECTION   │
-                  │  (Categories, Fields, Rules)  │
-                  └───────────────┬───────────────┘
-                                  │
-                                  ▼
-                  ┌───────────────────────────────┐
-                  │     PUBLICATION PREFLIGHT     │
-                  │ (Transport-Neutral Validation)│
-                  └───────────────┬───────────────┘
-                                  │
-         ┌────────────────────────┴────────────────────────┐
-         │                                                 │
-         ▼                                                 ▼
-┌───────────────────────────────┐         ┌───────────────────────────────┐
-│   Official Autoload Adapter   │         │   Browser / Manual-Assisted   │
-│  (Active if API configured)   │         │    Fallback Path (Always ON)  │
-└───────────────────────────────┘         └───────────────────────────────┘
+```text
+                  ┌────────────────────────────────────────────────────────┐
+                  │                 AVITO-MODULE (Service)                 │
+                  │  • Owns AVITO_CLIENT_ID / AVITO_CLIENT_SECRET          │
+                  │  • Owns OAuth / Token Lifecycle                        │
+                  │  • Communicates with api.avito.ru / Autoload tree      │
+                  │  • Normalizes official schemas (Zero secrets in payload│
+                  └─────────────────────────┬──────────────────────────────┘
+                                            │ Internal HTTP POST
+                                            │ /api/integrations/avito/autoload-schema/import
+                                            ▼
+                  ┌────────────────────────────────────────────────────────┐
+                  │                     CORE (Domain)                      │
+                  │  • DB Owner (Products, Categories, Canonical Fields)   │
+                  │  • ZERO external Avito credentials or outbound calls   │
+                  │  • Persists Canonical Categories, Rules & Values       │
+                  │  • Builds Publication Package (Transport-Neutral)      │
+                  │  • Pure Preflight Validation (No API required)         │
+                  └─────────────────────────┬──────────────────────────────┘
+                                            │
+         ┌──────────────────────────────────┴───────────────────────────────┐
+         │                                                                  │
+         ▼                                                                  ▼
+┌────────────────────────────────────────┐         ┌────────────────────────────────────────┐
+│     Official Autoload Transport        │         │   Browser / Manual-Assisted Transport  │
+│  (Active if official schema persisted) │         │       Fallback Path (Always ON)        │
+└────────────────────────────────────────┘         └────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Capability Model
+## 2. Strict Architectural Boundaries
 
-Capabilities are detected dynamically at runtime via `get_avito_capabilities()`:
+| Component | Responsibility | Secret Access | Outbound External HTTP | Owns DB |
+| :--- | :--- | :---: | :---: | :---: |
+| **`core`** | Domain models, canonical schema, preflight, package generation | ❌ NO | ❌ NO | ✅ YES |
+| **`avito-module`** | External Avito API, OAuth, Autoload schema fetch & normalization | ✅ YES | ✅ YES | ❌ NO |
+| **`chrome-extension`** | DOM / InitialData listing extractor, pairing bridge | ❌ NO | ❌ NO (Browser context only) | ❌ NO |
+| **`admin-shell`** | Unified UI gateway, extension download distribution | ❌ NO | ❌ NO | ❌ NO |
 
+---
+
+## 3. Capability Model Split
+
+### 3.1 Core (Domain Capabilities)
+Detected via `get_avito_capabilities(db)`:
 ```json
 {
   "browser_bridge": true,
   "browser_assisted_available": true,
   "manual_available": true,
-  "api_configured": false,
-  "api_authenticated": false,
-  "autoload_schema_read": false,
-  "autoload_publish": false,
-  "canonical_schema_source": "observed_only"
+  "canonical_schema_source": "observed_only",
+  "autoload_schema_present": false,
+  "autoload_publish": false
 }
 ```
 
-- **`browser_bridge`**: Always `True`. Chrome Extension captures listings on `avito.ru`.
-- **`browser_assisted_available`**: Always `True`. Prepares form-filling payloads.
-- **`manual_available`**: Always `True`. Prepares clipboard/manual publication package.
-- **`api_configured`**: `True` only when `AVITO_CLIENT_ID` and `AVITO_CLIENT_SECRET` are provided in server environment.
-- **`autoload_schema_read`**: `True` if API access is active to fetch official node schemas.
-- **`autoload_publish`**: `False` (Publishing is strictly disabled in Stage 06A-R10A foundation).
+### 3.2 Avito Module (External Capabilities)
+Detected via `get_avito_external_capabilities()`:
+```json
+{
+  "api_configured": false,
+  "api_authenticated": false,
+  "autoload_schema_endpoint_accessible": false,
+  "autoload_publish_accessible": false,
+  "browser_bridge_active": true
+}
+```
 
 ---
 
-## 3. Database & Canonical Model Layer
+## 4. Schema Ingestion Flow
 
-### 3.1 Observed Layer (Preserved)
-- `AvitoCategory`: Captured category breadcrumbs and names.
-- `AvitoAttributeDefinition`: Dynamic characteristics discovered during imports.
-- `AvitoAttributeOption`: Observed option values.
-- `ProductAvitoAttributeValue`: Bound raw and normalized attribute values per product.
-
-### 3.2 Canonical Internal Layer
-- `AvitoCanonicalCategory`: Transport-neutral category definition with optional `official_slug`.
-- `AvitoCanonicalField`: Normalized field definitions (`internal_key`, `display_name`, `official_tag`, `data_type`, `field_type`).
-- `AvitoCanonicalFieldRule`: Non-flattened validation rules (required, required_by_dependency, dependencies, values_range).
-- `AvitoCanonicalFieldValue`: Allowed values (inline, linked_json, observed).
-- `AvitoObservedFieldMapping`: Exact normalized label mappings (`mapping_source = "exact_label"`).
+1. `avito-module` fetches tree from `GET https://api.avito.ru/autoload/v1/user-docs/tree`.
+2. `avito-module` fetches field definitions from `GET https://api.avito.ru/autoload/v1/user-docs/node/{slug}/fields`.
+3. `avito-module` normalizes rules and linked values without secrets using `build_normalized_schema_payload()`.
+4. `avito-module` transmits payload to Core via internal HTTP:
+   `POST http://core:8000/api/integrations/avito/autoload-schema/import`
+5. `core` persists canonical categories, fields, non-flattened rules, and allowed values in SQLite.
 
 ---
 
-## 4. Publication Preflight & Package Generation
+## 5. Security & Safety Guarantees
 
-- **`build_avito_publication_package(db, product_id)`**:
-  Constructs a transport-neutral publication dictionary containing title, description, price, condition, brand, model, photos, canonical_fields, and unresolved_fields.
-- **`preflight_product_for_avito(db, product_id)`**:
-  Performs transport-neutral validation (title, description, price > 0, photos > 0). If valid, sets `ready_for_browser_assisted = True` and `ready_for_manual = True`. Official Autoload readiness is evaluated only when the official schema capability is active.
-
----
-
-## 5. Transport Abstraction
-
-The `AvitoPublicationTransport` abstract base class defines the standard contract:
-- `capabilities()`
-- `prepare(product_id)`
-- `validate(product_id)`
-- `publish(product_id)` ➔ Raises `NotImplementedError` in Stage 06A-R10A (no real writes to Avito).
+1. **Zero Credentials in Core**: `core/app/config.py` has no knowledge of Avito client credentials.
+2. **Zero Outbound Calls in Core**: `core` never issues requests to `api.avito.ru`.
+3. **No Real Writes in Foundation**: All transport `publish()` methods raise `NotImplementedError`.

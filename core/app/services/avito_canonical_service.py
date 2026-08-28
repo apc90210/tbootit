@@ -208,3 +208,106 @@ def get_canonical_projection_for_product(db: Session, product_id: int) -> Dict[s
         "canonical_fields": canonical_fields,
         "unresolved_fields": unresolved_fields
     }
+
+def import_official_schema_payload(
+    db: Session,
+    payload: Dict[str, Any]
+) -> models.AvitoCanonicalCategory:
+    """
+    Ingest normalized official schema payload received from avito-module over internal HTTP.
+    Creates or updates AvitoCanonicalCategory, AvitoCanonicalField, AvitoCanonicalFieldRule, AvitoCanonicalFieldValue.
+    """
+    import json
+    now = datetime.datetime.now(datetime.timezone.utc)
+    node_slug = payload.get("official_slug") or "unknown"
+    category_name = payload.get("category_name") or node_slug
+    internal_key = f"official_{node_slug.replace('-', '_')}"
+
+    canonical_cat = db.query(models.AvitoCanonicalCategory).filter(
+        (models.AvitoCanonicalCategory.official_slug == node_slug) |
+        (models.AvitoCanonicalCategory.internal_key == internal_key)
+    ).first()
+
+    if not canonical_cat:
+        canonical_cat = models.AvitoCanonicalCategory(
+            internal_key=internal_key,
+            display_name=category_name,
+            official_slug=node_slug,
+            official_source="autoload_api",
+            capability_source="official_api",
+            active=True,
+            created_at=now
+        )
+        db.add(canonical_cat)
+        db.flush()
+    else:
+        canonical_cat.official_slug = node_slug
+        canonical_cat.official_source = "autoload_api"
+        canonical_cat.capability_source = "official_api"
+        canonical_cat.updated_at = now
+        db.flush()
+
+    fields_list = payload.get("fields") or []
+    for f_item in fields_list:
+        tag = f_item.get("official_tag") or f_item.get("tag") or "Unknown"
+        label = f_item.get("display_name") or f_item.get("label") or tag
+        field_key = f_item.get("internal_key") or tag.lower().replace("-", "_")
+
+        field = db.query(models.AvitoCanonicalField).filter(
+            models.AvitoCanonicalField.category_id == canonical_cat.id,
+            models.AvitoCanonicalField.internal_key == field_key
+        ).first()
+
+        if not field:
+            field = models.AvitoCanonicalField(
+                category_id=canonical_cat.id,
+                internal_key=field_key,
+                display_name=label,
+                official_tag=tag,
+                official_source="autoload_api",
+                active=True,
+                created_at=now
+            )
+            db.add(field)
+            db.flush()
+
+        rules_list = f_item.get("rules") or []
+        for r_data in rules_list:
+            dep_val = r_data.get("dependencies")
+            dep_json = json.dumps(dep_val, ensure_ascii=False) if dep_val and isinstance(dep_val, (dict, list)) else (r_data.get("dependencies_json") or (dep_val if isinstance(dep_val, str) else None))
+            
+            range_val = r_data.get("values_range")
+            range_json = json.dumps(range_val, ensure_ascii=False) if range_val and isinstance(range_val, (dict, list)) else (r_data.get("values_range_json") or None)
+
+            rule = models.AvitoCanonicalFieldRule(
+                field_id=field.id,
+                ordinal=r_data.get("ordinal", 0),
+                rule_source=r_data.get("rule_source", "official_api"),
+                required=r_data.get("required"),
+                required_by_dependency=r_data.get("required_by_dependency"),
+                dependencies_json=dep_json,
+                values_range_json=range_json,
+                raw_json=r_data.get("raw_json"),
+                created_at=now
+            )
+            db.add(rule)
+            db.flush()
+
+            for v in (r_data.get("values") or []):
+                val_str = str(v.get("value") if isinstance(v, dict) else v).strip()
+                desc_str = str(v.get("description") if isinstance(v, dict) else "") or None
+                if val_str:
+                    db.add(models.AvitoCanonicalFieldValue(
+                        field_id=field.id,
+                        rule_id=rule.id,
+                        value=val_str,
+                        description=desc_str,
+                        official_value=val_str,
+                        source="inline",
+                        active=True,
+                        created_at=now
+                    ))
+
+    db.flush()
+    return canonical_cat
+

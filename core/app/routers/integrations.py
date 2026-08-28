@@ -560,3 +560,19 @@ def get_product_publication_package_endpoint(product_id: int, db: Session = Depe
     from app.services.avito_preflight_service import build_avito_publication_package
     return build_avito_publication_package(db, product_id)
 
+@router.post("/avito/autoload-schema/import")
+def import_autoload_schema_endpoint(payload: dict, db: Session = Depends(get_db)):
+    """
+    Internal endpoint to ingest normalized Avito Autoload schema from avito-module.
+    Accepts zero OAuth credentials / secrets.
+    """
+    from app.services.avito_canonical_service import import_official_schema_payload
+    canonical_cat = import_official_schema_payload(db, payload)
+    return {
+        "status": "success",
+        "canonical_category_id": canonical_cat.id,
+        "official_slug": canonical_cat.official_slug,
+        "fields_count": len(canonical_cat.fields)
+    }
+
+

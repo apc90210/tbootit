@@ -54,7 +54,7 @@ def build_avito_publication_package(db: Session, product_id: int) -> Dict[str, A
         "canonical_fields": projection.get("canonical_fields", {}),
         "unresolved_fields": projection.get("unresolved_fields", []),
         "transport_options": {
-            "official_autoload": capabilities.get("autoload_schema_read", False),
+            "official_autoload": capabilities.get("autoload_schema_present", False) and bool(projection.get("official_slug")),
             "browser_assisted": capabilities.get("browser_assisted_available", True),
             "manual": capabilities.get("manual_available", True)
         }
@@ -112,10 +112,8 @@ def preflight_product_for_avito(db: Session, product_id: int) -> Dict[str, Any]:
     ready_for_manual = is_valid_base and capabilities.get("manual_available", True)
 
     ready_for_official_autoload = False
-    if not capabilities.get("autoload_schema_read", False):
-        warnings.append("AUTOLOAD_SCHEMA_UNAVAILABLE: Официальная схема Avito Autoload не подключена (отсутствуют API ключи)")
-    elif not projection.get("official_slug"):
-        warnings.append("OFFICIAL_SLUG_UNRESOLVED: Официальный код (slug) категории Avito не подтвержден")
+    if not capabilities.get("autoload_schema_present", False) or not projection.get("official_slug"):
+        warnings.append("AUTOLOAD_SCHEMA_UNAVAILABLE: Официальная схема Avito Autoload не подключена или не сопоставлен официальный slug")
     else:
         # If official autoload schema capability is active, validate official rules
         official_errors = []
