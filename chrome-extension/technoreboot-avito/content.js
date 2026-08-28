@@ -1389,14 +1389,32 @@ function isDangerousControl(el) {
 function resolveFieldLabel(inputEl) {
     if (!inputEl) return '';
 
+    // Direct check for textarea / rich description editors
+    if (inputEl.tagName === 'TEXTAREA' || inputEl.getAttribute('contenteditable') === 'true') {
+        const placeholder = normalizeFieldLabel(inputEl.getAttribute('placeholder') || '');
+        const nameAttr = normalizeFieldLabel(inputEl.getAttribute('name') || '');
+        const dataMarker = normalizeFieldLabel(inputEl.getAttribute('data-marker') || '');
+        if (placeholder.includes('описан') || placeholder.includes('подумайт') || placeholder.includes('расскаж') || nameAttr.includes('description') || dataMarker.includes('description') || (!nameAttr && !dataMarker)) {
+            return 'описание';
+        }
+    }
+
     // 0. Placeholder check
     const placeholder = normalizeFieldLabel(inputEl.getAttribute('placeholder') || '');
     if (placeholder) {
         if (placeholder.includes('что вы прода') || placeholder.includes('что прода') || placeholder.includes('название') || placeholder.includes('заголовок')) {
             return 'название';
         }
-        if (placeholder.includes('описание')) return 'описание';
+        if (placeholder.includes('описание') || placeholder.includes('подумайт') || placeholder.includes('расскаж')) return 'описание';
         if (placeholder.includes('цена') || placeholder.includes('стоимость')) return 'цена';
+    }
+
+    // 0.01. Direct data-marker check for common Avito inputs
+    const dataMarker = normalizeFieldLabel(inputEl.getAttribute('data-marker') || '');
+    if (dataMarker) {
+        if (dataMarker.includes('description') || dataMarker.includes('params[200]')) return 'описание';
+        if (dataMarker.includes('price') || dataMarker.includes('params[201]')) return 'цена';
+        if (dataMarker.includes('title') || dataMarker.includes('params[100]')) return 'название';
     }
 
     // 0.1. Direct text if inputEl is a title/legend/heading/span element
@@ -1441,7 +1459,6 @@ function resolveFieldLabel(inputEl) {
     }
 
     // 4. Stable data-marker attribute
-    const dataMarker = inputEl.getAttribute('data-marker');
     if (dataMarker) {
         const clean = normalizeFieldLabel(dataMarker.replace(/-/g, ' '));
         if (clean && !clean.includes('input') && !clean.includes('field')) return clean;
@@ -1698,10 +1715,31 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
         // 0. Check for initial Suggested Categories list (on /additem initial step)
         const categorySuggestTiles = Array.from(document.querySelectorAll(
-            '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button'
+            '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [data-marker*="rubricator"] button, [data-marker*="rubricator"] [role="button"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="rubricator"] [role="button"], [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button, [class*="suggested-categories-list"] [role="button"], [class*="suggested-categories"] button'
         )).filter(isElementVisible).filter(t => !isDangerousControl(t));
 
-        if (categorySuggestTiles.length > 0) {
+        if (categorySuggestTiles.length === 1) {
+            const tile = categorySuggestTiles[0];
+            let rawCatText = '';
+            const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+            if (span && span.innerText) {
+                rawCatText = span.innerText;
+            } else {
+                rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
+            }
+            const cleanCatText = rawCatText.trim() || 'Предложенная категория';
+            tile.click();
+            report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
+            passChanges++;
+            filledCoreRoles.add('category');
+            filledCharacteristicKeys.add('Категория');
+            filledCharacteristicKeys.add('категория');
+            filledCharacteristicKeys.add('Вид товара');
+            filledCharacteristicKeys.add('вид товара');
+            await delay(450);
+        } else if (categorySuggestTiles.length > 1) {
+            let matchedTile = null;
+            let matchedText = '';
             for (const tile of categorySuggestTiles) {
                 let rawCatText = '';
                 const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
@@ -1712,17 +1750,25 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 }
                 const cleanCatText = rawCatText.trim();
                 if (matchCategorySuggestion(cleanCatText, packageData)) {
-                    tile.click();
-                    report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
-                    passChanges++;
-                    filledCoreRoles.add('category');
-                    filledCharacteristicKeys.add('Категория');
-                    filledCharacteristicKeys.add('категория');
-                    filledCharacteristicKeys.add('Вид товара');
-                    filledCharacteristicKeys.add('вид товара');
-                    await delay(450);
+                    matchedTile = tile;
+                    matchedText = cleanCatText;
                     break;
                 }
+            }
+            if (!matchedTile && categorySuggestTiles.length > 0) {
+                matchedTile = categorySuggestTiles[0];
+                matchedText = (matchedTile.innerText || matchedTile.textContent || '').trim();
+            }
+            if (matchedTile) {
+                matchedTile.click();
+                report.filled.push({ source: 'category', target: 'категория', value: matchedText || 'Категория', type: 'category-tile' });
+                passChanges++;
+                filledCoreRoles.add('category');
+                filledCharacteristicKeys.add('Категория');
+                filledCharacteristicKeys.add('категория');
+                filledCharacteristicKeys.add('Вид товара');
+                filledCharacteristicKeys.add('вид товара');
+                await delay(450);
             }
         }
 
@@ -1905,12 +1951,20 @@ async function fillAvitoPublicationFormAsync(packageData) {
                         }
 
                         if (sourceRoleName === 'title') {
-                            await delay(350);
-                            const immediateCategoryTiles = Array.from(document.querySelectorAll(
-                                '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button'
-                            )).filter(isElementVisible).filter(t => !isDangerousControl(t));
+                            let foundTiles = [];
+                            for (let w = 0; w < 12; w++) {
+                                await delay(150);
+                                const tiles = Array.from(document.querySelectorAll(
+                                    '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [data-marker*="rubricator"] button, [data-marker*="rubricator"] [role="button"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="rubricator"] [role="button"], [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button, [class*="suggested-categories-list"] [role="button"], [class*="suggested-categories"] button'
+                                )).filter(isElementVisible).filter(t => !isDangerousControl(t));
+                                if (tiles.length > 0) {
+                                    foundTiles = tiles;
+                                    break;
+                                }
+                            }
 
-                            for (const tile of immediateCategoryTiles) {
+                            if (foundTiles.length === 1) {
+                                const tile = foundTiles[0];
                                 let rawCatText = '';
                                 const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
                                 if (span && span.innerText) {
@@ -1918,10 +1972,41 @@ async function fillAvitoPublicationFormAsync(packageData) {
                                 } else {
                                     rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
                                 }
-                                const cleanCatText = rawCatText.trim();
-                                if (matchCategorySuggestion(cleanCatText, packageData)) {
-                                    tile.click();
-                                    report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
+                                const cleanCatText = rawCatText.trim() || 'Предложенная категория';
+                                tile.click();
+                                report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
+                                passChanges++;
+                                filledCoreRoles.add('category');
+                                filledCharacteristicKeys.add('Категория');
+                                filledCharacteristicKeys.add('категория');
+                                filledCharacteristicKeys.add('Вид товара');
+                                filledCharacteristicKeys.add('вид товара');
+                                await delay(450);
+                            } else if (foundTiles.length > 1) {
+                                let chosen = null;
+                                let chosenText = '';
+                                for (const tile of foundTiles) {
+                                    let rawCatText = '';
+                                    const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+                                    if (span && span.innerText) {
+                                        rawCatText = span.innerText;
+                                    } else {
+                                        rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
+                                    }
+                                    const cleanCatText = rawCatText.trim();
+                                    if (matchCategorySuggestion(cleanCatText, packageData)) {
+                                        chosen = tile;
+                                        chosenText = cleanCatText;
+                                        break;
+                                    }
+                                }
+                                if (!chosen && foundTiles.length > 0) {
+                                    chosen = foundTiles[0];
+                                    chosenText = (chosen.innerText || chosen.textContent || '').trim();
+                                }
+                                if (chosen) {
+                                    chosen.click();
+                                    report.filled.push({ source: 'category', target: 'категория', value: chosenText || 'Категория', type: 'category-tile' });
                                     passChanges++;
                                     filledCoreRoles.add('category');
                                     filledCharacteristicKeys.add('Категория');
@@ -1929,7 +2014,6 @@ async function fillAvitoPublicationFormAsync(packageData) {
                                     filledCharacteristicKeys.add('Вид товара');
                                     filledCharacteristicKeys.add('вид товара');
                                     await delay(450);
-                                    break;
                                 }
                             }
                         }
