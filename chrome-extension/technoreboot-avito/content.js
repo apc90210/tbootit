@@ -1562,13 +1562,14 @@ function setReactInputValue(el, value, shouldBlur = false) {
 
 function matchCoreFieldRole(normalizedLabel) {
     if (!normalizedLabel) return null;
-    for (const [role, aliases] of Object.entries(CORE_FIELD_ALIASES)) {
-        for (const alias of aliases) {
-            if (normalizedLabel === alias || normalizedLabel.startsWith(alias + ' ') || normalizedLabel.endsWith(' ' + alias)) {
-                return role;
-            }
-        }
-    }
+    const clean = normalizedLabel.toLowerCase().replace(/ё/g, 'е');
+    if (clean.includes('названи') || clean.includes('заголов') || clean.includes('что прода') || clean.includes('наименовани')) return 'title';
+    if (clean.includes('описан')) return 'description';
+    if (clean.includes('цен') || clean.includes('стоимост')) return 'price';
+    if (clean.includes('производител') || clean.includes('бренд') || clean.includes('марка') || clean.includes('изготовител')) return 'brand';
+    if (clean.includes('модел') || clean.includes('сери') || clean.includes('линейк')) return 'model';
+    if (clean.includes('состояни')) return 'condition';
+    if (clean.includes('местоположен') || clean.includes('адрес') || clean.includes('город') || clean.includes('улиц')) return 'address';
     return null;
 }
 
@@ -2308,26 +2309,26 @@ async function fillAvitoPublicationFormAsync(packageData) {
             let sourceRoleName = null;
 
             if (coreRole) {
-                if (coreRole === 'title' && packageData.title && !filledCoreRoles.has('title')) {
-                    targetValue = packageData.title;
+                if (coreRole === 'title' && !filledCoreRoles.has('title')) {
+                    targetValue = packageData.title || packageData.name || packageData.product_name || characteristics['Название'] || characteristics['Заголовок'] || null;
                     sourceRoleName = 'title';
-                } else if (coreRole === 'description' && packageData.description && !filledCoreRoles.has('description')) {
-                    targetValue = packageData.description;
+                } else if (coreRole === 'description' && !filledCoreRoles.has('description')) {
+                    targetValue = packageData.description || characteristics['Описание'] || null;
                     sourceRoleName = 'description';
-                } else if (coreRole === 'price' && packageData.price && !filledCoreRoles.has('price')) {
-                    targetValue = String(packageData.price);
+                } else if (coreRole === 'price' && !filledCoreRoles.has('price')) {
+                    targetValue = packageData.price ? String(packageData.price) : (characteristics['Цена'] ? String(characteristics['Цена']) : null);
                     sourceRoleName = 'price';
-                } else if (coreRole === 'brand' && packageData.brand && !filledCoreRoles.has('brand')) {
-                    targetValue = packageData.brand;
+                } else if (coreRole === 'brand' && !filledCoreRoles.has('brand')) {
+                    targetValue = packageData.brand || characteristics['Производитель'] || characteristics['производитель'] || characteristics['Бренд'] || characteristics['бренд'] || characteristics['brand'] || characteristics['Фирма'] || null;
                     sourceRoleName = 'brand';
-                } else if (coreRole === 'model' && packageData.model && !filledCoreRoles.has('model')) {
-                    targetValue = packageData.model;
+                } else if (coreRole === 'model' && !filledCoreRoles.has('model')) {
+                    targetValue = packageData.model || characteristics['Модель'] || characteristics['модель'] || characteristics['Серия'] || characteristics['серия'] || characteristics['model'] || null;
                     sourceRoleName = 'model';
-                } else if (coreRole === 'condition' && packageData.condition && !filledCoreRoles.has('condition')) {
-                    targetValue = packageData.condition;
+                } else if (coreRole === 'condition' && !filledCoreRoles.has('condition')) {
+                    targetValue = packageData.condition || characteristics['Состояние'] || characteristics['состояние'] || 'Б/у';
                     sourceRoleName = 'condition';
                 } else if (coreRole === 'address' && !filledCoreRoles.has('address')) {
-                    const verifiedAddr = (packageData.location && packageData.location.address) || packageData.address || null;
+                    const verifiedAddr = (packageData.location && packageData.location.address) || packageData.address || characteristics['Адрес'] || characteristics['Местоположение'] || null;
                     if (verifiedAddr) {
                         targetValue = verifiedAddr;
                         sourceRoleName = 'address';
@@ -2534,14 +2535,14 @@ async function fillAvitoPublicationFormAsync(packageData) {
             let sourceRoleName = null;
 
             if (coreRole) {
-                if (coreRole === 'condition' && packageData.condition && !filledCoreRoles.has('condition')) {
-                    targetValue = packageData.condition;
+                if (coreRole === 'condition' && !filledCoreRoles.has('condition')) {
+                    targetValue = packageData.condition || characteristics['Состояние'] || characteristics['состояние'] || 'Б/у';
                     sourceRoleName = 'condition';
-                } else if (coreRole === 'brand' && packageData.brand && !filledCoreRoles.has('brand')) {
-                    targetValue = packageData.brand;
+                } else if (coreRole === 'brand' && !filledCoreRoles.has('brand')) {
+                    targetValue = packageData.brand || characteristics['Производитель'] || characteristics['производитель'] || characteristics['Бренд'] || characteristics['бренд'] || characteristics['brand'] || null;
                     sourceRoleName = 'brand';
-                } else if (coreRole === 'model' && packageData.model && !filledCoreRoles.has('model')) {
-                    targetValue = packageData.model;
+                } else if (coreRole === 'model' && !filledCoreRoles.has('model')) {
+                    targetValue = packageData.model || characteristics['Модель'] || characteristics['модель'] || characteristics['Серия'] || characteristics['серия'] || characteristics['model'] || null;
                     sourceRoleName = 'model';
                 }
             }
