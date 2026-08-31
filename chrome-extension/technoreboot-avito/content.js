@@ -88,30 +88,8 @@ function getCanonicalAvitoImageIdentity(url) {
     const filename = cleanPath.split('/').pop() || cleanPath;
     const token = filename.replace(/^\d+\./, '');
 
-    // Format 1: 1.YIZY7ra4... -> prefix is YIZY7
-    const laMatch = token.match(/^([A-Za-z0-9_-]+?)[a-zA-Z]a\d/i);
-    if (laMatch && laMatch[1] && laMatch[1].length >= 2) {
-        return `avito_photo_${laMatch[1]}`;
-    }
-
-    // Format 2: dimension filenames like 123456789.jpg
     const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
-    if (/^\d{6,}$/.test(tokenNoExt)) {
-        return `avito_photo_${tokenNoExt}`;
-    }
-
-    // Format 3: hash tokens with dots: 1.TOKEN.HASH -> take first full segment
-    const parts = tokenNoExt.split('.');
-    if (parts.length >= 2) {
-        return `avito_photo_${parts[0]}_${parts[1].substring(0, 16)}`;
-    }
-
-    const cleanName = tokenNoExt.replace(/[^A-Za-z0-9_-]/g, '');
-    if (cleanName.length >= 2) {
-        return `avito_photo_${cleanName}`;
-    }
-
-    return pathOnly;
+    return tokenNoExt || token || filename || pathOnly;
 }
 
 function extractAvitoResolutionVersion(url) {
@@ -595,6 +573,19 @@ function extractPhotosFromDom() {
         if (match && match[1]) {
             addUrl(match[1]);
         }
+    });
+
+    // 6. Global listing photo scan across entire document
+    const allImgs = document.querySelectorAll('img[src*="avito.st"], img[data-src*="avito.st"], img[srcset*="avito.st"]');
+    allImgs.forEach(img => {
+        if (isInsideExcluded(img)) return;
+        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+        if (srcset) {
+            const candidates = parseSrcsetCandidates(srcset);
+            candidates.forEach(c => addUrl(c.url));
+        }
+        if (img.src) addUrl(img.src);
+        if (img.dataset && img.dataset.src) addUrl(img.dataset.src);
     });
 
     return rawCandidates;
