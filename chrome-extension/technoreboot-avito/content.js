@@ -1512,11 +1512,10 @@ function resolveFieldLabel(inputEl) {
     return '';
 }
 
-function setReactInputValue(el, value) {
+function setReactInputValue(el, value, shouldBlur = false) {
     if (!el) return;
-    const strVal = String(value);
+    const strVal = String(value || '');
 
-    // Handle contenteditable / rich text description editors
     if (el.getAttribute('contenteditable') === 'true' || el.getAttribute('role') === 'textbox') {
         try {
             el.focus();
@@ -1533,7 +1532,9 @@ function setReactInputValue(el, value) {
         }
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new Event('blur', { bubbles: true }));
+        if (shouldBlur) {
+            el.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
         return;
     }
 
@@ -1554,7 +1555,9 @@ function setReactInputValue(el, value) {
 
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    if (shouldBlur) {
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
 }
 
 function matchCoreFieldRole(normalizedLabel) {
@@ -1580,40 +1583,35 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     const targetTokens = normTarget.split(/[\s\-_\/,\.]+/).filter(t => t.length >= 2);
     const targetNumbers = (normTarget.match(/\d{2,}/g) || []);
 
-    // 1. Focus input and wait for UI to activate
+    // 1. Focus input without blurring
     try {
         inputEl.focus();
     } catch (e) {}
-    await delay(200);
+    await delay(150);
 
     // 2. Click input to trigger opening of dropdown
     try {
         inputEl.click();
     } catch (e) {}
-    await delay(300);
+    await delay(200);
 
-    // 3. Set value using React property descriptor
-    // If target has specific model number (e.g. "1102"), type it to filter the listbox
-    setReactInputValue(inputEl, targetValue);
-    await delay(250);
-
-    // 4. Dispatch keyboard and input events so autocomplete filtering triggers in React
+    // 3. Clear and set value using React property descriptor (never blur while waiting for dropdown!)
+    setReactInputValue(inputEl, targetValue, false);
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
 
-    // 5. PAUSE: Give Avito React component time to open/render the dropdown listbox
-    await delay(500);
+    // 4. PAUSE: Give Avito backend and React component time to fetch and render the dropdown listbox
+    await delay(800);
 
     let candidateOptions = [];
-    for (let wait = 0; wait < 12; wait++) {
+    for (let wait = 0; wait < 15; wait++) {
         // Collect active dropdown listbox / popup containers (strictly within field or known dropdown classes)
         const parentField = inputEl.closest('[class*="field-"], [class*="param-"], [class*="input-"], [data-marker*="param"], [class*="suggest-"], [class*="control-"]') || inputEl.parentElement;
         let containers = [];
 
         if (parentField) {
             const localBoxes = Array.from(parentField.querySelectorAll(
-                '[role="listbox"], [data-marker*="suggest"], [data-marker*="dropdown"], [class*="suggestions-list"], [class*="dropdown-list"], [class*="select-list"], ul[class*="suggest"], ul[class*="dropdown"], [class*="options-list"]'
+                '[role="listbox"], [role="menu"], [data-marker*="suggest"], [data-marker*="dropdown"], [class*="suggestions-list"], [class*="dropdown-list"], [class*="select-list"], ul[class*="suggest"], ul[class*="dropdown"], [class*="options-list"]'
             ));
             containers.push(...localBoxes);
         }
@@ -1627,23 +1625,20 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
             }
         }
 
-        // Search listboxes attached to main publication form (NEVER header or search bars)
-        const mainForm = inputEl.closest('form, main, [data-marker*="form"], [data-marker*="add-item"], [class*="add-item"]');
-        if (mainForm) {
-            const formBoxes = Array.from(mainForm.querySelectorAll(
-                '[role="listbox"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"]'
-            )).filter(box => {
-                if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], form[action*="search"], [data-marker*="search"], [class*="search"], [data-marker*="recommend"], [data-marker*="similar"]')) return false;
-                return isElementVisible(box);
-            });
-            containers.push(...formBoxes);
-        }
+        // Global React Portal popups attached to document.body (strictly excluding header, search bars, nav)
+        const portalBoxes = Array.from(document.querySelectorAll(
+            '[role="listbox"], [role="menu"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"], ul[class*="suggestions"]'
+        )).filter(box => {
+            if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], form[action*="search"], [data-marker*="search"], [class*="search"], [data-marker*="recommend"], [data-marker*="similar"]')) return false;
+            return isElementVisible(box);
+        });
+        containers.push(...portalBoxes);
 
         // Extract option items ONLY from inside these verified listbox containers
         const found = [];
         for (const container of containers) {
             const items = Array.from(container.querySelectorAll(
-                '[role="option"], [data-marker*="suggest-item"], [data-marker*="option-item"], [data-marker*="option"], [class*="suggest-item"], [class*="dropdown-item"], [class*="select-item"], [class*="option-item"], li[class*="suggest"], li[class*="option"]'
+                '[role="option"], [role="menuitem"], [data-marker*="suggest-item"], [data-marker*="option-item"], [data-marker*="option"], [class*="suggest-item"], [class*="dropdown-item"], [class*="select-item"], [class*="option-item"], li[class*="suggest"], li[class*="option"], li'
             ))
             .filter(isElementVisible)
             .filter(o => !isDangerousControl(o))
@@ -1663,7 +1658,7 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
             break;
         }
 
-        await delay(150);
+        await delay(200);
     }
 
     let bestMatch = null;
@@ -1739,20 +1734,19 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     }
 
     if (bestMatch && bestScore > 0) {
-        await delay(150);
+        // Clear pause before click to ensure UI is completely steady
+        await delay(300);
 
         // Single clean safe click on the chosen option
         forceClickElement(bestMatch);
 
-        await delay(350);
+        // Generous delay after selection for React state update
+        await delay(600);
         return true;
     }
 
-    // Fallback: press Enter on input to confirm typed value only if no option was clicked
-    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-    await delay(250);
-    return true;
+    await delay(300);
+    return false;
 }
 
 async function selectAddressSuggestion(inputEl, targetAddress, locationData, report) {
