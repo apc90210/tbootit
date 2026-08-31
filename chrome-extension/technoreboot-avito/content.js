@@ -1677,22 +1677,26 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
         const optText = normalizeFieldLabel(rawText);
         if (!optText) continue;
 
+        const optTokens = optText.split(/[\s\-_\/,\.]+/).filter(t => t.length >= 2);
+
         let score = 0;
 
         // Exact match
         if (optText === normTarget) {
+            score = 2000;
+        } else if (optText.startsWith(normTarget)) {
             score = 1000;
-        } else if (optText.startsWith(normTarget) || normTarget.startsWith(optText)) {
-            score = 500;
         } else if (optText.includes(normTarget) || normTarget.includes(optText)) {
-            score = 300;
+            score = 600;
         }
 
-        // Number match boost (e.g. "1102" in "HP LaserJet Pro P1102")
+        // Exact number token match boost (e.g. "1102" as separate token in "HP LaserJet Pro P1102")
         if (targetNumbers.length > 0) {
             for (const num of targetNumbers) {
-                if (optText.includes(num)) {
-                    score += 400;
+                if (optTokens.includes(num)) {
+                    score += 600;
+                } else if (optText.includes(num)) {
+                    score += 300;
                 }
             }
         }
@@ -1700,18 +1704,15 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
         // Token match boost
         if (targetTokens.length > 0) {
             for (const tok of targetTokens) {
-                if (optText.includes(tok)) {
+                if (optTokens.includes(tok)) {
+                    score += 150;
+                } else if (optText.includes(tok)) {
                     score += 50;
                 }
             }
         }
 
         scoredCandidates.push({ opt, text: rawText.trim(), score });
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMatch = opt;
-        }
     }
 
     scoredCandidates.sort((a, b) => b.score - a.score);
@@ -1727,8 +1728,10 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
         return false;
     }
 
-    // If no scored match but only 1 option in listbox, choose it if safe
-    if (!bestMatch && candidateOptions.length === 1) {
+    if (top1 && top1.score > 0) {
+        bestMatch = top1.opt;
+        bestScore = top1.score;
+    } else if (!bestMatch && candidateOptions.length === 1) {
         bestMatch = candidateOptions[0];
         bestScore = 100;
     }
