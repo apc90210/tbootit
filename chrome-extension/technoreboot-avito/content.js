@@ -478,6 +478,14 @@ function extractPhotosFromEmbeddedState() {
                 }
             }
         }
+        if (text.includes('img.avito.st')) {
+            const matches = text.match(/https?:\/\/[a-zA-Z0-9_\-\.]*img\.avito\.st\/[^\s"'\\]+/g);
+            if (matches) {
+                for (const m of matches) {
+                    addUrl(m);
+                }
+            }
+        }
     }
     return urls;
 }
@@ -494,19 +502,17 @@ function extractPhotosFromDom() {
         }
     }
 
-    // Strictly scope to the listing gallery container
-    const galleryContainer = document.querySelector('[data-marker="item-view/gallery"]') ||
-                             document.querySelector('[data-marker="gallery"]') ||
-                             document.querySelector('.style-item-view-gallery-') ||
-                             document.querySelector('.gallery-root') ||
-                             document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                             document.querySelector('[data-marker="gallery/list"]') ||
-                             document.querySelector('[data-marker="item-view/main"] [data-marker*="gallery"]') ||
-                             document.querySelector('[data-marker="item-view/main"]');
+    // 0. Meta tags & OpenGraph images
+    const metaImages = document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"], meta[property="vk:image"], link[rel="image_src"]');
+    metaImages.forEach(m => {
+        const c = m.content || m.href;
+        if (c) addUrl(c);
+    });
 
-    if (!galleryContainer) {
-        return rawCandidates;
-    }
+    // 1. Gallery container or main content / body fallback
+    const galleryContainer = document.querySelector(
+        '[data-marker="item-view/gallery"], [data-marker="gallery"], .style-item-view-gallery-, .gallery-root, [data-marker="image-frame/image-wrapper"], [data-marker="gallery/list"], [data-marker="item-view/main"] [data-marker*="gallery"], [data-marker="item-view/main"], [class*="gallery"], [class*="image-frame"], main'
+    ) || document.body;
 
     function isInsideExcluded(el) {
         if (!el || !el.closest) return false;
@@ -519,18 +525,20 @@ function extractPhotosFromDom() {
                   el.closest('[data-marker="seller-items"]') ||
                   el.closest('.similar-items') ||
                   el.closest('.recommendations-root') ||
-                  el.closest('.serp-item'));
+                  el.closest('.serp-item') ||
+                  el.closest('header') ||
+                  el.closest('footer'));
     }
 
-    // 1. Scan links wrapping gallery images
-    const links = galleryContainer.querySelectorAll('a[href*="img.avito.st"]');
+    // 2. Scan links wrapping gallery images
+    const links = galleryContainer.querySelectorAll('a[href*="img.avito.st"], a[href*="avito.st"]');
     links.forEach(a => {
         if (isInsideExcluded(a)) return;
         addUrl(a.href);
     });
 
-    // 2. Scan elements with data-url / data-src / data-large / data-full / data-high-res / data-preview
-    const dataEls = galleryContainer.querySelectorAll('[data-url*="img.avito.st"], [data-src*="img.avito.st"], [data-large*="img.avito.st"], [data-full*="img.avito.st"], [data-high-res*="img.avito.st"], [data-preview*="img.avito.st"], [data-img*="img.avito.st"]');
+    // 3. Scan elements with data-url / data-src / data-large / data-full / data-high-res / data-preview
+    const dataEls = galleryContainer.querySelectorAll('[data-url*="avito.st"], [data-src*="avito.st"], [data-large*="avito.st"], [data-full*="avito.st"], [data-high-res*="avito.st"], [data-preview*="avito.st"], [data-img*="avito.st"]');
     dataEls.forEach(el => {
         if (isInsideExcluded(el)) return;
         ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res', 'data-preview', 'data-img'].forEach(attr => {
@@ -539,7 +547,7 @@ function extractPhotosFromDom() {
         });
     });
 
-    // 3. Scan img and picture source elements inside gallery
+    // 4. Scan img and picture source elements inside gallery
     const selector = [
         '[data-marker="image-frame/image-wrapper"] img',
         '[data-marker="gallery/image"] img',
@@ -555,8 +563,8 @@ function extractPhotosFromDom() {
         '.gallery-img',
         '.image-frame-wrapper img',
         '.gallery-list img',
-        'img[src*="img.avito.st"]',
-        'img[data-src*="img.avito.st"]'
+        'img[src*="avito.st"]',
+        'img[data-src*="avito.st"]'
     ].join(', ');
 
     const els = galleryContainer.querySelectorAll(selector);
@@ -564,7 +572,7 @@ function extractPhotosFromDom() {
         if (isInsideExcluded(el)) return;
 
         const parentLink = el.closest('a');
-        if (parentLink && parentLink.href && parentLink.href.includes('img.avito.st') && !isInsideExcluded(parentLink)) {
+        if (parentLink && parentLink.href && parentLink.href.includes('avito.st') && !isInsideExcluded(parentLink)) {
             addUrl(parentLink.href);
         }
 
@@ -578,12 +586,12 @@ function extractPhotosFromDom() {
         if (el.dataset && el.dataset.src) addUrl(el.dataset.src);
     });
 
-    // 4. Scan elements with background-image style inside gallery
-    const bgEls = galleryContainer.querySelectorAll('[style*="img.avito.st"]');
+    // 5. Scan elements with background-image style inside gallery
+    const bgEls = galleryContainer.querySelectorAll('[style*="avito.st"]');
     bgEls.forEach(el => {
         if (isInsideExcluded(el)) return;
         const style = el.getAttribute('style') || '';
-        const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+?\.img\.avito\.st[^\'")\s]+)['"]?\)/i);
+        const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+?avito\.st[^\'")\s]+)['"]?\)/i);
         if (match && match[1]) {
             addUrl(match[1]);
         }
