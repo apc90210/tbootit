@@ -77,9 +77,49 @@ def test_category_suggestion_matching_and_step_flow():
         content = f.read()
 
     assert "matchCategorySuggestion" in content
+    assert "scoreCategorySuggestion" in content
     assert "CATEGORY_HARDWARE_KEYWORDS" in content
     assert "category-tile" in content
     assert "suggested-category" in content
+    assert "laserjet" in content
+    assert "printer" in content
+    assert "findCategorySuggestTiles" in content
+    assert "handleCategorySuggestions" in content
+
+def test_dropdown_collapse_discipline():
+    """Verify content.js provides collapseOpenDropdowns to close open dropdowns via Escape & outside clicks."""
+    content_js_path = os.path.abspath("chrome-extension/technoreboot-avito/content.js")
+    with open(content_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "collapseOpenDropdowns" in content
+    assert "code: 'Escape'" in content or 'key: "Escape"' in content or "'Escape'" in content
+    assert "mousedown" in content
+    assert "blur()" in content
+
+def test_rich_text_and_textarea_description_support():
+    """Verify content.js supports textarea, contenteditable, role textbox, and aria-labels for description."""
+    content_js_path = os.path.abspath("chrome-extension/technoreboot-avito/content.js")
+    with open(content_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "contenteditable" in content
+    assert "execCommand('insertText'" in content or 'execCommand("insertText"' in content
+    assert "HTMLTextAreaElement.prototype" in content
+
+def test_address_location_geocoding_support():
+    """Verify content.js contains address alias matching, dynamic verified address support, and geocoder suggestion selection."""
+    content_js_path = os.path.abspath("chrome-extension/technoreboot-avito/content.js")
+    with open(content_js_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "DEFAULT_ADDRESS" not in content
+    assert "Кузнецова" not in content
+    assert "selectAddressSuggestion" in content
+    assert "address-suggest" in content
+    assert "местоположение" in content
+    assert "forceClickElement" in content
+
 
 
 

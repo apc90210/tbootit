@@ -5,9 +5,16 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from validate_extension_package import validate_extension_directory, validate_extension_zip
 
-VERSION = "0.2.10"
+import json
+
+def get_version():
+    manifest_path = os.path.abspath("chrome-extension/technoreboot-avito/manifest.json")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("version", "0.2.30")
 
 def build_zip():
+    version = get_version()
     extension_dir = os.path.abspath("chrome-extension/technoreboot-avito")
     dist_dir = os.path.abspath("dist")
     admin_app_dir = os.path.abspath("admin-shell/app")
@@ -16,7 +23,7 @@ def build_zip():
     # 1. Validate source directory first
     validate_extension_directory(extension_dir)
 
-    zip_filename = f"technoreboot-avito-extension-{VERSION}.zip"
+    zip_filename = f"technoreboot-avito-extension-{version}.zip"
     zip_path = os.path.join(dist_dir, zip_filename)
     admin_zip_path = os.path.join(admin_app_dir, zip_filename)
     generic_admin_zip_path = os.path.join(admin_app_dir, "technoreboot-avito-extension.zip")

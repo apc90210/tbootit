@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.18)
+// Technoreboot Avito Popup Script (v0.2.31)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.18";
+        let manifestVer = "0.2.30";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -328,15 +328,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                     function combineReports(r1, r2) {
                         const filled = [...(r1.filled || []), ...(r2.filled || [])];
                         const skipped = [...(r1.skipped_nonempty || []), ...(r2.skipped_nonempty || [])];
-                        const filledKeys = new Set(filled.map(f => f.source));
-                        const unresFields = (r2.unresolved_fields || []).filter(u => !filledKeys.has(u.key));
+                        const filledKeys = new Set(filled.map(f => f.source || f.target));
+                        const unresFields = (r2.unresolved_fields || []).filter(u => !filledKeys.has(u.key || u.field));
                         const unresOptions = [...(r1.unresolved_options || []), ...(r2.unresolved_options || [])];
+                        const protectedActions = [...(r1.protected_actions || []), ...(r2.protected_actions || [])];
                         return {
                             product_id: r2.product_id || r1.product_id,
+                            category: (r2.category && r2.category.status !== 'manual_required') ? r2.category : (r1.category || { status: 'manual_required' }),
+                            address: (r2.address && r2.address.status !== 'manual_required') ? r2.address : (r1.address || { status: 'manual_required' }),
                             filled,
                             skipped_nonempty: skipped,
                             unresolved_fields: unresFields,
-                            unresolved_options: unresOptions
+                            unresolved_options: unresOptions,
+                            protected_actions: protectedActions
                         };
                     }
 
@@ -347,8 +351,33 @@ document.addEventListener("DOMContentLoaded", async () => {
                         const unresFieldsCount = (report.unresolved_fields || []).length;
                         const unresOptionsCount = (report.unresolved_options || []).length;
 
+                        let catStatusHtml = "";
+                        if (report.category) {
+                            if (report.category.status === 'selected') {
+                                catStatusHtml = `• Категория: <span style="color:#2e7d32; font-weight:600;">✓ ${report.category.selected}</span><br>`;
+                            } else if (report.category.status === 'ambiguous') {
+                                const candList = (report.category.candidates || []).slice(0, 2).map(c => c.text).join(', ');
+                                catStatusHtml = `• Категория: <span style="color:#e65100; font-weight:600;">⚠️ Несколько вариантов (${candList || 'требуется уточнение'})</span><br>`;
+                            } else {
+                                catStatusHtml = `• Категория: <span style="color:#555;">ℹ️ Ручной выбор на форме</span><br>`;
+                            }
+                        }
+
+                        let addrStatusHtml = "";
+                        if (report.address) {
+                            if (report.address.status === 'filled') {
+                                addrStatusHtml = `• Адрес: <span style="color:#2e7d32; font-weight:600;">✓ ${report.address.selected}</span><br>`;
+                            } else if (report.address.status === 'ambiguous') {
+                                addrStatusHtml = `• Адрес: <span style="color:#e65100; font-weight:600;">⚠️ Неоднозначный адрес (проверьте на карте)</span><br>`;
+                            } else {
+                                addrStatusHtml = `• Адрес: <span style="color:#555;">ℹ️ Адрес не указан в пакете (ручной ввод)</span><br>`;
+                            }
+                        }
+
                         fillSummary.innerHTML = `
                             <strong>Результат заполнения:</strong><br>
+                            ${catStatusHtml}
+                            ${addrStatusHtml}
                             • Заполнено полей: <strong>${filledCount}</strong><br>
                             • Пропущено (уже заполнено): <strong>${skippedCount}</strong><br>
                             • Ожидают ввода / не найдены: <strong>${unresFieldsCount}</strong><br>
@@ -363,7 +392,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             detailsHtml += "<strong>Уже были заполнены:</strong><br>" + report.skipped_nonempty.map(s => `- ${s.target}: ${s.existing_value}`).join("<br>") + "<br><br>";
                         }
                         if (unresFieldsCount > 0) {
-                            detailsHtml += "<strong>Не сопоставлены:</strong><br>" + report.unresolved_fields.map(u => `? ${u.key}: ${u.value}`).join("<br>");
+                            detailsHtml += "<strong>Не сопоставлены:</strong><br>" + report.unresolved_fields.map(u => `? ${u.key || u.field || 'поле'}: ${u.reason || u.value || ''}`).join("<br>");
                         }
 
                         fillDetails.innerHTML = detailsHtml;
@@ -412,7 +441,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                             fillMsg.className = "msg msg-success";
                                             fillMsg.innerHTML = "✓ Все доступные шаги выполнены: название, категория, цена, состояние и характеристики заполнены!";
                                         });
-                                    }, 1200);
+                                    }, 2200);
                                 } else {
                                     fillAutoBtn.disabled = false;
                                     fillStepBtn.disabled = false;

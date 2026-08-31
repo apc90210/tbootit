@@ -480,14 +480,24 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.18"
+    version = "0.2.32"
     filename = f"technoreboot-avito-extension-{version}.zip"
-    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), filename))
-    if not os.path.exists(zip_path):
-        zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip"))
-    if not os.path.exists(zip_path):
-        zip_path = os.path.abspath(f"dist/{filename}")
-    if not os.path.exists(zip_path):
+    candidate_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), filename)),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "app", filename)),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "app", "technoreboot-avito-extension.zip")),
+        os.path.abspath(f"/app/{filename}"),
+        os.path.abspath(f"/app/app/{filename}"),
+        os.path.abspath(f"dist/{filename}"),
+        os.path.abspath(f"admin-shell/app/{filename}"),
+    ]
+    zip_path = None
+    for p in candidate_paths:
+        if os.path.exists(p):
+            zip_path = p
+            break
+    if not zip_path or not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail="Файл расширения не найден.")
     
     return FileResponse(

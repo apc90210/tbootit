@@ -108,3 +108,24 @@ The extension strictly refuses to interact with controls matching dangerous keyw
 - `разместить`, `опубликовать`, `подать объявление`, `отправить`, `подтвердить`, `оплатить`, `купить`, `продолжить`, `далее`, `готово`, `сохранить и опубликовать`.
 - `form.submit()`, `HTMLFormElement.prototype.submit`, `requestSubmit()`, Enter key synthetics are **strictly prohibited**.
 - Photo file upload (`input[type=file]`), contact preferences, delivery settings, and paid tariffs are **strictly manual**.
+
+---
+
+## 6. Category Confidence Gate & Ambiguity Control (Stage 06A-R11-R1)
+
+To protect the Owner from incorrect category transitions:
+1. **Source Evidence Priority**: `category.observed_path` (highest) > `category.display_name` > `characteristics["Категория"]` > strong hardware title keywords.
+2. **Confidence Threshold**: Auto-click allowed only when top score >= `100` AND top1-top2 gap >= `30` (or single candidate score >= `100`).
+3. **Ambiguity Gate**: If score < 100 or gap < 30, no auto-click is performed; reported as `CATEGORY_AMBIGUOUS` or `CATEGORY_LOW_CONFIDENCE`, and Owner selects manually.
+4. **Scope Isolation**: Strictly excludes recommendation carousels, anchors (`<a>`), `[target="_blank"]`, listing snippets, and cards.
+
+---
+
+## 7. Address Safety & Dynamic Geocoder Scoping (Stage 06A-R11-R1)
+
+1. **No Hardcoded Literal Address**: Universal literal address strings are prohibited in extension code.
+2. **Server-Driven Configuration**: Address is provided dynamically in `package.location` from `OrganizationSettings.address`.
+3. **Dynamic Token Matching**: Geocoder scoring matches candidate text against target address tokens (street name, numbers).
+4. **Strict Container Scoping**: Suggestion options are searched only within the direct address/location container (`[data-marker*="location"], [data-marker*="address"], [data-marker*="geo"]`).
+5. **Safe Fallback**: If no suggestion matches or ambiguity is detected (< 20 gap), input commits typed address via `Enter` without clicking external DOM elements.
+

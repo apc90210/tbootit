@@ -1,36 +1,6 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.18)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.30)
 
-let pageInitialData = null;
 
-// Listen for direct initial data captured from main world
-document.addEventListener('TechnorebootInitialData', function(e) {
-    if (e && e.detail) {
-        try {
-            pageInitialData = typeof e.detail === 'string' ? JSON.parse(e.detail) : e.detail;
-        } catch (err) {}
-    }
-});
-
-function triggerInitialDataCapture() {
-    try {
-        const script = document.createElement('script');
-        script.textContent = `
-            (function() {
-                try {
-                    var d = window.__initialData__ || window.__INITIAL_STATE__ || window.__state__;
-                    if (d) {
-                        document.dispatchEvent(new CustomEvent('TechnorebootInitialData', { detail: JSON.stringify(d) }));
-                    }
-                } catch(e) {}
-            })();
-        `;
-        (document.head || document.documentElement).appendChild(script);
-        script.remove();
-    } catch (e) {}
-}
-
-// Immediately attempt capture on load
-triggerInitialDataCapture();
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -1060,16 +1030,18 @@ async function walkAndCollectAllGalleryPhotos() {
                 if (typeof thumb.scrollIntoView === 'function') {
                     thumb.scrollIntoView({ block: 'nearest', inline: 'center' });
                 }
-                const clickTarget = thumb.querySelector('button, img, a') || thumb;
-                clickTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
-                clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
-                clickTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
-                clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                clickTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
-                clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-                clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                if (typeof clickTarget.click === 'function') {
-                    clickTarget.click();
+                const clickTarget = thumb.querySelector('button, img') || (thumb.tagName !== 'A' ? thumb : null);
+                if (clickTarget) {
+                    clickTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
+                    clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                    clickTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+                    clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                    clickTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+                    clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                    clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                    if (typeof clickTarget.click === 'function' && clickTarget.tagName !== 'A') {
+                        clickTarget.click();
+                    }
                 }
             } catch (e) {}
 
@@ -1079,8 +1051,8 @@ async function walkAndCollectAllGalleryPhotos() {
 
         // Restore first thumbnail
         try {
-            const firstTarget = thumbs[0].querySelector('button, img, a') || thumbs[0];
-            if (typeof firstTarget.click === 'function') firstTarget.click();
+            const firstTarget = thumbs[0].querySelector('button, img') || (thumbs[0].tagName !== 'A' ? thumbs[0] : null);
+            if (firstTarget && typeof firstTarget.click === 'function' && firstTarget.tagName !== 'A') firstTarget.click();
         } catch (e) {}
     } else {
         // Arrow-based fallback if no list items
@@ -1297,7 +1269,7 @@ async function extractListingDataMultiPass() {
 }
 
 // ============================================================================
-// STAGE 06A-R10B: SAFE BROWSER-ASSISTED AVITO PUBLICATION FORM ADAPTER
+// STAGE 06A-R11-R1: SAFE BROWSER-ASSISTED AVITO PUBLICATION FORM ADAPTER (v0.2.32)
 // ============================================================================
 
 const DANGEROUS_ACTION_KEYWORDS = [
@@ -1311,16 +1283,26 @@ const DANGEROUS_ACTION_KEYWORDS = [
     "продолжить",
     "далее",
     "готово",
-    "сохранить и опубликовать"
+    "сохранить и опубликовать",
+    "продвижение",
+    "турбо",
+    "премиум",
+    "сделать x2",
+    "сделать x5",
+    "сделать x10",
+    "удалить",
+    "снять с публикации",
+    "закрыть объявление"
 ];
 
 const CORE_FIELD_ALIASES = {
     title: ["название", "заголовок", "название товара", "заголовок объявления", "что вы продаете", "что продаете", "что вы продаёте", "что продаёте", "title", "title input", "наименование"],
-    description: ["описание", "описание товара", "текст объявления", "description"],
-    price: ["цена", "стоимость", "цена товара", "price"],
-    condition: ["состояние", "состояние товара", "condition"],
-    brand: ["бренд", "производитель", "марка", "brand"],
-    model: ["модель", "модель материнской платы", "модель устройства", "модель процессора", "модель видеокарты", "model"]
+    description: ["описание", "описание товара", "текст объявления", "подробное описание", "расскажите о товаре", "подумайте, что бы вы хотели узнать", "description"],
+    price: ["цена", "стоимость", "цена товара", "цена руб", "цена ₽", "стоимость руб", "price"],
+    condition: ["состояние", "состояние товара", "вид состояния", "condition"],
+    brand: ["бренд", "производитель", "марка", "фирма", "изготовитель", "brand", "manufacturer"],
+    model: ["модель", "модель материнской платы", "модель устройства", "модель процессора", "модель видеокарты", "название модели", "серия", "линейка", "model"],
+    address: ["местоположение", "адрес", "город, улица, дом", "город", "улица", "где находится", "точка на карте", "location", "address"]
 };
 
 function normalizeFieldLabel(label) {
@@ -1386,11 +1368,55 @@ function isDangerousControl(el) {
     return false;
 }
 
+function forceClickElement(el) {
+    if (!el) return false;
+    try {
+        if (isDangerousControl(el)) return false;
+        // HARD SAFETY GUARD: Never click <a> links or anything with href or target=_blank!
+        if (el.tagName === 'A' || el.getAttribute('href') || el.closest('a') || el.closest('[href]')) {
+            return false;
+        }
+        if (el.getAttribute('target') === '_blank' || el.closest('[target="_blank"]')) {
+            return false;
+        }
+        if (el.getAttribute('data-item-id') || el.closest('[data-item-id]')) {
+            return false;
+        }
+        if (el.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="search-form"]')) {
+            return false;
+        }
+        if (el.closest('[data-marker*="recommend"], [data-marker*="similar"], [class*="recommend"], [class*="similar"], [data-marker*="items-carousel"], [data-marker*="catalog"], [data-marker*="serp"], [data-marker*="item-"], [data-marker*="snippet"], [class*="snippet"], [class*="card"], [class*="listing"]')) {
+            return false;
+        }
+
+        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+        el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+        el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+        el.click();
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function collapseOpenDropdowns() {
+    try {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+        document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        if (document.activeElement && document.activeElement !== document.body) {
+            try { document.activeElement.blur(); } catch (e) {}
+        }
+    } catch (e) {}
+}
+
 function resolveFieldLabel(inputEl) {
     if (!inputEl) return '';
 
     // Direct check for textarea / rich description editors
-    if (inputEl.tagName === 'TEXTAREA' || inputEl.getAttribute('contenteditable') === 'true') {
+    if (inputEl.tagName === 'TEXTAREA' || inputEl.getAttribute('contenteditable') === 'true' || inputEl.getAttribute('role') === 'textbox') {
         const placeholder = normalizeFieldLabel(inputEl.getAttribute('placeholder') || '');
         const nameAttr = normalizeFieldLabel(inputEl.getAttribute('name') || '');
         const dataMarker = normalizeFieldLabel(inputEl.getAttribute('data-marker') || '');
@@ -1407,6 +1433,7 @@ function resolveFieldLabel(inputEl) {
         }
         if (placeholder.includes('описание') || placeholder.includes('подумайт') || placeholder.includes('расскаж')) return 'описание';
         if (placeholder.includes('цена') || placeholder.includes('стоимость')) return 'цена';
+        if (placeholder.includes('город') || placeholder.includes('улиц') || placeholder.includes('адрес')) return 'местоположение';
     }
 
     // 0.01. Direct data-marker check for common Avito inputs
@@ -1415,6 +1442,7 @@ function resolveFieldLabel(inputEl) {
         if (dataMarker.includes('description') || dataMarker.includes('params[200]')) return 'описание';
         if (dataMarker.includes('price') || dataMarker.includes('params[201]')) return 'цена';
         if (dataMarker.includes('title') || dataMarker.includes('params[100]')) return 'название';
+        if (dataMarker.includes('location') || dataMarker.includes('address') || dataMarker.includes('params[202]')) return 'местоположение';
     }
 
     // 0.1. Direct text if inputEl is a title/legend/heading/span element
@@ -1488,10 +1516,33 @@ function setReactInputValue(el, value) {
     if (!el) return;
     const strVal = String(value);
 
+    // Handle contenteditable / rich text description editors
+    if (el.getAttribute('contenteditable') === 'true' || el.getAttribute('role') === 'textbox') {
+        try {
+            el.focus();
+            if (typeof document.execCommand === 'function') {
+                document.execCommand('insertText', false, strVal);
+            }
+            if (!el.innerText || el.innerText.trim() === '') {
+                el.innerText = strVal;
+                el.textContent = strVal;
+            }
+        } catch (e) {
+            el.innerText = strVal;
+            el.textContent = strVal;
+        }
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+        return;
+    }
+
     // Set value on DOM element using prototype descriptor to notify React/Vue/Angular state
     try {
         const prototype = Object.getPrototypeOf(el);
-        const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value') || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value') ||
+            Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ||
+            Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
         if (descriptor && descriptor.set) {
             descriptor.set.call(el, strVal);
         } else {
@@ -1525,57 +1576,93 @@ function delay(ms) {
 async function selectDropdownSuggestion(inputEl, targetValue) {
     if (!inputEl || !targetValue) return false;
 
-    // 1. Focus and click to trigger dropdown activation
+    const normTarget = normalizeFieldLabel(targetValue);
+    const targetTokens = normTarget.split(/[\s\-_\/,\.]+/).filter(t => t.length >= 2);
+    const targetNumbers = (normTarget.match(/\d{2,}/g) || []);
+
+    // 1. Focus input and wait for UI to activate
     try {
         inputEl.focus();
+    } catch (e) {}
+    await delay(200);
+
+    // 2. Click input to trigger opening of dropdown
+    try {
         inputEl.click();
     } catch (e) {}
+    await delay(300);
 
-    // 2. Set value using React property descriptor
+    // 3. Set value using React property descriptor
+    // If target has specific model number (e.g. "1102"), type it to filter the listbox
     setReactInputValue(inputEl, targetValue);
+    await delay(250);
 
-    // 3. Dispatch keyboard events so autocomplete filtering triggers
-    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', bubbles: true }));
+    // 4. Dispatch keyboard and input events so autocomplete filtering triggers in React
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
 
-    // 4. Poll for suggestion dropdown listbox to mount (up to 800ms)
-    const normTarget = normalizeFieldLabel(targetValue);
-    const targetTokens = normTarget.split(/[\s\-_\/]+/).filter(t => t.length >= 2);
+    // 5. PAUSE: Give Avito React component time to open/render the dropdown listbox
+    await delay(500);
 
     let candidateOptions = [];
-    for (let wait = 0; wait < 8; wait++) {
-        await delay(100);
+    for (let wait = 0; wait < 12; wait++) {
+        // Collect active dropdown listbox / popup containers (strictly within field or known dropdown classes)
+        const parentField = inputEl.closest('[class*="field-"], [class*="param-"], [class*="input-"], [data-marker*="param"], [class*="suggest-"]');
+        let containers = [];
 
-        // Search scope: parent container first, or listbox/dropdown containers on page
-        const parentContainer = inputEl.closest('[class*="field"], [class*="param"], [class*="item"], [data-marker*="param"], fieldset, form') || document;
-        const optionSelectors = [
-            '[role="listbox"] [role="option"]',
-            '[role="listbox"] li',
-            '[data-marker*="suggest-item"]',
-            '[data-marker*="option-item"]',
-            '[class*="suggest-item"]',
-            '[class*="suggestions-item"]',
-            '[class*="dropdown-item"]',
-            '[class*="select-item"]',
-            '[class*="options-item"]',
-            '[class*="popup"] [role="option"]',
-            '[class*="popup"] li'
-        ];
+        if (parentField) {
+            const localBoxes = Array.from(parentField.querySelectorAll(
+                '[role="listbox"], [data-marker*="suggest"], [data-marker*="dropdown"], [class*="suggestions-list"], [class*="dropdown-list"], [class*="select-list"], ul[class*="suggest"], ul[class*="dropdown"]'
+            ));
+            containers.push(...localBoxes);
+        }
 
-        candidateOptions = Array.from(parentContainer.querySelectorAll(optionSelectors.join(',')))
+        // Global listboxes attached to body (React Portals)
+        const globalBoxes = Array.from(document.querySelectorAll(
+            '[role="listbox"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"], ul[class*="suggestions"]'
+        )).filter(box => {
+            if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="catalog"], [data-marker*="items"], [class*="catalog"], [class*="items-"]')) return false;
+            return isElementVisible(box);
+        });
+        containers.push(...globalBoxes);
+
+        // Extract option items ONLY from inside these verified listbox containers
+        const found = [];
+        for (const container of containers) {
+            const items = Array.from(container.querySelectorAll(
+                '[role="option"], [data-marker*="suggest-item"], [data-marker*="option-item"], [data-marker*="option"], [class*="suggest-item"], [class*="dropdown-item"], [class*="select-item"], [class*="option-item"], li[class*="suggest"], li[class*="option"]'
+            ))
             .filter(isElementVisible)
             .filter(o => !isDangerousControl(o))
             .filter(o => {
-                // HARD SAFETY GUARD: Never click <a> navigation links to other ads or header elements!
-                if (o.tagName === 'A' || o.getAttribute('href') || o.closest('a[href]')) return false;
-                if (o.closest('header, nav, [data-marker*="header"], [data-marker*="search-form"]')) return false;
+                // NEVER click <a> links or ad items
+                if (o.tagName === 'A' || o.getAttribute('href') || o.closest('a') || o.closest('[href]')) return false;
+                if (o.getAttribute('target') === '_blank' || o.closest('[target="_blank"]')) return false;
+                if (o.getAttribute('data-item-id') || o.closest('[data-item-id]')) return false;
+                if (o.closest('[data-marker*="recommend"], [data-marker*="similar"], [class*="recommend"], [class*="similar"], [data-marker*="item-"], [data-marker*="snippet"], [class*="snippet"], [class*="card"], [class*="listing"], footer, header, nav')) return false;
                 return true;
             });
+            found.push(...items);
+        }
 
-        if (candidateOptions.length > 0) break;
+        if (found.length > 0) {
+            candidateOptions = found;
+            break;
+        }
+
+        if (wait === 2 || wait === 5) {
+            inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+        }
+
+        await delay(150);
     }
 
     let bestMatch = null;
+    let bestScore = -1;
+
+    let scoredCandidates = [];
+
     for (const opt of candidateOptions) {
         let rawText = '';
         const span = opt.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
@@ -1587,50 +1674,306 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
         const optText = normalizeFieldLabel(rawText);
         if (!optText) continue;
 
+        let score = 0;
+
         // Exact match
         if (optText === normTarget) {
-            bestMatch = opt;
-            break;
+            score = 1000;
+        } else if (optText.startsWith(normTarget) || normTarget.startsWith(optText)) {
+            score = 500;
+        } else if (optText.includes(normTarget) || normTarget.includes(optText)) {
+            score = 300;
         }
 
-        // Option starts with target or target starts with option
-        if (optText.startsWith(normTarget) || normTarget.startsWith(optText)) {
-            bestMatch = opt;
-            break;
+        // Number match boost (e.g. "1102" in "HP LaserJet Pro P1102")
+        if (targetNumbers.length > 0) {
+            for (const num of targetNumbers) {
+                if (optText.includes(num)) {
+                    score += 400;
+                }
+            }
         }
 
-        // Substring match
-        if (optText.includes(normTarget) || normTarget.includes(optText)) {
-            bestMatch = opt;
-            break;
+        // Token match boost
+        if (targetTokens.length > 0) {
+            for (const tok of targetTokens) {
+                if (optText.includes(tok)) {
+                    score += 50;
+                }
+            }
         }
 
-        // Token match (e.g. "M252" in "HP Color LaserJet Pro M252")
-        if (targetTokens.length > 0 && targetTokens.some(tok => optText.includes(tok))) {
-            if (!bestMatch) bestMatch = opt;
+        scoredCandidates.push({ opt, text: rawText.trim(), score });
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMatch = opt;
         }
     }
 
-    if (bestMatch) {
-        bestMatch.click();
+    scoredCandidates.sort((a, b) => b.score - a.score);
+    const top1 = scoredCandidates[0] || null;
+    const top2 = scoredCandidates[1] || null;
+
+    // Check for ambiguity: multiple candidates with identical top score < 1000 and target has number/token
+    if (top1 && top2 && top1.score === top2.score && top1.score < 1000 && top1.score > 0) {
+        // Ambiguous model/option candidates: do NOT click!
+        inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
         inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-        inputEl.dispatchEvent(new Event('blur', { bubbles: true }));
-        await delay(300);
+        await delay(350);
+        return false;
+    }
+
+    // If no scored match but only 1 option in listbox, choose it if safe
+    if (!bestMatch && candidateOptions.length === 1) {
+        bestMatch = candidateOptions[0];
+        bestScore = 100;
+    }
+
+    if (bestMatch && bestScore > 0) {
+        await delay(250);
+
+        // Safe click
+        const clicked = forceClickElement(bestMatch);
+        if (!clicked) {
+            if (!bestMatch.closest('a') && !bestMatch.getAttribute('href') && !bestMatch.getAttribute('data-item-id')) {
+                bestMatch.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+                bestMatch.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+                bestMatch.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+                bestMatch.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+                try { bestMatch.click(); } catch (e) {}
+            }
+        }
+
+        // Also click inner span/div if present and safe
+        const innerClickable = bestMatch.querySelector('span, div, [class*="text"]');
+        if (innerClickable && !innerClickable.closest('a') && !innerClickable.getAttribute('href')) {
+            try {
+                innerClickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+                innerClickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+                innerClickable.click();
+            } catch (e) {}
+        }
+
+        // Confirm via Enter on input
+        inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+        inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+        await delay(450);
         return true;
     }
 
-    // Fallback: press Enter on the input
-    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    // Fallback: press Enter on input to confirm typed value
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-    inputEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    await delay(350);
+    return true;
+}
+
+async function selectAddressSuggestion(inputEl, targetAddress, locationData, report) {
+    if (!inputEl) return false;
+    const addressToUse = (typeof targetAddress === 'string' && targetAddress.trim()) ? targetAddress.trim() : (locationData && locationData.address ? String(locationData.address).trim() : '');
+    const isVerified = (locationData && locationData.verified !== false) || (typeof targetAddress === 'string' && targetAddress.trim().length > 0);
+
+    if (!isVerified || !addressToUse) {
+        if (report) {
+            report.address = {
+                status: 'manual_required',
+                source: (locationData && locationData.source) || 'none',
+                selected: null
+            };
+            report.unresolved_fields.push({
+                field: 'address',
+                reason: 'ADDRESS_MANUAL_REQUIRED'
+            });
+        }
+        return false;
+    }
+
+    try {
+        inputEl.focus();
+    } catch (e) {}
     await delay(200);
+
+    try {
+        inputEl.click();
+    } catch (e) {}
+    await delay(250);
+
+    setReactInputValue(inputEl, addressToUse);
+    await delay(250);
+
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
+
+    await delay(500);
+
+    const normTarget = normalizeFieldLabel(addressToUse);
+    const targetTokens = normTarget.split(/[\s\-_\/,\.]+/).filter(t => t.length >= 2);
+    const targetNumbers = (normTarget.match(/\d+/g) || []);
+
+    let candidateOptions = [];
+    for (let wait = 0; wait < 10; wait++) {
+        // Collect ONLY geocoder / address popup containers
+        const parentField = inputEl.closest('[data-marker*="location"], [data-marker*="address"], [data-marker*="geo"], [class*="location-"], [class*="address-"], [class*="geo-"], [class*="suggest-"]');
+        let containers = [];
+
+        if (parentField) {
+            const localBoxes = Array.from(parentField.querySelectorAll(
+                '[role="listbox"], [data-marker*="suggest-list"], [data-marker*="geo-suggest"], [data-marker*="address-suggest"], [class*="suggestions-list"], [class*="suggests-"], [class*="geo-suggest"], [class*="address-suggest"]'
+            ));
+            containers.push(...localBoxes);
+        }
+
+        // Dedicated global geocoder popups
+        const globalBoxes = Array.from(document.querySelectorAll(
+            '[data-marker*="address-suggest"], [data-marker*="geo-suggest"], [data-marker*="location-suggest"], div[class*="geo-suggest"], div[class*="address-suggest"], div[class*="location-suggest"], [role="listbox"][data-marker*="suggest"], div[class*="suggestions-list"]'
+        )).filter(box => {
+            if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="catalog"], [data-marker*="items"], [class*="catalog"], [class*="items-"]')) return false;
+            return isElementVisible(box);
+        });
+        containers.push(...globalBoxes);
+
+        const found = [];
+        for (const container of containers) {
+            const items = Array.from(container.querySelectorAll(
+                '[role="option"], [data-marker*="suggest-item"], [data-marker*="geo-suggest-item"], [data-marker*="address-item"], [data-marker*="geo-item"], [class*="suggest-item"], [class*="geo-suggest-item"], [class*="address-suggest-item"]'
+            ))
+            .filter(isElementVisible)
+            .filter(o => !isDangerousControl(o))
+            .filter(o => {
+                if (o.tagName === 'A' || o.getAttribute('href') || o.closest('a') || o.closest('[href]')) return false;
+                if (o.getAttribute('target') === '_blank' || o.closest('[target="_blank"]')) return false;
+                if (o.getAttribute('data-item-id') || o.closest('[data-item-id]')) return false;
+                if (o.closest('[data-marker*="recommend"], [data-marker*="similar"], [class*="recommend"], [class*="similar"], [data-marker*="item-"], [data-marker*="snippet"], [class*="snippet"], [class*="card"], [class*="listing"], footer, header, nav, [data-marker*="catalog"]')) return false;
+                return true;
+            });
+            found.push(...items);
+        }
+
+        if (found.length > 0) {
+            candidateOptions = found;
+            break;
+        }
+
+        await delay(150);
+    }
+
+    let scoredCandidates = [];
+
+    for (const opt of candidateOptions) {
+        let rawText = '';
+        const span = opt.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+        if (span && span.innerText) {
+            rawText = span.innerText;
+        } else {
+            rawText = opt.innerText || opt.textContent || opt.getAttribute('data-marker') || '';
+        }
+        const text = normalizeFieldLabel(rawText);
+        if (!text) continue;
+
+        let score = 0;
+        for (const tok of targetTokens) {
+            if (text.includes(tok)) score += 30;
+        }
+        for (const num of targetNumbers) {
+            if (text.includes(num)) score += 40;
+        }
+        if (text === normTarget) score += 500;
+        else if (text.startsWith(normTarget) || normTarget.startsWith(text)) score += 200;
+
+        scoredCandidates.push({ opt, text: rawText.trim(), score });
+    }
+
+    scoredCandidates.sort((a, b) => b.score - a.score);
+
+    const top1 = scoredCandidates[0] || null;
+    const top2 = scoredCandidates[1] || null;
+
+    const MIN_ADDRESS_CONFIDENCE = 50;
+    const MIN_ADDRESS_GAP = 20;
+
+    let addressAutoSelectAllowed = false;
+    if (top1 && top1.score >= MIN_ADDRESS_CONFIDENCE) {
+        if (!top2 || (top1.score - top2.score) >= MIN_ADDRESS_GAP || top1.score >= 500) {
+            addressAutoSelectAllowed = true;
+        }
+    }
+
+    if (addressAutoSelectAllowed && top1) {
+        await delay(200);
+
+        const clicked = forceClickElement(top1.opt);
+        if (!clicked) {
+            if (!top1.opt.closest('a') && !top1.opt.getAttribute('href') && !top1.opt.getAttribute('data-item-id')) {
+                top1.opt.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+                top1.opt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
+                top1.opt.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+                top1.opt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
+                try { top1.opt.click(); } catch (e) {}
+            }
+        }
+
+        inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+        inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+        if (report) {
+            report.address = {
+                status: 'filled',
+                source: (locationData && locationData.source) || 'package',
+                selected: top1.text || addressToUse
+            };
+            report.filled.push({ source: 'address', target: 'местоположение', value: top1.text || addressToUse, type: 'address-suggest' });
+        }
+
+        await delay(400);
+        return true;
+    }
+
+    if (top1 && top2 && (top1.score - top2.score) < MIN_ADDRESS_GAP && top1.score > 0) {
+        // Ambiguous address options
+        if (report) {
+            report.address = {
+                status: 'ambiguous',
+                source: (locationData && locationData.source) || 'package',
+                selected: null,
+                candidates: scoredCandidates.slice(0, 3).map(c => ({ text: c.text, score: c.score }))
+            };
+            report.unresolved_fields.push({
+                field: 'address',
+                reason: 'AMBIGUOUS_ADDRESS_SUGGESTIONS',
+                candidates: scoredCandidates.slice(0, 3).map(c => c.text)
+            });
+        }
+        return false;
+    }
+
+    // Safe fallback: commit typed addressToUse via Enter without clicking external DOM elements
+    inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (report) {
+        report.address = {
+            status: 'filled',
+            source: (locationData && locationData.source) || 'package',
+            selected: addressToUse
+        };
+        report.filled.push({ source: 'address', target: 'местоположение', value: addressToUse, type: 'address-input' });
+    }
+
+    await delay(300);
     return true;
 }
 
 const CATEGORY_HARDWARE_KEYWORDS = {
-    printer: ['принтер', 'мфу', 'оргтехник', 'расходник', 'сканер', 'картридж', 'печать', 'струйн', 'лазерн'],
+    printer: ['принтер', 'мфу', 'оргтехник', 'расходник', 'сканер', 'картридж', 'печать', 'струйн', 'лазерн', 'laserjet', 'deskjet'],
     motherboard: ['материнск', 'motherboard', 'системная плата', 'комплектующ'],
     computer: ['компьютер', 'системный блок', 'пк', 'моноблок', 'десктоп', 'настольн'],
     laptop: ['ноутбук', 'laptop', 'нетбук', 'ультрабук'],
@@ -1642,45 +1985,220 @@ const CATEGORY_HARDWARE_KEYWORDS = {
     network: ['роутер', 'маршрутизатор', 'коммутатор', 'сетев']
 };
 
-function matchCategorySuggestion(categoryText, packageData) {
-    if (!categoryText || !packageData) return false;
+function scoreCategorySuggestion(categoryText, packageData) {
+    if (!categoryText || !packageData) return 0;
     const normText = normalizeFieldLabel(categoryText);
+    let score = 0;
+    let hasEvidence = false;
 
-    // 0. Top-level category card matching on /additem (e.g. "Электроника")
-    if (normText === 'электроника' || normText === 'товары' || normText === 'бытовая электроника' || normText === 'электроника и техника') {
-        return true;
-    }
-
-    // 1. Direct match with packageData category display_name or observed_path
-    if (packageData.category) {
-        if (packageData.category.display_name) {
-            const normCatName = normalizeFieldLabel(packageData.category.display_name);
-            if (normText.includes(normCatName) || normCatName.includes(normText)) return true;
-        }
-        if (Array.isArray(packageData.category.observed_path)) {
-            for (const pathItem of packageData.category.observed_path) {
-                const normPath = normalizeFieldLabel(pathItem);
-                if (normPath && (normText.includes(normPath) || normPath.includes(normText))) return true;
+    // Priority 1: Match observed_path (exact path or leaf)
+    const catObj = (typeof packageData.category === 'object' && packageData.category !== null) ? packageData.category : null;
+    const catStr = (typeof packageData.category === 'string') ? packageData.category : (catObj ? catObj.display_name : '');
+    
+    if (catObj && Array.isArray(catObj.observed_path) && catObj.observed_path.length > 0) {
+        for (let i = 0; i < catObj.observed_path.length; i++) {
+            const pathItem = normalizeFieldLabel(catObj.observed_path[i]);
+            if (pathItem) {
+                if (normText === pathItem) {
+                    score += (i === catObj.observed_path.length - 1) ? 350 : 200;
+                    hasEvidence = true;
+                } else if (normText.includes(pathItem) || pathItem.includes(normText)) {
+                    score += 150;
+                    hasEvidence = true;
+                }
             }
         }
     }
 
-    // 2. Direct match with characteristics["Категория"] or characteristics["Вид товара"]
-    const characteristics = packageData.characteristics || {};
-    for (const [key, val] of Object.entries(characteristics)) {
-        if (key.toLowerCase().includes('категор') || key.toLowerCase().includes('вид товара') || key.toLowerCase().includes('тип')) {
-            const normVal = normalizeFieldLabel(String(val));
-            if (normVal && (normText.includes(normVal) || normVal.includes(normText))) return true;
+    // Priority 2: Direct match with category display_name / string
+    if (catStr) {
+        const normCatName = normalizeFieldLabel(catStr);
+        if (normText === normCatName) {
+            score += 300;
+            hasEvidence = true;
+        } else if (normText.includes(normCatName) || normCatName.includes(normText)) {
+            score += 180;
+            hasEvidence = true;
         }
     }
 
-    // 3. Keyword heuristic match against title
+    // Priority 3: Match with characteristics["Категория"] or characteristics["Вид товара"]
+    const characteristics = packageData.characteristics || {};
+    for (const [key, val] of Object.entries(characteristics)) {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('категор') || lowerKey.includes('вид товара') || lowerKey.includes('тип')) {
+            const normVal = normalizeFieldLabel(String(val));
+            if (normVal) {
+                if (normText === normVal) {
+                    score += 220;
+                    hasEvidence = true;
+                } else if (normText.includes(normVal) || normVal.includes(normText)) {
+                    score += 140;
+                    hasEvidence = true;
+                }
+            }
+        }
+    }
+
+    // Priority 4: Keyword heuristic ONLY if title has strong hardware keywords
     const title = normalizeFieldLabel(packageData.title || '');
     for (const [catKey, keywords] of Object.entries(CATEGORY_HARDWARE_KEYWORDS)) {
         const titleMatches = keywords.some(kw => title.includes(kw));
         if (titleMatches) {
             const catMatches = keywords.some(kw => normText.includes(kw));
-            if (catMatches) return true;
+            if (catMatches) {
+                score += 100;
+                hasEvidence = true;
+            }
+        }
+    }
+
+    // Top-level category card matching on /additem (e.g. "Электроника")
+    if (normText === 'электроника' || normText === 'товары' || normText === 'бытовая электроника' || normText === 'электроника и техника') {
+        const hasHw = Object.values(CATEGORY_HARDWARE_KEYWORDS).some(keywords =>
+            keywords.some(kw => title.includes(kw))
+        );
+        if (hasHw) {
+            score += 160;
+            hasEvidence = true;
+        }
+    }
+
+    return hasEvidence ? score : 0;
+}
+
+function matchCategorySuggestion(categoryText, packageData) {
+    return scoreCategorySuggestion(categoryText, packageData) >= 100;
+}
+
+function findCategorySuggestTiles() {
+    const selectors = [
+        '[data-marker*="suggested-category"]',
+        '[data-marker*="category-suggest"]',
+        '[data-marker*="suggested-rubric"]',
+        '[data-marker*="category-item"]',
+        '[data-marker*="rubricator"] button',
+        '[data-marker*="rubricator"] [role="button"]',
+        '[class*="category-tile"]',
+        '[class*="suggestedCategory"]',
+        '[class*="suggested-category"]',
+        '[class*="rubricator"] button',
+        '[class*="rubricator"] [role="button"]',
+        '[class*="category-suggest"] button',
+        'button[class*="category"]',
+        '[class*="suggested-categories-list"] button',
+        '[class*="suggested-categories-list"] [role="button"]',
+        '[class*="suggested-categories"] button',
+        '[data-marker*="category-tile"]',
+        '[data-marker*="suggested-category-tile"]'
+    ];
+
+    return Array.from(document.querySelectorAll(selectors.join(',')))
+        .filter(isElementVisible)
+        .filter(t => !isDangerousControl(t))
+        .filter(t => !t.closest('header, nav, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"]'));
+}
+
+async function handleCategorySuggestions(packageData, report, filledCoreRoles, filledCharacteristicKeys) {
+    // Check if Step 2 parameter inputs (price, description, brand, model) are already mounted
+    const step2Fields = Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"], [role="combobox"]'))
+        .filter(isElementVisible)
+        .map(el => resolveFieldLabel(el))
+        .filter(lbl => lbl === 'цена' || lbl === 'описание' || lbl === 'состояние' || lbl === 'производитель' || lbl === 'модель');
+
+    if (step2Fields.length >= 2) {
+        // Step 2 is already active; do not click category tiles
+        return false;
+    }
+
+    const categorySuggestTiles = findCategorySuggestTiles();
+    if (!categorySuggestTiles || categorySuggestTiles.length === 0) return false;
+
+    let scoredCandidates = [];
+
+    for (const tile of categorySuggestTiles) {
+        let rawCatText = '';
+        const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
+        if (span && span.innerText) {
+            rawCatText = span.innerText;
+        } else {
+            rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
+        }
+        const cleanCatText = rawCatText.trim();
+        const score = scoreCategorySuggestion(cleanCatText, packageData);
+        scoredCandidates.push({ tile, text: cleanCatText, score });
+    }
+
+    scoredCandidates.sort((a, b) => b.score - a.score);
+
+    const top1 = scoredCandidates[0] || null;
+    const top2 = scoredCandidates[1] || null;
+
+    const MIN_CATEGORY_CONFIDENCE = 100;
+    const MIN_CATEGORY_GAP = 30;
+
+    let categoryAutoSelectAllowed = false;
+
+    if (top1 && top1.score >= MIN_CATEGORY_CONFIDENCE) {
+        if (!top2 || (top1.score - top2.score) >= MIN_CATEGORY_GAP) {
+            categoryAutoSelectAllowed = true;
+        }
+    }
+
+    if (categoryAutoSelectAllowed && top1) {
+        forceClickElement(top1.tile);
+        if (report) {
+            report.category = {
+                status: 'selected',
+                selected: top1.text,
+                score: top1.score,
+                runner_up: top2 ? top2.text : null,
+                score_gap: top2 ? (top1.score - top2.score) : top1.score,
+                candidates: scoredCandidates.map(c => ({ text: c.text, score: c.score }))
+            };
+            report.filled.push({ source: 'category', target: 'категория', value: top1.text, type: 'category-tile' });
+        }
+        filledCoreRoles.add('category');
+        filledCharacteristicKeys.add('Категория');
+        filledCharacteristicKeys.add('категория');
+        filledCharacteristicKeys.add('Вид товара');
+        filledCharacteristicKeys.add('вид товара');
+        await delay(450);
+        return true;
+    }
+
+    // Confidence not met -> DO NOT CLICK
+    if (top1 && top2 && (top1.score - top2.score) < MIN_CATEGORY_GAP && top1.score > 0) {
+        if (report) {
+            report.category = {
+                status: 'ambiguous',
+                selected: null,
+                score: top1.score,
+                runner_up: top2.text,
+                score_gap: top1.score - top2.score,
+                candidates: scoredCandidates.map(c => ({ text: c.text, score: c.score }))
+            };
+            report.unresolved_fields.push({
+                field: 'category',
+                reason: 'CATEGORY_AMBIGUOUS',
+                candidates: scoredCandidates.map(c => c.text)
+            });
+        }
+    } else {
+        if (report) {
+            report.category = {
+                status: 'manual_required',
+                selected: null,
+                score: top1 ? top1.score : 0,
+                runner_up: null,
+                score_gap: 0,
+                candidates: scoredCandidates.map(c => ({ text: c.text, score: c.score }))
+            };
+            report.unresolved_fields.push({
+                field: 'category',
+                reason: 'CATEGORY_LOW_CONFIDENCE',
+                candidates: scoredCandidates.map(c => c.text)
+            });
         }
     }
 
@@ -1691,6 +2209,19 @@ async function fillAvitoPublicationFormAsync(packageData) {
     const report = {
         product_id: packageData ? packageData.product_id : null,
         page_url: window.location.href,
+        category: {
+            status: 'manual_required',
+            selected: null,
+            score: 0,
+            runner_up: null,
+            score_gap: 0,
+            candidates: []
+        },
+        address: {
+            status: 'manual_required',
+            source: (packageData && packageData.location && packageData.location.source) || 'none',
+            selected: null
+        },
         filled: [],
         skipped_nonempty: [],
         unresolved_fields: [],
@@ -1713,67 +2244,14 @@ async function fillAvitoPublicationFormAsync(packageData) {
     for (let pass = 0; pass < maxPasses; pass++) {
         let passChanges = 0;
 
-        // 0. Check for initial Suggested Categories list (on /additem initial step)
-        const categorySuggestTiles = Array.from(document.querySelectorAll(
-            '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [data-marker*="rubricator"] button, [data-marker*="rubricator"] [role="button"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="rubricator"] [role="button"], [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button, [class*="suggested-categories-list"] [role="button"], [class*="suggested-categories"] button'
-        )).filter(isElementVisible).filter(t => !isDangerousControl(t));
-
-        if (categorySuggestTiles.length === 1) {
-            const tile = categorySuggestTiles[0];
-            let rawCatText = '';
-            const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
-            if (span && span.innerText) {
-                rawCatText = span.innerText;
-            } else {
-                rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
-            }
-            const cleanCatText = rawCatText.trim() || 'Предложенная категория';
-            tile.click();
-            report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
+        // 0. Handle Category Suggestions (if present on initial or transitional steps)
+        const catHandled = await handleCategorySuggestions(packageData, report, filledCoreRoles, filledCharacteristicKeys);
+        if (catHandled) {
             passChanges++;
-            filledCoreRoles.add('category');
-            filledCharacteristicKeys.add('Категория');
-            filledCharacteristicKeys.add('категория');
-            filledCharacteristicKeys.add('Вид товара');
-            filledCharacteristicKeys.add('вид товара');
-            await delay(450);
-        } else if (categorySuggestTiles.length > 1) {
-            let matchedTile = null;
-            let matchedText = '';
-            for (const tile of categorySuggestTiles) {
-                let rawCatText = '';
-                const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
-                if (span && span.innerText) {
-                    rawCatText = span.innerText;
-                } else {
-                    rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
-                }
-                const cleanCatText = rawCatText.trim();
-                if (matchCategorySuggestion(cleanCatText, packageData)) {
-                    matchedTile = tile;
-                    matchedText = cleanCatText;
-                    break;
-                }
-            }
-            if (!matchedTile && categorySuggestTiles.length > 0) {
-                matchedTile = categorySuggestTiles[0];
-                matchedText = (matchedTile.innerText || matchedTile.textContent || '').trim();
-            }
-            if (matchedTile) {
-                matchedTile.click();
-                report.filled.push({ source: 'category', target: 'категория', value: matchedText || 'Категория', type: 'category-tile' });
-                passChanges++;
-                filledCoreRoles.add('category');
-                filledCharacteristicKeys.add('Категория');
-                filledCharacteristicKeys.add('категория');
-                filledCharacteristicKeys.add('Вид товара');
-                filledCharacteristicKeys.add('вид товара');
-                await delay(450);
-            }
         }
 
-        // 1. Scan standard inputs, textareas, selects, and comboboxes
-        const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"]'));
+        // 1. Scan standard inputs, textareas, selects, comboboxes, and contenteditable editors
+        const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"], [contenteditable="true"], [role="textbox"]'));
 
         for (const el of inputElements) {
             if (!isElementVisible(el)) continue;
@@ -1787,7 +2265,12 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 continue;
             }
 
-            // HARD SAFETY GUARD: Never touch file upload inputs in R10B
+            // Exclude header, nav, recommendations
+            if (el.closest('header, nav, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"]')) {
+                continue;
+            }
+
+            // HARD SAFETY GUARD: Never touch file upload inputs
             if (el.tagName === 'INPUT' && el.type === 'file') {
                 continue;
             }
@@ -1801,7 +2284,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
             const normLabel = normalizeFieldLabel(label);
             if (!normLabel) continue;
 
-            // Check if field matches a core field role (title, description, price, brand, model, condition)
+            // Check if field matches a core field role (title, description, price, brand, model, condition, address)
             const coreRole = matchCoreFieldRole(normLabel);
             let targetValue = null;
             let sourceRoleName = null;
@@ -1825,6 +2308,24 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 } else if (coreRole === 'condition' && packageData.condition && !filledCoreRoles.has('condition')) {
                     targetValue = packageData.condition;
                     sourceRoleName = 'condition';
+                } else if (coreRole === 'address' && !filledCoreRoles.has('address')) {
+                    const verifiedAddr = (packageData.location && packageData.location.address) || packageData.address || null;
+                    if (verifiedAddr) {
+                        targetValue = verifiedAddr;
+                        sourceRoleName = 'address';
+                    } else {
+                        report.address = {
+                            status: 'manual_required',
+                            source: 'none',
+                            selected: null
+                        };
+                        report.unresolved_fields.push({
+                            field: 'address',
+                            reason: 'ADDRESS_MANUAL_REQUIRED'
+                        });
+                        filledCoreRoles.add('address');
+                        continue;
+                    }
                 }
             }
 
@@ -1843,7 +2344,27 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
             if (!targetValue) continue;
 
-            // Check if input is a Combobox / Autocomplete / Suggestion Dropdown
+            const tagName = el.tagName.toUpperCase();
+
+            // Address field handling
+            if (sourceRoleName === 'address' || normLabel.includes('местоположени') || normLabel.includes('адрес')) {
+                const currentVal = (el.value || el.innerText || '').trim();
+                const normCurrentVal = normalizeFieldLabel(currentVal);
+                const normTargetVal = normalizeFieldLabel(targetValue);
+                if (currentVal !== '' && (normCurrentVal === normTargetVal || normCurrentVal.includes(normTargetVal) || normTargetVal.includes(normCurrentVal))) {
+                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                    filledCoreRoles.add('address');
+                } else {
+                    const selected = await selectAddressSuggestion(el, targetValue, packageData.location, report);
+                    if (selected) {
+                        passChanges++;
+                        filledCoreRoles.add('address');
+                    }
+                }
+                continue;
+            }
+
+            // Combobox / Autocomplete / Suggestion Dropdown
             const isCombobox = (
                 el.getAttribute('role') === 'combobox' ||
                 el.getAttribute('aria-autocomplete') === 'list' ||
@@ -1851,8 +2372,6 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 (el.placeholder && (el.placeholder.includes('Выберите') || el.placeholder.includes('Поиск'))) ||
                 el.closest('[class*="suggest"], [class*="autocomplete"], [data-marker*="suggest"], [data-marker*="select"]') !== null
             );
-
-            const tagName = el.tagName.toUpperCase();
 
             if (isCombobox && tagName === 'INPUT') {
                 const currentVal = (el.value || '').trim();
@@ -1878,9 +2397,9 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 continue;
             }
 
-            // Standard input types
-            if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
-                const inputType = (el.getAttribute('type') || 'text').toLowerCase();
+            // Standard input types and textareas / contenteditable
+            if (tagName === 'INPUT' || tagName === 'TEXTAREA' || el.getAttribute('contenteditable') === 'true' || el.getAttribute('role') === 'textbox') {
+                const inputType = (el.getAttribute('type') || (tagName === 'TEXTAREA' ? 'textarea' : 'text')).toLowerCase();
 
                 if (inputType === 'radio') {
                     const optionText = normalizeFieldLabel((el.value || '') + ' ' + (resolveFieldLabel(el) || ''));
@@ -1901,7 +2420,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
                                 filledCharacteristicKeys.add(sourceRoleName);
                             }
                         } else {
-                            el.click();
+                            forceClickElement(el);
                             el.dispatchEvent(new Event('change', { bubbles: true }));
                             report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'radio' });
                             passChanges++;
@@ -1922,7 +2441,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
                                 filledCharacteristicKeys.add(sourceRoleName);
                             }
                         } else {
-                            el.click();
+                            forceClickElement(el);
                             el.dispatchEvent(new Event('change', { bubbles: true }));
                             report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'checkbox' });
                             passChanges++;
@@ -1933,8 +2452,8 @@ async function fillAvitoPublicationFormAsync(packageData) {
                         }
                     }
                 } else {
-                    // Text, Number, Textarea
-                    const currentVal = (el.value || '').trim();
+                    // Text, Number, Textarea, Contenteditable
+                    const currentVal = (el.value || el.innerText || '').trim();
                     if (currentVal !== '') {
                         report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
                         if (sourceRoleName) {
@@ -1950,70 +2469,15 @@ async function fillAvitoPublicationFormAsync(packageData) {
                             filledCharacteristicKeys.add(sourceRoleName);
                         }
 
+                        // If title was just filled, look for category suggest tiles immediately
                         if (sourceRoleName === 'title') {
-                            let foundTiles = [];
-                            for (let w = 0; w < 12; w++) {
+                            for (let w = 0; w < 8; w++) {
                                 await delay(150);
-                                const tiles = Array.from(document.querySelectorAll(
-                                    '[data-marker*="suggested-category"], [data-marker*="category-suggest"], [data-marker*="suggested-rubric"], [data-marker*="category-item"], [data-marker*="rubricator"] button, [data-marker*="rubricator"] [role="button"], [class*="category-tile"], [class*="suggestedCategory"], [class*="rubricator"] button, [class*="rubricator"] [role="button"], [class*="category-suggest"] button, button[class*="category"], [class*="suggested-categories-list"] button, [class*="suggested-categories-list"] [role="button"], [class*="suggested-categories"] button'
-                                )).filter(isElementVisible).filter(t => !isDangerousControl(t));
+                                const tiles = findCategorySuggestTiles();
                                 if (tiles.length > 0) {
-                                    foundTiles = tiles;
+                                    const handled = await handleCategorySuggestions(packageData, report, filledCoreRoles, filledCharacteristicKeys);
+                                    if (handled) passChanges++;
                                     break;
-                                }
-                            }
-
-                            if (foundTiles.length === 1) {
-                                const tile = foundTiles[0];
-                                let rawCatText = '';
-                                const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
-                                if (span && span.innerText) {
-                                    rawCatText = span.innerText;
-                                } else {
-                                    rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
-                                }
-                                const cleanCatText = rawCatText.trim() || 'Предложенная категория';
-                                tile.click();
-                                report.filled.push({ source: 'category', target: 'категория', value: cleanCatText, type: 'category-tile' });
-                                passChanges++;
-                                filledCoreRoles.add('category');
-                                filledCharacteristicKeys.add('Категория');
-                                filledCharacteristicKeys.add('категория');
-                                filledCharacteristicKeys.add('Вид товара');
-                                filledCharacteristicKeys.add('вид товара');
-                                await delay(450);
-                            } else if (foundTiles.length > 1) {
-                                let chosen = null;
-                                let chosenText = '';
-                                for (const tile of foundTiles) {
-                                    let rawCatText = '';
-                                    const span = tile.querySelector('span, [class*="text"], [class*="title"], [class*="name"]');
-                                    if (span && span.innerText) {
-                                        rawCatText = span.innerText;
-                                    } else {
-                                        rawCatText = tile.innerText || tile.textContent || tile.getAttribute('data-marker') || '';
-                                    }
-                                    const cleanCatText = rawCatText.trim();
-                                    if (matchCategorySuggestion(cleanCatText, packageData)) {
-                                        chosen = tile;
-                                        chosenText = cleanCatText;
-                                        break;
-                                    }
-                                }
-                                if (!chosen && foundTiles.length > 0) {
-                                    chosen = foundTiles[0];
-                                    chosenText = (chosen.innerText || chosen.textContent || '').trim();
-                                }
-                                if (chosen) {
-                                    chosen.click();
-                                    report.filled.push({ source: 'category', target: 'категория', value: chosenText || 'Категория', type: 'category-tile' });
-                                    passChanges++;
-                                    filledCoreRoles.add('category');
-                                    filledCharacteristicKeys.add('Категория');
-                                    filledCharacteristicKeys.add('категория');
-                                    filledCharacteristicKeys.add('Вид товара');
-                                    filledCharacteristicKeys.add('вид товара');
-                                    await delay(450);
                                 }
                             }
                         }
@@ -2044,12 +2508,6 @@ async function fillAvitoPublicationFormAsync(packageData) {
                             filledCoreRoles.add(sourceRoleName);
                             filledCharacteristicKeys.add(sourceRoleName);
                         }
-                    } else if (el.selectedIndex > 0 && currentVal !== '' && el.selectedIndex !== 0) {
-                        report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            filledCharacteristicKeys.add(sourceRoleName);
-                        }
                     } else {
                         el.value = matchedOption.value;
                         el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2069,7 +2527,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
         // 2. Scan segmented button groups / chip selectors (e.g. "Состояние", "Вид товара", "Тип", etc.)
         const groupContainers = Array.from(document.querySelectorAll(
             'fieldset, [role="radiogroup"], [data-marker*="param"], [data-marker*="condition"], [class*="param"], [class*="field"], [class*="group"], [class*="chips"]'
-        ));
+        )).filter(c => !c.closest('header, nav, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"]'));
 
         for (const container of groupContainers) {
             if (!isElementVisible(container)) continue;
@@ -2159,7 +2617,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
                             }
                         }
                     } else {
-                        btn.click();
+                        forceClickElement(btn);
                         btn.dispatchEvent(new Event('change', { bubbles: true }));
                         btn.dispatchEvent(new Event('input', { bubbles: true }));
                         report.filled.push({ source: sourceRoleName, target: normGroupLabel, value: btnText || targetValue, type: 'button-chip' });
@@ -2183,7 +2641,9 @@ async function fillAvitoPublicationFormAsync(packageData) {
         if (packageData.condition && !filledCoreRoles.has('condition')) {
             const normCond = normalizeConditionValue(packageData.condition);
             const conditionButtons = Array.from(document.querySelectorAll('button[data-marker*="condition"], [role="radio"][data-marker*="condition"], button, [role="radio"]'))
-                .filter(b => b.tagName !== 'DIV' && b.tagName !== 'FIELDSET' && b.tagName !== 'FORM' && b.getAttribute('role') !== 'radiogroup');
+                .filter(b => b.tagName !== 'DIV' && b.tagName !== 'FIELDSET' && b.tagName !== 'FORM' && b.getAttribute('role') !== 'radiogroup')
+                .filter(b => !b.closest('header, nav, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"]'));
+
             for (const cBtn of conditionButtons) {
                 if (!isElementVisible(cBtn)) continue;
                 if (isDangerousControl(cBtn)) continue;
@@ -2201,7 +2661,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 if (normalizeConditionValue(btnText) === normCond || (marker && marker.toLowerCase().includes(normCond))) {
                     const isSelected = cBtn.getAttribute('aria-checked') === 'true' || cBtn.getAttribute('aria-pressed') === 'true' || cBtn.classList.contains('active') || cBtn.classList.contains('selected');
                     if (!isSelected) {
-                        cBtn.click();
+                        forceClickElement(cBtn);
                         cBtn.dispatchEvent(new Event('change', { bubbles: true }));
                         report.filled.push({ source: 'condition', target: 'состояние', value: btnText || packageData.condition, type: 'button-chip' });
                         passChanges++;
@@ -2216,7 +2676,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
         // If this pass performed changes, wait for React cascading updates to render dependent fields
         if (passChanges > 0) {
-            await delay(350);
+            await delay(400);
         } else {
             // Reached steady state: no further fields mounted or unfulfilled on this step
             break;
@@ -2272,7 +2732,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.18",
+                    extension_version: "0.2.30",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -2304,5 +2764,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return true;
 });
+
 
 

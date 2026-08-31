@@ -39,16 +39,37 @@ def build_avito_publication_package(db: Session, product_id: int) -> Dict[str, A
         attr_name = attr_val.definition.name if attr_val.definition else "attr"
         characteristics[attr_name] = attr_val.value or attr_val.raw_value
 
+    org_settings = db.query(models.OrganizationSettings).first()
+    shop_address = (org_settings.address if org_settings and org_settings.address else "Свердловская область, Екатеринбург, улица Кузнецова, 10")
+    
+    canonical_cat_name = projection.get("canonical_category_name") or (product.category.name if getattr(product, "category", None) else "Товары")
+    observed_path = projection.get("observed_path") or ([canonical_cat_name] if canonical_cat_name else [])
+
+    category_info = {
+        "display_name": canonical_cat_name,
+        "observed_path": observed_path,
+        "canonical_category_id": projection.get("canonical_category_id")
+    }
+
+    location_info = {
+        "city": (org_settings.city if org_settings and getattr(org_settings, "city", None) else "Екатеринбург") if shop_address else None,
+        "address": shop_address,
+        "source": "store_default" if shop_address else "none",
+        "verified": bool(shop_address)
+    }
+
     package = {
         "product_id": product.id,
         "sku": product.sku,
-        "category": projection.get("canonical_category_name") or (product.category.name if getattr(product, "category", None) else "Товары"),
+        "category": category_info,
         "title": product.title or product.avito_title or "",
         "description": product.description or product.avito_description or "",
         "price": float(product.sale_price or 0.0),
         "brand": product.brand,
         "model": product.model,
         "condition": product.condition or product.avito_condition or "Б/у",
+        "address": shop_address,
+        "location": location_info,
         "characteristics": characteristics,
         "photos": photos_data,
         "canonical_fields": projection.get("canonical_fields", {}),
