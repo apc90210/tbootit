@@ -481,111 +481,91 @@ function extractPhotosFromDom() {
     }
 
     // 0. Meta tags & OpenGraph images
-    const metaImages = document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"], meta[property="vk:image"], link[rel="image_src"]');
+    const metaImages = document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"], meta[property="vk:image"], link[rel="image_src"], meta[itemprop="image"]');
     metaImages.forEach(m => {
         const c = m.content || m.href;
         if (c) addUrl(c);
     });
 
-    // 1. Gallery container or main content / body fallback
-    const galleryContainer = document.querySelector(
-        '[data-marker="item-view/gallery"], [data-marker="gallery"], .style-item-view-gallery-, .gallery-root, [data-marker="image-frame/image-wrapper"], [data-marker="gallery/list"], [data-marker="item-view/main"] [data-marker*="gallery"], [data-marker="item-view/main"], [class*="gallery"], [class*="image-frame"], main'
-    ) || document.body;
-
     function isInsideExcluded(el) {
         if (!el || !el.closest) return false;
-        return !!(el.closest('[data-marker="seller-info"]') ||
-                  el.closest('[data-marker="user-info"]') ||
-                  el.closest('.seller-info-avatar') ||
-                  el.closest('[data-marker="recommendations"]') ||
-                  el.closest('[data-marker="similar-items"]') ||
-                  el.closest('[data-marker="items-carousel"]') ||
-                  el.closest('[data-marker="seller-items"]') ||
-                  el.closest('.similar-items') ||
-                  el.closest('.recommendations-root') ||
-                  el.closest('.serp-item') ||
-                  el.closest('header') ||
-                  el.closest('footer'));
+        return !!(el.closest('[data-marker*="seller"], [data-marker*="user-info"], [data-marker*="profile"], .seller-info-avatar, [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="items-carousel"], [data-marker*="seller-items"], .similar-items, .recommendations-root, .serp-item, header, footer, nav, aside'));
     }
 
-    // 2. Scan links wrapping gallery images
-    const links = galleryContainer.querySelectorAll('a[href*="img.avito.st"], a[href*="avito.st"]');
-    links.forEach(a => {
-        if (isInsideExcluded(a)) return;
-        addUrl(a.href);
+    // Explicit gallery selectors for structured layout
+    const gallerySelectors = [
+        '[data-marker="image-frame/image-wrapper"] img',
+        '[data-marker="gallery/image"] img',
+        '[data-marker="slider-image/image"] img',
+        '[data-marker*="image"] img',
+        '[data-marker*="gallery"] img',
+        'ul[data-marker="gallery/list"] li img',
+        'div[class*="gallery"] img',
+        'div[class*="image-frame"] img'
+    ];
+    const galleryImgs = document.querySelectorAll(gallerySelectors.join(', '));
+    galleryImgs.forEach(img => {
+        if (isInsideExcluded(img)) return;
+        if (img.src) addUrl(img.src);
+        if (img.dataset && img.dataset.src) addUrl(img.dataset.src);
     });
 
-    // 3. Scan elements with data-url / data-src / data-large / data-full / data-high-res / data-preview
-    const dataEls = galleryContainer.querySelectorAll('[data-url*="avito.st"], [data-src*="avito.st"], [data-large*="avito.st"], [data-full*="avito.st"], [data-high-res*="avito.st"], [data-preview*="avito.st"], [data-img*="avito.st"]');
+    // 1. Scan ALL img elements in the page
+    const allImgs = document.querySelectorAll('img');
+    allImgs.forEach(img => {
+        if (isInsideExcluded(img)) return;
+
+        const parentLink = img.closest('a');
+        if (parentLink && parentLink.href && !isInsideExcluded(parentLink)) {
+            addUrl(parentLink.href);
+        }
+
+        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+        if (srcset) {
+            const candidates = parseSrcsetCandidates(srcset);
+            candidates.forEach(c => addUrl(c.url));
+        }
+
+        if (img.src) addUrl(img.src);
+        if (img.dataset) {
+            if (img.dataset.src) addUrl(img.dataset.src);
+            if (img.dataset.url) addUrl(img.dataset.url);
+            if (img.dataset.large) addUrl(img.dataset.large);
+            if (img.dataset.full) addUrl(img.dataset.full);
+            if (img.dataset.preview) addUrl(img.dataset.preview);
+        }
+    });
+
+    // 2. Scan ALL picture source elements
+    const sources = document.querySelectorAll('picture source[srcset], picture source[data-srcset]');
+    sources.forEach(s => {
+        if (isInsideExcluded(s)) return;
+        const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
+        if (srcset) {
+            const candidates = parseSrcsetCandidates(srcset);
+            candidates.forEach(c => addUrl(c.url));
+        }
+    });
+
+    // 3. Scan elements with background-image style
+    const bgEls = document.querySelectorAll('[style*="url("]');
+    bgEls.forEach(el => {
+        if (isInsideExcluded(el)) return;
+        const style = el.getAttribute('style') || '';
+        const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+)['"]?\)/i);
+        if (match && match[1]) {
+            addUrl(match[1]);
+        }
+    });
+
+    // 4. Scan elements with data-url / data-src / data-large / data-full
+    const dataEls = document.querySelectorAll('[data-url], [data-src], [data-large], [data-full], [data-high-res], [data-preview], [data-img]');
     dataEls.forEach(el => {
         if (isInsideExcluded(el)) return;
         ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res', 'data-preview', 'data-img'].forEach(attr => {
             const val = el.getAttribute(attr);
             if (val) addUrl(val);
         });
-    });
-
-    // 4. Scan img and picture source elements inside gallery
-    const selector = [
-        '[data-marker="image-frame/image-wrapper"] img',
-        '[data-marker="gallery/image"] img',
-        '[data-marker="slider-image/image"] img',
-        '[data-marker*="image"] img',
-        '[data-marker*="gallery"] img',
-        '[data-marker*="slider"] img',
-        'picture source[srcset]',
-        'picture img',
-        'ul[data-marker="gallery/list"] li img',
-        'div[class*="gallery"] img',
-        'div[class*="image-frame"] img',
-        '.gallery-img',
-        '.image-frame-wrapper img',
-        '.gallery-list img',
-        'img[src*="avito.st"]',
-        'img[data-src*="avito.st"]'
-    ].join(', ');
-
-    const els = galleryContainer.querySelectorAll(selector);
-    els.forEach(el => {
-        if (isInsideExcluded(el)) return;
-
-        const parentLink = el.closest('a');
-        if (parentLink && parentLink.href && parentLink.href.includes('avito.st') && !isInsideExcluded(parentLink)) {
-            addUrl(parentLink.href);
-        }
-
-        const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
-        if (srcset) {
-            const candidates = parseSrcsetCandidates(srcset);
-            candidates.forEach(c => addUrl(c.url));
-        }
-
-        if (el.src) addUrl(el.src);
-        if (el.dataset && el.dataset.src) addUrl(el.dataset.src);
-    });
-
-    // 5. Scan elements with background-image style inside gallery
-    const bgEls = galleryContainer.querySelectorAll('[style*="avito.st"]');
-    bgEls.forEach(el => {
-        if (isInsideExcluded(el)) return;
-        const style = el.getAttribute('style') || '';
-        const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+?avito\.st[^\'")\s]+)['"]?\)/i);
-        if (match && match[1]) {
-            addUrl(match[1]);
-        }
-    });
-
-    // 6. Global listing photo scan across entire document
-    const allImgs = document.querySelectorAll('img[src*="avito.st"], img[data-src*="avito.st"], img[srcset*="avito.st"]');
-    allImgs.forEach(img => {
-        if (isInsideExcluded(img)) return;
-        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
-        if (srcset) {
-            const candidates = parseSrcsetCandidates(srcset);
-            candidates.forEach(c => addUrl(c.url));
-        }
-        if (img.src) addUrl(img.src);
-        if (img.dataset && img.dataset.src) addUrl(img.dataset.src);
     });
 
     return rawCandidates;
