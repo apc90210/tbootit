@@ -1608,24 +1608,36 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     let candidateOptions = [];
     for (let wait = 0; wait < 12; wait++) {
         // Collect active dropdown listbox / popup containers (strictly within field or known dropdown classes)
-        const parentField = inputEl.closest('[class*="field-"], [class*="param-"], [class*="input-"], [data-marker*="param"], [class*="suggest-"]');
+        const parentField = inputEl.closest('[class*="field-"], [class*="param-"], [class*="input-"], [data-marker*="param"], [class*="suggest-"], [class*="control-"]') || inputEl.parentElement;
         let containers = [];
 
         if (parentField) {
             const localBoxes = Array.from(parentField.querySelectorAll(
-                '[role="listbox"], [data-marker*="suggest"], [data-marker*="dropdown"], [class*="suggestions-list"], [class*="dropdown-list"], [class*="select-list"], ul[class*="suggest"], ul[class*="dropdown"]'
+                '[role="listbox"], [data-marker*="suggest"], [data-marker*="dropdown"], [class*="suggestions-list"], [class*="dropdown-list"], [class*="select-list"], ul[class*="suggest"], ul[class*="dropdown"], [class*="options-list"]'
             ));
             containers.push(...localBoxes);
         }
 
-        // Global listboxes attached to body (React Portals)
-        const globalBoxes = Array.from(document.querySelectorAll(
-            '[role="listbox"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"], ul[class*="suggestions"]'
-        )).filter(box => {
-            if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="catalog"], [data-marker*="items"], [class*="catalog"], [class*="items-"]')) return false;
-            return isElementVisible(box);
-        });
-        containers.push(...globalBoxes);
+        // If input has aria-controls / aria-owns
+        const ariaControlsId = inputEl.getAttribute('aria-controls') || inputEl.getAttribute('aria-owns');
+        if (ariaControlsId) {
+            const ariaBox = document.getElementById(ariaControlsId);
+            if (ariaBox && isElementVisible(ariaBox)) {
+                containers.push(ariaBox);
+            }
+        }
+
+        // Search listboxes attached to main publication form (NEVER header or search bars)
+        const mainForm = inputEl.closest('form, main, [data-marker*="form"], [data-marker*="add-item"], [class*="add-item"]');
+        if (mainForm) {
+            const formBoxes = Array.from(mainForm.querySelectorAll(
+                '[role="listbox"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"]'
+            )).filter(box => {
+                if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], form[action*="search"], [data-marker*="search"], [class*="search"], [data-marker*="recommend"], [data-marker*="similar"]')) return false;
+                return isElementVisible(box);
+            });
+            containers.push(...formBoxes);
+        }
 
         // Extract option items ONLY from inside these verified listbox containers
         const found = [];
@@ -1636,11 +1648,11 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
             .filter(isElementVisible)
             .filter(o => !isDangerousControl(o))
             .filter(o => {
-                // NEVER click <a> links or ad items
+                // NEVER click <a> links, ad items, or search suggestions
                 if (o.tagName === 'A' || o.getAttribute('href') || o.closest('a') || o.closest('[href]')) return false;
                 if (o.getAttribute('target') === '_blank' || o.closest('[target="_blank"]')) return false;
                 if (o.getAttribute('data-item-id') || o.closest('[data-item-id]')) return false;
-                if (o.closest('[data-marker*="recommend"], [data-marker*="similar"], [class*="recommend"], [class*="similar"], [data-marker*="item-"], [data-marker*="snippet"], [class*="snippet"], [class*="card"], [class*="listing"], footer, header, nav')) return false;
+                if (o.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], form[action*="search"], [data-marker*="search"], [class*="search"], [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="item-"], [data-marker*="snippet"], [class*="snippet"], [class*="card"], [class*="listing"]')) return false;
                 return true;
             });
             found.push(...items);
@@ -1649,10 +1661,6 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
         if (found.length > 0) {
             candidateOptions = found;
             break;
-        }
-
-        if (wait === 2 || wait === 5) {
-            inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true }));
         }
 
         await delay(150);
@@ -2062,14 +2070,18 @@ function findCategorySuggestTiles() {
 }
 
 async function handleCategorySuggestions(packageData, report, filledCoreRoles, filledCharacteristicKeys) {
-    // Check if Step 2 parameter inputs (price, description, brand, model) are already mounted
+    if (filledCoreRoles && (filledCoreRoles.has('category') || filledCoreRoles.has('model') || filledCoreRoles.has('brand'))) {
+        return false;
+    }
+
+    // If ANY parameter field is already present on the page (model, brand, condition, description, price, etc.), Step 2 is active -> NEVER click category tiles!
     const step2Fields = Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"], [role="combobox"]'))
         .filter(isElementVisible)
         .map(el => resolveFieldLabel(el))
-        .filter(lbl => lbl === 'цена' || lbl === 'описание' || lbl === 'состояние' || lbl === 'производитель' || lbl === 'модель');
+        .filter(lbl => lbl && lbl.length > 0);
 
-    if (step2Fields.length >= 2) {
-        // Step 2 is already active; do not click category tiles
+    if (step2Fields.length > 0) {
+        // Step 2 or later is active; strictly refuse category auto-click
         return false;
     }
 
