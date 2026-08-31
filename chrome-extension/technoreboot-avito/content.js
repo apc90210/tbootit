@@ -2071,11 +2071,11 @@ async function handleCategorySuggestions(packageData, report, filledCoreRoles, f
         return false;
     }
 
-    // If ANY parameter field is already present on the page (model, brand, condition, description, price, etc.), Step 2 is active -> NEVER click category tiles!
+    // Check if Step 2 parameter fields (brand, model, condition, description, price) are mounted
     const step2Fields = Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"], [role="combobox"]'))
         .filter(isElementVisible)
-        .map(el => resolveFieldLabel(el))
-        .filter(lbl => lbl && lbl.length > 0);
+        .map(el => normalizeFieldLabel(resolveFieldLabel(el)))
+        .filter(lbl => lbl.includes('производител') || lbl.includes('бренд') || lbl.includes('модел') || lbl.includes('состояни') || lbl.includes('описани') || lbl.includes('цена'));
 
     if (step2Fields.length > 0) {
         // Step 2 or later is active; strictly refuse category auto-click
@@ -2657,8 +2657,11 @@ async function fillAvitoPublicationFormAsync(packageData) {
     }
 
     // Record unresolved characteristics that had no matching field mounted on this step
+    const ignoredKeys = new Set(['избранное', 'контакты', 'показы', 'просмотры', 'расходы', 'просмотров', 'статистика', 'дата', 'артикул', 'id', 'product_id', 'source_url', 'created_at', 'updated_at']);
     for (const [charKey, charVal] of Object.entries(characteristics)) {
-        if (!filledCharacteristicKeys.has(charKey) && !filledCharacteristicKeys.has(charKey.toLowerCase())) {
+        const normKey = normalizeFieldLabel(charKey);
+        if (ignoredKeys.has(normKey) || ignoredKeys.has(charKey.toLowerCase())) continue;
+        if (!filledCharacteristicKeys.has(charKey) && !filledCharacteristicKeys.has(charKey.toLowerCase()) && !filledCharacteristicKeys.has(normKey)) {
             report.unresolved_fields.push({ key: charKey, value: charVal });
         }
     }
