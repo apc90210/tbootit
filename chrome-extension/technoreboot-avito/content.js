@@ -1717,10 +1717,10 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
 
     // Check for ambiguity: multiple candidates with identical top score < 1000 and target has number/token
     if (top1 && top2 && top1.score === top2.score && top1.score < 1000 && top1.score > 0) {
-        // Ambiguous model/option candidates: do NOT click!
+        // Ambiguous model/option candidates: do NOT click, keep typed text
         inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
         inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-        await delay(350);
+        await delay(250);
         return false;
     }
 
@@ -1731,45 +1731,19 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     }
 
     if (bestMatch && bestScore > 0) {
-        await delay(250);
+        await delay(150);
 
-        // Safe click
-        const clicked = forceClickElement(bestMatch);
-        if (!clicked) {
-            if (!bestMatch.closest('a') && !bestMatch.getAttribute('href') && !bestMatch.getAttribute('data-item-id')) {
-                bestMatch.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
-                bestMatch.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
-                bestMatch.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
-                bestMatch.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
-                try { bestMatch.click(); } catch (e) {}
-            }
-        }
+        // Single clean safe click on the chosen option
+        forceClickElement(bestMatch);
 
-        // Also click inner span/div if present and safe
-        const innerClickable = bestMatch.querySelector('span, div, [class*="text"]');
-        if (innerClickable && !innerClickable.closest('a') && !innerClickable.getAttribute('href')) {
-            try {
-                innerClickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
-                innerClickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
-                innerClickable.click();
-            } catch (e) {}
-        }
-
-        // Confirm via Enter on input
-        inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-        inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-
-        await delay(450);
+        await delay(350);
         return true;
     }
 
-    // Fallback: press Enter on input to confirm typed value
+    // Fallback: press Enter on input to confirm typed value only if no option was clicked
     inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-    inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-    await delay(350);
+    await delay(250);
     return true;
 }
 
@@ -1905,22 +1879,10 @@ async function selectAddressSuggestion(inputEl, targetAddress, locationData, rep
     }
 
     if (addressAutoSelectAllowed && top1) {
-        await delay(200);
+        await delay(150);
 
-        const clicked = forceClickElement(top1.opt);
-        if (!clicked) {
-            if (!top1.opt.closest('a') && !top1.opt.getAttribute('href') && !top1.opt.getAttribute('data-item-id')) {
-                top1.opt.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
-                top1.opt.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, view: window }));
-                top1.opt.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
-                top1.opt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0, view: window }));
-                try { top1.opt.click(); } catch (e) {}
-            }
-        }
-
-        inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-        inputEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+        // Single clean safe click on the chosen address option
+        forceClickElement(top1.opt);
 
         if (report) {
             report.address = {
@@ -1931,7 +1893,7 @@ async function selectAddressSuggestion(inputEl, targetAddress, locationData, rep
             report.filled.push({ source: 'address', target: 'местоположение', value: top1.text || addressToUse, type: 'address-suggest' });
         }
 
-        await delay(400);
+        await delay(350);
         return true;
     }
 
@@ -2238,7 +2200,53 @@ async function fillAvitoPublicationFormAsync(packageData) {
     const characteristics = packageData.characteristics || {};
     const filledCharacteristicKeys = new Set();
     const filledCoreRoles = new Set();
-    const maxPasses = 6;
+    const maxPasses = 3;
+
+    function markFieldHandled(el, roleName, normLabelKey) {
+        if (el) {
+            try { el.dataset.technorebootHandled = 'true'; } catch (e) {}
+        }
+        if (roleName) {
+            filledCoreRoles.add(roleName);
+            filledCoreRoles.add(roleName.toLowerCase());
+            filledCharacteristicKeys.add(roleName);
+            filledCharacteristicKeys.add(roleName.toLowerCase());
+            filledCharacteristicKeys.add(normalizeFieldLabel(roleName));
+        }
+        if (normLabelKey) {
+            filledCoreRoles.add(normLabelKey);
+            filledCharacteristicKeys.add(normLabelKey);
+        }
+        if (roleName === 'brand' || normLabelKey === 'производитель' || normLabelKey === 'бренд') {
+            filledCoreRoles.add('brand');
+            filledCharacteristicKeys.add('производитель');
+            filledCharacteristicKeys.add('бренд');
+            filledCharacteristicKeys.add('brand');
+            filledCharacteristicKeys.add('Производитель');
+            filledCharacteristicKeys.add('Бренд');
+        }
+        if (roleName === 'model' || normLabelKey === 'модель' || normLabelKey === 'серия') {
+            filledCoreRoles.add('model');
+            filledCharacteristicKeys.add('модель');
+            filledCharacteristicKeys.add('серия');
+            filledCharacteristicKeys.add('model');
+            filledCharacteristicKeys.add('Модель');
+            filledCharacteristicKeys.add('Серия');
+        }
+        if (roleName === 'condition' || normLabelKey === 'состояние') {
+            filledCoreRoles.add('condition');
+            filledCharacteristicKeys.add('состояние');
+            filledCharacteristicKeys.add('condition');
+            filledCharacteristicKeys.add('Состояние');
+        }
+        if (roleName === 'category' || normLabelKey === 'категория' || normLabelKey === 'вид товара') {
+            filledCoreRoles.add('category');
+            filledCharacteristicKeys.add('категория');
+            filledCharacteristicKeys.add('вид товара');
+            filledCharacteristicKeys.add('Категория');
+            filledCharacteristicKeys.add('Вид товара');
+        }
+    }
 
     // Multi-pass cascading filling loop
     for (let pass = 0; pass < maxPasses; pass++) {
@@ -2255,6 +2263,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
         for (const el of inputElements) {
             if (!isElementVisible(el)) continue;
+            if (el.dataset && el.dataset.technorebootHandled === 'true') continue;
 
             // HARD SAFETY GUARD: Never touch submit/continue buttons or dangerous actions
             if (isDangerousControl(el)) {
@@ -2323,7 +2332,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
                             field: 'address',
                             reason: 'ADDRESS_MANUAL_REQUIRED'
                         });
-                        filledCoreRoles.add('address');
+                        markFieldHandled(el, 'address', normLabel);
                         continue;
                     }
                 }
@@ -2332,7 +2341,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
             // Check if field matches a specific characteristic key (exact normalized matching)
             if (!targetValue) {
                 for (const [charKey, charVal] of Object.entries(characteristics)) {
-                    if (filledCharacteristicKeys.has(charKey)) continue;
+                    if (filledCharacteristicKeys.has(charKey) || filledCharacteristicKeys.has(charKey.toLowerCase())) continue;
                     const normCharKey = normalizeFieldLabel(charKey);
                     if (normCharKey === normLabel) {
                         targetValue = String(charVal);
@@ -2353,12 +2362,12 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 const normTargetVal = normalizeFieldLabel(targetValue);
                 if (currentVal !== '' && (normCurrentVal === normTargetVal || normCurrentVal.includes(normTargetVal) || normTargetVal.includes(normCurrentVal))) {
                     report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                    filledCoreRoles.add('address');
+                    markFieldHandled(el, 'address', normLabel);
                 } else {
                     const selected = await selectAddressSuggestion(el, targetValue, packageData.location, report);
+                    markFieldHandled(el, 'address', normLabel);
                     if (selected) {
                         passChanges++;
-                        filledCoreRoles.add('address');
                     }
                 }
                 continue;
@@ -2379,19 +2388,14 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 const normTargetVal = normalizeFieldLabel(targetValue);
 
                 if (currentVal !== '' && (normCurrentVal === normTargetVal || normCurrentVal.includes(normTargetVal) || normTargetVal.includes(normCurrentVal))) {
-                    if (sourceRoleName) {
-                        filledCoreRoles.add(sourceRoleName);
-                        filledCharacteristicKeys.add(sourceRoleName);
-                    }
+                    report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
+                    markFieldHandled(el, sourceRoleName, normLabel);
                 } else {
                     const selected = await selectDropdownSuggestion(el, targetValue);
+                    markFieldHandled(el, sourceRoleName, normLabel);
                     if (selected) {
                         report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'combobox' });
                         passChanges++;
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            filledCharacteristicKeys.add(sourceRoleName);
-                        }
                     }
                 }
                 continue;
@@ -2415,19 +2419,13 @@ async function fillAvitoPublicationFormAsync(packageData) {
                     if (isMatch) {
                         if (el.checked) {
                             report.skipped_nonempty.push({ target: normLabel, existing_value: el.value || optionText });
-                            if (sourceRoleName) {
-                                filledCoreRoles.add(sourceRoleName);
-                                filledCharacteristicKeys.add(sourceRoleName);
-                            }
+                            markFieldHandled(el, sourceRoleName, normLabel);
                         } else {
                             forceClickElement(el);
                             el.dispatchEvent(new Event('change', { bubbles: true }));
                             report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'radio' });
                             passChanges++;
-                            if (sourceRoleName) {
-                                filledCoreRoles.add(sourceRoleName);
-                                filledCharacteristicKeys.add(sourceRoleName);
-                            }
+                            markFieldHandled(el, sourceRoleName, normLabel);
                         }
                     }
                 } else if (inputType === 'checkbox') {
@@ -2436,19 +2434,13 @@ async function fillAvitoPublicationFormAsync(packageData) {
                     if (optionText.includes(normTargetVal) || normTargetVal.includes(optionText)) {
                         if (el.checked) {
                             report.skipped_nonempty.push({ target: normLabel, existing_value: 'checked' });
-                            if (sourceRoleName) {
-                                filledCoreRoles.add(sourceRoleName);
-                                filledCharacteristicKeys.add(sourceRoleName);
-                            }
+                            markFieldHandled(el, sourceRoleName, normLabel);
                         } else {
                             forceClickElement(el);
                             el.dispatchEvent(new Event('change', { bubbles: true }));
                             report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: 'checkbox' });
                             passChanges++;
-                            if (sourceRoleName) {
-                                filledCoreRoles.add(sourceRoleName);
-                                filledCharacteristicKeys.add(sourceRoleName);
-                            }
+                            markFieldHandled(el, sourceRoleName, normLabel);
                         }
                     }
                 } else {
@@ -2456,18 +2448,12 @@ async function fillAvitoPublicationFormAsync(packageData) {
                     const currentVal = (el.value || el.innerText || '').trim();
                     if (currentVal !== '') {
                         report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            filledCharacteristicKeys.add(sourceRoleName);
-                        }
+                        markFieldHandled(el, sourceRoleName, normLabel);
                     } else {
                         setReactInputValue(el, targetValue);
                         report.filled.push({ source: sourceRoleName, target: normLabel, value: targetValue, type: inputType });
                         passChanges++;
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            filledCharacteristicKeys.add(sourceRoleName);
-                        }
+                        markFieldHandled(el, sourceRoleName, normLabel);
 
                         // If title was just filled, look for category suggest tiles immediately
                         if (sourceRoleName === 'title') {
@@ -2504,22 +2490,17 @@ async function fillAvitoPublicationFormAsync(packageData) {
                 if (matchedOption) {
                     if (el.selectedIndex > 0 && currentVal !== '' && currentVal === matchedOption.value) {
                         report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            filledCharacteristicKeys.add(sourceRoleName);
-                        }
+                        markFieldHandled(el, sourceRoleName, normLabel);
                     } else {
                         el.value = matchedOption.value;
                         el.dispatchEvent(new Event('change', { bubbles: true }));
                         report.filled.push({ source: sourceRoleName, target: normLabel, value: matchedOption.text, type: 'select' });
                         passChanges++;
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            filledCharacteristicKeys.add(sourceRoleName);
-                        }
+                        markFieldHandled(el, sourceRoleName, normLabel);
                     }
                 } else {
                     report.unresolved_options.push({ key: normLabel, expected: targetValue });
+                    markFieldHandled(el, sourceRoleName, normLabel);
                 }
             }
         }
@@ -2532,6 +2513,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
         for (const container of groupContainers) {
             if (!isElementVisible(container)) continue;
             if (isDangerousControl(container)) continue;
+            if (container.dataset && container.dataset.technorebootHandled === 'true') continue;
 
             const titleEl = container.querySelector('legend, h3, h4, h5, [class*="title"], [class*="label"], [class*="name"], [data-marker*="title"], span');
             const groupLabel = resolveFieldLabel(titleEl || container);
@@ -2557,7 +2539,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
             if (!targetValue) {
                 for (const [charKey, charVal] of Object.entries(characteristics)) {
-                    if (filledCharacteristicKeys.has(charKey)) continue;
+                    if (filledCharacteristicKeys.has(charKey) || filledCharacteristicKeys.has(charKey.toLowerCase())) continue;
                     const normCharKey = normalizeFieldLabel(charKey);
                     if (normCharKey === normGroupLabel) {
                         targetValue = String(charVal);
@@ -2607,30 +2589,14 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
                     if (isSelected) {
                         report.skipped_nonempty.push({ target: normGroupLabel, existing_value: btnText });
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            if (sourceRoleName === 'condition') {
-                                filledCharacteristicKeys.add('Состояние');
-                                filledCharacteristicKeys.add('состояние');
-                            } else {
-                                filledCharacteristicKeys.add(sourceRoleName);
-                            }
-                        }
+                        markFieldHandled(container, sourceRoleName, normGroupLabel);
                     } else {
                         forceClickElement(btn);
                         btn.dispatchEvent(new Event('change', { bubbles: true }));
                         btn.dispatchEvent(new Event('input', { bubbles: true }));
                         report.filled.push({ source: sourceRoleName, target: normGroupLabel, value: btnText || targetValue, type: 'button-chip' });
                         passChanges++;
-                        if (sourceRoleName) {
-                            filledCoreRoles.add(sourceRoleName);
-                            if (sourceRoleName === 'condition') {
-                                filledCharacteristicKeys.add('Состояние');
-                                filledCharacteristicKeys.add('состояние');
-                            } else {
-                                filledCharacteristicKeys.add(sourceRoleName);
-                            }
-                        }
+                        markFieldHandled(container, sourceRoleName, normGroupLabel);
                     }
                     break;
                 }
@@ -2665,9 +2631,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
                         cBtn.dispatchEvent(new Event('change', { bubbles: true }));
                         report.filled.push({ source: 'condition', target: 'состояние', value: btnText || packageData.condition, type: 'button-chip' });
                         passChanges++;
-                        filledCoreRoles.add('condition');
-                        filledCharacteristicKeys.add('Состояние');
-                        filledCharacteristicKeys.add('состояние');
+                        markFieldHandled(cBtn, 'condition', 'состояние');
                         break;
                     }
                 }
@@ -2676,7 +2640,7 @@ async function fillAvitoPublicationFormAsync(packageData) {
 
         // If this pass performed changes, wait for React cascading updates to render dependent fields
         if (passChanges > 0) {
-            await delay(400);
+            await delay(350);
         } else {
             // Reached steady state: no further fields mounted or unfulfilled on this step
             break;
