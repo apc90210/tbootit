@@ -1450,7 +1450,7 @@ function resolveFieldLabel(inputEl) {
         const direct = (inputEl.innerText || inputEl.textContent || '').trim();
         if (direct && direct.length >= 2 && direct.length <= 60) {
             const clean = normalizeFieldLabel(direct);
-            if (clean && !clean.includes('выберите') && !clean.includes('поиск')) return clean;
+            if (clean && !clean.includes('выберите') && !clean.includes('не выбран') && !clean.includes('поиск')) return clean;
         }
     }
 
@@ -1584,30 +1584,38 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
     const targetTokens = normTarget.split(/[\s\-_\/,\.]+/).filter(t => t.length >= 2);
     const targetNumbers = (normTarget.match(/\d{2,}/g) || []);
 
-    // 1. Focus input without blurring
-    try {
-        inputEl.focus();
-    } catch (e) {}
-    await delay(150);
+    const isInput = inputEl.tagName === 'INPUT' || inputEl.tagName === 'TEXTAREA' || inputEl.getAttribute('contenteditable') === 'true';
 
-    // 2. Click input to trigger opening of dropdown
-    try {
-        inputEl.click();
-    } catch (e) {}
-    await delay(200);
+    if (isInput) {
+        // 1. Focus input without blurring
+        try {
+            inputEl.focus();
+        } catch (e) {}
+        await delay(150);
 
-    // 3. Clear and set value using React property descriptor (never blur while waiting for dropdown!)
-    setReactInputValue(inputEl, targetValue, false);
-    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+        // 2. Click input to trigger opening of dropdown
+        try {
+            inputEl.click();
+        } catch (e) {}
+        await delay(200);
+
+        // 3. Clear and set value using React property descriptor (never blur while waiting for dropdown!)
+        setReactInputValue(inputEl, targetValue, false);
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+        // Dropdown trigger button or div: single click to open popup
+        forceClickElement(inputEl);
+        await delay(350);
+    }
 
     // 4. PAUSE: Give Avito backend and React component time to fetch and render the dropdown listbox
-    await delay(800);
+    await delay(500);
 
     let candidateOptions = [];
     for (let wait = 0; wait < 15; wait++) {
         // Collect active dropdown listbox / popup containers (strictly within field or known dropdown classes)
-        const parentField = inputEl.closest('[class*="field-"], [class*="param-"], [class*="input-"], [data-marker*="param"], [class*="suggest-"], [class*="control-"]') || inputEl.parentElement;
+        const parentField = inputEl.closest('[class*="field-"], [class*="param-"], [class*="input-"], [data-marker*="param"], [class*="suggest-"], [class*="control-"], [class*="select-"]') || inputEl.parentElement;
         let containers = [];
 
         if (parentField) {
@@ -1628,18 +1636,31 @@ async function selectDropdownSuggestion(inputEl, targetValue) {
 
         // Global React Portal popups attached to document.body (strictly excluding header, search bars, nav)
         const portalBoxes = Array.from(document.querySelectorAll(
-            '[role="listbox"], [role="menu"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"], ul[class*="suggestions"]'
+            '[role="listbox"], [role="menu"], [data-marker*="suggest-list"], [data-marker*="dropdown-list"], [data-marker*="popup-list"], div[class*="suggestions-list"], div[class*="dropdown-list"], div[class*="select-list"], ul[class*="suggestions"], [class*="modal-"], [data-marker*="modal"]'
         )).filter(box => {
             if (box.closest('header, nav, footer, [data-marker*="header"], [data-marker*="user-menu"], form[action*="search"], [data-marker*="search"], [class*="search"], [data-marker*="recommend"], [data-marker*="similar"]')) return false;
             return isElementVisible(box);
         });
         containers.push(...portalBoxes);
 
+        // If a search input exists in any open popup container, type targetValue into it
+        if (!isInput) {
+            for (const container of containers) {
+                const searchBox = container.querySelector('input[type="text"], input[type="search"], input:not([type="hidden"])');
+                if (searchBox && isElementVisible(searchBox) && !searchBox.value) {
+                    setReactInputValue(searchBox, targetValue, false);
+                    searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                    await delay(300);
+                    break;
+                }
+            }
+        }
+
         // Extract option items ONLY from inside these verified listbox containers
         const found = [];
         for (const container of containers) {
             const items = Array.from(container.querySelectorAll(
-                '[role="option"], [role="menuitem"], [data-marker*="suggest-item"], [data-marker*="option-item"], [data-marker*="option"], [class*="suggest-item"], [class*="dropdown-item"], [class*="select-item"], [class*="option-item"], li[class*="suggest"], li[class*="option"], li'
+                '[role="option"], [role="menuitem"], [data-marker*="suggest-item"], [data-marker*="option-item"], [data-marker*="option"], [class*="suggest-item"], [class*="dropdown-item"], [class*="select-item"], [class*="option-item"], li[class*="suggest"], li[class*="option"], li, button[class*="item"]'
             ))
             .filter(isElementVisible)
             .filter(o => !isDangerousControl(o))
@@ -2268,8 +2289,10 @@ async function fillAvitoPublicationFormAsync(packageData) {
             passChanges++;
         }
 
-        // 1. Scan standard inputs, textareas, selects, comboboxes, and contenteditable editors
-        const inputElements = Array.from(document.querySelectorAll('input, textarea, select, [role="combobox"], [contenteditable="true"], [role="textbox"]'));
+        // 1. Scan standard inputs, textareas, selects, comboboxes, custom dropdown triggers, and contenteditable editors
+        const inputElements = Array.from(document.querySelectorAll(
+            'input, textarea, select, [role="combobox"], [role="listbox"], [role="button"][data-marker*="param"], [role="button"][class*="select"], [role="button"][aria-haspopup], [contenteditable="true"], [role="textbox"], div[data-marker*="param"][class*="select"], div[data-marker*="param"][class*="dropdown"], button[data-marker*="param"], [class*="select-button"]'
+        ));
 
         for (const el of inputElements) {
             if (!isElementVisible(el)) continue;
@@ -2386,18 +2409,21 @@ async function fillAvitoPublicationFormAsync(packageData) {
             // Combobox / Autocomplete / Suggestion Dropdown
             const isCombobox = (
                 el.getAttribute('role') === 'combobox' ||
+                el.getAttribute('role') === 'listbox' ||
                 el.getAttribute('aria-autocomplete') === 'list' ||
+                el.getAttribute('aria-haspopup') === 'listbox' ||
+                el.getAttribute('aria-haspopup') === 'true' ||
                 (sourceRoleName === 'brand' || sourceRoleName === 'model') ||
                 (el.placeholder && (el.placeholder.includes('Выберите') || el.placeholder.includes('Поиск'))) ||
-                el.closest('[class*="suggest"], [class*="autocomplete"], [data-marker*="suggest"], [data-marker*="select"]') !== null
+                el.closest('[class*="suggest"], [class*="autocomplete"], [data-marker*="suggest"], [data-marker*="select"], [class*="select"]') !== null
             );
 
-            if (isCombobox && tagName === 'INPUT') {
-                const currentVal = (el.value || '').trim();
+            if (isCombobox) {
+                const currentVal = (el.value || el.innerText || '').trim();
                 const normCurrentVal = normalizeFieldLabel(currentVal);
                 const normTargetVal = normalizeFieldLabel(targetValue);
 
-                if (currentVal !== '' && (normCurrentVal === normTargetVal || normCurrentVal.includes(normTargetVal) || normTargetVal.includes(normCurrentVal))) {
+                if (currentVal !== '' && !currentVal.toLowerCase().includes('выберите') && !currentVal.toLowerCase().includes('не выбран') && (normCurrentVal === normTargetVal || normCurrentVal.includes(normTargetVal) || normTargetVal.includes(normCurrentVal))) {
                     report.skipped_nonempty.push({ target: normLabel, existing_value: currentVal });
                     markFieldHandled(el, sourceRoleName, normLabel);
                 } else {
