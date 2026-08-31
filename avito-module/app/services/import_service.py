@@ -194,11 +194,15 @@ async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
     photos = []
     for idx, p in enumerate(ad.photos):
         p_url = p.url if hasattr(p, "url") and p.url else (p.get("url") if isinstance(p, dict) else str(p))
+        b64 = getattr(p, "content_base64", None) if hasattr(p, "content_base64") else (p.get("content_base64") if isinstance(p, dict) else None)
         if p_url:
-            photos.append({
+            p_dict = {
                 "url": p_url,
                 "position": idx
-            })
+            }
+            if b64:
+                p_dict["content_base64"] = b64
+            photos.append(p_dict)
     
     payload = {
         "account_key": account_key,

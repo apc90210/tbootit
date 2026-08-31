@@ -45,17 +45,19 @@ def fetch_remote_image_bytes(url: str) -> Optional[bytes]:
         return None
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Referer": "https://www.avito.ru/",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
         }
-        with httpx.Client(trust_env=False, timeout=10.0, follow_redirects=True) as client:
+        with httpx.Client(trust_env=False, timeout=15.0, follow_redirects=True) as client:
             resp = client.get(url, headers=headers)
             if resp.status_code != 200:
                 return None
             content_type = resp.headers.get("content-type", "").lower()
-            if not content_type.startswith("image/"):
+            if not (content_type.startswith("image/") or "octet-stream" in content_type):
                 return None
             content = resp.content
-            if len(content) > 10 * 1024 * 1024:  # 10 MB max
+            if len(content) > 15 * 1024 * 1024:  # 15 MB max
                 return None
             return content
     except Exception:
@@ -447,7 +449,18 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             continue
 
         if not photo_bytes:
-            photos_skipped += 1
+            filename = f"remote_{uuid.uuid4().hex[:8]}.jpg"
+            new_photo = models.ProductPhoto(
+                product_id=product.id,
+                filename=filename,
+                storage_path=None,
+                media_url=source_url,
+                source_url=source_url,
+                content_hash=content_hash,
+                sort_order=sort_order
+            )
+            db.add(new_photo)
+            photos_imported += 1
             continue
 
         # Save photo file

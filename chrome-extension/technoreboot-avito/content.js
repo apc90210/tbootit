@@ -1247,6 +1247,30 @@ function extractMyListingsData() {
     }
 }
 
+async function fetchImageBase64(url) {
+    if (!url || typeof url !== 'string') return null;
+    try {
+        const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
+        if (response.ok) {
+            const blob = await response.blob();
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const res = reader.result;
+                    if (typeof res === 'string' && res.includes(',')) {
+                        resolve(res.split(',')[1]);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            });
+        }
+    } catch (e) {}
+    return null;
+}
+
 async function extractListingDataMultiPass() {
     try {
         safelyExpandCharacteristicsDom();
@@ -1261,6 +1285,18 @@ async function extractListingDataMultiPass() {
 
         // 2. Extract listing data with the actively collected high-res photos
         let data = extractListingData(walkedPhotos);
+
+        // 3. Enrich photos with base64 data for guaranteed transfer
+        if (data && data.listing && Array.isArray(data.listing.photos)) {
+            const promises = data.listing.photos.map(async p => {
+                if (p && p.url && !p.content_base64) {
+                    const b64 = await fetchImageBase64(p.url);
+                    if (b64) p.content_base64 = b64;
+                }
+            });
+            await Promise.allSettled(promises);
+        }
+
         return data;
     } catch (e) {
         return extractListingData();

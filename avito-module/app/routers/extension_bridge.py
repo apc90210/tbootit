@@ -182,7 +182,7 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         elif isinstance(item, dict) and item.get("url"):
             url_str = str(item.get("url")).strip()
             if url_str:
-                photos.append(schemas.Photo(url=url_str))
+                photos.append(schemas.Photo(url=url_str, content_base64=item.get("content_base64")))
 
     photos_received = len(raw_photos)
     photos_forwarded = len(photos)

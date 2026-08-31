@@ -19,6 +19,7 @@ class Photo(BaseModel):
     url: str
     local_path: Optional[str] = None
     downloaded: bool = False
+    content_base64: Optional[str] = None
 
 class ParsedAd(BaseModel):
     id: str
