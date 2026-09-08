@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.45)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.46)
 
 let pageInitialData = null;
 
@@ -7,7 +7,17 @@ if (typeof document !== 'undefined') {
     document.addEventListener('TechnorebootInitialData', function(e) {
         if (e && e.detail) {
             try {
-                pageInitialData = typeof e.detail === 'string' ? JSON.parse(e.detail) : e.detail;
+                let data = e.detail;
+                if (typeof data === 'string') {
+                    if (data.includes('%7B') || data.includes('%22')) {
+                        try { data = decodeURIComponent(data); } catch(e1) {}
+                    }
+                    try { data = JSON.parse(data); } catch(e2) {}
+                }
+                if (typeof data === 'string') {
+                    try { data = JSON.parse(data); } catch(e3) {}
+                }
+                pageInitialData = data;
             } catch (err) {}
         }
     });
@@ -22,7 +32,8 @@ function triggerInitialDataCapture() {
                 try {
                     var d = window.__initialData__ || window.__INITIAL_STATE__ || window.__state__;
                     if (d) {
-                        document.dispatchEvent(new CustomEvent('TechnorebootInitialData', { detail: JSON.stringify(d) }));
+                        var payload = typeof d === 'string' ? d : JSON.stringify(d);
+                        document.dispatchEvent(new CustomEvent('TechnorebootInitialData', { detail: payload }));
                     }
                 } catch(e) {}
             })();
@@ -100,8 +111,12 @@ function validateListingImageUrl(url) {
 
     const lower = u.toLowerCase();
     if (lower.includes('/avatar/') || lower.includes('/avatars/') ||
-        lower.includes('/icons/') || lower.includes('/logos/') ||
+        lower.includes('/icon/') || lower.includes('/icons/') ||
+        lower.includes('/logo/') || lower.includes('/logos/') ||
         lower.includes('/banner/') || lower.includes('/badge/') ||
+        lower.includes('/delivery/') || lower.includes('/map/') || lower.includes('/cursor/') ||
+        lower.includes('/tracker/') || lower.includes('/adriver/') || lower.includes('/counter/') ||
+        lower.includes('/pixel/') || lower.includes('/seller/') ||
         lower.includes('/static/') || lower.includes('/shop/') ||
         lower.includes('/user/') || lower.includes('/profile/') ||
         lower.endsWith('.svg') || lower.startsWith('data:') ||
@@ -331,8 +346,192 @@ function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
     return found;
 }
 
+function extractGalleryFromInitialData(data, currentItemId) {
+    if (!data || typeof data !== 'object') return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false };
+
+    let candidateBlocks = [];
+
+    for (const [key, value] of Object.entries(data)) {
+        if (!value || typeof value !== 'object') continue;
+        if (key.includes('@avito/bx-item-view') || key.includes('bx-item-view')) {
+            candidateBlocks.push({ key: key, block: value });
+        }
+    }
+
+    if (candidateBlocks.length === 0) {
+        for (const [topKey, topVal] of Object.entries(data)) {
+            if (topVal && typeof topVal === 'object' && !Array.isArray(topVal)) {
+                for (const [nestedKey, nestedVal] of Object.entries(topVal)) {
+                    if (nestedVal && typeof nestedVal === 'object' && (nestedKey.includes('@avito/bx-item-view') || nestedKey.includes('bx-item-view'))) {
+                        candidateBlocks.push({ key: nestedKey, block: nestedVal });
+                    }
+                }
+            }
+        }
+    }
+
+    let targetBlock = null;
+    if (candidateBlocks.length === 1) {
+        targetBlock = candidateBlocks[0].block;
+    } else if (candidateBlocks.length > 1) {
+        if (currentItemId) {
+            for (const { key, block } of candidateBlocks) {
+                const item = block.buyerItem || block.item || block;
+                const bId = item.id || item.itemId || block.id || block.itemId;
+                if (bId && String(bId) === String(currentItemId)) {
+                    targetBlock = block;
+                    break;
+                }
+                if (key.includes(String(currentItemId))) {
+                    targetBlock = block;
+                    break;
+                }
+            }
+        }
+        if (!targetBlock) targetBlock = candidateBlocks[0].block;
+    }
+
+    if (!targetBlock) {
+        if (data.buyerItem && data.buyerItem.galleryInfo) targetBlock = data;
+        else if (data.galleryInfo && data.galleryInfo.media) targetBlock = { buyerItem: data };
+        else if (data.item && data.item.galleryInfo) targetBlock = { buyerItem: data.item };
+    }
+
+    if (!targetBlock) return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false };
+
+    const buyerItem = targetBlock.buyerItem || targetBlock.item || targetBlock;
+    const galleryInfo = buyerItem.galleryInfo || targetBlock.galleryInfo || buyerItem.gallery || targetBlock.gallery;
+    if (!galleryInfo) return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: true };
+
+    const mediaList = galleryInfo.media || galleryInfo.images || galleryInfo.items || [];
+    if (!Array.isArray(mediaList) || mediaList.length === 0) {
+        return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: true };
+    }
+
+    const slots = [];
+    let nonVideoCount = 0;
+
+    for (let i = 0; i < mediaList.length; i++) {
+        const item = mediaList[i];
+        if (!item || typeof item !== 'object') continue;
+
+        if (item.isVideo === true || item.type === 'video') {
+            continue;
+        }
+
+        nonVideoCount++;
+        const candidates = [];
+        const seenUrls = new Set();
+
+        if (item.urls && typeof item.urls === 'object') {
+            for (const [resKey, rawUrl] of Object.entries(item.urls)) {
+                if (!rawUrl || typeof rawUrl !== 'string') continue;
+                const validUrl = validateListingImageUrl(rawUrl);
+                if (!validUrl || seenUrls.has(validUrl)) continue;
+                seenUrls.add(validUrl);
+
+                let width = 0, height = 0, area = 0;
+                const m = resKey.match(/^(\d+)x(\d+)$/i);
+                if (m) {
+                    width = parseInt(m[1], 10) || 0;
+                    height = parseInt(m[2], 10) || 0;
+                    area = width * height;
+                } else {
+                    area = extractAvitoResolutionVersion(validUrl) * 10000;
+                }
+
+                candidates.push({
+                    url: validUrl,
+                    resolution: resKey,
+                    width: width,
+                    height: height,
+                    area: area,
+                    source_type: "initial_data_media",
+                    score: area || getImageQualityScore(validUrl)
+                });
+            }
+        }
+
+        for (const prop of ['image', 'url', 'large', 'orig', '1280x960', '640x480']) {
+            if (item[prop] && typeof item[prop] === 'string') {
+                const valid = validateListingImageUrl(item[prop]);
+                if (valid && !seenUrls.has(valid)) {
+                    seenUrls.add(valid);
+                    candidates.push({
+                        url: valid,
+                        resolution: prop,
+                        width: 0,
+                        height: 0,
+                        area: 0,
+                        source_type: "initial_data_media",
+                        score: getImageQualityScore(valid)
+                    });
+                }
+            }
+        }
+
+        if (candidates.length === 0) continue;
+
+        candidates.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+        slots.push({
+            slot_index: slots.length,
+            original_index: i,
+            source: "initialData.galleryInfo.media",
+            candidates: candidates,
+            candidate_count: candidates.length,
+            selected_url: candidates[0].url,
+            selected_resolution: candidates[0].resolution || "default",
+            score: candidates[0].score
+        });
+    }
+
+    return {
+        slots: slots,
+        rawMediaCount: mediaList.length,
+        nonVideoCount: nonVideoCount,
+        blockFound: true
+    };
+}
+
+function getAvitoInitialData() {
+    if (typeof pageInitialData !== 'undefined' && pageInitialData) {
+        return pageInitialData;
+    }
+    try {
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const rawText = script.textContent || '';
+            if (!rawText) continue;
+            if (rawText.includes('@avito/bx-item-view') || rawText.includes('__initialData__') || rawText.includes('buyerItem') || rawText.includes('galleryInfo')) {
+                if (script.type === 'application/json' || script.id === '__NEXT_DATA__') {
+                    try {
+                        const parsed = JSON.parse(rawText);
+                        if (parsed) return parsed;
+                    } catch (e) {}
+                }
+                for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
+                    if (rawText.includes(varName)) {
+                        try {
+                            const parsed = extractJsonAssignedToVar(rawText, varName);
+                            if (parsed) return parsed;
+                        } catch (e) {}
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
 function parseItemImagesFromJsonObject(data) {
     if (!data || typeof data !== 'object') return [];
+
+    const galleryRes = extractGalleryFromInitialData(data);
+    if (galleryRes && galleryRes.slots && galleryRes.slots.length > 0) {
+        return galleryRes.slots.map(s => s.selected_url).filter(Boolean);
+    }
+
     const urls = [];
     const seen = new Set();
 
@@ -652,111 +851,168 @@ function getPhotoExtractionDiagnostics() {
     return lastExtractionDiagnostics || null;
 }
 
-function determineExpectedPhotoCount(galleryRoot, structuredItems) {
+function extractGallerySlotsFromInitialData(currentItemId) {
+    try {
+        const initialData = getAvitoInitialData();
+        if (initialData) {
+            return extractGalleryFromInitialData(initialData, currentItemId);
+        }
+    } catch (e) {}
+    return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false };
+}
+
+function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
+    // 1. Search for gallery counter in galleryRoot or anywhere in document
+    const counterSelectors = [
+        '[data-marker="gallery/counter"]',
+        '[data-marker="image-frame/counter"]',
+        '[data-marker="image-viewer/counter"]',
+        '[class*="image-frame-counter"]',
+        '[class*="gallery-counter"]',
+        '[class*="counter"]',
+        '[aria-label*="из"]'
+    ];
+    for (const sel of counterSelectors) {
+        try {
+            const els = (galleryRoot ? galleryRoot.querySelectorAll(sel) : []).length > 0
+                ? galleryRoot.querySelectorAll(sel)
+                : document.querySelectorAll(sel);
+            for (const el of els) {
+                const text = el.textContent || el.getAttribute('aria-label') || '';
+                const m = text.match(/(\d+)\s*(?:из|\/)\s*(\d+)/i);
+                if (m && m[2]) {
+                    const total = parseInt(m[2], 10);
+                    if (total > 0 && total < 100) return total;
+                }
+            }
+        } catch(e) {}
+    }
+
+    // 2. Search for thumbnail list in galleryRoot
     if (galleryRoot) {
-        const thumbs = galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"]');
-        if (thumbs && thumbs.length > 0) {
-            return thumbs.length;
-        }
-        const counterEl = galleryRoot.querySelector('[data-marker="gallery/counter"], [class*="counter"]');
-        if (counterEl && counterEl.textContent) {
-            const m = counterEl.textContent.match(/(\d+)\s*(?:из|\/)\s*(\d+)/i);
-            if (m && m[2]) return parseInt(m[2], 10);
-        }
+        try {
+            const thumbs = galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"], [data-marker="gallery/preview"], li[class*="preview-item"], [data-marker*="preview"]');
+            if (thumbs && thumbs.length > 0) {
+                return thumbs.length;
+            }
+        } catch(e) {}
     }
-    if (Array.isArray(structuredItems) && structuredItems.length > 0) {
-        const identities = new Set();
-        structuredItems.forEach(u => {
-            const id = getCanonicalAvitoImageIdentity(typeof u === 'string' ? u : (u && u.url));
-            if (id) identities.add(id);
-        });
-        if (identities.size > 0) return identities.size;
+
+    // 3. Fallback to structured items count if available
+    if (typeof structuredCount === 'number' && structuredCount > 0) {
+        return structuredCount;
     }
+
     return 0;
 }
 
-function extractAllPhotos(jsonLd, extraUrls = []) {
-    const rawCandidates = [];
-    let foreignImagesRejectedCount = 0;
-
-    // Determine gallery root
+function extractAllPhotos(jsonLd, walkedSlots = []) {
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const itemId = extractAvitoItemId(currentUrl, '') || 'unknown';
     const { root: galleryRoot, selector: galleryStrategy } = findGalleryRootElement();
 
-    // 1. JSON-LD (checked for main listing only)
-    try {
-        const jsonLdImgs = parseJsonLdImages(jsonLd);
-        if (Array.isArray(jsonLdImgs)) {
-            jsonLdImgs.forEach(u => {
-                const valid = validateListingImageUrl(u);
-                if (valid) {
-                    rawCandidates.push({
-                        url: valid,
-                        source_type: "structured_data",
-                        quality_hint: "json_ld",
-                        score: getImageQualityScore(valid)
-                    });
-                }
-            });
-        }
-    } catch (e) {}
+    let layerUsed = "dom";
+    let initialDataFound = false;
+    let itemViewKeyFound = false;
+    let mediaArrayCount = 0;
+    let nonVideoMediaCount = 0;
+    let initialDomImageCount = 0;
+    let traversalUsed = Array.isArray(walkedSlots) && walkedSlots.length > 0;
+    let traversalUniqueSlides = traversalUsed ? walkedSlots.length : 0;
 
-    // 2. Embedded state (strictly scoped to current item)
-    let structuredItems = [];
+    // Count true initial DOM gallery images
     try {
-        structuredItems = extractPhotosFromEmbeddedState();
-        if (Array.isArray(structuredItems)) {
-            structuredItems.forEach(item => {
-                const url = typeof item === 'string' ? item : (item && item.url);
-                const valid = validateListingImageUrl(url);
-                if (valid) {
-                    rawCandidates.push({
-                        url: valid,
-                        source_type: (item && item.source_type) || "structured_data",
-                        quality_hint: (item && item.quality_hint) || "structured_state",
-                        score: getImageQualityScore(valid)
-                    });
-                }
-            });
-        }
-    } catch (e) {}
-
-    // 3. Gallery DOM (strictly scoped to gallery root)
-    try {
-        const domImgs = extractPhotosFromDom();
-        if (Array.isArray(domImgs)) {
-            domImgs.forEach(item => {
-                const url = typeof item === 'string' ? item : (item && item.url);
-                const valid = validateListingImageUrl(url);
-                if (valid) {
-                    rawCandidates.push(typeof item === 'object' && item !== null ? item : {
-                        url: valid,
-                        source_type: "gallery_dom",
-                        quality_hint: "dom_img",
-                        score: getImageQualityScore(valid)
-                    });
-                }
-            });
-        }
-    } catch (e) {}
-
-    // 4. Extra URLs from active walker (scoped to main frame)
-    if (Array.isArray(extraUrls) && extraUrls.length > 0) {
-        extraUrls.forEach(item => {
-            const url = typeof item === 'string' ? item : (item && item.url);
-            const valid = validateListingImageUrl(url);
-            if (valid) {
-                rawCandidates.push(typeof item === 'object' && item !== null ? item : {
-                    url: valid,
-                    source_type: "active_gallery_traversal",
-                    quality_hint: "walk_url",
-                    score: getImageQualityScore(valid)
-                });
-            }
+        const domCandidates = extractPhotosFromDom();
+        const domIdentities = new Set();
+        domCandidates.forEach(c => {
+            const id = getCanonicalAvitoImageIdentity(c.url);
+            if (id) domIdentities.add(id);
         });
+        initialDomImageCount = domIdentities.size || (domCandidates.length > 0 ? 1 : 0);
+    } catch (e) {}
+
+    // LAYER 1: Avito embedded __initialData__
+    let layer1Res = null;
+    try {
+        layer1Res = extractGallerySlotsFromInitialData(itemId);
+        if (layer1Res) {
+            initialDataFound = !!getAvitoInitialData();
+            itemViewKeyFound = layer1Res.blockFound;
+            mediaArrayCount = layer1Res.rawMediaCount || 0;
+            nonVideoMediaCount = layer1Res.nonVideoCount || 0;
+        }
+    } catch (e) {}
+
+    const expectedPhotoCount = determineExpectedPhotoCount(
+        galleryRoot,
+        (layer1Res && layer1Res.slots ? layer1Res.slots.length : 0) || (traversalUsed ? walkedSlots.length : 0)
+    );
+
+    let chosenSlots = [];
+
+    // Decide whether Layer 1 is sufficient
+    if (layer1Res && layer1Res.slots && layer1Res.slots.length > 0) {
+        if (expectedPhotoCount === 0 || layer1Res.slots.length >= expectedPhotoCount) {
+            // Layer 1 is complete!
+            chosenSlots = layer1Res.slots;
+            layerUsed = "initialData";
+        }
     }
 
-    // 5. Ultimate fallback ONLY if absolutely nothing was found anywhere
-    if (rawCandidates.length === 0) {
+    // LAYER 2: If Layer 1 was missing or incomplete, use traversal slots
+    if (chosenSlots.length === 0 && traversalUsed) {
+        chosenSlots = walkedSlots;
+        layerUsed = "traversal";
+    } else if (chosenSlots.length > 0 && traversalUsed && walkedSlots.length > chosenSlots.length) {
+        // Traversal found MORE photos than initialData
+        chosenSlots = walkedSlots;
+        layerUsed = "traversal";
+    }
+
+    // LAYER 3: Scoped DOM extraction fallback
+    let duplicatesRejectedCount = 0;
+    let foreignImagesRejectedCount = 0;
+
+    if (chosenSlots.length === 0) {
+        // Use extractPhotosFromDom() grouped into slots
+        layerUsed = "dom";
+        const domCands = extractPhotosFromDom();
+        const groupsMap = new Map();
+        const groupOrder = [];
+
+        for (const c of domCands) {
+            const valid = validateListingImageUrl(c.url);
+            if (!valid) {
+                foreignImagesRejectedCount++;
+                continue;
+            }
+            const key = getCanonicalAvitoImageIdentity(valid) || valid;
+            if (!groupsMap.has(key)) {
+                groupsMap.set(key, []);
+                groupOrder.push(key);
+            }
+            groupsMap.get(key).push(c);
+        }
+
+        for (const key of groupOrder) {
+            const cands = groupsMap.get(key);
+            cands.sort((a, b) => (b.score || 0) - (a.score || 0));
+            if (cands.length > 1) duplicatesRejectedCount += (cands.length - 1);
+            chosenSlots.push({
+                slot_index: chosenSlots.length,
+                source: "gallery_dom",
+                candidates: cands,
+                candidate_count: cands.length,
+                selected_url: cands[0].url,
+                selected_resolution: cands[0].descriptor || "default",
+                score: cands[0].score,
+                identity: key
+            });
+        }
+    }
+
+    // Ultimate fallback if still zero
+    if (chosenSlots.length === 0) {
         try {
             const fullHtml = ((document.documentElement && document.documentElement.innerHTML) || '')
                 .replace(/\\u002F/ig, '/')
@@ -764,14 +1020,20 @@ function extractAllPhotos(jsonLd, extraUrls = []) {
                 .replace(/\\\//g, '/');
             const matches = fullHtml.match(/https?:\/\/[a-zA-Z0-9_\-\.]*img\.avito\.st\/[^\s"'<>\\]+/g);
             if (matches) {
+                const seenFallbacks = new Set();
                 for (const m of matches) {
                     const valid = validateListingImageUrl(m);
-                    if (valid) {
-                        rawCandidates.push({
-                            url: valid,
-                            source_type: "fallback",
-                            quality_hint: "html_fallback",
-                            score: getImageQualityScore(valid)
+                    if (valid && !seenFallbacks.has(valid)) {
+                        seenFallbacks.add(valid);
+                        chosenSlots.push({
+                            slot_index: chosenSlots.length,
+                            source: "fallback",
+                            candidates: [{ url: valid, score: getImageQualityScore(valid), source_type: "fallback" }],
+                            candidate_count: 1,
+                            selected_url: valid,
+                            selected_resolution: "default",
+                            score: getImageQualityScore(valid),
+                            identity: valid
                         });
                     }
                 }
@@ -779,95 +1041,48 @@ function extractAllPhotos(jsonLd, extraUrls = []) {
         } catch (e) {}
     }
 
-    const expectedPhotoCount = determineExpectedPhotoCount(galleryRoot, structuredItems);
-
-    const groupsMap = new Map(); // canonicalKey -> [candidateObjects]
-    const keyOrder = [];
-    const seenUrls = new Set();
-
-    for (let candidate of rawCandidates) {
-        const rawUrl = typeof candidate === 'string' ? candidate : (candidate && candidate.url);
-        let validUrl = validateListingImageUrl(rawUrl);
-        if (!validUrl) {
-            foreignImagesRejectedCount++;
-            continue;
-        }
-
-        // NO blind upscaling - preserve real authentic candidate URLs
-        validUrl = upgradeAvitoImageUrlToMaxQuality(validUrl);
-
-        if (seenUrls.has(validUrl)) continue;
-        seenUrls.add(validUrl);
-
-        const key = getCanonicalAvitoImageIdentity(validUrl) || validUrl;
-        if (!groupsMap.has(key)) {
-            groupsMap.set(key, []);
-            keyOrder.push(key);
-        }
-
-        const candidateObj = typeof candidate === 'object' && candidate !== null ? {
-            url: validUrl,
-            source_type: candidate.source_type || "gallery_dom",
-            quality_hint: candidate.quality_hint || "standard",
-            descriptor: candidate.descriptor || "",
-            srcsetW: candidate.srcsetW || 0,
-            score: candidate.score || getImageQualityScore(validUrl)
-        } : {
-            url: validUrl,
-            source_type: "gallery_dom",
-            quality_hint: "standard",
-            score: getImageQualityScore(validUrl)
-        };
-
-        groupsMap.get(key).push(candidateObj);
-    }
-
-    let duplicatesRejectedCount = 0;
+    // Format final photos array: EXACTLY ONE per slot (deduplication at slot level!)
     const uniquePhotos = [];
-
-    for (const key of keyOrder) {
-        const variants = groupsMap.get(key) || [];
-        if (variants.length === 0) continue;
-
-        if (variants.length > 1) {
-            duplicatesRejectedCount += (variants.length - 1);
-        }
-
-        // Sort candidates descending by quality score
-        variants.sort((a, b) => b.score - a.score);
-
-        const best = variants[0];
+    chosenSlots.forEach((slot, idx) => {
+        const best = (slot.candidates && slot.candidates.length > 0) ? slot.candidates[0] : { url: slot.selected_url };
         uniquePhotos.push({
-            url: best.url,
+            url: slot.selected_url || best.url,
             position: uniquePhotos.length,
-            identity: key,
-            candidates: variants,
-            candidate_count: variants.length,
-            selected_source: best.source_type,
-            quality_hint: best.quality_hint,
-            quality_score: best.score
+            identity: slot.identity || getCanonicalAvitoImageIdentity(slot.selected_url) || slot.selected_url,
+            candidates: slot.candidates || [best],
+            candidate_count: (slot.candidates && slot.candidates.length) || 1,
+            selected_source: slot.source || "initialData",
+            selected_resolution: slot.selected_resolution || "default",
+            quality_score: slot.score || (best && best.score) || 0
         });
-    }
+    });
 
-    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const itemId = extractAvitoItemId(currentUrl, '') || 'unknown';
-
+    // Populate Section 10 diagnostics object
     lastExtractionDiagnostics = {
         listing_id: itemId,
+        visible_gallery_count: expectedPhotoCount || uniquePhotos.length,
         expected_photo_count: expectedPhotoCount || uniquePhotos.length,
-        extracted_photo_count: uniquePhotos.length,
+        initial_data_found: initialDataFound,
+        item_view_key_found: itemViewKeyFound,
+        media_array_count: mediaArrayCount,
+        non_video_media_count: nonVideoMediaCount,
+        initial_dom_gallery_image_count: initialDomImageCount,
         gallery_root_strategy: galleryStrategy || (galleryRoot ? "gallery_container" : "fallback"),
+        traversal_used: traversalUsed,
+        traversal_unique_slides: traversalUniqueSlides,
+        final_photo_count: uniquePhotos.length,
+        extracted_photo_count: uniquePhotos.length,
+        foreign_images_rejected: foreignImagesRejectedCount,
+        duplicates_rejected: duplicatesRejectedCount,
         photos: uniquePhotos.map((p, idx) => ({
             index: idx,
+            source: p.selected_source || layerUsed,
             candidate_count: p.candidate_count || 1,
-            selected_source: p.selected_source || "gallery_dom",
-            selected_quality_hint: p.quality_hint || "standard",
+            selected_resolution: p.selected_resolution || "default",
             download_ok: false,
             bytes: 0,
-            content_type: "image/jpeg"
-        })),
-        foreign_images_rejected: foreignImagesRejectedCount,
-        duplicates_rejected: duplicatesRejectedCount
+            sha256: ""
+        }))
     };
 
     if (typeof window !== 'undefined') {
@@ -1188,91 +1403,106 @@ function extractAllCharacteristics(jsonLd, itemId) {
     return combined;
 }
 
-async function walkAndCollectAllGalleryPhotos() {
+function collectActiveSlideCandidates(container) {
+    if (!container) return [];
+    const candidates = [];
+    const seenUrls = new Set();
+
+    function add(u, sourceType, qualityHint, srcsetW = 0, descriptor = "") {
+        const valid = validateListingImageUrl(u);
+        if (valid && !seenUrls.has(valid)) {
+            seenUrls.add(valid);
+            const score = srcsetW || getImageQualityScore({ url: valid, srcsetW: srcsetW });
+            candidates.push({
+                url: valid,
+                source_type: sourceType,
+                quality_hint: qualityHint,
+                srcsetW: srcsetW,
+                descriptor: descriptor,
+                score: score
+            });
+        }
+    }
+
+    // 1. Sources inside <picture>
+    const sources = container.querySelectorAll('source[srcset], source[data-srcset]');
+    sources.forEach(s => {
+        const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
+        if (srcset) {
+            const parsed = parseSrcsetCandidates(srcset);
+            parsed.forEach(c => add(c.url, "active_gallery_traversal", `source_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+        }
+    });
+
+    // 2. Images
+    const imgs = container.querySelectorAll('img');
+    imgs.forEach(img => {
+        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+        if (srcset) {
+            const parsed = parseSrcsetCandidates(srcset);
+            parsed.forEach(c => add(c.url, "active_gallery_traversal", `img_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+        }
+        if (img.currentSrc) add(img.currentSrc, "active_gallery_traversal", "current_src");
+        if (img.src && !img.src.startsWith('data:')) add(img.src, "active_gallery_traversal", "src");
+        if (img.dataset) {
+            if (img.dataset.src) add(img.dataset.src, "active_gallery_traversal", "data_src");
+            if (img.dataset.url) add(img.dataset.url, "active_gallery_traversal", "data_url");
+            if (img.dataset.large) add(img.dataset.large, "active_gallery_traversal", "data_large");
+            if (img.dataset.full) add(img.dataset.full, "active_gallery_traversal", "data_full");
+        }
+    });
+
+    candidates.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return candidates;
+}
+
+async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
     const { root: galleryRoot } = findGalleryRootElement();
     if (!galleryRoot) return [];
 
-    const collectedCandidates = [];
-    const seenUrls = new Set();
+    const activeFrame = galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                        galleryRoot.querySelector('[data-marker="image-frame"]') ||
+                        galleryRoot;
 
-    function inspectAndCollectFromMainFrame() {
-        const mainFrame = galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                          galleryRoot.querySelector('[data-marker="image-frame"]') ||
-                          galleryRoot;
-        if (!mainFrame) return;
+    const slots = [];
+    const seenIdentities = new Set();
 
-        // 1. Check sources in picture
-        const sources = mainFrame.querySelectorAll('source[srcset], source[data-srcset]');
-        sources.forEach(s => {
-            const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
-            if (srcset) {
-                const candidates = parseSrcsetCandidates(srcset);
-                if (candidates.length > 0 && !seenUrls.has(candidates[0].url)) {
-                    seenUrls.add(candidates[0].url);
-                    collectedCandidates.push(candidates[0]);
-                }
-            }
-        });
+    function getSlideIdentifier(cands) {
+        if (!cands || cands.length === 0) return null;
+        for (const c of cands) {
+            const id = getCanonicalAvitoImageIdentity(c.url);
+            if (id) return id;
+        }
+        return cands[0].url;
+    }
 
-        // 2. Check main images
-        const imgs = mainFrame.querySelectorAll('img');
-        imgs.forEach(img => {
-            const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
-            if (srcset) {
-                const candidates = parseSrcsetCandidates(srcset);
-                if (candidates.length > 0 && !seenUrls.has(candidates[0].url)) {
-                    seenUrls.add(candidates[0].url);
-                    collectedCandidates.push(candidates[0]);
-                }
-            }
-            if (img.currentSrc) {
-                const valid = validateListingImageUrl(img.currentSrc);
-                if (valid && !seenUrls.has(valid)) {
-                    seenUrls.add(valid);
-                    collectedCandidates.push({
-                        url: valid,
-                        score: getImageQualityScore(valid),
-                        source_type: "active_gallery_traversal",
-                        quality_hint: "main_current_src"
-                    });
-                }
-            }
-            if (img.src && !img.src.startsWith('data:')) {
-                const valid = validateListingImageUrl(img.src);
-                if (valid && !seenUrls.has(valid)) {
-                    seenUrls.add(valid);
-                    collectedCandidates.push({
-                        url: valid,
-                        score: getImageQualityScore(valid),
-                        source_type: "active_gallery_traversal",
-                        quality_hint: "main_src"
-                    });
-                }
-            }
-            if (img.dataset && img.dataset.src) {
-                const valid = validateListingImageUrl(img.dataset.src);
-                if (valid && !seenUrls.has(valid)) {
-                    seenUrls.add(valid);
-                    collectedCandidates.push({
-                        url: valid,
-                        score: getImageQualityScore(valid),
-                        source_type: "active_gallery_traversal",
-                        quality_hint: "main_data_src"
-                    });
-                }
-            }
+    // Step A: Collect initial active slide
+    let initialCands = collectActiveSlideCandidates(activeFrame);
+    let initialId = getSlideIdentifier(initialCands);
+    if (initialCands.length > 0 && initialId) {
+        seenIdentities.add(initialId);
+        slots.push({
+            slot_index: 0,
+            source: "active_gallery_traversal",
+            candidates: initialCands,
+            candidate_count: initialCands.length,
+            selected_url: initialCands[0].url,
+            selected_resolution: initialCands[0].descriptor || "default",
+            score: initialCands[0].score,
+            identity: initialId
         });
     }
 
-    // Initial capture from main frame
-    inspectAndCollectFromMainFrame();
+    // Check if thumbnail list exists strictly inside galleryRoot
+    const thumbs = Array.from(galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"], [data-marker="gallery/preview"]'));
 
-    // Find all thumbnail elements in gallery list strictly within galleryRoot
-    const thumbs = Array.from(galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"]'));
-
-    if (thumbs.length > 0) {
-        for (let i = 0; i < thumbs.length; i++) {
+    if (thumbs.length > 1) {
+        // Thumbnail-directed traversal
+        const targetCount = expectedCount > 0 ? expectedCount : thumbs.length;
+        for (let i = 1; i < targetCount && i < thumbs.length; i++) {
             const thumb = thumbs[i];
+            const prevId = initialId;
+
             try {
                 if (typeof thumb.scrollIntoView === 'function') {
                     thumb.scrollIntoView({ block: 'nearest', inline: 'center' });
@@ -1290,37 +1520,103 @@ async function walkAndCollectAllGalleryPhotos() {
                         clickTarget.click();
                     }
                 }
-            } catch (e) {}
+            } catch(e) {}
 
-            await new Promise(r => setTimeout(r, 120));
-            inspectAndCollectFromMainFrame();
+            // Poll for actual slide change up to 350ms (Section 4.6)
+            let newCands = [];
+            let newId = null;
+            const startTime = Date.now();
+            while (Date.now() - startTime < 350) {
+                await new Promise(r => setTimeout(r, 40));
+                newCands = collectActiveSlideCandidates(activeFrame);
+                newId = getSlideIdentifier(newCands);
+                if (newId && newId !== prevId && !seenIdentities.has(newId)) {
+                    break;
+                }
+            }
+
+            if (newCands.length > 0 && newId && !seenIdentities.has(newId)) {
+                seenIdentities.add(newId);
+                slots.push({
+                    slot_index: slots.length,
+                    source: "active_gallery_traversal",
+                    candidates: newCands,
+                    candidate_count: newCands.length,
+                    selected_url: newCands[0].url,
+                    selected_resolution: newCands[0].descriptor || "default",
+                    score: newCands[0].score,
+                    identity: newId
+                });
+                initialId = newId;
+            }
         }
 
-        // Restore first thumbnail
+        // Restore first thumbnail at end when practical
         try {
             const firstTarget = thumbs[0].querySelector('button, img') || (thumbs[0].tagName !== 'A' ? thumbs[0] : null);
             if (firstTarget && typeof firstTarget.click === 'function' && firstTarget.tagName !== 'A') firstTarget.click();
-        } catch (e) {}
+        } catch(e) {}
+
     } else {
-        // Arrow-based fallback if no list items
+        // Next-button driven traversal
         const nextBtn = galleryRoot.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
-        if (nextBtn) {
-            for (let step = 0; step < 15; step++) {
+        const maxSteps = expectedCount > 0 ? expectedCount + 2 : 15;
+        let consecutiveNoChange = 0;
+        const firstObservedId = initialId;
+
+        for (let step = 0; step < maxSteps; step++) {
+            if (expectedCount > 0 && slots.length >= expectedCount) break;
+
+            const prevId = initialId;
+            if (nextBtn) {
                 try {
                     nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
                     if (typeof nextBtn.click === 'function') nextBtn.click();
                 } catch (e) {}
-                await new Promise(r => setTimeout(r, 140));
-                const prevCount = collectedCandidates.length;
-                inspectAndCollectFromMainFrame();
-                if (collectedCandidates.length === prevCount && step > 2) {
-                    break;
-                }
             }
+
+            // Poll for slide change up to 350ms
+            let newCands = [];
+            let newId = null;
+            const startTime = Date.now();
+            while (Date.now() - startTime < 350) {
+                await new Promise(r => setTimeout(r, 40));
+                newCands = collectActiveSlideCandidates(activeFrame);
+                newId = getSlideIdentifier(newCands);
+                if (newId && newId !== prevId) break;
+            }
+
+            if (!newId || newId === prevId) {
+                consecutiveNoChange++;
+                if (consecutiveNoChange >= 3) break;
+                continue;
+            }
+
+            consecutiveNoChange = 0;
+
+            // Wrap detection: returned to first photo
+            if (firstObservedId && newId === firstObservedId && slots.length > 1) {
+                break;
+            }
+
+            if (!seenIdentities.has(newId)) {
+                seenIdentities.add(newId);
+                slots.push({
+                    slot_index: slots.length,
+                    source: "active_gallery_traversal",
+                    candidates: newCands,
+                    candidate_count: newCands.length,
+                    selected_url: newCands[0].url,
+                    selected_resolution: newCands[0].descriptor || "default",
+                    score: newCands[0].score,
+                    identity: newId
+                });
+            }
+            initialId = newId;
         }
     }
 
-    return collectedCandidates;
+    return slots;
 }
 
 function extractListingData(extraPhotos = []) {
@@ -1412,7 +1708,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.45",
+            extension_version: "0.2.46",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1432,9 +1728,9 @@ function extractListingData(extraPhotos = []) {
 
         if (lastExtractionDiagnostics) {
             resultPayload.diagnostics = lastExtractionDiagnostics;
-            if (lastExtractionDiagnostics.expected_photo_count > 0 &&
-                lastExtractionDiagnostics.extracted_photo_count !== lastExtractionDiagnostics.expected_photo_count) {
-                resultPayload.warning = `Ожидалось ${lastExtractionDiagnostics.expected_photo_count} фотографий объявления, получено ${lastExtractionDiagnostics.extracted_photo_count}.`;
+            if (lastExtractionDiagnostics.visible_gallery_count > 0 &&
+                lastExtractionDiagnostics.final_photo_count < lastExtractionDiagnostics.visible_gallery_count) {
+                resultPayload.warning = `Найдено только ${lastExtractionDiagnostics.final_photo_count} из ${lastExtractionDiagnostics.visible_gallery_count} фотографий объявления.`;
             }
         }
 
@@ -1443,7 +1739,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.17",
+            extension_version: "0.2.46",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1487,7 +1783,7 @@ function extractMyListingsData() {
         });
         return {
             schema_version: 1,
-            extension_version: "0.2.17",
+            extension_version: "0.2.46",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -1496,7 +1792,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.17",
+            extension_version: "0.2.46",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -1527,20 +1823,32 @@ async function extractListingDataMultiPass() {
     try {
         safelyExpandCharacteristicsDom();
 
-        // 1. Actively click through all gallery thumbnails to force Avito to load high-res photos
-        let walkedPhotos = [];
-        try {
-            walkedPhotos = await walkAndCollectAllGalleryPhotos();
-        } catch (err) {}
+        const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+        const itemId = extractAvitoItemId(currentUrl, '') || 'unknown';
+        const { root: galleryRoot } = findGalleryRootElement();
 
+        // 1. Check Layer 1 (__initialData__)
+        let layer1Res = null;
         try {
             if (typeof triggerInitialDataCapture === 'function') {
                 triggerInitialDataCapture();
             }
+            layer1Res = extractGallerySlotsFromInitialData(itemId);
         } catch (e) {}
 
-        // 2. Extract listing data with the actively collected high-res photos
-        let data = extractListingData(walkedPhotos);
+        const layer1Count = (layer1Res && layer1Res.slots) ? layer1Res.slots.length : 0;
+        const expectedCount = determineExpectedPhotoCount(galleryRoot, layer1Count);
+
+        let walkedSlots = [];
+        // If Layer 1 is missing or returns fewer photos than visible gallery count, trigger Layer 2 traversal!
+        if (layer1Count === 0 || (expectedCount > 0 && layer1Count < expectedCount)) {
+            try {
+                walkedSlots = await walkAndCollectAllGalleryPhotos(expectedCount);
+            } catch (err) {}
+        }
+
+        // 2. Extract listing data with the collected photos
+        let data = extractListingData(walkedSlots);
 
         // 3. Enrich photos with base64 data downloaded via Extension Service Worker
         if (data && data.listing && Array.isArray(data.listing.photos)) {
@@ -1573,7 +1881,7 @@ async function extractListingDataMultiPass() {
                             if (lastExtractionDiagnostics && lastExtractionDiagnostics.photos && lastExtractionDiagnostics.photos[idx]) {
                                 lastExtractionDiagnostics.photos[idx].download_ok = true;
                                 lastExtractionDiagnostics.photos[idx].bytes = downloadRes.bytes;
-                                lastExtractionDiagnostics.photos[idx].content_type = downloadRes.content_type;
+                                lastExtractionDiagnostics.photos[idx].sha256 = downloadRes.sha256 || "";
                             }
                         }
                     } catch (err) {}
@@ -1584,6 +1892,10 @@ async function extractListingDataMultiPass() {
 
         if (data && lastExtractionDiagnostics) {
             data.diagnostics = lastExtractionDiagnostics;
+            if (lastExtractionDiagnostics.visible_gallery_count > 0 &&
+                lastExtractionDiagnostics.final_photo_count < lastExtractionDiagnostics.visible_gallery_count) {
+                data.warning = `Найдено только ${lastExtractionDiagnostics.final_photo_count} из ${lastExtractionDiagnostics.visible_gallery_count} фотографий объявления.`;
+            }
         }
 
         return data;
@@ -3059,7 +3371,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.45",
+                    extension_version: "0.2.46",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
