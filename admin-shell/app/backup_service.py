@@ -314,13 +314,22 @@ def _clean_and_copy_dir(src: Path, dst: Path):
     dst.mkdir(parents=True, exist_ok=True)
     for child in dst.iterdir():
         if child.is_dir():
-            shutil.rmtree(child, ignore_errors=True)
+            src_child = src / child.name
+            if src_child.is_dir():
+                _clean_and_copy_dir(src_child, child)
+            else:
+                shutil.rmtree(child, ignore_errors=True)
         else:
             try:
                 child.unlink()
             except OSError:
                 pass
-    shutil.copytree(src, dst, dirs_exist_ok=True)
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_file():
+            shutil.copy2(item, target)
+        elif item.is_dir() and not target.exists():
+            shutil.copytree(item, target)
 
 
 def restore_backup(zip_path: Path) -> Tuple[bool, str]:

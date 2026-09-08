@@ -8,6 +8,8 @@ services:
       - ./data/db:/data/db
       - ./data/storage:/data/storage
       - ./data/backups:/data/backups
+      - ./core/app:/app/app
+      - ./core/tests:/app/tests
     environment:
       - APP_ENV=dev
       - DATABASE_URL=sqlite:////data/db/technoreboot.db

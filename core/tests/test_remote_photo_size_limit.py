@@ -4,12 +4,12 @@ from app.routers.integrations import fetch_remote_image_bytes
 
 @patch("httpx.Client.get")
 def test_remote_photo_size_limit_enforcement(mock_get):
-    """Verify fetch_remote_image_bytes rejects images exceeding 10 MB."""
-    # 11 MB fake payload
+    """Verify fetch_remote_image_bytes rejects images exceeding limit (15 MB)."""
+    # 16 MB fake payload
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.headers = {"content-type": "image/png"}
-    mock_resp.content = b"0" * (11 * 1024 * 1024)
+    mock_resp.content = b"0" * (16 * 1024 * 1024)
     mock_get.return_value = mock_resp
 
     res = fetch_remote_image_bytes("https://example.com/huge.png")

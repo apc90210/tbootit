@@ -155,8 +155,21 @@ async def run_account_import(
                         run.skipped_count += 1
                 else:
                     item_result.status = "failed"
-                    item_result.error = f"HTTP {res.status_code}: {res.text}"
+                    err_text = res.text.strip().replace("\n", " ")[:200]
+                    try:
+                        err_json = res.json()
+                        if isinstance(err_json, dict):
+                            detail = err_json.get("detail") or err_json.get("message")
+                            if detail:
+                                err_text = str(detail)
+                    except Exception:
+                        pass
+                    item_result.error = f"HTTP {res.status_code}: {err_text}"
                     run.error_count += 1
+            except httpx.TimeoutException:
+                item_result.status = "failed"
+                item_result.error = "Превышено время ожидания ответа от Core API (60с)"
+                run.error_count += 1
             except Exception as e:
                 item_result.status = "failed"
                 item_result.error = f"Core API call error: {str(e)}"
@@ -226,6 +239,21 @@ async def import_ad_to_core(ad_id: str, account_key: str) -> Dict[str, Any]:
             if res.status_code == 200:
                 resp_json = res.json()
                 return resp_json
-            return {"status": "failed", "error": f"HTTP {res.status_code}: {res.text}"}
+
+            # Safe structured error parsing
+            err_msg = f"HTTP {res.status_code}"
+            try:
+                err_data = res.json()
+                if isinstance(err_data, dict):
+                    detail = err_data.get("detail") or err_data.get("message") or err_data.get("error")
+                    if detail:
+                        err_msg = f"HTTP {res.status_code}: {detail}"
+            except Exception:
+                clean_text = res.text.strip().replace("\n", " ")[:200]
+                if clean_text:
+                    err_msg = f"HTTP {res.status_code}: {clean_text}"
+            return {"status": "failed", "error": err_msg}
+    except httpx.TimeoutException:
+        return {"status": "failed", "error": "Превышено время ожидания ответа от Core API (60с)"}
     except Exception as e:
-        return {"status": "failed", "error": str(e)}
+        return {"status": "failed", "error": f"Ошибка соединения с Core API: {str(e)}"}

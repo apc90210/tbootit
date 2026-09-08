@@ -125,6 +125,29 @@ def check_service_health(url: str, max_retries: int = 30, delay: float = 1.0) ->
     return False
 
 
+def _safe_sync_dir(src: Path, dst: Path):
+    """Safely synchronizes src into dst in-place to preserve directory inodes and prevent broken Docker mounts."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for child in dst.iterdir():
+        if child.is_dir():
+            src_child = src / child.name
+            if src_child.is_dir():
+                _safe_sync_dir(src_child, child)
+            else:
+                shutil.rmtree(child, ignore_errors=True)
+        else:
+            try:
+                child.unlink()
+            except OSError:
+                pass
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_file():
+            shutil.copy2(item, target)
+        elif item.is_dir() and not target.exists():
+            shutil.copytree(item, target)
+
+
 def main():
     project_root = resolve_project_root()
     print("=" * 70)
@@ -258,16 +281,7 @@ def main():
         backup_storage = source_dir / "storage"
         target_storage = project_root / "data" / "storage"
         if backup_storage.is_dir():
-            target_storage.mkdir(parents=True, exist_ok=True)
-            for child in target_storage.iterdir():
-                if child.is_dir():
-                    shutil.rmtree(child, ignore_errors=True)
-                else:
-                    try:
-                        child.unlink()
-                    except OSError:
-                        pass
-            shutil.copytree(backup_storage, target_storage, dirs_exist_ok=True)
+            _safe_sync_dir(backup_storage, target_storage)
             files_restored = sum(len(files) for _, _, files in os.walk(target_storage))
             print(f"      OK: Product photos & media restored ({files_restored} files).")
 
@@ -275,16 +289,7 @@ def main():
         backup_auth = source_dir / "auth"
         target_auth = project_root / "data" / "auth"
         if backup_auth.is_dir():
-            target_auth.mkdir(parents=True, exist_ok=True)
-            for child in target_auth.iterdir():
-                if child.is_dir():
-                    shutil.rmtree(child, ignore_errors=True)
-                else:
-                    try:
-                        child.unlink()
-                    except OSError:
-                        pass
-            shutil.copytree(backup_auth, target_auth, dirs_exist_ok=True)
+            _safe_sync_dir(backup_auth, target_auth)
             auth_files = sum(len(files) for _, _, files in os.walk(target_auth))
             print(f"      OK: Auth PKI & certificates restored ({auth_files} files).")
 
@@ -292,16 +297,7 @@ def main():
         backup_avito = source_dir / "avito-module"
         target_avito = project_root / "data" / "avito-module"
         if backup_avito.is_dir():
-            target_avito.mkdir(parents=True, exist_ok=True)
-            for child in target_avito.iterdir():
-                if child.is_dir():
-                    shutil.rmtree(child, ignore_errors=True)
-                else:
-                    try:
-                        child.unlink()
-                    except OSError:
-                        pass
-            shutil.copytree(backup_avito, target_avito, dirs_exist_ok=True)
+            _safe_sync_dir(backup_avito, target_avito)
             avito_files = sum(len(files) for _, _, files in os.walk(target_avito))
             print(f"      OK: Avito module persistent state restored ({avito_files} files).")
 

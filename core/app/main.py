@@ -7,9 +7,16 @@ from app.database import engine, Base
 from app.routers import health, products, categories, customers, repairs, sales, photos, admin, product_cards, reports
 
 # Ensure directories exist
-os.makedirs(settings.storage_root, exist_ok=True)
-os.makedirs(os.path.join(settings.storage_root, "product_photos"), exist_ok=True)
-os.makedirs(os.path.dirname(settings.database_url.replace('sqlite:///', '')), exist_ok=True)
+try:
+    os.makedirs(settings.storage_root, exist_ok=True)
+    os.makedirs(os.path.join(settings.storage_root, "product_photos"), exist_ok=True)
+except Exception as e:
+    print(f"[WARN] Storage root initialization warning: {e}")
+
+try:
+    os.makedirs(os.path.dirname(settings.database_url.replace('sqlite:///', '')), exist_ok=True)
+except Exception as e:
+    print(f"[WARN] Database dir initialization warning: {e}")
 
 # Create tables
 Base.metadata.create_all(bind=engine)

@@ -232,7 +232,18 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     photos_skipped = 0
     photos_reconciled = 0
     storage_photos_dir = os.path.join(settings.storage_root, "product_photos")
-    os.makedirs(storage_photos_dir, exist_ok=True)
+    storage_writable = True
+    try:
+        os.makedirs(storage_photos_dir, exist_ok=True)
+    except Exception as e:
+        print(f"[WARN] Failed to create or access primary storage_photos_dir '{storage_photos_dir}': {e}")
+        try:
+            fallback_dir = "/tmp/product_photos"
+            os.makedirs(fallback_dir, exist_ok=True)
+            storage_photos_dir = fallback_dir
+        except Exception as e2:
+            print(f"[ERROR] Failed to create fallback photo storage: {e2}")
+            storage_writable = False
 
     def _extract_avito_resolution_version(url):
         """Extract resolution version from Avito CDN URL.
@@ -465,11 +476,20 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
 
         # Save photo file
         filename = f"{product.id}_{uuid.uuid4().hex[:8]}.jpg"
-        storage_path = os.path.join(storage_photos_dir, filename)
-        media_url = f"/media/product_photos/{filename}"
+        storage_path = None
+        media_url = source_url
 
-        with open(storage_path, "wb") as f:
-            f.write(photo_bytes)
+        if storage_writable:
+            candidate_path = os.path.join(storage_photos_dir, filename)
+            try:
+                with open(candidate_path, "wb") as f:
+                    f.write(photo_bytes)
+                storage_path = candidate_path
+                media_url = f"/media/product_photos/{filename}"
+            except Exception as e:
+                print(f"[WARN] Failed to write photo to disk '{candidate_path}': {e}")
+                storage_path = None
+                media_url = source_url
 
         new_photo = models.ProductPhoto(
             product_id=product.id,
