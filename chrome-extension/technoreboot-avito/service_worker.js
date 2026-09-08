@@ -195,6 +195,93 @@ async function fetchPublicationPackage(productId) {
     }
 }
 
+async function downloadPhotoFromCdn(candidateUrls, maxBytes = 20 * 1024 * 1024) {
+    const urls = Array.isArray(candidateUrls) ? candidateUrls : (candidateUrls ? [candidateUrls] : []);
+    if (urls.length === 0) {
+        return { success: false, error: "No candidate URLs provided", candidate_count: 0 };
+    }
+    let lastError = null;
+
+    for (let i = 0; i < urls.length; i++) {
+        const url = urls[i];
+        if (!url || typeof url !== "string") continue;
+        try {
+            let parsedUrl;
+            try {
+                parsedUrl = new URL(url);
+            } catch (e) {
+                lastError = `Invalid URL: ${url}`;
+                continue;
+            }
+            const host = parsedUrl.hostname.toLowerCase();
+            if (!host.endsWith(".img.avito.st") && host !== "img.avito.st") {
+                lastError = `Forbidden CDN host: ${host}`;
+                continue;
+            }
+
+            const res = await fetch(url, {
+                method: "GET",
+                credentials: "omit"
+            });
+            if (!res.ok) {
+                lastError = `HTTP ${res.status} from ${url}`;
+                continue;
+            }
+
+            const contentType = res.headers.get("content-type") || "";
+            if (!contentType.toLowerCase().startsWith("image/")) {
+                lastError = `Non-image Content-Type '${contentType}' from ${url}`;
+                continue;
+            }
+
+            const arrayBuffer = await res.arrayBuffer();
+            if (arrayBuffer.byteLength > maxBytes) {
+                lastError = `Image exceeds max byte limit (${arrayBuffer.byteLength} > ${maxBytes})`;
+                continue;
+            }
+            if (arrayBuffer.byteLength === 0) {
+                lastError = `Empty image response from ${url}`;
+                continue;
+            }
+
+            let binary = "";
+            const bytes = new Uint8Array(arrayBuffer);
+            const len = bytes.byteLength;
+            const chunkSize = 8192;
+            for (let j = 0; j < len; j += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(j, Math.min(j + chunkSize, len)));
+            }
+            const base64Str = btoa(binary);
+
+            let sha256Hex = null;
+            try {
+                const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                sha256Hex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+            } catch (e) {}
+
+            return {
+                success: true,
+                selected_url: url,
+                candidate_index: i,
+                candidate_count: urls.length,
+                content_type: contentType,
+                bytes: len,
+                sha256: sha256Hex,
+                base64: base64Str
+            };
+        } catch (err) {
+            lastError = err.message || `Fetch error for ${url}`;
+        }
+    }
+
+    return {
+        success: false,
+        error: lastError || "All photo candidates failed to download",
+        candidate_count: urls.length
+    };
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "get_status") {
         checkBridgeStatus().then(sendResponse);
@@ -216,6 +303,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         fetchPublicationPackage(request.product_id).then(sendResponse);
         return true;
     }
+    if (request.action === "download_photo_candidate") {
+        downloadPhotoFromCdn(request.candidate_urls, request.max_bytes).then(sendResponse);
+        return true;
+    }
     return true;
 });
+
 

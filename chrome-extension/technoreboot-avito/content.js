@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.44)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.45)
 
 let pageInitialData = null;
 
@@ -88,10 +88,22 @@ function validateListingImageUrl(url) {
     if (u.startsWith('//')) u = 'https:' + u;
     if (!u.startsWith('http://') && !u.startsWith('https://')) return null;
 
+    try {
+        const parsed = new URL(u);
+        const host = parsed.hostname.toLowerCase();
+        if (!host.endsWith('.img.avito.st') && host !== 'img.avito.st') {
+            return null;
+        }
+    } catch (e) {
+        return null;
+    }
+
     const lower = u.toLowerCase();
     if (lower.includes('/avatar/') || lower.includes('/avatars/') ||
         lower.includes('/icons/') || lower.includes('/logos/') ||
-        lower.includes('/banner/') ||
+        lower.includes('/banner/') || lower.includes('/badge/') ||
+        lower.includes('/static/') || lower.includes('/shop/') ||
+        lower.includes('/user/') || lower.includes('/profile/') ||
         lower.endsWith('.svg') || lower.startsWith('data:') ||
         lower.endsWith('.mp4') || lower.endsWith('.m3u8') || lower.endsWith('.webm') ||
         lower.includes('video.avito.st') || lower.includes('/video/')) {
@@ -102,16 +114,8 @@ function validateListingImageUrl(url) {
 }
 
 function upgradeAvitoImageUrlToMaxQuality(url) {
-    if (!url || typeof url !== 'string') return url;
-    let u = url;
-
-    // Only dimension path prefix /140x105/ or /640x480/ can be upgraded to /1280x960/
-    if (u.match(/\/\d+x\d+\//)) {
-        u = u.replace(/\/\d+x\d+\//, '/1280x960/');
-    }
-
-    // NEVER regex replace /image/1/ signed hash tokens!
-    return u;
+    // Preserve authentic CDN URLs - NO blind string replacements (TEST G)
+    return url;
 }
 
 function getCanonicalAvitoImageIdentity(url) {
@@ -228,6 +232,8 @@ function parseSrcsetCandidates(srcset) {
         candidates.push({
             url: valid,
             srcsetW: width,
+            descriptor: descriptor,
+            source_type: "gallery_srcset",
             score: getImageQualityScore({ url: valid, srcsetW: width })
         });
     }
@@ -531,155 +537,226 @@ function extractPhotosFromEmbeddedState() {
                     }
                 }
             }
-
-            if (text.includes('img.avito.st')) {
-                const matches = text.match(/https?:\/\/[a-zA-Z0-9_\-\.]*img\.avito\.st\/[^\s"'\\]+/g);
-                if (matches) {
-                    for (const m of matches) {
-                        addUrl(m);
-                    }
-                }
-            }
         }
     } catch (e) {}
     return urls;
+}
+
+function findGalleryRootElement() {
+    const candidateSelectors = [
+        '[data-marker="item-view/gallery"]',
+        '[data-marker="image-frame/image-wrapper"]',
+        '[data-marker="image-frame"]',
+        'ul[data-marker="gallery/list"]',
+        '.style-item-view-gallery-',
+        '.gallery-root',
+        '[class*="gallery-root"]'
+    ];
+    for (const sel of candidateSelectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+            const root = el.closest('[data-marker="item-view/gallery"], .gallery-root, [class*="gallery-root"]') || el;
+            return { root: root, selector: sel };
+        }
+    }
+    return { root: null, selector: null };
+}
+
+const GALLERY_SELECTORS = [
+    '[data-marker="image-frame/image-wrapper"] img',
+    '[data-marker="gallery/image"] img',
+    '[data-marker="slider-image/image"] img'
+];
+
+function isInsideExcluded(el) {
+    if (!el || !el.closest) return false;
+    // Never exclude elements inside gallery or item view main container
+    if (el.closest('[data-marker*="gallery"]') || el.closest('[data-marker*="image-frame"]') || el.closest('[data-marker*="item-view/gallery"]') || el.closest('[data-marker="item-view/main"]')) {
+        return false;
+    }
+    return !!(el.closest('[data-marker*="seller"], [data-marker*="user-info"], [data-marker*="profile"], .seller-info-avatar, [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="items-carousel"], [data-marker*="seller-items"], .similar-items, .recommendations-root, .serp-item, header, footer, nav, aside'));
 }
 
 function extractPhotosFromDom() {
     const rawCandidates = [];
     const seen = new Set();
 
-    function addUrl(u) {
+    function addCandidate(u, sourceType = "gallery_dom", qualityHint = "standard", srcsetW = 0, descriptor = "") {
         const valid = validateListingImageUrl(u);
         if (valid && !seen.has(valid)) {
             seen.add(valid);
-            rawCandidates.push(valid);
+            rawCandidates.push({
+                url: valid,
+                source_type: sourceType,
+                quality_hint: qualityHint,
+                srcsetW: srcsetW,
+                descriptor: descriptor,
+                score: getImageQualityScore({ url: valid, srcsetW: srcsetW })
+            });
         }
     }
 
-    // 0. Meta tags & OpenGraph images
-    const metaImages = document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"], meta[property="vk:image"], link[rel="image_src"], meta[itemprop="image"]');
-    metaImages.forEach(m => {
-        const c = m.content || m.href;
-        if (c) addUrl(c);
-    });
-
-    function isInsideExcluded(el) {
-        if (!el || !el.closest) return false;
-        // Never exclude elements inside gallery or item view main container
-        if (el.closest('[data-marker*="gallery"], [data-marker*="image-frame"], [data-marker*="item-view/gallery"], [data-marker="item-view/main"], .gallery-root, [class*="gallery-"], [class*="image-frame"]')) {
-            return false;
-        }
-        return !!(el.closest('[data-marker*="seller"], [data-marker*="user-info"], [data-marker*="profile"], .seller-info-avatar, [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="items-carousel"], [data-marker*="seller-items"], .similar-items, .recommendations-root, .serp-item, header, footer, nav, aside'));
-    }
-
-    // Explicit gallery selectors for structured layout
-    const gallerySelectors = [
-        '[data-marker="image-frame/image-wrapper"] img',
-        '[data-marker="gallery/image"] img',
-        '[data-marker="slider-image/image"] img',
-        '[data-marker*="image"] img',
-        '[data-marker*="gallery"] img',
-        'ul[data-marker="gallery/list"] li img',
-        'div[class*="gallery"] img',
-        'div[class*="image-frame"] img'
-    ];
-    const galleryImgs = document.querySelectorAll(gallerySelectors.join(', '));
-    galleryImgs.forEach(img => {
-        if (isInsideExcluded(img)) return;
-        if (img.src) addUrl(img.src);
-        if (img.dataset && img.dataset.src) addUrl(img.dataset.src);
-    });
-
-    // 1. Scan ALL img elements in the page
-    const allImgs = document.querySelectorAll('img');
-    allImgs.forEach(img => {
-        if (isInsideExcluded(img)) return;
-
-        const parentLink = img.closest('a');
-        if (parentLink && parentLink.href && !isInsideExcluded(parentLink)) {
-            addUrl(parentLink.href);
-        }
-
-        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
-        if (srcset) {
-            const candidates = parseSrcsetCandidates(srcset);
-            candidates.forEach(c => addUrl(c.url));
-        }
-
-        if (img.src) addUrl(img.src);
-        if (img.dataset) {
-            if (img.dataset.src) addUrl(img.dataset.src);
-            if (img.dataset.url) addUrl(img.dataset.url);
-            if (img.dataset.large) addUrl(img.dataset.large);
-            if (img.dataset.full) addUrl(img.dataset.full);
-            if (img.dataset.preview) addUrl(img.dataset.preview);
-        }
-    });
-
-    // 2. Scan ALL picture source elements
-    const sources = document.querySelectorAll('picture source[srcset], picture source[data-srcset]');
-    sources.forEach(s => {
-        if (isInsideExcluded(s)) return;
-        const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
-        if (srcset) {
-            const candidates = parseSrcsetCandidates(srcset);
-            candidates.forEach(c => addUrl(c.url));
-        }
-    });
-
-    // 3. Scan elements with background-image style
-    const bgEls = document.querySelectorAll('[style*="url("]');
-    bgEls.forEach(el => {
-        if (isInsideExcluded(el)) return;
-        const style = el.getAttribute('style') || '';
-        const match = style.match(/url\(['"]?(https?:\/\/[^\'")\s]+)['"]?\)/i);
-        if (match && match[1]) {
-            addUrl(match[1]);
-        }
-    });
-
-    // 4. Scan elements with data-url / data-src / data-large / data-full
-    const dataEls = document.querySelectorAll('[data-url], [data-src], [data-large], [data-full], [data-high-res], [data-preview], [data-img]');
-    dataEls.forEach(el => {
-        if (isInsideExcluded(el)) return;
-        ['data-url', 'data-src', 'data-large', 'data-full', 'data-high-res', 'data-preview', 'data-img'].forEach(attr => {
-            const val = el.getAttribute(attr);
-            if (val) addUrl(val);
+    const { root: galleryRoot } = findGalleryRootElement();
+    if (!galleryRoot) {
+        // Fallback: If no explicit gallery root container was found, search ONLY within main item-view container
+        const itemView = document.querySelector('[data-marker="item-view/main"]') || document.body;
+        const mainImgs = itemView.querySelectorAll('[data-marker*="image"] img, [data-marker*="gallery"] img');
+        mainImgs.forEach(img => {
+            if (img.src) addCandidate(img.src, "fallback", "main_src");
         });
+        return rawCandidates;
+    }
+
+    // 1. Extract from thumbnail list inside gallery root
+    const thumbEls = galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"]');
+    thumbEls.forEach(thumb => {
+        const imgs = thumb.querySelectorAll('img, source');
+        imgs.forEach(el => {
+            const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
+            if (srcset) {
+                const candidates = parseSrcsetCandidates(srcset);
+                candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `thumb_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+            }
+            if (el.src) addCandidate(el.src, "gallery_img_src", "thumb_src");
+            if (el.dataset && el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "thumb_data_src");
+        });
+    });
+
+    // 2. Extract from main display frame inside gallery root
+    const mainFrame = galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                      galleryRoot.querySelector('[data-marker="image-frame"]') ||
+                      galleryRoot;
+    const mainEls = mainFrame.querySelectorAll('source[srcset], source[data-srcset], img');
+    mainEls.forEach(el => {
+        const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
+        if (srcset) {
+            const candidates = parseSrcsetCandidates(srcset);
+            candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `main_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+        }
+        if (el.currentSrc) addCandidate(el.currentSrc, "gallery_current_src", "main_current_src");
+        if (el.src) addCandidate(el.src, "gallery_img_src", "main_src");
+        if (el.dataset) {
+            if (el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "main_data_src");
+            if (el.dataset.url) addCandidate(el.dataset.url, "gallery_img_src", "main_data_url");
+            if (el.dataset.large) addCandidate(el.dataset.large, "gallery_img_src", "main_data_large");
+            if (el.dataset.full) addCandidate(el.dataset.full, "gallery_img_src", "main_data_full");
+        }
     });
 
     return rawCandidates;
 }
 
-function extractAllPhotos(jsonLd, extraUrls = []) {
-    const rawUrls = [];
+let lastExtractionDiagnostics = null;
 
-    // 1. JSON-LD
+function getPhotoExtractionDiagnostics() {
+    return lastExtractionDiagnostics || null;
+}
+
+function determineExpectedPhotoCount(galleryRoot, structuredItems) {
+    if (galleryRoot) {
+        const thumbs = galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"]');
+        if (thumbs && thumbs.length > 0) {
+            return thumbs.length;
+        }
+        const counterEl = galleryRoot.querySelector('[data-marker="gallery/counter"], [class*="counter"]');
+        if (counterEl && counterEl.textContent) {
+            const m = counterEl.textContent.match(/(\d+)\s*(?:из|\/)\s*(\d+)/i);
+            if (m && m[2]) return parseInt(m[2], 10);
+        }
+    }
+    if (Array.isArray(structuredItems) && structuredItems.length > 0) {
+        const identities = new Set();
+        structuredItems.forEach(u => {
+            const id = getCanonicalAvitoImageIdentity(typeof u === 'string' ? u : (u && u.url));
+            if (id) identities.add(id);
+        });
+        if (identities.size > 0) return identities.size;
+    }
+    return 0;
+}
+
+function extractAllPhotos(jsonLd, extraUrls = []) {
+    const rawCandidates = [];
+    let foreignImagesRejectedCount = 0;
+
+    // Determine gallery root
+    const { root: galleryRoot, selector: galleryStrategy } = findGalleryRootElement();
+
+    // 1. JSON-LD (checked for main listing only)
     try {
         const jsonLdImgs = parseJsonLdImages(jsonLd);
-        if (Array.isArray(jsonLdImgs)) rawUrls.push(...jsonLdImgs);
+        if (Array.isArray(jsonLdImgs)) {
+            jsonLdImgs.forEach(u => {
+                const valid = validateListingImageUrl(u);
+                if (valid) {
+                    rawCandidates.push({
+                        url: valid,
+                        source_type: "structured_data",
+                        quality_hint: "json_ld",
+                        score: getImageQualityScore(valid)
+                    });
+                }
+            });
+        }
     } catch (e) {}
 
-    // 2. Embedded state / scripts
+    // 2. Embedded state (strictly scoped to current item)
+    let structuredItems = [];
     try {
-        const embeddedImgs = extractPhotosFromEmbeddedState();
-        if (Array.isArray(embeddedImgs)) rawUrls.push(...embeddedImgs);
+        structuredItems = extractPhotosFromEmbeddedState();
+        if (Array.isArray(structuredItems)) {
+            structuredItems.forEach(item => {
+                const url = typeof item === 'string' ? item : (item && item.url);
+                const valid = validateListingImageUrl(url);
+                if (valid) {
+                    rawCandidates.push({
+                        url: valid,
+                        source_type: (item && item.source_type) || "structured_data",
+                        quality_hint: (item && item.quality_hint) || "structured_state",
+                        score: getImageQualityScore(valid)
+                    });
+                }
+            });
+        }
     } catch (e) {}
 
-    // 3. DOM gallery and image tags
+    // 3. Gallery DOM (strictly scoped to gallery root)
     try {
         const domImgs = extractPhotosFromDom();
-        if (Array.isArray(domImgs)) rawUrls.push(...domImgs);
+        if (Array.isArray(domImgs)) {
+            domImgs.forEach(item => {
+                const url = typeof item === 'string' ? item : (item && item.url);
+                const valid = validateListingImageUrl(url);
+                if (valid) {
+                    rawCandidates.push(typeof item === 'object' && item !== null ? item : {
+                        url: valid,
+                        source_type: "gallery_dom",
+                        quality_hint: "dom_img",
+                        score: getImageQualityScore(valid)
+                    });
+                }
+            });
+        }
     } catch (e) {}
 
-    // 4. Extra URLs from active walker
+    // 4. Extra URLs from active walker (scoped to main frame)
     if (Array.isArray(extraUrls) && extraUrls.length > 0) {
-        rawUrls.push(...extraUrls);
+        extraUrls.forEach(item => {
+            const url = typeof item === 'string' ? item : (item && item.url);
+            const valid = validateListingImageUrl(url);
+            if (valid) {
+                rawCandidates.push(typeof item === 'object' && item !== null ? item : {
+                    url: valid,
+                    source_type: "active_gallery_traversal",
+                    quality_hint: "walk_url",
+                    score: getImageQualityScore(valid)
+                });
+            }
+        });
     }
 
-    // 5. Ultimate fallback: scan full page HTML if no photos found yet
-    if (rawUrls.length === 0) {
+    // 5. Ultimate fallback ONLY if absolutely nothing was found anywhere
+    if (rawCandidates.length === 0) {
         try {
             const fullHtml = ((document.documentElement && document.documentElement.innerHTML) || '')
                 .replace(/\\u002F/ig, '/')
@@ -689,21 +766,34 @@ function extractAllPhotos(jsonLd, extraUrls = []) {
             if (matches) {
                 for (const m of matches) {
                     const valid = validateListingImageUrl(m);
-                    if (valid) rawUrls.push(valid);
+                    if (valid) {
+                        rawCandidates.push({
+                            url: valid,
+                            source_type: "fallback",
+                            quality_hint: "html_fallback",
+                            score: getImageQualityScore(valid)
+                        });
+                    }
                 }
             }
         } catch (e) {}
     }
 
-    const groupsMap = new Map(); // canonicalKey -> [urls]
+    const expectedPhotoCount = determineExpectedPhotoCount(galleryRoot, structuredItems);
+
+    const groupsMap = new Map(); // canonicalKey -> [candidateObjects]
     const keyOrder = [];
     const seenUrls = new Set();
 
-    for (let raw of rawUrls) {
-        let validUrl = validateListingImageUrl(raw);
-        if (!validUrl) continue;
+    for (let candidate of rawCandidates) {
+        const rawUrl = typeof candidate === 'string' ? candidate : (candidate && candidate.url);
+        let validUrl = validateListingImageUrl(rawUrl);
+        if (!validUrl) {
+            foreignImagesRejectedCount++;
+            continue;
+        }
 
-        // Upgrade low-res dimension/version tags to maximum quality
+        // NO blind upscaling - preserve real authentic candidate URLs
         validUrl = upgradeAvitoImageUrlToMaxQuality(validUrl);
 
         if (seenUrls.has(validUrl)) continue;
@@ -714,30 +804,74 @@ function extractAllPhotos(jsonLd, extraUrls = []) {
             groupsMap.set(key, []);
             keyOrder.push(key);
         }
-        groupsMap.get(key).push(validUrl);
+
+        const candidateObj = typeof candidate === 'object' && candidate !== null ? {
+            url: validUrl,
+            source_type: candidate.source_type || "gallery_dom",
+            quality_hint: candidate.quality_hint || "standard",
+            descriptor: candidate.descriptor || "",
+            srcsetW: candidate.srcsetW || 0,
+            score: candidate.score || getImageQualityScore(validUrl)
+        } : {
+            url: validUrl,
+            source_type: "gallery_dom",
+            quality_hint: "standard",
+            score: getImageQualityScore(validUrl)
+        };
+
+        groupsMap.get(key).push(candidateObj);
     }
 
-    // Pick EXACTLY ONE single highest-quality variant for each distinct photo key (NO DUPLICATES)
+    let duplicatesRejectedCount = 0;
     const uniquePhotos = [];
 
     for (const key of keyOrder) {
         const variants = groupsMap.get(key) || [];
         if (variants.length === 0) continue;
 
-        let bestVariant = variants[0];
-        let maxScore = getImageQualityScore(bestVariant);
-        for (let i = 1; i < variants.length; i++) {
-            const score = getImageQualityScore(variants[i]);
-            if (score > maxScore) {
-                maxScore = score;
-                bestVariant = variants[i];
-            }
+        if (variants.length > 1) {
+            duplicatesRejectedCount += (variants.length - 1);
         }
 
+        // Sort candidates descending by quality score
+        variants.sort((a, b) => b.score - a.score);
+
+        const best = variants[0];
         uniquePhotos.push({
-            url: bestVariant,
-            position: uniquePhotos.length
+            url: best.url,
+            position: uniquePhotos.length,
+            identity: key,
+            candidates: variants,
+            candidate_count: variants.length,
+            selected_source: best.source_type,
+            quality_hint: best.quality_hint,
+            quality_score: best.score
         });
+    }
+
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const itemId = extractAvitoItemId(currentUrl, '') || 'unknown';
+
+    lastExtractionDiagnostics = {
+        listing_id: itemId,
+        expected_photo_count: expectedPhotoCount || uniquePhotos.length,
+        extracted_photo_count: uniquePhotos.length,
+        gallery_root_strategy: galleryStrategy || (galleryRoot ? "gallery_container" : "fallback"),
+        photos: uniquePhotos.map((p, idx) => ({
+            index: idx,
+            candidate_count: p.candidate_count || 1,
+            selected_source: p.selected_source || "gallery_dom",
+            selected_quality_hint: p.quality_hint || "standard",
+            download_ok: false,
+            bytes: 0,
+            content_type: "image/jpeg"
+        })),
+        foreign_images_rejected: foreignImagesRejectedCount,
+        duplicates_rejected: duplicatesRejectedCount
+    };
+
+    if (typeof window !== 'undefined') {
+        window.__technoreboot_photo_diagnostics = lastExtractionDiagnostics;
     }
 
     return uniquePhotos;
@@ -1055,15 +1189,16 @@ function extractAllCharacteristics(jsonLd, itemId) {
 }
 
 async function walkAndCollectAllGalleryPhotos() {
-    const collectedHighResUrls = new Set();
+    const { root: galleryRoot } = findGalleryRootElement();
+    if (!galleryRoot) return [];
+
+    const collectedCandidates = [];
+    const seenUrls = new Set();
 
     function inspectAndCollectFromMainFrame() {
-        const mainFrame = document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                          document.querySelector('[data-marker="image-frame"]') ||
-                          document.querySelector('.style-item-view-gallery-') ||
-                          document.querySelector('.gallery-root') ||
-                          document.querySelector('[data-marker="item-view/gallery"]') ||
-                          document.querySelector('[data-marker="item-view/main"]');
+        const mainFrame = galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                          galleryRoot.querySelector('[data-marker="image-frame"]') ||
+                          galleryRoot;
         if (!mainFrame) return;
 
         // 1. Check sources in picture
@@ -1072,8 +1207,9 @@ async function walkAndCollectAllGalleryPhotos() {
             const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
             if (srcset) {
                 const candidates = parseSrcsetCandidates(srcset);
-                if (candidates.length > 0) {
-                    collectedHighResUrls.add(candidates[0].url);
+                if (candidates.length > 0 && !seenUrls.has(candidates[0].url)) {
+                    seenUrls.add(candidates[0].url);
+                    collectedCandidates.push(candidates[0]);
                 }
             }
         });
@@ -1084,15 +1220,46 @@ async function walkAndCollectAllGalleryPhotos() {
             const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
             if (srcset) {
                 const candidates = parseSrcsetCandidates(srcset);
-                if (candidates.length > 0) {
-                    collectedHighResUrls.add(candidates[0].url);
+                if (candidates.length > 0 && !seenUrls.has(candidates[0].url)) {
+                    seenUrls.add(candidates[0].url);
+                    collectedCandidates.push(candidates[0]);
                 }
             }
-            if (img.src && !img.src.startsWith('data:') && validateListingImageUrl(img.src)) {
-                collectedHighResUrls.add(img.src);
+            if (img.currentSrc) {
+                const valid = validateListingImageUrl(img.currentSrc);
+                if (valid && !seenUrls.has(valid)) {
+                    seenUrls.add(valid);
+                    collectedCandidates.push({
+                        url: valid,
+                        score: getImageQualityScore(valid),
+                        source_type: "active_gallery_traversal",
+                        quality_hint: "main_current_src"
+                    });
+                }
             }
-            if (img.dataset && img.dataset.src && validateListingImageUrl(img.dataset.src)) {
-                collectedHighResUrls.add(img.dataset.src);
+            if (img.src && !img.src.startsWith('data:')) {
+                const valid = validateListingImageUrl(img.src);
+                if (valid && !seenUrls.has(valid)) {
+                    seenUrls.add(valid);
+                    collectedCandidates.push({
+                        url: valid,
+                        score: getImageQualityScore(valid),
+                        source_type: "active_gallery_traversal",
+                        quality_hint: "main_src"
+                    });
+                }
+            }
+            if (img.dataset && img.dataset.src) {
+                const valid = validateListingImageUrl(img.dataset.src);
+                if (valid && !seenUrls.has(valid)) {
+                    seenUrls.add(valid);
+                    collectedCandidates.push({
+                        url: valid,
+                        score: getImageQualityScore(valid),
+                        source_type: "active_gallery_traversal",
+                        quality_hint: "main_data_src"
+                    });
+                }
             }
         });
     }
@@ -1100,29 +1267,8 @@ async function walkAndCollectAllGalleryPhotos() {
     // Initial capture from main frame
     inspectAndCollectFromMainFrame();
 
-    // Find all thumbnail elements in gallery list
-    const thumbSelectors = [
-        'ul[data-marker="gallery/list"] li',
-        'ul[data-marker="gallery/list"] > *',
-        '[data-marker="gallery/list"] [data-marker*="image"]',
-        '[data-marker="gallery/preview-item"]',
-        '[data-marker*="preview"]',
-        '[data-marker="item-view/gallery"] ul li',
-        '[data-marker="gallery"] ul li',
-        'div[class*="gallery-list"] > *',
-        'div[class*="style-gallery-list"] li',
-        'ul[class*="gallery-list"] li'
-    ].join(', ');
-
-    const thumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
-        if (el.closest && el.closest('[data-marker*="gallery"], [data-marker*="image-frame"], [data-marker*="item-view/gallery"]')) {
-            return true;
-        }
-        if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
-            return false;
-        }
-        return true;
-    });
+    // Find all thumbnail elements in gallery list strictly within galleryRoot
+    const thumbs = Array.from(galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"]'));
 
     if (thumbs.length > 0) {
         for (let i = 0; i < thumbs.length; i++) {
@@ -1157,7 +1303,7 @@ async function walkAndCollectAllGalleryPhotos() {
         } catch (e) {}
     } else {
         // Arrow-based fallback if no list items
-        const nextBtn = document.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
+        const nextBtn = galleryRoot.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
         if (nextBtn) {
             for (let step = 0; step < 15; step++) {
                 try {
@@ -1165,16 +1311,16 @@ async function walkAndCollectAllGalleryPhotos() {
                     if (typeof nextBtn.click === 'function') nextBtn.click();
                 } catch (e) {}
                 await new Promise(r => setTimeout(r, 140));
-                const prevCount = collectedHighResUrls.size;
+                const prevCount = collectedCandidates.length;
                 inspectAndCollectFromMainFrame();
-                if (collectedHighResUrls.size === prevCount && step > 2) {
+                if (collectedCandidates.length === prevCount && step > 2) {
                     break;
                 }
             }
         }
     }
 
-    return Array.from(collectedHighResUrls);
+    return collectedCandidates;
 }
 
 function extractListingData(extraPhotos = []) {
@@ -1264,9 +1410,9 @@ function extractListingData(extraPhotos = []) {
             }
         }
 
-        return {
+        const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.44",
+            extension_version: "0.2.45",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1283,6 +1429,16 @@ function extractListingData(extraPhotos = []) {
                 photos: photos
             }
         };
+
+        if (lastExtractionDiagnostics) {
+            resultPayload.diagnostics = lastExtractionDiagnostics;
+            if (lastExtractionDiagnostics.expected_photo_count > 0 &&
+                lastExtractionDiagnostics.extracted_photo_count !== lastExtractionDiagnostics.expected_photo_count) {
+                resultPayload.warning = `Ожидалось ${lastExtractionDiagnostics.expected_photo_count} фотографий объявления, получено ${lastExtractionDiagnostics.extracted_photo_count}.`;
+            }
+        }
+
+        return resultPayload;
     } catch (err) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
@@ -1352,22 +1508,16 @@ function extractMyListingsData() {
 async function fetchImageBase64(url) {
     if (!url || typeof url !== 'string') return null;
     try {
-        const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
-        if (response.ok) {
-            const blob = await response.blob();
-            return new Promise(resolve => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const res = reader.result;
-                    if (typeof res === 'string' && res.includes(',')) {
-                        resolve(res.split(',')[1]);
-                    } else {
-                        resolve(null);
-                    }
-                };
-                reader.onerror = () => resolve(null);
-                reader.readAsDataURL(blob);
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            const res = await new Promise(resolve => {
+                chrome.runtime.sendMessage({
+                    action: "download_photo_candidate",
+                    candidate_urls: [url]
+                }, resolve);
             });
+            if (res && res.success && res.base64) {
+                return res.base64;
+            }
         }
     } catch (e) {}
     return null;
@@ -1392,15 +1542,48 @@ async function extractListingDataMultiPass() {
         // 2. Extract listing data with the actively collected high-res photos
         let data = extractListingData(walkedPhotos);
 
-        // 3. Enrich photos with base64 data for guaranteed transfer
+        // 3. Enrich photos with base64 data downloaded via Extension Service Worker
         if (data && data.listing && Array.isArray(data.listing.photos)) {
-            const promises = data.listing.photos.map(async p => {
-                if (p && p.url && !p.content_base64) {
-                    const b64 = await fetchImageBase64(p.url);
-                    if (b64) p.content_base64 = b64;
+            const promises = data.listing.photos.map(async (p, idx) => {
+                const candidateUrls = (p.candidates && p.candidates.length > 0)
+                    ? p.candidates.map(c => c.url || c).filter(Boolean)
+                    : (p.url ? [p.url] : []);
+
+                if (candidateUrls.length > 0 && !p.content_base64) {
+                    try {
+                        const downloadRes = await new Promise(resolve => {
+                            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                                chrome.runtime.sendMessage({
+                                    action: "download_photo_candidate",
+                                    candidate_urls: candidateUrls
+                                }, resolve);
+                            } else {
+                                resolve(null);
+                            }
+                        });
+
+                        if (downloadRes && downloadRes.success && downloadRes.base64) {
+                            p.url = downloadRes.selected_url;
+                            p.content_base64 = downloadRes.base64;
+                            p.bytes = downloadRes.bytes;
+                            p.content_type = downloadRes.content_type;
+                            p.sha256 = downloadRes.sha256;
+                            p.downloaded = true;
+
+                            if (lastExtractionDiagnostics && lastExtractionDiagnostics.photos && lastExtractionDiagnostics.photos[idx]) {
+                                lastExtractionDiagnostics.photos[idx].download_ok = true;
+                                lastExtractionDiagnostics.photos[idx].bytes = downloadRes.bytes;
+                                lastExtractionDiagnostics.photos[idx].content_type = downloadRes.content_type;
+                            }
+                        }
+                    } catch (err) {}
                 }
             });
             await Promise.allSettled(promises);
+        }
+
+        if (data && lastExtractionDiagnostics) {
+            data.diagnostics = lastExtractionDiagnostics;
         }
 
         return data;
@@ -2876,7 +3059,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.44",
+                    extension_version: "0.2.45",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -2889,6 +3072,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         }
+    } else if (request.action === "get_photo_diagnostics") {
+        sendResponse(getPhotoExtractionDiagnostics());
+        return true;
     } else if (request.action === "fill_avito_form") {
         fillAvitoPublicationFormAsync(request.package)
             .then(report => sendResponse(report))
