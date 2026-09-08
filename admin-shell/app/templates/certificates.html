@@ -35,6 +35,29 @@
         .alert-info { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; }
         .actions-cell { display: flex; gap: 8px; align-items: center; }
         .text-muted { color: #94a3b8; }
+
+        /* Modal Overlay & Card */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 520px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 1px solid #cbd5e1;
+        }
     </style>
 </head>
 <body>
@@ -56,16 +79,6 @@
                 <input type="text" id="certName" class="form-input" placeholder="Название (например: Ноутбук магазин)" required>
                 <button type="submit" class="btn btn-primary" id="issueBtn">[ Выпустить сертификат ]</button>
             </form>
-
-            <div id="issuedCertInfo" style="display: none;" class="alert-box alert-success">
-                <strong>Сертификат успешно выпущен!</strong>
-                <p style="margin: 6px 0 0 0;">
-                    Название: <span id="newCertName"></span> | 
-                    Пароль архива .p12: <code id="newCertPass" style="background:#fff; padding: 2px 6px; border-radius:4px; font-weight:bold;"></code>
-                    <br>
-                    <a id="newCertDownload" href="#" class="btn btn-primary btn-sm" style="margin-top: 8px;">Скачать .p12 файл</a>
-                </p>
-            </div>
 
             <table>
                 <thead>
@@ -121,7 +134,80 @@
         </div>
     </div>
 
+    <!-- Persistent Result Modal -->
+    <div id="certResultModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <h2 style="margin-top: 0; font-size: 1.4rem; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Сертификат выпущен</h2>
+            
+            <p style="font-size: 1rem; margin: 16px 0 8px 0;">
+                Название: <strong id="resCertName"></strong>
+            </p>
+
+            <div style="margin: 16px 0;">
+                <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 6px;">Пароль:</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="resCertPass" readonly style="flex: 1; font-family: monospace; font-size: 1.1rem; padding: 8px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-weight: bold; letter-spacing: 0.05em;">
+                    <button type="button" class="btn btn-outline" id="btnCopyPass" onclick="copyPassword()">Копировать</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <a id="resDownloadP12" href="#" class="btn btn-primary">Скачать сертификат .p12</a>
+                <a id="resDownloadTxt" href="#" class="btn btn-primary" onclick="downloadPasswordTxt(event)">Скачать пароль .txt</a>
+            </div>
+
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: right;">
+                <button type="button" class="btn btn-outline" id="btnCloseModal" onclick="closeResultModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentCertData = null;
+
+        function copyPassword() {
+            if (!currentCertData || !currentCertData.password) return;
+            const pass = currentCertData.password;
+            const btn = document.getElementById('btnCopyPass');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(pass).then(() => {
+                    btn.textContent = '✓ Скопировано';
+                    setTimeout(() => { btn.textContent = 'Копировать'; }, 2000);
+                }).catch(() => {
+                    fallbackCopy(pass, btn);
+                });
+            } else {
+                fallbackCopy(pass, btn);
+            }
+        }
+
+        function fallbackCopy(text, btn) {
+            const passInput = document.getElementById('resCertPass');
+            passInput.select();
+            document.execCommand('copy');
+            btn.textContent = '✓ Скопировано';
+            setTimeout(() => { btn.textContent = 'Копировать'; }, 2000);
+        }
+
+        function downloadPasswordTxt(event) {
+            if (!currentCertData || !currentCertData.password) return;
+            const certName = currentCertData.name || 'user_cert';
+            const blob = new Blob([currentCertData.password + "\n"], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${certName}_password.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function closeResultModal() {
+            document.getElementById('certResultModal').style.display = 'none';
+            window.location.reload();
+        }
+
         async function issueCertificate() {
             const nameInput = document.getElementById('certName');
             const name = nameInput.value.trim();
@@ -146,12 +232,14 @@
                 const data = await res.json();
                 nameInput.value = '';
 
-                document.getElementById('newCertName').textContent = data.name;
-                document.getElementById('newCertPass').textContent = data.password || 'пароль сохранен';
-                document.getElementById('newCertDownload').href = `/admin-api/certificates/${data.id}/download`;
-                document.getElementById('issuedCertInfo').style.display = 'block';
+                currentCertData = data;
+                document.getElementById('resCertName').textContent = data.name;
+                document.getElementById('resCertPass').value = data.password || '';
+                document.getElementById('resDownloadP12').href = `/admin-api/certificates/${data.id}/download`;
+                document.getElementById('resDownloadTxt').href = `/admin-api/certificates/${data.id}/password.txt`;
 
-                setTimeout(() => { window.location.reload(); }, 1500);
+                // Show persistent modal until owner explicitly clicks Close
+                document.getElementById('certResultModal').style.display = 'flex';
             } catch (e) {
                 showAlert('danger', e.message);
             } finally {

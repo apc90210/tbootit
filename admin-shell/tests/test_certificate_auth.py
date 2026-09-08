@@ -140,3 +140,70 @@ def test_endpoints_via_testclient():
     assert resp.status_code == 200
     assert "ТЕХНОРЕБУТ — ДОСТУП" in resp.text
 
+
+def test_stage07a_r2_user_cert_issuance_modal_and_password_download():
+    """Verify TEST A through TEST H from Stage 07A-R2 prompt."""
+    from app.main import auth_manager
+    owner = [c for c in auth_manager.list_certificates() if c.get("is_owner")][0]
+    owner_headers = {
+        "x-client-cert-verify": "SUCCESS",
+        "x-client-cert-serial": owner["serial_hex"],
+        "x-client-cert-fingerprint": owner["fingerprint_sha256"],
+    }
+
+    # TEST A: Issue a USER certificate through backend/API
+    res = client.post("/admin-api/certificates", json={"name": "TEST-PASSWORD-UI"}, headers=owner_headers)
+    assert res.status_code == 200
+    created = res.json()
+    assert "id" in created
+    assert "password" in created and len(created["password"]) > 0
+    cert_id = created["id"]
+    gen_pass = created["password"]
+
+    # TEST A & D: .p12 download works
+    p12_res = client.get(f"/admin-api/certificates/{cert_id}/download", headers=owner_headers)
+    assert p12_res.status_code == 200
+    assert len(p12_res.content) > 0
+    assert p12_res.headers["content-type"] == "application/x-pkcs12"
+
+    # TEST E: Password .txt download works and contains exactly the generated password (+ optional newline)
+    txt_res = client.get(f"/admin-api/certificates/{cert_id}/password.txt", headers=owner_headers)
+    assert txt_res.status_code == 200
+    assert txt_res.text.strip() == gen_pass
+
+    # TEST F: Password is NOT written into certificate registry
+    all_certs = auth_manager.list_certificates()
+    target_in_reg = next(c for c in all_certs if c["id"] == cert_id)
+    assert "password" not in target_in_reg
+
+    # TEST B, C, D, E in UI: Verify UI contains persistent modal, copy button, download links, and no auto-reload
+    ui_res = client.get("/certificates", headers=owner_headers)
+    assert ui_res.status_code == 200
+    assert 'id="certResultModal"' in ui_res.text
+    assert "Сертификат выпущен" in ui_res.text
+    assert 'id="resCertPass"' in ui_res.text
+    assert 'id="btnCopyPass"' in ui_res.text and 'copyPassword()' in ui_res.text
+    assert 'id="resDownloadP12"' in ui_res.text
+    assert 'id="resDownloadTxt"' in ui_res.text
+    assert 'id="btnCloseModal"' in ui_res.text and 'closeResultModal()' in ui_res.text
+    # Ensure no auto-reloading timeout hides the password
+    assert "setTimeout(() => { window.location.reload(); }, 1500)" not in ui_res.text
+
+    # TEST G: Ordinary USER cannot access /certificates or admin-api
+    user_headers = {
+        "x-client-cert-verify": "SUCCESS",
+        "x-client-cert-serial": target_in_reg["serial_hex"],
+        "x-client-cert-fingerprint": target_in_reg["fingerprint_sha256"],
+    }
+    user_ui_res = client.get("/certificates", headers=user_headers)
+    assert user_ui_res.status_code == 403
+
+    user_api_res = client.get("/admin-api/certificates", headers=user_headers)
+    assert user_api_res.status_code == 403
+
+    # TEST H: Revocation works
+    revoke_res = client.post(f"/admin-api/certificates/{cert_id}/revoke", headers=owner_headers)
+    assert revoke_res.status_code == 200
+    assert revoke_res.json()["status"] == "REVOKED"
+
+

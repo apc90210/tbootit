@@ -37,8 +37,10 @@ class AuthManager:
         self.ca_key_path = os.path.join(self.ca_dir, "ca.key")
         self.server_cert_path = os.path.join(self.server_dir, "server.crt")
         self.server_key_path = os.path.join(self.server_dir, "server.key")
+        self._temp_passwords: Dict[str, str] = {}
 
         self._ensure_initialized()
+
 
     def _ensure_initialized(self):
         self._ensure_ca()
@@ -151,6 +153,16 @@ class AuthManager:
         if not os.path.exists(self.registry_file):
             with open(self.registry_file, "w", encoding="utf-8") as f:
                 json.dump([], f, indent=2, ensure_ascii=False)
+        else:
+            registry = self._read_registry()
+            cleaned = False
+            for item in registry:
+                if "password" in item:
+                    del item["password"]
+                    cleaned = True
+            if cleaned:
+                self._write_registry(registry)
+
 
     def _read_registry(self) -> List[Dict]:
         if not os.path.exists(self.registry_file):
@@ -329,13 +341,19 @@ class AuthManager:
             "created_at": now.isoformat(),
             "revoked_at": None,
             "p12_filename": p12_filename,
-            "password": user_password,
         }
 
         registry = self._read_registry()
         registry.append(record)
         self._write_registry(registry)
-        return record
+
+        # Store in-memory only for immediate download / UI response
+        self._temp_passwords[cert_id] = user_password
+        return {**record, "password": user_password}
+
+    def get_temp_user_password(self, cert_id: str) -> Optional[str]:
+        return self._temp_passwords.get(cert_id)
+
 
     def revoke_certificate(self, cert_id: str) -> Dict:
         registry = self._read_registry()

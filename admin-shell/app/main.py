@@ -821,4 +821,19 @@ async def api_download_certificate(cert_id: str, request: Request):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@app.get("/admin-api/certificates/{cert_id}/password.txt")
+async def api_download_certificate_password(cert_id: str, request: Request):
+    """Download .txt password file for a freshly created certificate (OWNER only)."""
+    _require_owner(request)
+    password = auth_manager.get_temp_user_password(cert_id)
+    if not password:
+        raise HTTPException(status_code=404, detail="Одноразовый пароль более недоступен")
+    return Response(
+        content=f"{password}\n",
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{cert_id}_password.txt"'}
+    )
+
+
+
 
