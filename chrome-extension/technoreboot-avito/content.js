@@ -1,6 +1,41 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.30)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.44)
 
+let pageInitialData = null;
 
+// Listen for direct initial data captured from main world
+if (typeof document !== 'undefined') {
+    document.addEventListener('TechnorebootInitialData', function(e) {
+        if (e && e.detail) {
+            try {
+                pageInitialData = typeof e.detail === 'string' ? JSON.parse(e.detail) : e.detail;
+            } catch (err) {}
+        }
+    });
+}
+
+function triggerInitialDataCapture() {
+    try {
+        if (typeof document === 'undefined') return;
+        const script = document.createElement('script');
+        script.textContent = `
+            (function() {
+                try {
+                    var d = window.__initialData__ || window.__INITIAL_STATE__ || window.__state__;
+                    if (d) {
+                        document.dispatchEvent(new CustomEvent('TechnorebootInitialData', { detail: JSON.stringify(d) }));
+                    }
+                } catch(e) {}
+            })();
+        `;
+        (document.head || document.documentElement).appendChild(script);
+        script.remove();
+    } catch (e) {}
+}
+
+// Immediately attempt capture on load
+try {
+    triggerInitialDataCapture();
+} catch (e) {}
 
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
@@ -88,7 +123,16 @@ function getCanonicalAvitoImageIdentity(url) {
     const filename = cleanPath.split('/').pop() || cleanPath;
     const token = filename.replace(/^\d+\./, '');
 
+    // Match [prefix][letter]a[digit] — both new (ba4, ra3) and old (La6) formats
+    const laMatch = token.match(/^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d/i);
+    if (laMatch && laMatch[1]) {
+        return `avito_photo_${laMatch[1]}`;
+    }
+
     const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
+    if (tokenNoExt && tokenNoExt.length >= 3) {
+        return `avito_photo_${tokenNoExt}`;
+    }
     return tokenNoExt || token || filename || pathOnly;
 }
 
@@ -435,36 +479,69 @@ function extractPhotosFromEmbeddedState() {
     }
 
     // 1. Direct main-world initialData check
-    triggerInitialDataCapture();
-    if (pageInitialData) {
-        const photos = parseItemImagesFromJsonObject(pageInitialData);
-        photos.forEach(addUrl);
+    try {
+        if (typeof triggerInitialDataCapture === 'function') {
+            triggerInitialDataCapture();
+        }
+    } catch (e) {}
+
+    if (typeof pageInitialData !== 'undefined' && pageInitialData) {
+        try {
+            const photos = parseItemImagesFromJsonObject(pageInitialData);
+            photos.forEach(addUrl);
+        } catch (e) {}
     }
 
     // 2. Parse structured JSON from script tags
-    const scripts = document.querySelectorAll('script');
-    for (const script of scripts) {
-        const text = script.textContent || '';
-        if (text.includes('__initialData__') || text.includes('__NEXT_DATA__') || text.includes('__INITIAL_STATE__') || text.includes('window.__state__') || text.includes('initialData')) {
-            for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
-                if (text.includes(varName)) {
-                    const parsed = extractJsonAssignedToVar(text, varName);
-                    if (parsed) {
-                        const photos = parseItemImagesFromJsonObject(parsed);
-                        photos.forEach(addUrl);
+    try {
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const rawText = script.textContent || '';
+            if (!rawText) continue;
+
+            const text = rawText
+                .replace(/\\u002F/ig, '/')
+                .replace(/\\u0026/ig, '&')
+                .replace(/\\\//g, '/');
+
+            if (script.type === 'application/json' || script.id === '__NEXT_DATA__' ||
+                text.includes('__initialData__') || text.includes('__NEXT_DATA__') ||
+                text.includes('__INITIAL_STATE__') || text.includes('window.__state__') ||
+                text.includes('initialData')) {
+
+                if (script.type === 'application/json' || script.id === '__NEXT_DATA__') {
+                    try {
+                        const parsed = JSON.parse(script.textContent);
+                        if (parsed) {
+                            const photos = parseItemImagesFromJsonObject(parsed);
+                            photos.forEach(addUrl);
+                        }
+                    } catch (e) {}
+                }
+
+                for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
+                    if (text.includes(varName)) {
+                        try {
+                            const parsed = extractJsonAssignedToVar(text, varName);
+                            if (parsed) {
+                                const photos = parseItemImagesFromJsonObject(parsed);
+                                photos.forEach(addUrl);
+                            }
+                        } catch (e) {}
+                    }
+                }
+            }
+
+            if (text.includes('img.avito.st')) {
+                const matches = text.match(/https?:\/\/[a-zA-Z0-9_\-\.]*img\.avito\.st\/[^\s"'\\]+/g);
+                if (matches) {
+                    for (const m of matches) {
+                        addUrl(m);
                     }
                 }
             }
         }
-        if (text.includes('img.avito.st')) {
-            const matches = text.match(/https?:\/\/[a-zA-Z0-9_\-\.]*img\.avito\.st\/[^\s"'\\]+/g);
-            if (matches) {
-                for (const m of matches) {
-                    addUrl(m);
-                }
-            }
-        }
-    }
+    } catch (e) {}
     return urls;
 }
 
@@ -489,6 +566,10 @@ function extractPhotosFromDom() {
 
     function isInsideExcluded(el) {
         if (!el || !el.closest) return false;
+        // Never exclude elements inside gallery or item view main container
+        if (el.closest('[data-marker*="gallery"], [data-marker*="image-frame"], [data-marker*="item-view/gallery"], [data-marker="item-view/main"], .gallery-root, [class*="gallery-"], [class*="image-frame"]')) {
+            return false;
+        }
         return !!(el.closest('[data-marker*="seller"], [data-marker*="user-info"], [data-marker*="profile"], .seller-info-avatar, [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="items-carousel"], [data-marker*="seller-items"], .similar-items, .recommendations-root, .serp-item, header, footer, nav, aside'));
     }
 
@@ -574,12 +655,44 @@ function extractPhotosFromDom() {
 function extractAllPhotos(jsonLd, extraUrls = []) {
     const rawUrls = [];
 
-    // Collect ALL photos from JSON-LD, embedded state, DOM gallery, and active walker
-    rawUrls.push(...parseJsonLdImages(jsonLd));
-    rawUrls.push(...extractPhotosFromEmbeddedState());
-    rawUrls.push(...extractPhotosFromDom());
+    // 1. JSON-LD
+    try {
+        const jsonLdImgs = parseJsonLdImages(jsonLd);
+        if (Array.isArray(jsonLdImgs)) rawUrls.push(...jsonLdImgs);
+    } catch (e) {}
+
+    // 2. Embedded state / scripts
+    try {
+        const embeddedImgs = extractPhotosFromEmbeddedState();
+        if (Array.isArray(embeddedImgs)) rawUrls.push(...embeddedImgs);
+    } catch (e) {}
+
+    // 3. DOM gallery and image tags
+    try {
+        const domImgs = extractPhotosFromDom();
+        if (Array.isArray(domImgs)) rawUrls.push(...domImgs);
+    } catch (e) {}
+
+    // 4. Extra URLs from active walker
     if (Array.isArray(extraUrls) && extraUrls.length > 0) {
         rawUrls.push(...extraUrls);
+    }
+
+    // 5. Ultimate fallback: scan full page HTML if no photos found yet
+    if (rawUrls.length === 0) {
+        try {
+            const fullHtml = ((document.documentElement && document.documentElement.innerHTML) || '')
+                .replace(/\\u002F/ig, '/')
+                .replace(/\\u0026/ig, '&')
+                .replace(/\\\//g, '/');
+            const matches = fullHtml.match(/https?:\/\/[a-zA-Z0-9_\-\.]*img\.avito\.st\/[^\s"'<>\\]+/g);
+            if (matches) {
+                for (const m of matches) {
+                    const valid = validateListingImageUrl(m);
+                    if (valid) rawUrls.push(valid);
+                }
+            }
+        } catch (e) {}
     }
 
     const groupsMap = new Map(); // canonicalKey -> [urls]
@@ -596,7 +709,7 @@ function extractAllPhotos(jsonLd, extraUrls = []) {
         if (seenUrls.has(validUrl)) continue;
         seenUrls.add(validUrl);
 
-        const key = getCanonicalAvitoImageIdentity(validUrl);
+        const key = getCanonicalAvitoImageIdentity(validUrl) || validUrl;
         if (!groupsMap.has(key)) {
             groupsMap.set(key, []);
             keyOrder.push(key);
@@ -898,10 +1011,16 @@ function extractCharacteristicsFromDom() {
 function extractAllCharacteristics(jsonLd, itemId) {
     const combined = {};
 
-    triggerInitialDataCapture();
-    if (pageInitialData) {
-        const stateParams = extractCharacteristicsFromJsonObject(pageInitialData, itemId);
-        Object.assign(combined, stateParams);
+    try {
+        if (typeof triggerInitialDataCapture === 'function') {
+            triggerInitialDataCapture();
+        }
+    } catch (e) {}
+    if (typeof pageInitialData !== 'undefined' && pageInitialData) {
+        try {
+            const stateParams = extractCharacteristicsFromJsonObject(pageInitialData, itemId);
+            Object.assign(combined, stateParams);
+        } catch (e) {}
     }
 
     const scripts = document.querySelectorAll('script');
@@ -996,6 +1115,9 @@ async function walkAndCollectAllGalleryPhotos() {
     ].join(', ');
 
     const thumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
+        if (el.closest && el.closest('[data-marker*="gallery"], [data-marker*="image-frame"], [data-marker*="item-view/gallery"]')) {
+            return true;
+        }
         if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
             return false;
         }
@@ -1144,7 +1266,7 @@ function extractListingData(extraPhotos = []) {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.17",
+            extension_version: "0.2.44",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1261,7 +1383,11 @@ async function extractListingDataMultiPass() {
             walkedPhotos = await walkAndCollectAllGalleryPhotos();
         } catch (err) {}
 
-        triggerInitialDataCapture();
+        try {
+            if (typeof triggerInitialDataCapture === 'function') {
+                triggerInitialDataCapture();
+            }
+        } catch (e) {}
 
         // 2. Extract listing data with the actively collected high-res photos
         let data = extractListingData(walkedPhotos);
@@ -2750,7 +2876,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.30",
+                    extension_version: "0.2.44",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

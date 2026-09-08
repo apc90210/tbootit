@@ -489,7 +489,18 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.43"
+    version = "0.2.44"
+    try:
+        for manifest_candidate in [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")),
+            "/chrome-extension/technoreboot-avito/manifest.json"
+        ]:
+            if os.path.exists(manifest_candidate):
+                with open(manifest_candidate, "r", encoding="utf-8") as f:
+                    version = json.load(f).get("version", version)
+                break
+    except Exception:
+        pass
     filename = f"technoreboot-avito-extension-{version}.zip"
     candidate_paths = [
         os.path.abspath(os.path.join(os.path.dirname(__file__), filename)),
