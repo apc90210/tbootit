@@ -793,6 +793,7 @@ class AvitoItemImportResponse(BaseModel):
     photos_imported: int
     photos_skipped: int = 0
     photos_reconciled: int = 0
+    warnings: List[str] = []
 
 # Dynamic Avito Category & Attribute Schemas
 class AvitoAttributeOptionSchema(BaseModel):

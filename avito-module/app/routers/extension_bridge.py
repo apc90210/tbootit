@@ -265,6 +265,10 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
             }
         )
 
+    msg = f"Объявление {ext_id} импортировано в Техноребут (Product ID: {product_id}, фото: {photos_total})."
+    if result_status == "partial":
+        msg = f"Товар {ext_id} импортирован с предупреждением: фото не сохранены (ID: {product_id})."
+
     return {
         "status": "success" if result_status in ("created", "updated") else result_status,
         "external_item_id": ext_id,
@@ -274,7 +278,7 @@ async def receive_listing(payload: ListingPayload, token: str = Depends(verify_e
         "photos_skipped": photos_skipped,
         "photos_total": photos_total,
         "photos_received": photos_received,
-        "message": f"Объявление {ext_id} импортировано в Техноребут (Product ID: {product_id}, фото: {photos_total}).",
+        "message": msg,
         "details": res
     }
 

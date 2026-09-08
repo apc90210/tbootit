@@ -6,10 +6,15 @@ from app.config import settings
 from app.database import engine, Base
 from app.routers import health, products, categories, customers, repairs, sales, photos, admin, product_cards, reports
 
-# Ensure directories exist
+# Ensure directories exist and validate persistent photo storage
+from app.storage import check_persistent_photo_storage
 try:
     os.makedirs(settings.storage_root, exist_ok=True)
-    os.makedirs(os.path.join(settings.storage_root, "product_photos"), exist_ok=True)
+    storage_ok, storage_err = check_persistent_photo_storage()
+    if storage_ok:
+        print("[STORAGE] Canonical persistent photo storage verified: /data/storage/product_photos")
+    else:
+        print(f"[STORAGE ERROR] Canonical persistent photo storage check failed: {storage_err}")
 except Exception as e:
     print(f"[WARN] Storage root initialization warning: {e}")
 

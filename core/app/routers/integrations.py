@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, schemas
 from app.config import settings
+from app.storage import check_persistent_photo_storage, get_product_photos_dir
 
 router = APIRouter()
 
@@ -231,19 +232,13 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     photos_imported = 0
     photos_skipped = 0
     photos_reconciled = 0
-    storage_photos_dir = os.path.join(settings.storage_root, "product_photos")
-    storage_writable = True
-    try:
-        os.makedirs(storage_photos_dir, exist_ok=True)
-    except Exception as e:
-        print(f"[WARN] Failed to create or access primary storage_photos_dir '{storage_photos_dir}': {e}")
-        try:
-            fallback_dir = "/tmp/product_photos"
-            os.makedirs(fallback_dir, exist_ok=True)
-            storage_photos_dir = fallback_dir
-        except Exception as e2:
-            print(f"[ERROR] Failed to create fallback photo storage: {e2}")
-            storage_writable = False
+    warnings = []
+
+    storage_photos_dir = get_product_photos_dir()
+    storage_writable, storage_err = check_persistent_photo_storage()
+    if not storage_writable:
+        print(f"[STORAGE ERROR] Persistent photo storage unavailable during import: {storage_err}")
+        warnings.append("Persistent photo storage unavailable, photos not saved locally")
 
     def _extract_avito_resolution_version(url):
         """Extract resolution version from Avito CDN URL.
@@ -444,19 +439,38 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                         is_dummy = True
                 except Exception:
                     pass
-            if is_dummy and photo_bytes and len(photo_bytes) > 200:
+            if is_dummy and photo_bytes and len(photo_bytes) > 200 and storage_writable:
                 try:
                     with open(existing_photo.storage_path, "wb") as f:
                         f.write(photo_bytes)
-                    existing_photo.content_hash = content_hash
-                    existing_photo.sort_order = sort_order
-                    photos_imported += 1
+                    if os.path.isfile(existing_photo.storage_path) and os.path.getsize(existing_photo.storage_path) > 0:
+                        existing_photo.content_hash = content_hash
+                        existing_photo.sort_order = sort_order
+                        photos_imported += 1
+                        continue
                 except Exception:
-                    photos_skipped += 1
-            else:
-                # Update sort_order for existing photo
-                existing_photo.sort_order = sort_order
-                photos_skipped += 1
+                    pass
+            elif not existing_photo.storage_path and photo_bytes and storage_writable:
+                # Healing photo that was previously recorded without persistent storage
+                filename = f"{product.id}_{uuid.uuid4().hex[:8]}.jpg"
+                candidate_path = os.path.join(storage_photos_dir, filename)
+                try:
+                    with open(candidate_path, "wb") as f:
+                        f.write(photo_bytes)
+                    if os.path.isfile(candidate_path) and os.path.getsize(candidate_path) > 0:
+                        existing_photo.storage_path = candidate_path
+                        existing_photo.media_url = f"/media/product_photos/{filename}"
+                        existing_photo.filename = filename
+                        existing_photo.content_hash = content_hash
+                        existing_photo.sort_order = sort_order
+                        photos_imported += 1
+                        continue
+                except Exception as e:
+                    print(f"[WARN] Failed to heal photo to persistent storage: {e}")
+
+            # Update sort_order for existing photo
+            existing_photo.sort_order = sort_order
+            photos_skipped += 1
             continue
 
         if not photo_bytes:
@@ -471,10 +485,11 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 sort_order=sort_order
             )
             db.add(new_photo)
-            photos_imported += 1
+            # Photo is not saved locally, so photos_imported is NOT incremented
+            warnings.append(f"Photo from {source_url} has no byte content; stored as remote reference only.")
             continue
 
-        # Save photo file
+        # Save photo file to canonical persistent storage
         filename = f"{product.id}_{uuid.uuid4().hex[:8]}.jpg"
         storage_path = None
         media_url = source_url
@@ -484,12 +499,17 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             try:
                 with open(candidate_path, "wb") as f:
                     f.write(photo_bytes)
-                storage_path = candidate_path
-                media_url = f"/media/product_photos/{filename}"
+                if os.path.isfile(candidate_path) and os.path.getsize(candidate_path) > 0:
+                    storage_path = candidate_path
+                    media_url = f"/media/product_photos/{filename}"
+                    photos_imported += 1
+                else:
+                    warnings.append(f"Photo verification failed for {filename}; persistent write unconfirmed.")
             except Exception as e:
-                print(f"[WARN] Failed to write photo to disk '{candidate_path}': {e}")
-                storage_path = None
-                media_url = source_url
+                print(f"[WARN] Failed to write photo to persistent storage '{candidate_path}': {e}")
+                warnings.append(f"Failed to persist photo {filename}: {str(e)}")
+        else:
+            warnings.append(f"Persistent photo storage is unavailable; photo {filename} saved as remote reference only.")
 
         new_photo = models.ProductPhoto(
             product_id=product.id,
@@ -501,7 +521,6 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             sort_order=sort_order
         )
         db.add(new_photo)
-        photos_imported += 1
 
     # 3b. Avito photo set reconciliation — remove obsolete photos no longer in payload
     if len(payload.photos) > 0:
@@ -572,7 +591,8 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         external_listing_id=ext_link.id,
         photos_imported=photos_imported,
         photos_skipped=photos_skipped,
-        photos_reconciled=photos_reconciled
+        photos_reconciled=photos_reconciled,
+        warnings=warnings
     )
 
 @router.get("/avito/capabilities")
