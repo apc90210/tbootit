@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ТЕХНОРЕБУТ — РЕЗЕРВНОЕ КОПИРОВАНИЕ</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f8fafc; color: #1e293b; }
+        nav.main-nav { background: #0f172a; color: #fff; padding: 12px 20px; margin-bottom: 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        nav.main-nav a { color: #f8fafc; text-decoration: none; font-size: 0.95rem; }
+        nav.main-nav a:hover { text-decoration: underline; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 28px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        h1 { margin-top: 0; font-size: 1.5rem; color: #0f172a; margin-bottom: 16px; }
+        h2 { font-size: 1.25rem; color: #0f172a; margin-top: 0; margin-bottom: 12px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer; text-decoration: none; border: none; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-danger:disabled { background: #fca5a5; cursor: not-allowed; }
+        .btn-outline { background: #fff; border: 1px solid #cbd5e1; color: #334155; }
+        .btn-outline:hover { background: #f1f5f9; }
+        .form-row { display: flex; gap: 12px; align-items: center; margin-top: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .form-input { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; background: #fff; }
+        .divider { border: 0; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+        .alert-box { padding: 14px 18px; border-radius: 6px; margin-top: 16px; font-size: 0.95rem; line-height: 1.4; }
+        .alert-info { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; }
+        .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+        .alert-danger { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+        .alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+        .feature-list { margin: 12px 0 20px 20px; padding: 0; line-height: 1.6; color: #334155; }
+        .feature-list li { margin-bottom: 4px; }
+        .text-warning { color: #b45309; font-size: 0.92rem; margin: 6px 0; }
+
+        /* Modal confirmation */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 1px solid #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="main-nav">
+            <a href="/">← Панель управления</a>
+            <a href="/inventory/products">Склад</a>
+            <a href="/repairs/repairs">Ремонты</a>
+            <a href="/avito/extension">Расширение Avito</a>
+            <a href="/certificates">Доступ (mTLS)</a>
+            <span style="margin-left: auto; font-weight: bold; background: #0284c7; padding: 4px 10px; border-radius: 4px;">Резервные копии</span>
+        </nav>
+
+        <div class="card">
+            <h1>ТЕХНОРЕБУТ — РЕЗЕРВНОЕ КОПИРОВАНИЕ</h1>
+
+            <p style="margin-bottom: 8px;">Резервная копия содержит:</p>
+            <ul class="feature-list">
+                <li>База данных</li>
+                <li>Фото и файлы</li>
+                <li>Данные доступа / сертификаты</li>
+                <li>Другие изменяемые данные системы</li>
+            </ul>
+
+            <div style="margin-top: 18px;">
+                <button id="btnDownload" class="btn btn-primary" onclick="downloadBackup()">[ Скачать резервную копию ]</button>
+            </div>
+
+            <div id="downloadStatus" style="display: none;" class="alert-box alert-info">
+                Создание резервной копии... Пожалуйста, подождите.
+            </div>
+
+            <hr class="divider">
+
+            <h2>ВОССТАНОВЛЕНИЕ</h2>
+
+            <p class="text-warning">
+                Внимание: восстановление заменит текущие данные данными из выбранной копии.
+            </p>
+
+            <div class="form-row">
+                <input type="file" id="backupFile" accept=".zip" class="form-input">
+                <button id="btnRestore" class="btn btn-danger" onclick="onRestoreClick()">[ Восстановить ]</button>
+            </div>
+
+            <div id="restoreStatus" style="display: none;" class="alert-box"></div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-card">
+            <h3 style="margin-top: 0; color: #dc2626;">Подтверждение восстановления</h3>
+            <p style="color: #334155; line-height: 1.5;">
+                Восстановление заменит текущие данные. Продолжить?
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn btn-outline" onclick="closeConfirmModal()">Отмена</button>
+                <button class="btn btn-danger" id="confirmRestoreBtn" onclick="executeRestore()">Да, восстановить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function downloadBackup() {
+            const btn = document.getElementById('btnDownload');
+            const statusDiv = document.getElementById('downloadStatus');
+            btn.disabled = true;
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'alert-box alert-info';
+            statusDiv.innerText = 'Создание резервной копии... Скачивание начнется автоматически.';
+
+            try {
+                const response = await fetch('/admin-api/backups/download', {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    let errDetail = 'Ошибка создания резервной копии.';
+                    try {
+                        const errJson = await response.json();
+                        errDetail = errJson.detail || errJson.message || errDetail;
+                    } catch(e) {}
+                    statusDiv.className = 'alert-box alert-danger';
+                    statusDiv.innerText = 'Ошибка: ' + errDetail;
+                    btn.disabled = false;
+                    return;
+                }
+
+                // Extract filename
+                let filename = 'TECHNOREBOOT_BACKUP.zip';
+                const disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match && match[1]) {
+                        filename = match[1];
+                    }
+                }
+
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+
+                statusDiv.className = 'alert-box alert-success';
+                statusDiv.innerText = 'Резервная копия успешно загружена в браузер: ' + filename;
+            } catch (err) {
+                statusDiv.className = 'alert-box alert-danger';
+                statusDiv.innerText = 'Сетевая ошибка при скачивании резервной копии: ' + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function onRestoreClick() {
+            const fileInput = document.getElementById('backupFile');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Пожалуйста, выберите файл резервной копии (.zip).');
+                return;
+            }
+            // Show modal
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
+        async function executeRestore() {
+            closeConfirmModal();
+            const fileInput = document.getElementById('backupFile');
+            const file = fileInput.files[0];
+            const btnRestore = document.getElementById('btnRestore');
+            const statusDiv = document.getElementById('restoreStatus');
+
+            btnRestore.disabled = true;
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'alert-box alert-info';
+            statusDiv.innerText = 'Восстановление выполняется...';
+
+            const formData = new FormData();
+            formData.append('backup_file', file);
+
+            try {
+                const response = await fetch('/admin-api/backups/restore', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'ok') {
+                    statusDiv.className = 'alert-box alert-success';
+                    statusDiv.innerText = data.message || 'Резервная копия успешно восстановлена. Система перезапущена.';
+                } else {
+                    statusDiv.className = 'alert-box alert-danger';
+                    statusDiv.innerText = 'Ошибка восстановления: ' + (data.message || data.detail || 'Неизвестная ошибка.');
+                }
+            } catch (err) {
+                statusDiv.className = 'alert-box alert-danger';
+                statusDiv.innerText = 'Ошибка восстановления: ' + err.message;
+            } finally {
+                btnRestore.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

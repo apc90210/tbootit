@@ -37,6 +37,7 @@ services:
       - ./admin-shell/app:/app/app
       - ./admin-shell/tests:/app/tests
       - ./data/auth:/app/auth-data
+      - ./data:/data
     depends_on:
       - core
       - avito-module

@@ -1,13 +1,17 @@
-from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse, RedirectResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 import os
 import httpx
 import asyncio
 import urllib.parse
+import tempfile
+from pathlib import Path
 
 from app.auth_manager import AuthManager
+from app import backup_service
 
 app = FastAPI(title="Technoreboot Admin Shell")
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -835,5 +839,63 @@ async def api_download_certificate_password(cert_id: str, request: Request):
     )
 
 
+# ============================================================================
+# Stage 07B-R2: Web Backup and Restore (OWNER only)
+# ============================================================================
+
+@app.get("/backups", response_class=HTMLResponse)
+async def backups_page(request: Request):
+    """Web Backup and Restore Admin Page (OWNER only)."""
+    _require_owner(request)
+    return templates.TemplateResponse("backups.html", {"request": request})
 
 
+@app.post("/admin-api/backups/download")
+async def api_download_backup(request: Request):
+    """Create and download full system backup archive (OWNER only)."""
+    _require_owner(request)
+    try:
+        backup_zip, manifest = backup_service.create_backup()
+
+        def _cleanup(file_path: str):
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+
+        return FileResponse(
+            path=str(backup_zip),
+            filename=backup_zip.name,
+            media_type="application/zip",
+            background=BackgroundTask(_cleanup, str(backup_zip)),
+            headers={"Content-Disposition": f'attachment; filename="{backup_zip.name}"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка создания резервной копии: {e}")
+
+
+@app.post("/admin-api/backups/restore")
+async def api_restore_backup(request: Request, backup_file: UploadFile = File(...)):
+    """Upload and restore full system backup archive (OWNER only)."""
+    _require_owner(request)
+
+    temp_zip = Path(tempfile.gettempdir()) / f"upload_restore_{os.getpid()}_{backup_file.filename}"
+    try:
+        with open(temp_zip, "wb") as f:
+            while chunk := await backup_file.read(1024 * 1024):
+                f.write(chunk)
+
+        success, msg = backup_service.restore_backup(temp_zip)
+        if not success:
+            return JSONResponse(status_code=400, content={"status": "error", "message": msg})
+
+        return JSONResponse(content={"status": "ok", "message": msg})
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"status": "error", "message": f"Ошибка восстановления: {e}"})
+    finally:
+        if temp_zip.is_file():
+            try:
+                temp_zip.unlink()
+            except Exception:
+                pass
