@@ -25,6 +25,9 @@ Thumbs.db
 tmp/
 temp/
 
+# Backups
+backups/
+
 # Data and Runtime databases
 data/
 data/db/
@@ -51,6 +54,9 @@ debug.py
 task.md
 implementation_plan.md
 TECHNOREBOOT_*_REPORT.md
+scratch/
+dist/
+admin-shell/app/*.zip
 
 # Avito Browser Profiles & Session Storage
 data/avito-module/profiles/
