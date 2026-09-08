@@ -27,6 +27,12 @@
 - `pytest admin-shell/tests`: 69 passed, 1 skipped, 4216 warnings in 40.72s
 - `python scripts/verify_stage07b_r5_r1_storage.py`: All 9 steps (TEST A through TEST I) PASSED 100%
 
+## Git
+- **COMMIT:** `f7a1cd1ab36df28748fac82c30ab3a3dd3302857`
+- **PUSH:** `origin/main` (synced)
+- **HEAD_AFTER:** `f7a1cd1ab36df28748fac82c30ab3a3dd3302857`
+- **FINAL_GIT_STATUS:** clean
+
 ## Owner Manual Check Instructions
 Browser/extension only (no CMD / terminal commands for Owner):
 1. Open one Avito listing containing photos.
