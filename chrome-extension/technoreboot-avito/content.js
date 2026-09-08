@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.46)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.47)
 
 let pageInitialData = null;
 
@@ -498,18 +498,39 @@ function getAvitoInitialData() {
     if (typeof pageInitialData !== 'undefined' && pageInitialData) {
         return pageInitialData;
     }
+    if (typeof window !== 'undefined' && window.__initialData__) {
+        try {
+            let data = window.__initialData__;
+            if (typeof data === 'string') {
+                if (data.includes('%')) data = decodeURIComponent(data);
+                data = JSON.parse(data);
+                if (typeof data === 'string') data = JSON.parse(data);
+            }
+            if (data && typeof data === 'object') return data;
+        } catch(e) {}
+    }
     try {
         const scripts = document.querySelectorAll('script');
         for (const script of scripts) {
             const rawText = script.textContent || '';
             if (!rawText) continue;
-            if (rawText.includes('@avito/bx-item-view') || rawText.includes('__initialData__') || rawText.includes('buyerItem') || rawText.includes('galleryInfo')) {
-                if (script.type === 'application/json' || script.id === '__NEXT_DATA__') {
-                    try {
-                        const parsed = JSON.parse(rawText);
-                        if (parsed) return parsed;
-                    } catch (e) {}
-                }
+
+            if (script.type === 'application/json' || script.id === '__NEXT_DATA__' || script.id === '__initialData__') {
+                try {
+                    let parsed = JSON.parse(rawText);
+                    if (typeof parsed === 'string') {
+                        if (parsed.includes('%')) parsed = decodeURIComponent(parsed);
+                        parsed = JSON.parse(parsed);
+                    }
+                    if (parsed && typeof parsed === 'object') return parsed;
+                } catch (e) {}
+            }
+
+            if (rawText.includes('@avito/bx-item-view') || rawText.includes('%40avito%2Fbx-item-view') ||
+                rawText.includes('__initialData__') || rawText.includes('buyerItem') ||
+                rawText.includes('%22buyerItem%22') || rawText.includes('galleryInfo') ||
+                rawText.includes('%22galleryInfo%22')) {
+
                 for (const varName of ['__initialData__', '__INITIAL_STATE__', '__NEXT_DATA__', 'window.__state__', 'initialData', '__state__']) {
                     if (rawText.includes(varName)) {
                         try {
@@ -518,6 +539,18 @@ function getAvitoInitialData() {
                         } catch (e) {}
                     }
                 }
+
+                // Fallback for quoted encoded JSON inside script
+                try {
+                    const match = rawText.match(/(?:window\.__initialData__\s*=\s*(?:JSON\.parse\s*\(\s*)?(?:decodeURIComponent\s*\(\s*)?["'])([\s\S]+?)(?:["']\s*\)?\s*\)?;?)/);
+                    if (match && match[1]) {
+                        let val = match[1];
+                        if (val.includes('%')) val = decodeURIComponent(val);
+                        let parsed = JSON.parse(val);
+                        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+                        if (parsed && typeof parsed === 'object') return parsed;
+                    }
+                } catch(e) {}
             }
         }
     } catch (e) {}
@@ -575,7 +608,8 @@ function extractJsonAssignedToVar(text, varName) {
 
     let startIdx = -1;
     let isQuotedString = false;
-    for (let i = eqIdx + 1; i < text.length; i++) {
+    // Look forward up to 300 characters after '=' to find the opening quote or brace
+    for (let i = eqIdx + 1; i < Math.min(text.length, eqIdx + 300); i++) {
         const c = text[i];
         if (c === '{') {
             startIdx = i;
@@ -584,9 +618,6 @@ function extractJsonAssignedToVar(text, varName) {
         if (c === '"' || c === "'") {
             startIdx = i;
             isQuotedString = true;
-            break;
-        }
-        if (c !== ' ' && c !== '\t' && c !== '\r' && c !== '\n') {
             break;
         }
     }
@@ -613,7 +644,7 @@ function extractJsonAssignedToVar(text, varName) {
         if (endIdx !== -1) {
             let strVal = text.substring(startIdx + 1, endIdx);
             try {
-                if (strVal.includes('%7B') || strVal.includes('%22') || strVal.includes('%3A')) {
+                if (strVal.includes('%7B') || strVal.includes('%22') || strVal.includes('%3A') || strVal.includes('%40')) {
                     strVal = decodeURIComponent(strVal);
                 }
                 let parsed = JSON.parse(strVal);
@@ -624,6 +655,7 @@ function extractJsonAssignedToVar(text, varName) {
             } catch (e) {
                 try {
                     let cleaned = strVal.replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\\//g, '/');
+                    if (cleaned.includes('%')) cleaned = decodeURIComponent(cleaned);
                     let parsed = JSON.parse(cleaned);
                     if (typeof parsed === 'string') parsed = JSON.parse(parsed);
                     if (typeof parsed === 'object' && parsed) return parsed;
@@ -796,20 +828,41 @@ function extractPhotosFromDom() {
     }
 
     const { root: galleryRoot } = findGalleryRootElement();
-    if (!galleryRoot) {
-        // Fallback: If no explicit gallery root container was found, search ONLY within main item-view container
-        const itemView = document.querySelector('[data-marker="item-view/main"]') || document.body;
-        const mainImgs = itemView.querySelectorAll('[data-marker*="image"] img, [data-marker*="gallery"] img');
-        mainImgs.forEach(img => {
-            if (img.src) addCandidate(img.src, "fallback", "main_src");
-        });
-        return rawCandidates;
-    }
 
-    // 1. Extract from thumbnail list inside gallery root
-    const thumbEls = galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"]');
+    // 1. Extract from thumbnail list across document (excluding recommendations and seller items)
+    const thumbSelectors = [
+        'ul[data-marker="gallery/list"] li',
+        'ul[data-marker="gallery/list"] > *',
+        '[data-marker="gallery/list"] [data-marker*="image"]',
+        '[data-marker="gallery/preview-item"]',
+        '[data-marker*="preview"]',
+        '[data-marker="item-view/gallery"] ul li',
+        '[data-marker="gallery"] ul li',
+        'div[class*="gallery-list"] > *',
+        'div[class*="style-gallery-list"] li',
+        'ul[class*="gallery-list"] li',
+        '[data-marker="image-frame/preview"]'
+    ].join(', ');
+
+    const allThumbEls = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
+        if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
+            return false;
+        }
+        return true;
+    });
+    const thumbEls = allThumbEls.filter(el => !allThumbEls.some(other => other !== el && other.contains(el)));
+
     thumbEls.forEach(thumb => {
-        const imgs = thumb.querySelectorAll('img, source');
+        const imgs = thumb.querySelectorAll ? thumb.querySelectorAll('img, source') : [];
+        if (thumb.tagName === 'IMG') {
+            const srcset = thumb.getAttribute('srcset') || thumb.getAttribute('data-srcset');
+            if (srcset) {
+                const candidates = parseSrcsetCandidates(srcset);
+                candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `thumb_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+            }
+            if (thumb.src) addCandidate(thumb.src, "gallery_img_src", "thumb_src");
+            if (thumb.dataset && thumb.dataset.src) addCandidate(thumb.dataset.src, "gallery_img_src", "thumb_data_src");
+        }
         imgs.forEach(el => {
             const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
             if (srcset) {
@@ -819,28 +872,57 @@ function extractPhotosFromDom() {
             if (el.src) addCandidate(el.src, "gallery_img_src", "thumb_src");
             if (el.dataset && el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "thumb_data_src");
         });
+
+        // Also check background images and dataset attributes on thumb and child elements
+        const allInThumb = [thumb, ...(thumb.querySelectorAll ? Array.from(thumb.querySelectorAll('*')) : [])];
+        allInThumb.forEach(el => {
+            const style = el.getAttribute ? (el.getAttribute('style') || '') : '';
+            if (style.includes('url(')) {
+                const m = style.match(/url\(['"]?([^'"\)]+)['"]?\)/);
+                if (m && m[1]) addCandidate(m[1], "gallery_bg_img", "thumb_bg");
+            }
+            if (el.dataset) {
+                if (el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "thumb_data_src");
+                if (el.dataset.url) addCandidate(el.dataset.url, "gallery_img_src", "thumb_data_url");
+                if (el.dataset.preview) addCandidate(el.dataset.preview, "gallery_img_src", "thumb_data_preview");
+                if (el.dataset.full) addCandidate(el.dataset.full, "gallery_img_src", "thumb_data_full");
+            }
+        });
     });
 
-    // 2. Extract from main display frame inside gallery root
-    const mainFrame = galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                      galleryRoot.querySelector('[data-marker="image-frame"]') ||
+    // 2. Extract from main display frame
+    const mainFrame = document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                      document.querySelector('[data-marker="image-frame"]') ||
+                      (galleryRoot ? (galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') || galleryRoot.querySelector('[data-marker="image-frame"]')) : null) ||
                       galleryRoot;
-    const mainEls = mainFrame.querySelectorAll('source[srcset], source[data-srcset], img');
-    mainEls.forEach(el => {
-        const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
-        if (srcset) {
-            const candidates = parseSrcsetCandidates(srcset);
-            candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `main_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+
+    if (mainFrame) {
+        if (mainFrame.tagName === 'IMG') {
+            const srcset = mainFrame.getAttribute('srcset') || mainFrame.getAttribute('data-srcset');
+            if (srcset) {
+                const candidates = parseSrcsetCandidates(srcset);
+                candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `main_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+            }
+            if (mainFrame.currentSrc) addCandidate(mainFrame.currentSrc, "gallery_current_src", "main_current_src");
+            if (mainFrame.src) addCandidate(mainFrame.src, "gallery_img_src", "main_src");
         }
-        if (el.currentSrc) addCandidate(el.currentSrc, "gallery_current_src", "main_current_src");
-        if (el.src) addCandidate(el.src, "gallery_img_src", "main_src");
-        if (el.dataset) {
-            if (el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "main_data_src");
-            if (el.dataset.url) addCandidate(el.dataset.url, "gallery_img_src", "main_data_url");
-            if (el.dataset.large) addCandidate(el.dataset.large, "gallery_img_src", "main_data_large");
-            if (el.dataset.full) addCandidate(el.dataset.full, "gallery_img_src", "main_data_full");
-        }
-    });
+        const mainEls = mainFrame.querySelectorAll ? mainFrame.querySelectorAll('source[srcset], source[data-srcset], img') : [];
+        mainEls.forEach(el => {
+            const srcset = el.getAttribute('srcset') || el.getAttribute('data-srcset');
+            if (srcset) {
+                const candidates = parseSrcsetCandidates(srcset);
+                candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `main_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
+            }
+            if (el.currentSrc) addCandidate(el.currentSrc, "gallery_current_src", "main_current_src");
+            if (el.src) addCandidate(el.src, "gallery_img_src", "main_src");
+            if (el.dataset) {
+                if (el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "main_data_src");
+                if (el.dataset.url) addCandidate(el.dataset.url, "gallery_img_src", "main_data_url");
+                if (el.dataset.large) addCandidate(el.dataset.large, "gallery_img_src", "main_data_large");
+                if (el.dataset.full) addCandidate(el.dataset.full, "gallery_img_src", "main_data_full");
+            }
+        });
+    }
 
     return rawCandidates;
 }
@@ -862,7 +944,7 @@ function extractGallerySlotsFromInitialData(currentItemId) {
 }
 
 function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
-    // 1. Search for gallery counter in galleryRoot or anywhere in document
+    // 1. Search for gallery counter in document
     const counterSelectors = [
         '[data-marker="gallery/counter"]',
         '[data-marker="image-frame/counter"]',
@@ -874,9 +956,7 @@ function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
     ];
     for (const sel of counterSelectors) {
         try {
-            const els = (galleryRoot ? galleryRoot.querySelectorAll(sel) : []).length > 0
-                ? galleryRoot.querySelectorAll(sel)
-                : document.querySelectorAll(sel);
+            const els = document.querySelectorAll(sel);
             for (const el of els) {
                 const text = el.textContent || el.getAttribute('aria-label') || '';
                 const m = text.match(/(\d+)\s*(?:из|\/)\s*(\d+)/i);
@@ -888,15 +968,31 @@ function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
         } catch(e) {}
     }
 
-    // 2. Search for thumbnail list in galleryRoot
-    if (galleryRoot) {
-        try {
-            const thumbs = galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"], [data-marker="gallery/preview"], li[class*="preview-item"], [data-marker*="preview"]');
-            if (thumbs && thumbs.length > 0) {
-                return thumbs.length;
+    // 2. Search for thumbnail list in document, excluding recommendations/seller
+    try {
+        const thumbSelectors = [
+            'ul[data-marker="gallery/list"] li',
+            'ul[data-marker="gallery/list"] > *',
+            '[data-marker="gallery/list"] [data-marker*="image"]',
+            '[data-marker="gallery/preview-item"]',
+            '[data-marker*="preview"]',
+            '[data-marker="item-view/gallery"] ul li',
+            '[data-marker="gallery"] ul li',
+            'div[class*="gallery-list"] > *',
+            'div[class*="style-gallery-list"] li',
+            'ul[class*="gallery-list"] li',
+            '[data-marker="image-frame/preview"]'
+        ].join(', ');
+        const thumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
+            if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
+                return false;
             }
-        } catch(e) {}
-    }
+            return true;
+        });
+        if (thumbs && thumbs.length > 0) {
+            return thumbs.length;
+        }
+    } catch(e) {}
 
     // 3. Fallback to structured items count if available
     if (typeof structuredCount === 'number' && structuredCount > 0) {
@@ -1424,8 +1520,11 @@ function collectActiveSlideCandidates(container) {
         }
     }
 
-    // 1. Sources inside <picture>
-    const sources = container.querySelectorAll('source[srcset], source[data-srcset]');
+    // 1. Sources inside <picture> (or container itself)
+    const sources = [
+        ...(container.tagName === 'SOURCE' ? [container] : []),
+        ...(container.querySelectorAll ? Array.from(container.querySelectorAll('source[srcset], source[data-srcset]')) : [])
+    ];
     sources.forEach(s => {
         const srcset = s.getAttribute('srcset') || s.getAttribute('data-srcset');
         if (srcset) {
@@ -1434,8 +1533,11 @@ function collectActiveSlideCandidates(container) {
         }
     });
 
-    // 2. Images
-    const imgs = container.querySelectorAll('img');
+    // 2. Images (or container itself)
+    const imgs = [
+        ...(container.tagName === 'IMG' ? [container] : []),
+        ...(container.querySelectorAll ? Array.from(container.querySelectorAll('img')) : [])
+    ];
     imgs.forEach(img => {
         const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
         if (srcset) {
@@ -1452,16 +1554,28 @@ function collectActiveSlideCandidates(container) {
         }
     });
 
+    // 3. Background images on container and descendants
+    const styleEls = [
+        container,
+        ...(container.querySelectorAll ? Array.from(container.querySelectorAll('*')) : [])
+    ];
+    styleEls.forEach(el => {
+        const style = el.getAttribute ? (el.getAttribute('style') || '') : '';
+        if (style.includes('url(')) {
+            const m = style.match(/url\(['"]?([^'"\)]+)['"]?\)/);
+            if (m && m[1]) add(m[1], "active_gallery_traversal", "bg_image");
+        }
+    });
+
     candidates.sort((a, b) => (b.score || 0) - (a.score || 0));
     return candidates;
 }
 
 async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
     const { root: galleryRoot } = findGalleryRootElement();
-    if (!galleryRoot) return [];
-
-    const activeFrame = galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                        galleryRoot.querySelector('[data-marker="image-frame"]') ||
+    const activeFrame = document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                        document.querySelector('[data-marker="image-frame"]') ||
+                        (galleryRoot ? (galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') || galleryRoot.querySelector('[data-marker="image-frame"]')) : null) ||
                         galleryRoot;
 
     const slots = [];
@@ -1476,38 +1590,42 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
         return cands[0].url;
     }
 
-    // Step A: Collect initial active slide
-    let initialCands = collectActiveSlideCandidates(activeFrame);
-    let initialId = getSlideIdentifier(initialCands);
-    if (initialCands.length > 0 && initialId) {
-        seenIdentities.add(initialId);
-        slots.push({
-            slot_index: 0,
-            source: "active_gallery_traversal",
-            candidates: initialCands,
-            candidate_count: initialCands.length,
-            selected_url: initialCands[0].url,
-            selected_resolution: initialCands[0].descriptor || "default",
-            score: initialCands[0].score,
-            identity: initialId
-        });
-    }
+    // Find all thumbnail elements across document (excluding recommendations and seller items)
+    const thumbSelectors = [
+        'ul[data-marker="gallery/list"] li',
+        'ul[data-marker="gallery/list"] > *',
+        '[data-marker="gallery/list"] [data-marker*="image"]',
+        '[data-marker="gallery/preview-item"]',
+        '[data-marker*="preview"]',
+        '[data-marker="item-view/gallery"] ul li',
+        '[data-marker="gallery"] ul li',
+        'div[class*="gallery-list"] > *',
+        'div[class*="style-gallery-list"] li',
+        'ul[class*="gallery-list"] li',
+        '[data-marker="image-frame/preview"]'
+    ].join(', ');
 
-    // Check if thumbnail list exists strictly inside galleryRoot
-    const thumbs = Array.from(galleryRoot.querySelectorAll('ul[data-marker="gallery/list"] li, [data-marker="gallery/preview-item"], [data-marker="gallery/preview"]'));
+    const allThumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
+        if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
+            return false;
+        }
+        return true;
+    });
+
+    // Deduplicate: remove elements whose ancestor is already in allThumbs
+    const thumbs = allThumbs.filter(el => !allThumbs.some(other => other !== el && other.contains(el)));
 
     if (thumbs.length > 1) {
         // Thumbnail-directed traversal
-        const targetCount = expectedCount > 0 ? expectedCount : thumbs.length;
-        for (let i = 1; i < targetCount && i < thumbs.length; i++) {
+        const targetCount = expectedCount > 0 ? Math.min(expectedCount, thumbs.length) : thumbs.length;
+        for (let i = 0; i < targetCount; i++) {
             const thumb = thumbs[i];
-            const prevId = initialId;
 
             try {
                 if (typeof thumb.scrollIntoView === 'function') {
                     thumb.scrollIntoView({ block: 'nearest', inline: 'center' });
                 }
-                const clickTarget = thumb.querySelector('button, img') || (thumb.tagName !== 'A' ? thumb : null);
+                const clickTarget = thumb.querySelector('button, img, [role="button"]') || (thumb.tagName !== 'A' ? thumb : null);
                 if (clickTarget) {
                     clickTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
                     clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
@@ -1522,44 +1640,66 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
                 }
             } catch(e) {}
 
-            // Poll for actual slide change up to 350ms (Section 4.6)
-            let newCands = [];
-            let newId = null;
-            const startTime = Date.now();
-            while (Date.now() - startTime < 350) {
-                await new Promise(r => setTimeout(r, 40));
-                newCands = collectActiveSlideCandidates(activeFrame);
-                newId = getSlideIdentifier(newCands);
-                if (newId && newId !== prevId && !seenIdentities.has(newId)) {
-                    break;
+            await new Promise(r => setTimeout(r, 140));
+
+            const mainCands = collectActiveSlideCandidates(activeFrame);
+            const thumbCands = collectActiveSlideCandidates(thumb);
+
+            // Merge candidates for this slot: HD candidates from main frame + preview candidates from thumbnail
+            const slotCands = [...mainCands];
+            const seenUrlsInSlot = new Set(slotCands.map(c => c.url));
+            for (const tc of thumbCands) {
+                if (!seenUrlsInSlot.has(tc.url)) {
+                    seenUrlsInSlot.add(tc.url);
+                    slotCands.push(tc);
                 }
             }
 
-            if (newCands.length > 0 && newId && !seenIdentities.has(newId)) {
-                seenIdentities.add(newId);
-                slots.push({
-                    slot_index: slots.length,
-                    source: "active_gallery_traversal",
-                    candidates: newCands,
-                    candidate_count: newCands.length,
-                    selected_url: newCands[0].url,
-                    selected_resolution: newCands[0].descriptor || "default",
-                    score: newCands[0].score,
-                    identity: newId
-                });
-                initialId = newId;
-            }
+            slotCands.sort((a, b) => (b.score || 0) - (a.score || 0));
+            const slotId = getSlideIdentifier(slotCands) || (`slot_${i}`);
+
+            slots.push({
+                slot_index: i,
+                source: "active_gallery_traversal",
+                candidates: slotCands,
+                candidate_count: slotCands.length,
+                selected_url: slotCands.length > 0 ? slotCands[0].url : "",
+                selected_resolution: slotCands.length > 0 ? (slotCands[0].descriptor || "default") : "default",
+                score: slotCands.length > 0 ? slotCands[0].score : 0,
+                identity: slotId
+            });
+            seenIdentities.add(slotId);
         }
 
-        // Restore first thumbnail at end when practical
+        // Restore first thumbnail at end
         try {
-            const firstTarget = thumbs[0].querySelector('button, img') || (thumbs[0].tagName !== 'A' ? thumbs[0] : null);
-            if (firstTarget && typeof firstTarget.click === 'function' && firstTarget.tagName !== 'A') firstTarget.click();
+            const firstTarget = thumbs[0].querySelector('button, img, [role="button"]') || (thumbs[0].tagName !== 'A' ? thumbs[0] : null);
+            if (firstTarget && typeof firstTarget.click === 'function' && firstTarget.tagName !== 'A') {
+                firstTarget.click();
+            }
         } catch(e) {}
+
+        return slots;
 
     } else {
         // Next-button driven traversal
-        const nextBtn = galleryRoot.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
+        let initialCands = collectActiveSlideCandidates(activeFrame);
+        let initialId = getSlideIdentifier(initialCands);
+        if (initialCands.length > 0 && initialId) {
+            seenIdentities.add(initialId);
+            slots.push({
+                slot_index: 0,
+                source: "active_gallery_traversal",
+                candidates: initialCands,
+                candidate_count: initialCands.length,
+                selected_url: initialCands[0].url,
+                selected_resolution: initialCands[0].descriptor || "default",
+                score: initialCands[0].score,
+                identity: initialId
+            });
+        }
+
+        const nextBtn = document.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
         const maxSteps = expectedCount > 0 ? expectedCount + 2 : 15;
         let consecutiveNoChange = 0;
         const firstObservedId = initialId;
@@ -1599,7 +1739,7 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
                 break;
             }
 
-            if (!seenIdentities.has(newId)) {
+            if (newId && !seenIdentities.has(newId)) {
                 seenIdentities.add(newId);
                 slots.push({
                     slot_index: slots.length,
@@ -1611,12 +1751,11 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
                     score: newCands[0].score,
                     identity: newId
                 });
+                initialId = newId;
             }
-            initialId = newId;
         }
+        return slots;
     }
-
-    return slots;
 }
 
 function extractListingData(extraPhotos = []) {
@@ -1708,7 +1847,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.46",
+            extension_version: "0.2.47",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1739,7 +1878,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.46",
+            extension_version: "0.2.47",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1783,7 +1922,7 @@ function extractMyListingsData() {
         });
         return {
             schema_version: 1,
-            extension_version: "0.2.46",
+            extension_version: "0.2.47",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -1792,7 +1931,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.46",
+            extension_version: "0.2.47",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -3371,7 +3510,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.46",
+                    extension_version: "0.2.47",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

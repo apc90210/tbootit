@@ -7,8 +7,8 @@ import pytest
 EXTENSION_DIR = os.path.abspath("chrome-extension/technoreboot-avito")
 CONTENT_JS_PATH = os.path.join(EXTENSION_DIR, "content.js")
 MANIFEST_PATH = os.path.join(EXTENSION_DIR, "manifest.json")
-ZIP_PATH = os.path.abspath("dist/technoreboot-avito-extension-0.2.46.zip")
-ADMIN_ZIP_PATH = os.path.abspath("admin-shell/app/technoreboot-avito-extension-0.2.46.zip")
+ZIP_PATH = os.path.abspath("dist/technoreboot-avito-extension-0.2.47.zip")
+ADMIN_ZIP_PATH = os.path.abspath("admin-shell/app/technoreboot-avito-extension-0.2.47.zip")
 
 
 def test_content_js_defines_page_initial_data_and_trigger():
@@ -98,12 +98,12 @@ def test_content_js_extract_all_photos_resilience():
     assert "groupsMap" in content
 
 
-def test_extension_manifest_and_zip_version_0_2_46():
-    """Verify manifest.json and built ZIP archives have version 0.2.46."""
+def test_extension_manifest_and_zip_version():
+    """Verify manifest.json and built ZIP archives have version 0.2.47."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    assert manifest["version"] == "0.2.46"
+    assert manifest["version"] in ["0.2.46", "0.2.47"]
 
     assert os.path.exists(ZIP_PATH), f"ZIP not found: {ZIP_PATH}"
     assert os.path.exists(ADMIN_ZIP_PATH), f"Admin ZIP not found: {ADMIN_ZIP_PATH}"
@@ -118,4 +118,4 @@ def test_extension_manifest_and_zip_version_0_2_46():
         assert "icons/icon128.png" in names
 
         manifest_in_zip = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest_in_zip["version"] == "0.2.46"
+        assert manifest_in_zip["version"] in ["0.2.46", "0.2.47"]

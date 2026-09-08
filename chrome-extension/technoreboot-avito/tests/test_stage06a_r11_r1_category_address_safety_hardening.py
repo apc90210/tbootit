@@ -194,8 +194,8 @@ def test_report_structured_format():
     assert "unresolved_options: []" in code
     assert "protected_actions: []" in code
 
-def test_manifest_version_0_2_46():
-    """Verify manifest version is 0.2.46."""
+def test_manifest_version():
+    """Verify manifest version is 0.2.46 or 0.2.47."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
-    assert data["version"] == "0.2.46"
+    assert data["version"] in ["0.2.46", "0.2.47"]

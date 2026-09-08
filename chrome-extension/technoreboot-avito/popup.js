@@ -517,9 +517,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                         pageTypeTitle.textContent = "Карточка объявления";
                         const item = response.listing || {};
                         const detectedPhotosCount = (item.photos && item.photos.length) || 0;
+                        const visibleCount = (response.diagnostics && response.diagnostics.visible_gallery_count) || 0;
+                        const initialDisplayCount = Math.max(detectedPhotosCount, visibleCount);
                         const displayTitle = item.title || "Объявление Avito";
                         const displayPrice = item.price ? item.price + " ₽" : "Не указана";
-                        pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`;
+                        const photoStatusText = initialDisplayCount > 0 
+                            ? `Обнаружено фото: <strong>${initialDisplayCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`
+                            : `Обнаружено фото: <strong>0</strong>`;
+                        pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>${photoStatusText}`;
                         
                         if (isPaired) {
                             sendBtn.disabled = false;
