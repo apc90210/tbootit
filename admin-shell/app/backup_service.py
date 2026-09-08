@@ -51,6 +51,16 @@ def get_data_dir() -> Path:
     return Path("/data")
 
 
+def get_auth_dir() -> Path:
+    """Resolve auth storage directory."""
+    env_auth = os.getenv("AUTH_STORAGE_DIR")
+    if env_auth and Path(env_auth).is_dir():
+        return Path(env_auth)
+    if Path("/app/auth-data").is_dir():
+        return Path("/app/auth-data")
+    return get_data_dir() / "auth"
+
+
 def get_git_commit(project_root: Path) -> str:
     """Extract current git commit hash safely."""
     try:
@@ -341,16 +351,11 @@ def restore_backup(zip_path: Path) -> Tuple[bool, str]:
         if src_storage.is_dir():
             _clean_and_copy_dir(src_storage, dst_storage)
 
-        # 3. Restore Auth
-        src_auth = extract_dir / "auth"
-        dst_auth = data_dir / "auth"
-        if src_auth.is_dir():
-            _clean_and_copy_dir(src_auth, dst_auth)
-
-            # Synchronize /app/auth-data if present
-            app_auth = Path("/app/auth-data")
-            if app_auth.is_dir() and app_auth != dst_auth:
-                shutil.copytree(src_auth, app_auth, dirs_exist_ok=True)
+        # 3. Preserve Live Auth (Stage 07B-R3 policy)
+        # Normal web restore deliberately preserves data/auth (current CA, OWNER, registry,
+        # active/revoked states) to ensure the owner's active browser session and newly issued
+        # user certificates are never disrupted or rolled backward.
+        # The auth/ component in the zip is kept strictly for disaster recovery.
 
         # 4. Restore Avito
         src_avito = extract_dir / "avito-module"
@@ -358,28 +363,26 @@ def restore_backup(zip_path: Path) -> Tuple[bool, str]:
         if src_avito.is_dir():
             _clean_and_copy_dir(src_avito, dst_avito)
 
-        # Post-restore verification
+        # Post-restore verification: verify database integrity
         conn = sqlite3.connect(str(dst_db))
         cur = conn.cursor()
         cur.execute("SELECT count(*) FROM products")
         p_count = cur.fetchone()[0]
         conn.close()
 
-        # Check CA & OWNER
-        auth_check_dir = dst_auth if dst_auth.is_dir() else Path("/app/auth-data")
-        ca_cert = x509.load_pem_x509_certificate((auth_check_dir / "ca" / "ca.crt").read_bytes())
-        res_ca_fp = ca_cert.fingerprint(hashes.SHA256()).hex().upper()
-        exp_ca_fp = manifest.get("auth", {}).get("ca_fingerprint_sha256")
-        if exp_ca_fp and res_ca_fp != exp_ca_fp:
-            return False, f"Отпечаток CA не совпадает после восстановления."
+        # Verify live CA & OWNER certificates are intact
+        auth_check_dir = get_auth_dir()
+        ca_path = auth_check_dir / "ca" / "ca.crt"
+        owner_path = auth_check_dir / "certificates" / "owner.crt"
+        if not ca_path.is_file() or not owner_path.is_file():
+            return False, "Ошибка проверки безопасности: файлы аутентификации отсутствуют."
 
-        owner_cert = x509.load_pem_x509_certificate((auth_check_dir / "certificates" / "owner.crt").read_bytes())
-        res_owner_fp = owner_cert.fingerprint(hashes.SHA256()).hex().upper()
-        exp_owner_fp = manifest.get("auth", {}).get("owner_fingerprint_sha256")
-        if exp_owner_fp and res_owner_fp != exp_owner_fp:
-            return False, f"Отпечаток сертификата Владельца не совпадает после восстановления."
+        ca_cert = x509.load_pem_x509_certificate(ca_path.read_bytes())
+        owner_cert = x509.load_pem_x509_certificate(owner_path.read_bytes())
+        if not ca_cert or not owner_cert:
+            return False, "Ошибка проверки безопасности: не удалось загрузить сертификаты."
 
-        return True, "Резервная копия успешно восстановлена. Система перезапущена."
+        return True, "Бизнес-данные (база данных и медиа-файлы) успешно восстановлены. Текущие сертификаты доступа сохранены."
 
     except Exception as e:
         return False, f"Ошибка восстановления: {e}"

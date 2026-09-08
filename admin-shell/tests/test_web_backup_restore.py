@@ -169,4 +169,35 @@ def test_api_restore_valid_archive(client, owner_headers):
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
-    assert "успешно восстановлена" in data["message"]
+    assert "успешно восстановлен" in data["message"]
+
+
+def test_restore_preserves_live_auth(client, owner_headers):
+    """Stage 07B-R3: Verify that normal web restore preserves currently active auth."""
+    # 1. Download backup before issuing new certificate
+    dl_resp = client.post("/admin-api/backups/download", headers=owner_headers)
+    assert dl_resp.status_code == 200
+    backup_content = dl_resp.content
+
+    # 2. Issue a disposable user certificate after backup was taken
+    test_user_meta = auth_manager.create_user_certificate("DisposableAuthPreserveUser")
+    test_user_id = test_user_meta["id"]
+    assert auth_manager.get_certificate(test_user_id) is not None
+
+    # 3. Restore the older backup taken before the certificate was created
+    restore_io = io.BytesIO(backup_content)
+    resp = client.post(
+        "/admin-api/backups/restore",
+        headers=owner_headers,
+        files={"backup_file": ("older_backup.zip", restore_io, "application/zip")}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+
+    # 4. Verify the newly created user certificate is STILL active and present in live registry
+    live_cert = auth_manager.get_certificate(test_user_id)
+    assert live_cert is not None, "Post-backup user cert was incorrectly rolled back by restore!"
+    assert live_cert["status"] == "ACTIVE"
+
+    # Clean up disposable cert
+    auth_manager.revoke_certificate(test_user_id)

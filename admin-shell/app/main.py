@@ -876,9 +876,11 @@ async def api_download_backup(request: Request):
 
 
 @app.post("/admin-api/backups/restore")
-async def api_restore_backup(request: Request, backup_file: UploadFile = File(...)):
+async def api_restore_backup(request: Request, backup_file: UploadFile = File(None)):
     """Upload and restore full system backup archive (OWNER only)."""
     _require_owner(request)
+    if not backup_file or not backup_file.filename:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Файл резервной копии не передан"})
 
     temp_zip = Path(tempfile.gettempdir()) / f"upload_restore_{os.getpid()}_{backup_file.filename}"
     try:
