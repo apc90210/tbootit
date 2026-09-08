@@ -123,9 +123,9 @@
 ---
 
 ## Git
-- **COMMIT:** (to be recorded upon commit)
-- **PUSH:** (to be recorded upon push to origin/main)
-- **HEAD_AFTER:** (to be recorded upon push)
+- **COMMIT:** `c85f88f01b3eeb0c96c442436d40026e6ef3bf67`
+- **PUSH:** `origin/main` (pushed cleanly)
+- **HEAD_AFTER:** `c85f88f01b3eeb0c96c442436d40026e6ef3bf67`
 - **FINAL_GIT_STATUS:** clean
 
 ---
