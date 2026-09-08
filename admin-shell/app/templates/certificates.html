@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ТЕХНОРЕБУТ — ДОСТУП</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f8fafc; color: #1e293b; }
+        nav.main-nav { background: #0f172a; color: #fff; padding: 12px 20px; margin-bottom: 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px; }
+        nav.main-nav a { color: #f8fafc; text-decoration: none; font-size: 0.95rem; }
+        nav.main-nav a:hover { text-decoration: underline; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        h1 { margin-top: 0; font-size: 1.6rem; color: #0f172a; margin-bottom: 20px; }
+        .form-row { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+        .form-input { flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer; text-decoration: none; border: none; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-outline { background: #fff; border: 1px solid #cbd5e1; color: #334155; }
+        .btn-outline:hover { background: #f1f5f9; }
+        .btn-sm { padding: 4px 10px; font-size: 0.85rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; font-weight: 600; color: #475569; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .badge-active { background: #dcfce7; color: #15803d; }
+        .badge-revoked { background: #fee2e2; color: #b91c1c; }
+        .badge-owner { background: #e0e7ff; color: #4338ca; }
+        .alert-box { padding: 14px; border-radius: 6px; margin-bottom: 20px; font-size: 0.95rem; }
+        .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+        .alert-danger { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+        .alert-info { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; }
+        .actions-cell { display: flex; gap: 8px; align-items: center; }
+        .text-muted { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="main-nav">
+            <a href="/">← Панель управления</a>
+            <a href="/inventory/products">Склад</a>
+            <a href="/repairs/repairs">Ремонты</a>
+            <a href="/avito/extension">Расширение Avito</a>
+            <span style="margin-left: auto; font-weight: bold; background: #2563eb; padding: 4px 10px; border-radius: 4px;">Доступ (mTLS)</span>
+        </nav>
+
+        <div class="card">
+            <h1>ТЕХНОРЕБУТ — ДОСТУП</h1>
+
+            <div id="alertMsg" style="display: none;" class="alert-box"></div>
+
+            <form id="createCertForm" class="form-row" onsubmit="event.preventDefault(); issueCertificate();">
+                <input type="text" id="certName" class="form-input" placeholder="Название (например: Ноутбук магазин)" required>
+                <button type="submit" class="btn btn-primary" id="issueBtn">[ Выпустить сертификат ]</button>
+            </form>
+
+            <div id="issuedCertInfo" style="display: none;" class="alert-box alert-success">
+                <strong>Сертификат успешно выпущен!</strong>
+                <p style="margin: 6px 0 0 0;">
+                    Название: <span id="newCertName"></span> | 
+                    Пароль архива .p12: <code id="newCertPass" style="background:#fff; padding: 2px 6px; border-radius:4px; font-weight:bold;"></code>
+                    <br>
+                    <a id="newCertDownload" href="#" class="btn btn-primary btn-sm" style="margin-top: 8px;">Скачать .p12 файл</a>
+                </p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Создан</th>
+                        <th>Статус</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="certsTableBody">
+                    {% for c in certificates %}
+                    <tr id="row-{{ c.id }}">
+                        <td>
+                            <strong>{{ c.name }}</strong>
+                            {% if c.is_owner %}
+                                <span class="badge badge-owner" style="margin-left: 6px;">OWNER</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ c.created_at[:19].replace('T', ' ') }}</td>
+                        <td>
+                            {% if c.status == 'ACTIVE' %}
+                                <span class="badge badge-active">ACTIVE</span>
+                            {% else %}
+                                <span class="badge badge-revoked">REVOKED</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            {% if c.is_owner %}
+                                <a href="/admin-api/certificates/{{ c.id }}/download" class="btn btn-outline btn-sm">Скачать .p12</a>
+                            {% elif c.status == 'ACTIVE' %}
+                                <button onclick="revokeCertificate('{{ c.id }}', '{{ c.name }}')" class="btn btn-danger btn-sm">Отозвать</button>
+                                <a href="/admin-api/certificates/{{ c.id }}/download" class="btn btn-outline btn-sm">Скачать .p12</a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card" style="font-size: 0.9rem; color: #64748b;">
+            <h3 style="margin-top: 0; color: #334155;">Справка по безопасности</h3>
+            <p>
+                Вход в систему защищен взаимной проверкой сертификатов X.509 (mTLS). 
+                Сертификаты формата <code>.p12</code> (PKCS#12) импортируются в хранилище сертификатов операционной системы или браузера.
+            </p>
+            <p>
+                Пароль корневого сертификата OWNER хранится в безопасном файле <code>data/auth/owner_password.txt</code> на сервере.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        async function issueCertificate() {
+            const nameInput = document.getElementById('certName');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            const btn = document.getElementById('issueBtn');
+            btn.disabled = true;
+            btn.textContent = 'Выпуск...';
+
+            try {
+                const res = await fetch('/admin-api/certificates', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: name})
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Ошибка выпуска сертификата');
+                }
+
+                const data = await res.json();
+                nameInput.value = '';
+
+                document.getElementById('newCertName').textContent = data.name;
+                document.getElementById('newCertPass').textContent = data.password || 'пароль сохранен';
+                document.getElementById('newCertDownload').href = `/admin-api/certificates/${data.id}/download`;
+                document.getElementById('issuedCertInfo').style.display = 'block';
+
+                setTimeout(() => { window.location.reload(); }, 1500);
+            } catch (e) {
+                showAlert('danger', e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '[ Выпустить сертификат ]';
+            }
+        }
+
+        async function revokeCertificate(certId, certName) {
+            if (!confirm(`Вы действительно хотите отозвать сертификат "${certName}"?\nПосле отзыва доступ будет заблокирован.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/admin-api/certificates/${certId}/revoke`, {
+                    method: 'POST'
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Ошибка отзыва сертификата');
+                }
+
+                showAlert('success', `Сертификат "${certName}" успешно отозван`);
+                setTimeout(() => { window.location.reload(); }, 800);
+            } catch (e) {
+                showAlert('danger', e.message);
+            }
+        }
+
+        function showAlert(type, message) {
+            const box = document.getElementById('alertMsg');
+            box.className = `alert-box alert-${type}`;
+            box.textContent = message;
+            box.style.display = 'block';
+            setTimeout(() => { box.style.display = 'none'; }, 6000);
+        }
+    </script>
+</body>
+</html>

@@ -32,14 +32,28 @@ services:
       - AVITO_NOVNC_URL=http://avito-module:6080
       - INVENTORY_MODULE_URL=http://inventory-sales-module:8030
       - REPAIRS_MODULE_URL=http://repairs-module:8040
+      - AUTH_STORAGE_DIR=/app/auth-data
     volumes:
       - ./admin-shell/app:/app/app
       - ./admin-shell/tests:/app/tests
+      - ./data/auth:/app/auth-data
     depends_on:
       - core
       - avito-module
       - inventory-sales-module
       - repairs-module
+
+  gateway:
+    image: nginx:alpine
+    container_name: technoreboot-gateway
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/auth:/etc/nginx/certs:ro
+    depends_on:
+      - admin-shell
+
 
 
   avito-module:

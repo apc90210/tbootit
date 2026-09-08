@@ -5,10 +5,15 @@ from pydantic import BaseModel
 import os
 import httpx
 import asyncio
+import urllib.parse
+
+from app.auth_manager import AuthManager
 
 app = FastAPI(title="Technoreboot Admin Shell")
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=templates_dir)
+auth_manager = AuthManager()
+
 
 
 
@@ -695,5 +700,125 @@ async def redirect_products_detail_shortcut(product_id: int):
 @app.get("/products")
 async def redirect_products_list_shortcut():
     return RedirectResponse(url="/inventory/products", status_code=302)
+
+
+# ============================================================================
+# Stage 07A-R1: Minimal Certificate Access Gateway & Admin Routes
+# ============================================================================
+
+class CreateCertRequest(BaseModel):
+    name: str
+
+
+@app.get("/internal-auth/verify")
+async def internal_auth_verify(request: Request):
+    """
+    Internal mTLS validation subrequest invoked by Nginx gateway.
+    Verifies client certificate against Technoreboot CA and registry status.
+    """
+    verify_status = request.headers.get("x-client-cert-verify")
+    client_serial = request.headers.get("x-client-cert-serial")
+    client_fingerprint = request.headers.get("x-client-cert-fingerprint")
+    request_uri = request.headers.get("x-original-uri", "/")
+
+    ok, status_code, msg, cert = auth_manager.verify_request(
+        verify_status=verify_status,
+        client_serial=client_serial,
+        client_fingerprint=client_fingerprint,
+        request_uri=request_uri,
+    )
+
+    if not ok:
+        raise HTTPException(status_code=status_code, detail=msg)
+
+    return JSONResponse(
+        content={
+            "status": "ok",
+            "cert_id": cert["id"] if cert else None,
+            "name": cert["name"] if cert else None,
+            "is_owner": cert["is_owner"] if cert else False,
+        },
+        headers={
+            "X-Auth-Subject": urllib.parse.quote(str(cert["name"])) if cert else "",
+            "X-Auth-Is-Owner": "1" if (cert and cert.get("is_owner")) else "0",
+        },
+    )
+
+
+def _require_owner(request: Request):
+    client_serial = request.headers.get("x-client-cert-serial")
+    if not client_serial:
+        raise HTTPException(status_code=403, detail="Owner certificate required")
+    ok, code, msg, cert = auth_manager.verify_request(
+        request.headers.get("x-client-cert-verify", "SUCCESS"),
+        client_serial,
+        request.headers.get("x-client-cert-fingerprint"),
+        request.url.path,
+    )
+    if not ok or not (cert and cert.get("is_owner")):
+        raise HTTPException(status_code=403, detail="Owner certificate required")
+    return cert
+
+
+@app.get("/certificates", response_class=HTMLResponse)
+async def certificates_page(request: Request):
+    """
+    Minimal Certificate Management Admin Page (OWNER only).
+    """
+    _require_owner(request)
+    certs = auth_manager.list_certificates()
+    return templates.TemplateResponse("certificates.html", {
+        "request": request,
+        "certificates": certs,
+    })
+
+
+@app.get("/admin-api/certificates")
+async def api_list_certificates(request: Request):
+    """List all registered certificates (OWNER only)."""
+    _require_owner(request)
+    return auth_manager.list_certificates()
+
+
+@app.post("/admin-api/certificates")
+async def api_create_certificate(req: CreateCertRequest, request: Request):
+    """Issue a new USER certificate (OWNER only)."""
+    _require_owner(request)
+    try:
+        created = auth_manager.create_user_certificate(req.name)
+        return created
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/admin-api/certificates/{cert_id}/revoke")
+async def api_revoke_certificate(cert_id: str, request: Request):
+    """Revoke an active USER certificate (OWNER only; rejects revoking OWNER)."""
+    _require_owner(request)
+    try:
+        updated = auth_manager.revoke_certificate(cert_id)
+        return updated
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/admin-api/certificates/{cert_id}/download")
+async def api_download_certificate(cert_id: str, request: Request):
+    """Download .p12 archive for a certificate (OWNER only)."""
+    _require_owner(request)
+
+    try:
+        path, filename = auth_manager.get_p12_path(cert_id)
+        return FileResponse(
+            path=path,
+            filename=filename,
+            media_type="application/x-pkcs12",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 
 

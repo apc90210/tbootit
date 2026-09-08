@@ -11,6 +11,8 @@ logs/
 *.log
 *.log.tmp
 
+
+
 # IDE
 .vscode/
 .idea/
@@ -27,9 +29,19 @@ temp/
 data/
 data/db/
 data/avito-module/
+data/auth/
+auth-data/
 *.db
 *.sqlite
 *.sqlite3
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+*.password
+owner_password.txt
+
 
 # Test caches
 .pytest_cache/
