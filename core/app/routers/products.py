@@ -287,6 +287,34 @@ def get_meta(db: Session = Depends(get_db)):
         "storage_locations": locations
     }
 
+@router.get("/json/schema")
+def get_products_json_schema(db: Session = Depends(get_db)):
+    from app.services.product_json_service import generate_ai_prompt
+    return {
+        "format": "technoreboot-products",
+        "version": 1,
+        "ai_prompt": generate_ai_prompt(db)
+    }
+
+@router.post("/json/import")
+def import_products_json(payload: dict, db: Session = Depends(get_db)):
+    from app.services.product_json_service import import_canonical_products
+    result = import_canonical_products(db, payload)
+    if not result.get("success", False):
+        raise HTTPException(status_code=400, detail={
+            "message": "Ошибка валидации структуры JSON",
+            "errors": result.get("errors", [])
+        })
+    return result
+
+@router.get("/json/export")
+def export_products_json(ids: Optional[str] = None, db: Session = Depends(get_db)):
+    from app.services.product_json_service import export_canonical_products
+    product_ids = None
+    if ids:
+        product_ids = [int(i.strip()) for i in ids.split(",") if i.strip().isdigit()]
+    return export_canonical_products(db, product_ids)
+
 @router.post("/", response_model=schemas.Product)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     if product.barcode and product.barcode.strip():

@@ -1,8 +1,11 @@
-from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse, RedirectResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+import json
 import os
 import httpx
 import asyncio
@@ -12,6 +15,7 @@ from pathlib import Path
 
 from app.auth_manager import AuthManager
 from app import backup_service
+
 
 app = FastAPI(title="Technoreboot Admin Shell")
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -718,6 +722,30 @@ async def proxy_media(request: Request, path: str):
     return await _proxy_request(request, CORE_API_URL, f"media/{path}", "/media")
 
 
+@app.get("/products/json", response_class=HTMLResponse)
+async def products_json_page(request: Request):
+    """
+    Dedicated Web page for Product JSON Import, Export, and AI Prompt Generator.
+    """
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(f"{CORE_API_URL}/api/products/json/schema", timeout=10.0)
+            if resp.status_code == 200:
+                schema_data = resp.json()
+            else:
+                schema_data = {}
+        except Exception:
+            schema_data = {}
+
+    ai_prompt = schema_data.get("ai_prompt", "")
+    return templates.TemplateResponse("products_json.html", {
+        "request": request,
+        "ai_prompt": ai_prompt,
+        "schema_data": schema_data,
+        "core_url": CORE_API_URL,
+    })
+
+
 @app.get("/products/{product_id}")
 async def redirect_products_detail_shortcut(product_id: int):
     return RedirectResponse(url=f"/inventory/products/{product_id}", status_code=302)
@@ -923,3 +951,134 @@ async def api_restore_backup(request: Request, backup_file: UploadFile = File(No
                 temp_zip.unlink()
             except Exception:
                 pass
+
+
+# ============================================================================
+# Stage 07C-R1: Product Canonical JSON Import / Export & AI Prompt Generator
+# ============================================================================
+
+@app.get("/admin-api/products/json/prompt.txt")
+async def api_download_products_ai_prompt():
+    """Download AI Prompt as a plain text file."""
+    prompt_text = ""
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(f"{CORE_API_URL}/api/products/json/schema", timeout=10.0)
+            if resp.status_code == 200:
+                prompt_text = resp.json().get("ai_prompt", "")
+        except Exception:
+            prompt_text = ""
+
+    if not prompt_text:
+        prompt_text = "Промпт временно недоступен или Core API офлайн."
+
+    return Response(
+        content=prompt_text,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="technoreboot_ai_prompt.txt"'}
+    )
+
+
+@app.post("/admin-api/products/json/import")
+async def api_proxy_products_json_import(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    json_text: Optional[str] = Form(None)
+):
+    """
+    Proxy JSON product import to Core API.
+    Accepts:
+    1. Uploaded file (multipart/form-data)
+    2. Form field `json_text` (multipart/form-data or form-urlencoded)
+    3. Raw JSON body (application/json)
+    """
+    content_type = request.headers.get("content-type", "")
+    payload_data = None
+
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+        if file and file.filename:
+            try:
+                raw_bytes = await file.read()
+                payload_data = json.loads(raw_bytes.decode("utf-8-sig"))
+            except Exception as e:
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "message": f"Ошибка чтения загруженного JSON-файла: {e}"}
+                )
+        elif json_text:
+            try:
+                payload_data = json.loads(json_text)
+            except Exception as e:
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "message": f"Ошибка разбора JSON из текста: {e}"}
+                )
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Файл или текст JSON не переданы"}
+            )
+    else:
+        # Expect raw application/json body
+        try:
+            payload_data = await request.json()
+        except Exception as e:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": f"Некорректный JSON в теле запроса: {e}"}
+            )
+
+    if not payload_data:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "Пустые данные JSON для импорта"}
+        )
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.post(
+                f"{CORE_API_URL}/api/products/json/import",
+                json=payload_data,
+                timeout=60.0
+            )
+            return JSONResponse(status_code=resp.status_code, content=resp.json())
+        except httpx.RequestError as e:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "message": f"Ошибка соединения с Core API: {str(e)}"}
+            )
+
+
+@app.get("/admin-api/products/json/export")
+async def api_proxy_products_json_export(ids: Optional[str] = None):
+    """
+    Proxy JSON product export to Core API.
+    Streams back JSON attachment named TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json.
+    """
+    params = {}
+    if ids:
+        params["ids"] = ids
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(
+                f"{CORE_API_URL}/api/products/json/export",
+                params=params,
+                timeout=60.0
+            )
+            if resp.status_code == 200:
+                now_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+                filename = f"TECHNOREBOOT_PRODUCTS_{now_str}.json"
+                return Response(
+                    content=resp.content,
+                    media_type="application/json; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+                )
+            else:
+                return JSONResponse(status_code=resp.status_code, content=resp.json())
+        except httpx.RequestError as e:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "message": f"Ошибка соединения с Core API: {str(e)}"}
+            )
+

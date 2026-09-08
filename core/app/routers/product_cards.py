@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.database import get_db
 from app.models import Product, ProductCardImport, Category, ProductEvent
 from app.schemas import ProductCardJSONPayload, ProductCardImportSchema
@@ -162,3 +162,32 @@ def import_json(payload: ProductCardJSONPayload, db: Session = Depends(get_db)):
 @router.get("/imports", response_model=List[ProductCardImportSchema])
 def list_imports(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(ProductCardImport).order_by(ProductCardImport.id.desc()).offset(skip).limit(limit).all()
+
+@router.get("/canonical-schema")
+def get_canonical_schema(db: Session = Depends(get_db)):
+    from app.services.product_json_service import generate_ai_prompt
+    return {
+        "format": "technoreboot-products",
+        "version": 1,
+        "ai_prompt": generate_ai_prompt(db)
+    }
+
+@router.post("/import-canonical-json")
+def import_canonical_json_endpoint(payload: dict, db: Session = Depends(get_db)):
+    from app.services.product_json_service import import_canonical_products
+    result = import_canonical_products(db, payload)
+    if not result.get("success", False):
+        raise HTTPException(status_code=400, detail={
+            "message": "Ошибка валидации структуры JSON",
+            "errors": result.get("errors", [])
+        })
+    return result
+
+@router.get("/export-canonical-json")
+def export_canonical_json_endpoint(ids: Optional[str] = None, db: Session = Depends(get_db)):
+    from app.services.product_json_service import export_canonical_products
+    product_ids = None
+    if ids:
+        product_ids = [int(i.strip()) for i in ids.split(",") if i.strip().isdigit()]
+    return export_canonical_products(db, product_ids)
+
