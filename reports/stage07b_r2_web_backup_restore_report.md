@@ -2,6 +2,7 @@
 
 - **Дата и время:** 2026-09-08 14:52:00 MSK (UTC+3)
 - **Ветка Git:** `main`
+- **Коммит:** `a65005a8d4239846067b84807490ee0d1e2e987c`
 - **Предыдущий HEAD:** `1401b20f6caecae4493393b487ebfa204cf0ff27`
 - **Текущий этап:** Stage 07B-R2 (Web Backup / Restore — Owner UI only)
 - **Статус этапа:** `READY_FOR_ACCEPTANCE`
