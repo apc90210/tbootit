@@ -28,7 +28,12 @@ def _load_json(file_path: str) -> Dict[str, Any]:
         return {}
 
 def _save_json(file_path: str, data: Dict[str, Any]):
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    parent = os.path.dirname(file_path)
+    if parent:
+        try:
+            os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -94,14 +99,20 @@ async def get_last_ingest():
 @router.post("/pairing/generate")
 async def generate_pair_code():
     code = f"{secrets.randbelow(1000000):06d}"
-    expires_at = time.time() + 600  # 10 mins TTL
+    now = time.time()
+    expires_at = now + 600  # 10 mins TTL
     codes = _load_json(PAIR_CODES_FILE)
-    codes[code] = {
+    # Prune expired codes older than 24 hours to keep registry compact
+    pruned_codes = {
+        k: v for k, v in codes.items()
+        if isinstance(v, dict) and v.get("expires_at", 0) > (now - 86400)
+    }
+    pruned_codes[code] = {
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "expires_at": expires_at,
         "used": False
     }
-    _save_json(PAIR_CODES_FILE, codes)
+    _save_json(PAIR_CODES_FILE, pruned_codes)
     return {"pair_code": code, "expires_in_seconds": 600}
 
 @router.post("/pairing/pair")

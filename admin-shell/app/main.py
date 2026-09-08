@@ -533,7 +533,18 @@ async def proxy_avito_extension_api(path: str, request: Request):
                 headers=headers,
                 content=body if body else None
             )
-            return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
+            media_type = resp.headers.get("content-type", "application/json")
+            if resp.status_code >= 400 and "application/json" not in media_type:
+                text_content = resp.text.strip()
+                return JSONResponse(
+                    status_code=resp.status_code,
+                    content={
+                        "ok": False,
+                        "status": "failed",
+                        "detail": f"Модуль Avito вернул ошибку {resp.status_code}: {text_content or 'Internal Server Error'}"
+                    }
+                )
+            return Response(content=resp.content, status_code=resp.status_code, media_type=media_type)
     except httpx.TimeoutException as e:
         return JSONResponse(
             status_code=504,

@@ -258,8 +258,15 @@ def main():
         backup_storage = source_dir / "storage"
         target_storage = project_root / "data" / "storage"
         if backup_storage.is_dir():
-            if target_storage.exists():
-                shutil.rmtree(target_storage)
+            target_storage.mkdir(parents=True, exist_ok=True)
+            for child in target_storage.iterdir():
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    try:
+                        child.unlink()
+                    except OSError:
+                        pass
             shutil.copytree(backup_storage, target_storage, dirs_exist_ok=True)
             files_restored = sum(len(files) for _, _, files in os.walk(target_storage))
             print(f"      OK: Product photos & media restored ({files_restored} files).")
@@ -268,8 +275,15 @@ def main():
         backup_auth = source_dir / "auth"
         target_auth = project_root / "data" / "auth"
         if backup_auth.is_dir():
-            if target_auth.exists():
-                shutil.rmtree(target_auth)
+            target_auth.mkdir(parents=True, exist_ok=True)
+            for child in target_auth.iterdir():
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    try:
+                        child.unlink()
+                    except OSError:
+                        pass
             shutil.copytree(backup_auth, target_auth, dirs_exist_ok=True)
             auth_files = sum(len(files) for _, _, files in os.walk(target_auth))
             print(f"      OK: Auth PKI & certificates restored ({auth_files} files).")
@@ -278,8 +292,15 @@ def main():
         backup_avito = source_dir / "avito-module"
         target_avito = project_root / "data" / "avito-module"
         if backup_avito.is_dir():
-            if target_avito.exists():
-                shutil.rmtree(target_avito)
+            target_avito.mkdir(parents=True, exist_ok=True)
+            for child in target_avito.iterdir():
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    try:
+                        child.unlink()
+                    except OSError:
+                        pass
             shutil.copytree(backup_avito, target_avito, dirs_exist_ok=True)
             avito_files = sum(len(files) for _, _, files in os.walk(target_avito))
             print(f"      OK: Avito module persistent state restored ({avito_files} files).")
