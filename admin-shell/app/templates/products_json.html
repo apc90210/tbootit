@@ -446,18 +446,73 @@
         <div class="card" id="section-json-export">
             <h2>📤 Секция В: Экспорт товаров из базы Техноребут</h2>
             <p class="section-desc">
-                Выгрузка актуального каталога товаров из базы данных в каноническом формате JSON для резервной копии,
+                Выгрузка товаров из базы данных в каноническом формате JSON для резервной копии,
                 переноса на другой сервер или пакетного редактирования через нейросети.
+                Вы можете выбрать один товар, несколько отмеченных товаров или выгрузить весь каталог.
             </p>
 
-            <div class="form-row">
-                <input type="text" id="exportIdsInput" class="form-input" placeholder="ID товаров через запятую (например: 1, 2, 5) — оставьте пустым для всех">
-                <button type="button" class="btn btn-primary" id="btnExport" onclick="runProductExport()">
-                    📥 Экспорт JSON (скачать файл)
+            <!-- Search / Filter Input & Selection Helpers -->
+            <div class="form-row" style="margin-bottom: 12px;">
+                <input type="text" id="productSearchFilter" class="form-input" placeholder="🔍 Поиск / фильтр товаров по названию, артикулу, ID или бренду..." oninput="filterExportProducts()">
+                <button type="button" class="btn btn-outline btn-sm" id="btnSelectAllShown" onclick="selectAllShownProducts()">
+                    ✓ Выбрать все показанные
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" id="btnClearSelection" onclick="clearSelectedProducts()">
+                    ✕ Снять выбор
                 </button>
             </div>
+
+            <!-- Product Selection List Area -->
+            <div id="exportProductListContainer" style="max-height: 320px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; padding: 10px; margin-bottom: 14px;">
+                {% if products and products|length > 0 %}
+                    <div id="exportProductsList" style="display: flex; flex-direction: column; gap: 6px;">
+                        {% for p in products %}
+                        <label class="export-product-item" data-id="{{ p.id }}" data-title="{{ p.title|lower }}" data-sku="{{ p.sku|lower if p.sku else '' }}" data-brand="{{ p.brand|lower if p.brand else '' }}" style="display: flex; align-items: center; gap: 10px; padding: 7px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; transition: background 0.1s;">
+                            <input type="checkbox" class="export-product-cb" value="{{ p.id }}" onchange="updateSelectedCount()" style="width: 17px; height: 17px; cursor: pointer;">
+                            <span style="font-weight: 700; color: #334155; min-width: 45px;">#{{ p.id }}</span>
+                            <span style="font-family: monospace; font-size: 0.85rem; color: #64748b; min-width: 150px;">{{ p.sku or '—' }}</span>
+                            <span style="flex: 1; font-weight: 600; color: #0f172a;">{{ p.title }}</span>
+                            {% if p.brand %}
+                            <span style="font-size: 0.8rem; background: #f1f5f9; padding: 2px 7px; border-radius: 3px; color: #475569;">{{ p.brand }}</span>
+                            {% endif %}
+                            <span style="font-weight: 700; color: #059669; white-space: nowrap;">{{ "{:,.0f}".format(p.sale_price or 0)|replace(",", " ") }} ₽</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div style="padding: 24px; text-align: center; color: #64748b; font-size: 0.95rem;">
+                        В базе данных пока нет товаров. Вы можете импортировать их в Секции Б выше.
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Selection Status and Validation Error Display -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <div style="font-weight: 600; font-size: 1rem; color: #1e293b;">
+                    Выбрано: <span id="exportSelectedCount" style="color: #2563eb; font-weight: 700; font-size: 1.15rem;">0</span>
+                </div>
+                <div id="exportValidationError" style="display: none; color: #dc2626; font-weight: 600; font-size: 0.9rem; background: #fef2f2; border: 1px solid #fecaca; padding: 6px 14px; border-radius: 4px;">
+                    Выберите хотя бы один товар для экспорта.
+                </div>
+            </div>
+
+            <!-- Export Buttons -->
+            <div class="form-row" style="margin-bottom: 10px;">
+                <button type="button" class="btn btn-primary" id="btnExportSelected" onclick="runSelectedProductExport()">
+                    📦 Экспортировать выбранные в JSON
+                </button>
+                <button type="button" class="btn btn-outline" id="btnExportAll" onclick="runAllProductExport()">
+                    🌐 Экспортировать все товары в JSON
+                </button>
+                <!-- Retain hidden input for backward compatibility -->
+                <input type="hidden" id="exportIdsInput">
+                <span id="exportLoadingSpinner" style="display: none; color: #2563eb; font-size: 0.9rem; font-weight: 600;">
+                    ⏳ Формирование файла экспорта...
+                </span>
+            </div>
+
             <div style="font-size: 0.85rem; color: #64748b;">
-                Имя файла: <code>TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json</code>
+                Имя скачиваемого файла: <code>TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json</code>
             </div>
         </div>
     </div>
@@ -720,15 +775,147 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // --- Section C: Export JSON ---
-        function runProductExport() {
-            const idsVal = document.getElementById('exportIdsInput').value.trim();
-            let url = '/admin-api/products/json/export';
-            if (idsVal) {
-                url += '?ids=' + encodeURIComponent(idsVal);
+        // --- Section C: Product Selection & Export ---
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.export-product-cb:checked');
+            const countEl = document.getElementById('exportSelectedCount');
+            if (countEl) {
+                countEl.textContent = checkboxes.length;
             }
-            window.location.href = url;
-            showToast('Началась выгрузка файла JSON каталога...');
+            const errEl = document.getElementById('exportValidationError');
+            if (errEl && checkboxes.length > 0) {
+                errEl.style.display = 'none';
+            }
+        }
+
+        function filterExportProducts() {
+            const filterInput = document.getElementById('productSearchFilter');
+            const filterVal = filterInput ? filterInput.value.trim().toLowerCase() : '';
+            const items = document.querySelectorAll('.export-product-item');
+            items.forEach(item => {
+                const title = item.getAttribute('data-title') || '';
+                const sku = item.getAttribute('data-sku') || '';
+                const brand = item.getAttribute('data-brand') || '';
+                const id = item.getAttribute('data-id') || '';
+                if (!filterVal || title.includes(filterVal) || sku.includes(filterVal) || brand.includes(filterVal) || id === filterVal) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function selectAllShownProducts() {
+            const items = document.querySelectorAll('.export-product-item');
+            items.forEach(item => {
+                if (item.style.display !== 'none') {
+                    const cb = item.querySelector('.export-product-cb');
+                    if (cb) cb.checked = true;
+                }
+            });
+            updateSelectedCount();
+        }
+
+        function clearSelectedProducts() {
+            const checkboxes = document.querySelectorAll('.export-product-cb');
+            checkboxes.forEach(cb => { cb.checked = false; });
+            updateSelectedCount();
+        }
+
+        async function triggerDownload(url) {
+            const spinner = document.getElementById('exportLoadingSpinner');
+            const btnSelected = document.getElementById('btnExportSelected');
+            const btnAll = document.getElementById('btnExportAll');
+
+            if (spinner) spinner.style.display = 'inline';
+            if (btnSelected) btnSelected.disabled = true;
+            if (btnAll) btnAll.disabled = true;
+
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    let errMsg = `Ошибка при экспорте товаров (${resp.status})`;
+                    try {
+                        const errData = await resp.json();
+                        errMsg = errData.message || errData.detail || errMsg;
+                    } catch (e) {
+                        const text = await resp.text();
+                        if (text) errMsg = text;
+                    }
+                    showExportError(errMsg);
+                    return;
+                }
+
+                const blob = await resp.blob();
+                let filename = 'TECHNOREBOOT_PRODUCTS.json';
+                const disposition = resp.headers.get('content-disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match && match[1]) filename = match[1];
+                }
+
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+                showToast(`✓ Скачан файл ${filename}`);
+            } catch (err) {
+                showExportError(`Сетевая ошибка при экспорте товаров: ${err.message || err}`);
+            } finally {
+                if (spinner) spinner.style.display = 'none';
+                if (btnSelected) btnSelected.disabled = false;
+                if (btnAll) btnAll.disabled = false;
+            }
+        }
+
+        function showExportError(msg) {
+            const errEl = document.getElementById('exportValidationError');
+            if (errEl) {
+                errEl.textContent = msg;
+                errEl.style.display = 'block';
+            }
+            showToast(msg);
+        }
+
+        function runSelectedProductExport() {
+            const checkedBoxes = document.querySelectorAll('.export-product-cb:checked');
+            const errEl = document.getElementById('exportValidationError');
+
+            if (checkedBoxes.length === 0) {
+                if (errEl) {
+                    errEl.textContent = 'Выберите хотя бы один товар для экспорта.';
+                    errEl.style.display = 'block';
+                }
+                showToast('Выберите хотя бы один товар для экспорта.');
+                return;
+            }
+            if (errEl) errEl.style.display = 'none';
+
+            const ids = Array.from(checkedBoxes).map(cb => cb.value);
+            const url = '/admin-api/products/json/export?ids=' + encodeURIComponent(ids.join(','));
+            triggerDownload(url);
+        }
+
+        function runAllProductExport() {
+            const errEl = document.getElementById('exportValidationError');
+            if (errEl) errEl.style.display = 'none';
+            const url = '/admin-api/products/json/export';
+            triggerDownload(url);
+        }
+
+        // Backward compatibility alias
+        function runProductExport() {
+            const idsInput = document.getElementById('exportIdsInput');
+            const idsVal = idsInput ? idsInput.value.trim() : '';
+            if (idsVal) {
+                triggerDownload('/admin-api/products/json/export?ids=' + encodeURIComponent(idsVal));
+            } else {
+                runAllProductExport();
+            }
         }
     </script>
 </body>

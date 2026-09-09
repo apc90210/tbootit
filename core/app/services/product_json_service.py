@@ -440,11 +440,18 @@ def export_canonical_products(db: Session, product_ids: Optional[List[int]] = No
     """
     Exports products into canonical Technoreboot JSON payload.
     Preserves common fields + category + category-specific characteristics with full round-trip fidelity.
+    If product_ids is specified, preserves caller's selection order.
     """
     query = db.query(models.Product)
     if product_ids:
-        query = query.filter(models.Product.id.in_(product_ids))
-    products_db = query.order_by(models.Product.id.asc()).all()
+        seen = set()
+        ordered_ids = [x for x in product_ids if not (x in seen or seen.add(x))]
+        query = query.filter(models.Product.id.in_(ordered_ids))
+        products_db = query.all()
+        prod_map = {p.id: p for p in products_db}
+        products_db = [prod_map[pid] for pid in ordered_ids if pid in prod_map]
+    else:
+        products_db = query.order_by(models.Product.id.asc()).all()
 
     exported_products: List[Dict[str, Any]] = []
 
@@ -481,11 +488,16 @@ def export_canonical_products(db: Session, product_ids: Optional[List[int]] = No
             except Exception:
                 pass
 
-        # Collect photos
+        # Collect photos safely
         photos = []
         if prod.photos:
             for ph in prod.photos:
-                url_or_path = ph.url or ph.file_path
+                url_or_path = (
+                    getattr(ph, "media_url", None)
+                    or getattr(ph, "source_url", None)
+                    or getattr(ph, "storage_path", None)
+                    or getattr(ph, "url", None)
+                )
                 if url_or_path:
                     photos.append(url_or_path)
 

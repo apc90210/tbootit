@@ -315,6 +315,19 @@ def export_products_json(ids: Optional[str] = None, db: Session = Depends(get_db
         product_ids = [int(i.strip()) for i in ids.split(",") if i.strip().isdigit()]
     return export_canonical_products(db, product_ids)
 
+@router.post("/json/export")
+def export_products_json_post(payload: Optional[dict] = None, db: Session = Depends(get_db)):
+    from app.services.product_json_service import export_canonical_products
+    product_ids = None
+    if payload and isinstance(payload, dict):
+        raw_ids = payload.get("ids")
+        if isinstance(raw_ids, list):
+            product_ids = [int(x) for x in raw_ids if str(x).isdigit()]
+        elif isinstance(raw_ids, str):
+            product_ids = [int(i.strip()) for i in raw_ids.split(",") if i.strip().isdigit()]
+    return export_canonical_products(db, product_ids)
+
+
 @router.post("/", response_model=schemas.Product)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     if product.barcode and product.barcode.strip():

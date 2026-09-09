@@ -727,23 +727,33 @@ async def products_json_page(request: Request):
     """
     Dedicated Web page for Product JSON Import, Export, and AI Prompt Generator.
     """
+    schema_data = {}
+    products_list = []
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.get(f"{CORE_API_URL}/api/products/json/schema", timeout=10.0)
             if resp.status_code == 200:
                 schema_data = resp.json()
-            else:
-                schema_data = {}
         except Exception:
             schema_data = {}
+
+        try:
+            resp_prod = await client.get(f"{CORE_API_URL}/api/products/", params={"limit": 1000}, timeout=15.0)
+            if resp_prod.status_code == 200:
+                prod_json = resp_prod.json()
+                products_list = prod_json.get("items", []) if isinstance(prod_json, dict) else prod_json
+        except Exception:
+            products_list = []
 
     ai_prompt = schema_data.get("ai_prompt", "")
     return templates.TemplateResponse("products_json.html", {
         "request": request,
         "ai_prompt": ai_prompt,
         "schema_data": schema_data,
+        "products": products_list,
         "core_url": CORE_API_URL,
     })
+
 
 
 @app.get("/products/{product_id}")
@@ -1049,15 +1059,29 @@ async def api_proxy_products_json_import(
             )
 
 
-@app.get("/admin-api/products/json/export")
-async def api_proxy_products_json_export(ids: Optional[str] = None):
+@app.api_route("/admin-api/products/json/export", methods=["GET", "POST"])
+async def api_proxy_products_json_export(request: Request, ids: Optional[str] = None):
     """
     Proxy JSON product export to Core API.
     Streams back JSON attachment named TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json.
+    Supports GET with query param ?ids=1,2,3 or POST with JSON body {"ids": [1, 2, 3]}.
     """
+    product_ids_str = ids
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            if isinstance(body, dict) and "ids" in body:
+                raw_ids = body["ids"]
+                if isinstance(raw_ids, list):
+                    product_ids_str = ",".join(str(x) for x in raw_ids if str(x).isdigit())
+                elif isinstance(raw_ids, str):
+                    product_ids_str = raw_ids
+        except Exception:
+            pass
+
     params = {}
-    if ids:
-        params["ids"] = ids
+    if product_ids_str:
+        params["ids"] = product_ids_str
 
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
@@ -1075,10 +1099,15 @@ async def api_proxy_products_json_export(ids: Optional[str] = None):
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'}
                 )
             else:
-                return JSONResponse(status_code=resp.status_code, content=resp.json())
+                try:
+                    err_payload = resp.json()
+                except Exception:
+                    err_payload = {"status": "error", "message": resp.text or f"Ошибка Core API ({resp.status_code})"}
+                return JSONResponse(status_code=resp.status_code, content=err_payload)
         except httpx.RequestError as e:
             return JSONResponse(
                 status_code=503,
                 content={"status": "error", "message": f"Ошибка соединения с Core API: {str(e)}"}
             )
+
 

@@ -552,3 +552,166 @@ class TestProductCanonicalJson:
         assert p.title == "Старый формат товара"
         assert p.category.name == "Ноутбуки"
         db.close()
+
+    def test_selected_product_export_single_item(self):
+        """TEST A: One selected product export -> exactly 1 item in canonical format."""
+        # 1. Create a distinct test product
+        payload = {
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {
+                    "sku": "SELECT-001",
+                    "title": "Ноутбук одиночного экспорта",
+                    "category": "Ноутбуки",
+                    "price": 33000.0,
+                    "characteristics": {"Процессор": "Intel Core i5"}
+                }
+            ]
+        }
+        res_create = client.post("/api/products/json/import", json=payload)
+        assert res_create.status_code == 200
+        p_id = res_create.json()["imported_product_ids"][0]
+
+        # 2. Export only this 1 ID via GET
+        res_export = client.get(f"/api/products/json/export?ids={p_id}")
+        assert res_export.status_code == 200
+        export_data = res_export.json()
+
+        assert export_data["format"] == "technoreboot-products"
+        assert export_data["version"] == 1
+        assert len(export_data["products"]) == 1
+        assert export_data["products"][0]["id"] == p_id
+        assert export_data["products"][0]["title"] == "Ноутбук одиночного экспорта"
+        assert export_data["products"][0]["sku"] == "SELECT-001"
+        assert export_data["products"][0]["characteristics"]["Процессор"] == "Intel Core i5"
+
+    def test_selected_product_export_multiple_and_exclusion(self):
+        """TEST B & C: Three selected products export -> exactly 3 items, unselected excluded."""
+        # Create 4 products (3 to select, 1 to leave unselected)
+        payload = {
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {"sku": "MULTI-A", "title": "Товар для выбора 1", "price": 1000.0},
+                {"sku": "MULTI-B", "title": "Товар для выбора 2", "price": 2000.0},
+                {"sku": "MULTI-C", "title": "Товар для выбора 3", "price": 3000.0},
+                {"sku": "MULTI-D", "title": "НЕВЫБРАННЫЙ ТОВАР", "price": 9999.0}
+            ]
+        }
+        res_create = client.post("/api/products/json/import", json=payload)
+        assert res_create.status_code == 200
+        p_ids = res_create.json()["imported_product_ids"]
+        assert len(p_ids) == 4
+
+        selected_ids = p_ids[:3]
+        unselected_id = p_ids[3]
+
+        # Export selected 3 products via GET ?ids=...
+        res_export = client.get(f"/api/products/json/export?ids={selected_ids[0]},{selected_ids[1]},{selected_ids[2]}")
+        assert res_export.status_code == 200
+        data = res_export.json()
+
+        assert data["format"] == "technoreboot-products"
+        assert data["version"] == 1
+        assert len(data["products"]) == 3
+
+        exported_ids = [p["id"] for p in data["products"]]
+        assert exported_ids == selected_ids
+        # TEST C: Verify unselected product is strictly ABSENT
+        assert unselected_id not in exported_ids
+        assert all(p["sku"] != "MULTI-D" for p in data["products"])
+
+    def test_selected_product_export_roundtrip(self):
+        """TEST E, F, G, H: Selected export validates against importer and round-trip preserves all fields."""
+        # Create product with rich characteristics
+        payload = {
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {
+                    "sku": "RT-SEL-01",
+                    "title": "МФУ для раундтрипа",
+                    "category": "Принтеры и МФУ",
+                    "brand": "HP",
+                    "model": "LaserJet Pro",
+                    "price": 19500.0,
+                    "purchase_price": 12000.0,
+                    "condition": "Отличное",
+                    "description": "Тестовое подробное описание МФУ.",
+                    "storage_location": "Склад А",
+                    "barcode": "469999999999",
+                    "characteristics": {
+                        "Тип устройства": "МФУ",
+                        "Технология печати": "Лазерная",
+                        "Цветность печати": "Черно-белая"
+                    }
+                }
+            ]
+        }
+        res_create = client.post("/api/products/json/import", json=payload)
+        assert res_create.status_code == 200
+        prod_id = res_create.json()["imported_product_ids"][0]
+
+        # Export selected product
+        res_export = client.get(f"/api/products/json/export?ids={prod_id}")
+        assert res_export.status_code == 200
+        exported = res_export.json()
+
+        # Modify values on the exported item
+        exported["products"][0]["price"] = 21000.0
+        exported["products"][0]["characteristics"]["Тип устройства"] = "МФУ (Обновлено)"
+
+        # TEST F: Validate and re-import via importer
+        res_reimport = client.post("/api/products/json/import", json=exported)
+        assert res_reimport.status_code == 200
+        reimport_res = res_reimport.json()
+        assert reimport_res["updated_count"] == 1
+        assert reimport_res["created_count"] == 0
+
+        # TEST G & H: Verify in DB that common fields and characteristics survived round-trip
+        db = SessionLocal()
+        p_check = db.query(models.Product).filter(models.Product.id == prod_id).first()
+        assert p_check.sale_price == 21000.0
+        assert p_check.purchase_price == 12000.0
+        assert p_check.title == "МФУ для раундтрипа"
+        assert p_check.brand == "HP"
+        assert p_check.model == "LaserJet Pro"
+        assert p_check.storage_location == "Склад А"
+        assert p_check.barcode == "469999999999"
+
+        attr_vals = {row.definition.name: row.value for row in p_check.avito_attribute_values}
+        assert attr_vals["Тип устройства"] == "МФУ (Обновлено)"
+        assert attr_vals["Технология печати"] == "Лазерная"
+        db.close()
+
+    def test_selected_export_unknown_id_handled_safely(self):
+        """TEST J: Unknown product IDs handled safely without crashing (returns empty list)."""
+        res = client.get("/api/products/json/export?ids=999999,888888")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["format"] == "technoreboot-products"
+        assert data["version"] == 1
+        assert len(data["products"]) == 0
+
+    def test_selected_export_post_endpoint(self):
+        """TEST POST endpoint: POST /api/products/json/export accepts JSON body {"ids": [..]}."""
+        # Create 2 products
+        payload = {
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {"sku": "POST-SEL-1", "title": "Товар для POST 1", "price": 500.0},
+                {"sku": "POST-SEL-2", "title": "Товар для POST 2", "price": 750.0}
+            ]
+        }
+        res_create = client.post("/api/products/json/import", json=payload)
+        p_ids = res_create.json()["imported_product_ids"]
+
+        # Call POST /api/products/json/export
+        res_post = client.post("/api/products/json/export", json={"ids": p_ids})
+        assert res_post.status_code == 200
+        data = res_post.json()
+        assert len(data["products"]) == 2
+        assert [p["id"] for p in data["products"]] == p_ids
+

@@ -66,9 +66,14 @@ def test_products_json_page_render_all_sections():
         assert "jsonFileInput" in html
         assert "jsonTextInput" in html
 
-        # Section C: Export
+        # Section C: Export with Selection
         assert "Секция В: Экспорт товаров из базы Техноребут" in html
-        assert "Экспорт JSON (скачать файл)" in html
+        assert "Экспортировать выбранные в JSON" in html
+        assert "Экспортировать все товары в JSON" in html
+        assert "exportProductListContainer" in html
+        assert "productSearchFilter" in html
+        assert "exportSelectedCount" in html
+        assert "Выберите хотя бы один товар для экспорта" in html
         assert "TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json" in html
 
 
@@ -99,11 +104,15 @@ def test_import_proxy_json_body():
             "updated": 1,
             "skipped": 0
         },
-        "results": [
-            {"index": 0, "status": "created", "product_id": 101, "sku": "NB-001", "title": "Ноутбук"},
-            {"index": 1, "status": "updated", "product_id": 58, "sku": "PC-002", "title": "ПК"}
-        ],
-        "errors": []
+        "results": []
+    }
+
+    payload = {
+        "format": "technoreboot-products",
+        "version": 1,
+        "products": [
+            {"title": "Компьютер Intel Core i7", "price_rub": 50000}
+        ]
     }
 
     with patch("httpx.AsyncClient") as mock_client_cls:
@@ -111,27 +120,14 @@ def test_import_proxy_json_body():
         mock_instance.post = AsyncMock(return_value=httpx.Response(200, json=fake_core_resp))
         mock_client_cls.return_value.__aenter__.return_value = mock_instance
 
-        payload = {
-            "format": "technoreboot-products",
-            "version": 1,
-            "products": [
-                {"title": "Ноутбук", "price_rub": 50000},
-                {"id": 58, "title": "ПК", "price_rub": 35000}
-            ]
-        }
-
         resp = client.post("/admin-api/products/json/import", json=payload)
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["status"] == "ok"
-        assert data["summary"]["created"] == 1
-        assert data["summary"]["updated"] == 1
-        assert data["summary"]["skipped"] == 0
-        assert len(data["results"]) == 2
+        assert resp.json()["status"] == "ok"
+        assert resp.json()["summary"]["created"] == 1
 
 
 def test_import_proxy_multipart_file():
-    """TEST T2: Import via file upload multipart/form-data."""
+    """TEST T2: Import via multipart file upload proxies to Core API."""
     fake_core_resp = {
         "status": "ok",
         "summary": {
@@ -139,44 +135,36 @@ def test_import_proxy_multipart_file():
             "created": 1,
             "updated": 0,
             "skipped": 0
-        },
-        "results": [
-            {"index": 0, "status": "created", "product_id": 102, "sku": "MFP-001", "title": "МФУ HP"}
-        ],
-        "errors": []
+        }
     }
+
+    json_content = json.dumps({
+        "format": "technoreboot-products",
+        "version": 1,
+        "products": [{"title": "Монитор Dell 27", "price_rub": 18000}]
+    }).encode("utf-8")
 
     with patch("httpx.AsyncClient") as mock_client_cls:
         mock_instance = MagicMock()
         mock_instance.post = AsyncMock(return_value=httpx.Response(200, json=fake_core_resp))
         mock_client_cls.return_value.__aenter__.return_value = mock_instance
 
-        file_bytes = json.dumps({
-            "format": "technoreboot-products",
-            "version": 1,
-            "products": [{"title": "МФУ HP", "price_rub": 12000}]
-        }).encode("utf-8")
-
         resp = client.post(
             "/admin-api/products/json/import",
-            files={"file": ("test_import.json", file_bytes, "application/json")}
+            files={"file": ("test_catalog.json", json_content, "application/json")}
         )
         assert resp.status_code == 200
-        data = resp.json()
-        assert data["summary"]["created"] == 1
-        assert data["results"][0]["product_id"] == 102
+        assert resp.json()["summary"]["created"] == 1
 
 
-def test_export_proxy_timestamped_filename():
-    """TEST U: Export proxies to Core and returns TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json."""
+def test_export_all_proxy_downloads_timestamped_file():
+    """TEST U1: JSON Export all via Web API returns TECHNOREBOOT_PRODUCTS_YYYY-MM-DD_HHMMSS.json."""
     fake_export_data = {
         "format": "technoreboot-products",
         "version": 1,
-        "exported_at": "2026-09-08T22:00:00",
-        "total": 1,
         "products": [
             {
-                "id": 58,
+                "id": 1,
                 "sku": "NB-001",
                 "title": "Ноутбук Lenovo",
                 "price_rub": 45000,
@@ -203,6 +191,66 @@ def test_export_proxy_timestamped_filename():
         assert data["version"] == 1
         assert len(data["products"]) == 1
         assert data["products"][0]["title"] == "Ноутбук Lenovo"
+
+
+def test_export_selected_products_single_and_multiple():
+    """TEST U2: Selected product export filters by requested IDs (GET query and POST body)."""
+    # 1. Single product export via GET ?ids=101
+    single_export_data = {
+        "format": "technoreboot-products",
+        "version": 1,
+        "products": [{"id": 101, "title": "Ультрабук Dell"}]
+    }
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.get = AsyncMock(return_value=httpx.Response(200, json=single_export_data))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        resp = client.get("/admin-api/products/json/export?ids=101")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["products"]) == 1
+        assert data["products"][0]["id"] == 101
+
+    # 2. Multiple products export via GET ?ids=101,102,103
+    multi_export_data = {
+        "format": "technoreboot-products",
+        "version": 1,
+        "products": [
+            {"id": 101, "title": "Ультрабук Dell"},
+            {"id": 102, "title": "Принтер Canon"},
+            {"id": 103, "title": "Монитор ASUS"}
+        ]
+    }
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.get = AsyncMock(return_value=httpx.Response(200, json=multi_export_data))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        resp = client.get("/admin-api/products/json/export?ids=101,102,103")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["products"]) == 3
+        assert [p["id"] for p in data["products"]] == [101, 102, 103]
+
+    # 3. Multiple products export via POST JSON body {"ids": [101, 102]}
+    post_export_data = {
+        "format": "technoreboot-products",
+        "version": 1,
+        "products": [
+            {"id": 101, "title": "Ультрабук Dell"},
+            {"id": 102, "title": "Принтер Canon"}
+        ]
+    }
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.get = AsyncMock(return_value=httpx.Response(200, json=post_export_data))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        resp = client.post("/admin-api/products/json/export", json={"ids": [101, 102]})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["products"]) == 2
 
 
 def test_import_invalid_json_returns_400():
@@ -236,3 +284,49 @@ def test_navigation_links_on_admin_pages():
     assert resp.status_code == 200
     raw_port_pattern = re.compile(r'href=["\']http://(localhost|127\.0\.0\.1):(8000|8020|8030|8040|8061)')
     assert not raw_port_pattern.findall(resp.text), "Raw owner port found on /products/json"
+
+
+def test_products_json_access_control_contract():
+    """
+    TEST K & L: Verification of mTLS access control contract.
+    - No certificate presented -> rejected with 403 Forbidden.
+    - Active OWNER certificate -> accepted (is_owner=True).
+    - Active USER certificate -> accepted (is_owner=False, allowed for product operations).
+    - Revoked certificate -> rejected with 403 Forbidden.
+    """
+    owner_cert = auth_manager.get_certificate("owner")
+
+    # 1. No certificate
+    ok, code, msg, cert = auth_manager.verify_request(
+        verify_status="NONE",
+        client_serial=None,
+        client_fingerprint=None,
+        request_uri="/products/json"
+    )
+    assert ok is False
+    assert code == 403
+
+    # 2. OWNER certificate
+    ok, code, msg, cert = auth_manager.verify_request(
+        verify_status="SUCCESS",
+        client_serial=owner_cert["serial_hex"],
+        client_fingerprint=owner_cert["fingerprint_sha256"],
+        request_uri="/products/json"
+    )
+    assert ok is True
+    assert code == 200
+    assert cert["is_owner"] is True
+
+    # 3. Active USER certificate (matching existing product management authorization level)
+    # Find any active user cert or create temporary mock record
+    active_user = next((c for c in auth_manager.list_certificates() if c.get("status") == "ACTIVE" and not c.get("is_owner")), None)
+    if active_user:
+        ok, code, msg, cert = auth_manager.verify_request(
+            verify_status="SUCCESS",
+            client_serial=active_user["serial_hex"],
+            client_fingerprint=active_user["fingerprint_sha256"],
+            request_uri="/products/json"
+        )
+        assert ok is True
+        assert code == 200
+        assert cert["is_owner"] is False

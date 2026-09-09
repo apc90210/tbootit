@@ -191,3 +191,16 @@ def export_canonical_json_endpoint(ids: Optional[str] = None, db: Session = Depe
         product_ids = [int(i.strip()) for i in ids.split(",") if i.strip().isdigit()]
     return export_canonical_products(db, product_ids)
 
+@router.post("/export-canonical-json")
+def export_canonical_json_endpoint_post(payload: Optional[dict] = None, db: Session = Depends(get_db)):
+    from app.services.product_json_service import export_canonical_products
+    product_ids = None
+    if payload and isinstance(payload, dict):
+        raw_ids = payload.get("ids")
+        if isinstance(raw_ids, list):
+            product_ids = [int(x) for x in raw_ids if str(x).isdigit()]
+        elif isinstance(raw_ids, str):
+            product_ids = [int(i.strip()) for i in raw_ids.split(",") if i.strip().isdigit()]
+    return export_canonical_products(db, product_ids)
+
+
