@@ -407,7 +407,7 @@
                         <div class="stat-val" id="statTotal">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Создано новых</div>
+                        <div class="stat-label">Создано</div>
                         <div class="stat-val" style="color: #16a34a;" id="statCreated">0</div>
                     </div>
                     <div class="stat-card">
@@ -415,8 +415,12 @@
                         <div class="stat-val" style="color: #2563eb;" id="statUpdated">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Пропущено / ошибок</div>
-                        <div class="stat-val" style="color: #dc2626;" id="statSkipped">0</div>
+                        <div class="stat-label">Пропущено</div>
+                        <div class="stat-val" style="color: #d97706;" id="statSkipped">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Ошибок</div>
+                        <div class="stat-val" style="color: #dc2626;" id="statErrors">0</div>
                     </div>
                 </div>
 
@@ -708,58 +712,88 @@
             const statCreated = document.getElementById('statCreated');
             const statUpdated = document.getElementById('statUpdated');
             const statSkipped = document.getElementById('statSkipped');
+            const statErrors = document.getElementById('statErrors');
             const tbody = document.getElementById('resultsTableBody');
 
             tbody.innerHTML = '';
             container.style.display = 'block';
 
-            const summary = data.summary || {
-                total_in_payload: 0,
-                created: 0,
-                updated: 0,
-                skipped: 0
-            };
+            const rawSummary = data.summary || {};
+            const created = rawSummary.created ?? data.created_count ?? 0;
+            const updated = rawSummary.updated ?? data.updated_count ?? 0;
+            const skipped = rawSummary.skipped ?? (data.skipped_count !== undefined && rawSummary.errors !== undefined ? Math.max(0, data.skipped_count - rawSummary.errors) : 0);
+            const errors = rawSummary.errors ?? data.error_count ?? (Array.isArray(data.errors) ? data.errors.length : 0);
+            const totalInPayload = rawSummary.total_in_payload ?? rawSummary.total ?? (created + updated + skipped + errors);
 
-            statTotal.textContent = summary.total_in_payload;
-            statCreated.textContent = summary.created;
-            statUpdated.textContent = summary.updated;
-            statSkipped.textContent = summary.skipped;
+            statTotal.textContent = totalInPayload;
+            statCreated.textContent = created;
+            statUpdated.textContent = updated;
+            statSkipped.textContent = skipped;
+            if (statErrors) statErrors.textContent = errors;
 
-            if (summary.skipped > 0) {
-                banner.className = 'alert-box alert-warning';
-                banner.innerHTML = `⚠️ Импорт завершён частично. Успешно обработано: <b>${summary.created + summary.updated}</b>, пропущено с ошибками: <b>${summary.skipped}</b>. Подробности смотрите в таблице ниже.`;
+            // Invariant check: NEVER show green success if all counters are zero for non-empty input
+            if (totalInPayload > 0 && (created + updated + skipped + errors === 0)) {
+                banner.className = 'alert-box alert-danger';
+                banner.innerHTML = `❌ Ошибка импорта: сервер вернул нулевой результат для непустого пакета товаров (Создано: 0, Обновлено: 0, Пропущено: 0, Ошибок: 0).`;
+            } else if (errors > 0 || skipped > 0) {
+                if (created + updated > 0) {
+                    banner.className = 'alert-box alert-warning';
+                    banner.innerHTML = `⚠️ Импорт завершён частично.<br>Создано: <b>${created}</b>, Обновлено: <b>${updated}</b>, Пропущено: <b>${skipped}</b>, Ошибок: <b>${errors}</b>.<br><small>Подробности смотрите в таблице ниже.</small>`;
+                } else {
+                    banner.className = 'alert-box alert-danger';
+                    banner.innerHTML = `❌ Импорт не выполнен.<br>Создано: <b>0</b>, Обновлено: <b>0</b>, Пропущено: <b>${skipped}</b>, Ошибок: <b>${errors}</b>.<br><small>Подробности смотрите в таблице ниже.</small>`;
+                }
             } else {
                 banner.className = 'alert-box alert-success';
-                banner.innerHTML = `✓ Импорт успешно завершён! Создано: <b>${summary.created}</b>, обновлено: <b>${summary.updated}</b>, ошибок: <b>0</b>.`;
+                banner.innerHTML = `✓ Импорт успешно завершён!<br>Создано: <b>${created}</b>, Обновлено: <b>${updated}</b>, Пропущено: <b>${skipped}</b>, Ошибок: <b>${errors}</b>.`;
             }
 
             const results = data.results || [];
-            results.forEach((r, idx) => {
-                const tr = document.createElement('tr');
+            if (results.length > 0) {
+                results.forEach((r, idx) => {
+                    const tr = document.createElement('tr');
 
-                let badgeHtml = '';
-                let resultText = '';
-                if (r.status === 'created') {
-                    badgeHtml = '<span class="badge badge-success">СОЗДАН</span>';
-                    resultText = 'Успешно создан новый товар';
-                } else if (r.status === 'updated') {
-                    badgeHtml = '<span class="badge badge-info">ОБНОВЛЕН</span>';
-                    resultText = 'Данные существующего товара обновлены';
-                } else {
-                    badgeHtml = '<span class="badge badge-danger">ПРОПУЩЕН</span>';
-                    resultText = `<span style="color: #dc2626; font-weight: 600;">${r.error || 'Ошибка валидации'}</span>`;
-                }
+                    let badgeHtml = '';
+                    let resultText = '';
+                    if (r.status === 'created') {
+                        badgeHtml = '<span class="badge badge-success">СОЗДАН</span>';
+                        resultText = 'Успешно создан новый товар';
+                    } else if (r.status === 'updated') {
+                        badgeHtml = '<span class="badge badge-info">ОБНОВЛЕН</span>';
+                        resultText = 'Данные существующего товара обновлены';
+                    } else if (r.status === 'skipped') {
+                        badgeHtml = '<span class="badge badge-warning" style="background:#fef3c7; color:#92400e;">ПРОПУЩЕН</span>';
+                        resultText = `<span style="color: #d97706; font-weight: 600;">${escapeHtml(r.error || 'Пропущен политикой дубликатов')}</span>`;
+                    } else {
+                        badgeHtml = '<span class="badge badge-danger">ОШИБКА</span>';
+                        resultText = `<span style="color: #dc2626; font-weight: 600;">${escapeHtml(r.error || 'Ошибка валидации')}</span>`;
+                    }
 
-                tr.innerHTML = `
-                    <td>${idx + 1}</td>
-                    <td><b>${r.product_id ? ('#' + r.product_id) : '—'}</b></td>
-                    <td><code>${r.sku || '—'}</code></td>
-                    <td><b>${escapeHtml(r.title || '—')}</b></td>
-                    <td>${badgeHtml}</td>
-                    <td>${resultText}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+                    const prodId = r.id || r.product_id;
+                    tr.innerHTML = `
+                        <td style="text-align: center; color: #64748b;">${r.index || (idx + 1)}</td>
+                        <td style="font-weight: 700; color: #334155;">${prodId ? ('#' + prodId) : '—'}</td>
+                        <td style="font-family: monospace; font-size: 0.85rem; color: #64748b;">${escapeHtml(r.sku || '—')}</td>
+                        <td style="font-weight: 600; color: #0f172a;">${escapeHtml(r.title || '—')}</td>
+                        <td>${badgeHtml}</td>
+                        <td>${resultText}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else if (Array.isArray(data.errors) && data.errors.length > 0) {
+                data.errors.forEach((err, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td><span class="badge badge-danger">ОШИБКА</span></td>
+                        <td><span style="color: #dc2626; font-weight: 600;">${escapeHtml(err)}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
 
             // Smooth scroll to results
             container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

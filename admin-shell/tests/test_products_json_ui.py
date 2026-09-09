@@ -330,3 +330,83 @@ def test_products_json_access_control_contract():
         assert ok is True
         assert code == 200
         assert cert["is_owner"] is False
+
+
+def test_stage07c_r1_r2_ui_contains_all_four_outcome_classes():
+    """Stage 07C-R1-R2: UI displays all outcome classes (Создано, Обновлено, Пропущено, Ошибок)."""
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.get = AsyncMock(return_value=httpx.Response(200, json={"ai_prompt": "prompt", "products": []}))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        resp = client.get("/products/json")
+        assert resp.status_code == 200
+        html = resp.text
+
+        # All 5 stat cards present
+        assert 'id="statTotal"' in html
+        assert 'id="statCreated"' in html
+        assert 'id="statUpdated"' in html
+        assert 'id="statSkipped"' in html
+        assert 'id="statErrors"' in html
+
+        # Labels present
+        assert "Всего в пакете" in html
+        assert "Создано" in html
+        assert "Обновлено" in html
+        assert "Пропущено" in html
+        assert "Ошибок" in html
+
+        # Invariant & zero-result check script present
+        assert "server вернул нулевой результат" in html or "сервер вернул нулевой результат" in html
+
+
+def test_stage07c_r1_r2_owner_payload_proxy_returns_summary_and_results():
+    """Stage 07C-R1-R2: Proxy receives Core summary & results and passes through to UI."""
+    owner_core_response = {
+        "success": True,
+        "summary": {
+            "total_in_payload": 2,
+            "total": 2,
+            "created": 2,
+            "updated": 0,
+            "skipped": 0,
+            "errors": 0
+        },
+        "results": [
+            {"index": 1, "id": 101, "sku": "PRD-DELL1", "title": "Монитор Dell", "status": "created", "error": None},
+            {"index": 2, "id": 102, "sku": "PRD-HP1", "title": "Ноутбук HP", "status": "created", "error": None}
+        ],
+        "created_count": 2,
+        "updated_count": 0,
+        "skipped_count": 0,
+        "error_count": 0,
+        "errors": [],
+        "imported_product_ids": [101, 102]
+    }
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.post = AsyncMock(return_value=httpx.Response(200, json=owner_core_response))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        # 1. Via application/json body (textarea path)
+        resp_json = client.post("/admin-api/products/json/import", json={"products": [{"title": "Dell"}, {"title": "HP"}]})
+        assert resp_json.status_code == 200
+        data_json = resp_json.json()
+        assert data_json["summary"]["created"] == 2
+        assert data_json["summary"]["errors"] == 0
+        assert len(data_json["results"]) == 2
+
+        # 2. Via multipart/form-data (file upload path)
+        file_bytes = json.dumps({"products": [{"title": "Dell"}, {"title": "HP"}]}).encode("utf-8")
+        resp_file = client.post(
+            "/admin-api/products/json/import",
+            files={"file": ("owner_payload.json", file_bytes, "application/json")}
+        )
+        assert resp_file.status_code == 200
+        data_file = resp_file.json()
+        assert data_file["summary"]["created"] == 2
+        assert data_file["summary"]["errors"] == 0
+        assert len(data_file["results"]) == 2
+

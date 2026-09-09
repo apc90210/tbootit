@@ -280,25 +280,46 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
     if not valid_format:
         return {
             "success": False,
+            "summary": {
+                "total_in_payload": 0,
+                "total": 0,
+                "created": 0,
+                "updated": 0,
+                "skipped": 0,
+                "errors": len(format_errors)
+            },
+            "results": [],
             "created_count": 0,
             "updated_count": 0,
             "skipped_count": 0,
+            "error_count": len(format_errors),
             "errors": format_errors,
             "imported_product_ids": []
         }
 
+    total_in_payload = len(products)
     created_count = 0
     updated_count = 0
     skipped_count = 0
+    error_count = 0
     errors: List[str] = []
     imported_ids: List[int] = []
+    results: List[Dict[str, Any]] = []
     now = datetime.datetime.now(datetime.timezone.utc)
 
     for idx, p in enumerate(products):
         is_valid, record_errors = validate_product_record(p, idx)
         if not is_valid:
             errors.extend(record_errors)
-            skipped_count += 1
+            error_count += 1
+            results.append({
+                "index": idx + 1,
+                "id": p.get("id") if isinstance(p, dict) else None,
+                "sku": p.get("sku") if isinstance(p, dict) else None,
+                "title": (p.get("title") if isinstance(p, dict) else None) or f"Товар #{idx + 1}",
+                "status": "error",
+                "error": "; ".join(record_errors)
+            })
             continue
 
         prod_id = p.get("id")
@@ -311,14 +332,32 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
             try:
                 prod_id_int = int(prod_id)
             except (ValueError, TypeError):
-                errors.append(f"Товар #{idx + 1}: Некорректный ID товара '{prod_id}'.")
+                err_msg = f"Товар #{idx + 1}: Некорректный ID товара '{prod_id}'."
+                errors.append(err_msg)
                 skipped_count += 1
+                results.append({
+                    "index": idx + 1,
+                    "id": prod_id,
+                    "sku": sku or None,
+                    "title": str(p.get("title") or "").strip() or f"Товар #{idx + 1}",
+                    "status": "skipped",
+                    "error": err_msg
+                })
                 continue
 
             product = db.query(models.Product).filter(models.Product.id == prod_id_int).first()
             if not product:
-                errors.append(f"Товар #{idx + 1}: Товар с ID {prod_id_int} не найден в базе данных.")
+                err_msg = f"Товар #{idx + 1}: Товар с ID {prod_id_int} не найден в базе данных."
+                errors.append(err_msg)
                 skipped_count += 1
+                results.append({
+                    "index": idx + 1,
+                    "id": prod_id_int,
+                    "sku": sku or None,
+                    "title": str(p.get("title") or "").strip() or f"Товар #{idx + 1}",
+                    "status": "skipped",
+                    "error": err_msg
+                })
                 continue
             operation = "updated"
 
@@ -327,8 +366,17 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
             if sku:
                 existing_sku = db.query(models.Product).filter(models.Product.sku == sku).first()
                 if existing_sku:
-                    errors.append(f"Товар #{idx + 1}: Товар с артикулом '{sku}' уже существует (укажите 'id' для обновления).")
+                    err_msg = f"Товар #{idx + 1}: Товар с артикулом '{sku}' уже существует (укажите 'id' для обновления)."
+                    errors.append(err_msg)
                     skipped_count += 1
+                    results.append({
+                        "index": idx + 1,
+                        "id": None,
+                        "sku": sku,
+                        "title": str(p.get("title") or "").strip() or f"Товар #{idx + 1}",
+                        "status": "skipped",
+                        "error": err_msg
+                    })
                     continue
                 product = models.Product(sku=sku)
                 db.add(product)
@@ -421,20 +469,77 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
 
         if operation == "created":
             created_count += 1
+            results.append({
+                "index": idx + 1,
+                "id": product.id,
+                "sku": product.sku,
+                "title": product.title,
+                "status": "created",
+                "error": None
+            })
         else:
             updated_count += 1
+            results.append({
+                "index": idx + 1,
+                "id": product.id,
+                "sku": product.sku,
+                "title": product.title,
+                "status": "updated",
+                "error": None
+            })
         imported_ids.append(product.id)
+
+    # Invariant enforcement: every item must be accounted for
+    accounted_total = created_count + updated_count + skipped_count + error_count
+    if accounted_total != total_in_payload:
+        unaccounted = total_in_payload - accounted_total
+        err_msg = f"Ошибка учета товаров при импорте: {unaccounted} товаров не учтено."
+        errors.append(err_msg)
+        error_count += unaccounted
+
+    # If non-empty input yielded 0 total processed, never succeed
+    if total_in_payload > 0 and (created_count + updated_count + skipped_count + error_count) == 0:
+        db.rollback()
+        return {
+            "success": False,
+            "summary": {
+                "total_in_payload": total_in_payload,
+                "total": total_in_payload,
+                "created": 0,
+                "updated": 0,
+                "skipped": 0,
+                "errors": total_in_payload
+            },
+            "results": results,
+            "created_count": 0,
+            "updated_count": 0,
+            "skipped_count": 0,
+            "error_count": total_in_payload,
+            "errors": ["Не удалось обработать товары из пакета (обработано 0 товаров)."],
+            "imported_product_ids": []
+        }
 
     db.commit()
 
     return {
         "success": True,
+        "summary": {
+            "total_in_payload": total_in_payload,
+            "total": total_in_payload,
+            "created": created_count,
+            "updated": updated_count,
+            "skipped": skipped_count,
+            "errors": error_count
+        },
+        "results": results,
         "created_count": created_count,
         "updated_count": updated_count,
-        "skipped_count": skipped_count,
+        "skipped_count": skipped_count + error_count,
+        "error_count": error_count,
         "errors": errors,
         "imported_product_ids": imported_ids
     }
+
 
 def export_canonical_products(db: Session, product_ids: Optional[List[int]] = None) -> Dict[str, Any]:
     """

@@ -715,3 +715,191 @@ class TestProductCanonicalJson:
         assert len(data["products"]) == 2
         assert [p["id"] for p in data["products"]] == p_ids
 
+    def test_owner_exact_payload_imports_two_products_and_enforces_invariant(self):
+        """Stage 07C-R1-R2: Exact Owner payload creates 2 products, returns summary & results, preserves fields."""
+        owner_payload = {
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {
+                    "title": "Монитор Dell P2419H 24\" Full HD",
+                    "category": "Мониторы",
+                    "brand": "Dell",
+                    "model": "P2419H",
+                    "price": 8500.0,
+                    "purchase_price": 5000.0,
+                    "condition": "Б/у",
+                    "status": "in_stock",
+                    "quantity": 1,
+                    "description": "Монитор Dell P2419H в рабочем состоянии. Экран без трещин, изображение стабильное. Подходит для офиса, дома и работы с документами. В комплекте кабель питания.",
+                    "storage_location": "Витрина",
+                    "barcode": "",
+                    "characteristics": {
+                        "Диагональ": "24\"",
+                        "Разрешение": "1920x1080",
+                        "Тип матрицы": "IPS",
+                        "Частота обновления": "60 Гц",
+                        "Разъемы": "HDMI, DisplayPort, VGA, USB"
+                    },
+                    "photos": []
+                },
+                {
+                    "title": "Ноутбук HP ProBook 450 G6 15.6\"",
+                    "category": "Ноутбуки",
+                    "brand": "HP",
+                    "model": "ProBook 450 G6",
+                    "price": 24500.0,
+                    "purchase_price": 15500.0,
+                    "condition": "Б/у",
+                    "status": "in_stock",
+                    "quantity": 1,
+                    "description": "Рабочий ноутбук HP ProBook 450 G6. Подходит для офисных задач, учебы, интернета и удаленной работы. Ноутбук проверен, основные функции работают исправно. Блок питания в комплекте.",
+                    "storage_location": "Склад 1",
+                    "barcode": "",
+                    "characteristics": {
+                        "Процессор": "Intel Core i5-8265U",
+                        "Оперативная память": "8 ГБ",
+                        "Объем накопителя": "256 ГБ",
+                        "Тип накопителя": "SSD",
+                        "Видеокарта": "Intel UHD Graphics 620",
+                        "Диагональ экрана": "15.6\"",
+                        "Разрешение экрана": "1920x1080 Full HD",
+                        "Операционная система": "Windows 10 Pro"
+                    },
+                    "photos": []
+                }
+            ]
+        }
+
+        res = client.post("/api/products/json/import", json=owner_payload)
+        assert res.status_code == 200
+        data = res.json()
+
+        # Invariant & Summary assertions
+        assert data["success"] is True
+        assert data["created_count"] == 2
+        assert data["updated_count"] == 0
+        assert data["skipped_count"] == 0
+        assert data["errors"] == []
+
+        summary = data.get("summary")
+        assert summary is not None
+        assert summary["total_in_payload"] == 2
+        assert summary["created"] == 2
+        assert summary["updated"] == 0
+        assert summary["skipped"] == 0
+        assert summary["errors"] == 0
+
+        # Accounting invariant: created + updated + skipped + errors == total_in_payload
+        assert summary["created"] + summary["updated"] + summary["skipped"] + summary["errors"] == 2
+
+        # Results list assertions
+        results = data.get("results")
+        assert results is not None
+        assert len(results) == 2
+        assert results[0]["status"] == "created"
+        assert results[0]["title"] == "Монитор Dell P2419H 24\" Full HD"
+        assert results[1]["status"] == "created"
+        assert results[1]["title"] == "Ноутбук HP ProBook 450 G6 15.6\""
+
+        # Unique SKUs
+        sku1 = results[0]["sku"]
+        sku2 = results[1]["sku"]
+        assert sku1 and sku2
+        assert sku1 != sku2
+        assert sku1.startswith("PRD-")
+        assert sku2.startswith("PRD-")
+
+        # Verify in DB: Dell monitor
+        db = SessionLocal()
+        m_prod = db.query(models.Product).filter(models.Product.id == results[0]["id"]).first()
+        assert m_prod is not None
+        assert m_prod.title == "Монитор Dell P2419H 24\" Full HD"
+        assert m_prod.category.name == "Мониторы"
+        assert m_prod.brand == "Dell"
+        assert m_prod.model == "P2419H"
+        assert m_prod.sale_price == 8500.0
+        assert m_prod.purchase_price == 5000.0
+        assert m_prod.condition == "Б/у"
+        assert m_prod.quantity == 1
+        assert m_prod.storage_location == "Витрина"
+        assert "Монитор Dell P2419H в рабочем состоянии" in m_prod.description
+        m_params = json.loads(m_prod.avito_params_json)
+        assert m_params["Диагональ"] == "24\""
+        assert m_params["Разрешение"] == "1920x1080"
+        assert m_params["Тип матрицы"] == "IPS"
+        assert m_params["Частота обновления"] == "60 Гц"
+        assert m_params["Разъемы"] == "HDMI, DisplayPort, VGA, USB"
+
+        # Verify in DB: HP laptop
+        l_prod = db.query(models.Product).filter(models.Product.id == results[1]["id"]).first()
+        assert l_prod is not None
+        assert l_prod.title == "Ноутбук HP ProBook 450 G6 15.6\""
+        assert l_prod.category.name == "Ноутбуки"
+        assert l_prod.brand == "HP"
+        assert l_prod.model == "ProBook 450 G6"
+        assert l_prod.sale_price == 24500.0
+        assert l_prod.purchase_price == 15500.0
+        assert l_prod.condition == "Б/у"
+        assert l_prod.quantity == 1
+        assert l_prod.storage_location == "Склад 1"
+        assert "Рабочий ноутбук HP ProBook 450 G6" in l_prod.description
+        l_params = json.loads(l_prod.avito_params_json)
+        assert l_params["Процессор"] == "Intel Core i5-8265U"
+        assert l_params["Оперативная память"] == "8 ГБ"
+        assert l_params["Объем накопителя"] == "256 ГБ"
+        assert l_params["Тип накопителя"] == "SSD"
+        assert l_params["Видеокарта"] == "Intel UHD Graphics 620"
+        assert l_params["Диагональ экрана"] == "15.6\""
+        assert l_params["Разрешение экрана"] == "1920x1080 Full HD"
+        assert l_params["Операционная система"] == "Windows 10 Pro"
+        db.close()
+
+    def test_mixed_batch_accounting_invariant_enforced(self):
+        """Stage 07C-R1-R2: Mixed batch accounts for every item (created, updated, skipped, errors)."""
+        # Step 1: Create an existing product to test update and duplicate sku
+        seed_res = client.post("/api/products/json/import", json={
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {"sku": "SEED-INV-1", "title": "Товар для обновления", "price": 1000.0}
+            ]
+        })
+        existing_id = seed_res.json()["imported_product_ids"][0]
+
+        # Step 2: Send mixed batch of 4 items:
+        # 1. Update existing (id=existing_id) -> updated
+        # 2. Duplicate SKU without id (sku="SEED-INV-1") -> skipped
+        # 3. Invalid item (price="invalid") -> error
+        # 4. New valid item -> created
+        mixed_payload = {
+            "format": "technoreboot-products",
+            "version": 1,
+            "products": [
+                {"id": existing_id, "title": "Товар обновленный", "price": 1200.0},
+                {"sku": "SEED-INV-1", "title": "Товар дубликат", "price": 999.0},
+                {"title": "Товар с битой ценой", "price": "not_a_number"},
+                {"title": "Новый валидный товар", "price": 3000.0}
+            ]
+        }
+
+        res = client.post("/api/products/json/import", json=mixed_payload)
+        assert res.status_code == 200
+        data = res.json()
+
+        assert data["success"] is True
+        summary = data["summary"]
+        assert summary["total_in_payload"] == 4
+        assert summary["created"] == 1
+        assert summary["updated"] == 1
+        assert summary["skipped"] == 1
+        assert summary["errors"] == 1
+
+        # Strict invariant
+        assert summary["created"] + summary["updated"] + summary["skipped"] + summary["errors"] == 4
+        assert len(data["results"]) == 4
+
+        statuses = [r["status"] for r in data["results"]]
+        assert statuses == ["updated", "skipped", "error", "created"]
+
+
