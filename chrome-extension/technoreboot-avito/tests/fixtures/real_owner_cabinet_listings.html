@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мои объявления — Личный кабинет Avito</title>
+</head>
+<body class="page-profile-items">
+    <div id="app">
+        <header data-marker="header">
+            <nav>
+                <a href="/profile" data-marker="profile-link">Личный кабинет</a>
+            </nav>
+        </header>
+
+        <main class="profile-layout">
+            <div class="tabs-root" data-marker="profile-tabs">
+                <button data-marker="tab(active)" aria-selected="true" class="tab-active">Активные <span>4</span></button>
+                <button data-marker="tab(archive)" aria-selected="false">Архив <span>12</span></button>
+            </div>
+
+            <!-- Items container representing Owner cabinet -->
+            <div class="profile-items-list" data-marker="items-list">
+                
+                <!-- Card 1: Standard Cabinet Card with data-markers -->
+                <div class="profile-item-card" data-marker="item-root" data-item-id="8492019283">
+                    <div class="photo-col">
+                        <a href="/profile/item/8492019283" data-marker="item-photo-link">
+                            <img data-marker="item-photo" src="https://10.img.avito.st/image/1/1.xyz_photo1.jpg" alt="Видеокарта MSI GeForce RTX 3070 Gaming X Trio">
+                        </a>
+                    </div>
+                    <div class="info-col">
+                        <a href="/profile/item/8492019283" data-marker="item-title" class="title-link">
+                            Видеокарта MSI GeForce RTX 3070 Gaming X Trio
+                        </a>
+                        <div data-marker="item-price" class="price-value">34 000 ₽</div>
+                        <div data-marker="item-address" class="geo-info">Москва, м. Савёловская</div>
+                        <div class="status-badge" data-marker="item-status">Активно</div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Minimalist/obfuscated cabinet card relying on anchor fallback -->
+                <div class="styles-module-root-3kL9m snippet-wrapper" data-marker="item-8492019284">
+                    <div class="media-container">
+                        <a href="/moskva/tovary_dlya_kompyutera/materinskaya_plata_b550_aorus_pro_8492019284">
+                            <img src="https://20.img.avito.st/image/1/1.xyz_photo2.jpg" alt="Плата B550">
+                        </a>
+                    </div>
+                    <div class="content-container">
+                        <h3>
+                            <a href="/moskva/tovary_dlya_kompyutera/materinskaya_plata_b550_aorus_pro_8492019284" class="listing-link">
+                                Материнская плата Gigabyte B550 Aorus Pro AC
+                            </a>
+                        </h3>
+                        <span class="price-text">12 500 ₽</span>
+                        <p class="address-text">Москва, ул. Сущёвский Вал</p>
+                    </div>
+                </div>
+
+                <!-- Card 3: Card with duplicate anchors to same ID (photo, title, stats link) -->
+                <div class="card-item-container" data-marker="extended-item">
+                    <a href="/items/8492019285" class="thumb-link">
+                        <img src="https://30.img.avito.st/image/1/1.xyz_photo3.jpg">
+                    </a>
+                    <div class="details">
+                        <h4>
+                            <a href="/items/8492019285" title="Процессор AMD Ryzen 7 5700X AM4 OEM">
+                                Процессор AMD Ryzen 7 5700X AM4 OEM
+                            </a>
+                        </h4>
+                        <div class="price-block" data-marker="item-price" content="14500">14 500 ₽</div>
+                        <a href="/items/8492019285#stats" class="stats-link">Статистика просмотров</a>
+                    </div>
+                </div>
+
+                <!-- Card 4: Listing with MISSING price (price=None, must NOT drop item) -->
+                <div class="cabinet-item" data-marker="profile-item">
+                    <a href="/profile/items/8492019286" data-marker="item-title">
+                        Компьютерный корпус DeepCool CC560 (Без БП)
+                    </a>
+                    <span class="price-tag">Цена договорная</span>
+                    <span data-marker="item-address">Москва, Багратионовский проезд</span>
+                </div>
+
+            </div>
+
+            <!-- Real Pagination block -->
+            <nav class="pagination-wrapper" aria-label="Пагинация">
+                <span data-marker="pagination-button/current" class="pagination-item_active">1</span>
+                <a data-marker="page(2)" href="/profile/items?p=2" class="pagination-page">2</a>
+                <a data-marker="page(3)" href="/profile/items?p=3" class="pagination-page">3</a>
+                <a data-marker="pagination-button/next" href="/profile/items?p=2" class="pagination-item-next" aria-label="Следующая страница">След. →</a>
+            </nav>
+        </main>
+    </div>
+</body>
+</html>

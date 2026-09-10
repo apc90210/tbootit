@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.48)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.49)
 
 let pageInitialData = null;
 
@@ -48,20 +48,47 @@ try {
     triggerInitialDataCapture();
 } catch (e) {}
 
+function extractAvitoIdFromUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    const lower = url.toLowerCase();
+    // Exclude non-item URLs
+    if (lower.includes('/user/') && lower.includes('/profile') && !lower.includes('_') && !lower.includes('itemid=')) return null;
+    if (lower.includes('/rating') || lower.includes('/reviews') || lower.includes('/help') || lower.includes('/autoload') || lower.includes('/favorites') || lower.includes('/messenger')) return null;
+
+    // 1. Slug with underscore + digits (classic Avito SERP and profile link)
+    const slugMatch = url.match(/_(\d{8,14})(?:[/?#]|$)/);
+    if (slugMatch) return slugMatch[1];
+
+    // 2. Query param itemId or item_id
+    const queryMatch = url.match(/[?&]item_?id=(\d{8,14})/i);
+    if (queryMatch) return queryMatch[1];
+
+    // 3. /item/ or /items/ followed by digits
+    const itemMatch = url.match(/\/(?:item|items|obyavlenie)\/(\d{8,14})(?:[/?#]|$)/i);
+    if (itemMatch) return itemMatch[1];
+
+    // 4. Standalone /1234567890 (canonical short URL)
+    const shortMatch = url.match(/^(?:https?:\/\/[^\/]+)?\/(\d{8,14})(?:[/?#]|$)/);
+    if (shortMatch) return shortMatch[1];
+
+    return null;
+}
+
 function extractAvitoItemId(url, htmlContent) {
     if (!url) url = window.location.href;
-    const match = url.match(/_(\d+)(?:\?|$)/) || url.match(/\/(\d{8,14})(?:\?|$)/) || url.match(/itemId=(\d+)/i) || url.match(/item_id=(\d+)/i);
-    if (match) return match[1];
+    const fromUrl = extractAvitoIdFromUrl(url);
+    if (fromUrl) return fromUrl;
 
     try {
         const canonical = document.querySelector('link[rel="canonical"]');
         if (canonical && canonical.href) {
-            const canMatch = canonical.href.match(/_(\d+)(?:\?|$)/) || canonical.href.match(/\/(\d{8,14})(?:\?|$)/);
-            if (canMatch) return canMatch[1];
+            const canMatch = extractAvitoIdFromUrl(canonical.href);
+            if (canMatch) return canMatch;
         }
         const itemEl = document.querySelector('[data-item-id]');
         if (itemEl && itemEl.getAttribute('data-item-id')) {
-            return itemEl.getAttribute('data-item-id');
+            const dId = itemEl.getAttribute('data-item-id');
+            if (/^\d{8,14}$/.test(dId)) return dId;
         }
         const metaItem = document.querySelector('meta[name="item-id"], meta[property="al:ios:url"], meta[property="al:android:url"]');
         if (metaItem && metaItem.content) {
@@ -1847,7 +1874,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.48",
+            extension_version: "0.2.49",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1878,7 +1905,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.48",
+            extension_version: "0.2.49",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1894,6 +1921,145 @@ function extractListingData(extraPhotos = []) {
             }
         };
     }
+}
+
+function findCardContainerForAnchor(anchor) {
+    if (!anchor) return null;
+    let cur = anchor.parentElement;
+    let bestContainer = anchor.parentElement || anchor;
+    let depth = 0;
+    while (cur && cur !== document.body && cur !== document.documentElement && depth < 10) {
+        depth++;
+        const marker = cur.getAttribute('data-marker') || '';
+        const cls = cur.className || '';
+        const tag = cur.tagName.toLowerCase();
+
+        if (marker.includes('item') || marker.includes('snippet') || marker.includes('card') ||
+            cls.includes('item') || cls.includes('snippet') || cls.includes('card') || cls.includes('Snippet') ||
+            cls.includes('iva-item') || cls.includes('styles-root') ||
+            tag === 'article' || tag === 'li' || tag === 'tr') {
+            bestContainer = cur;
+            if (marker === 'item' || marker.startsWith('item-') || marker.includes('item-snippet') ||
+                marker === 'catalog-serp/item' || marker === 'item-root' || marker.startsWith('profile-item') ||
+                marker.startsWith('extended-item') || cls.includes('iva-item-root') || tag === 'article') {
+                return cur;
+            }
+        }
+        cur = cur.parentElement;
+    }
+    return bestContainer;
+}
+
+function parseListingCardElement(cardEl, fallbackAnchor = null) {
+    if (!cardEl && !fallbackAnchor) return null;
+    const container = cardEl || (fallbackAnchor ? (fallbackAnchor.parentElement || fallbackAnchor) : null);
+    if (!container) return null;
+
+    // 1. Link & Item ID
+    let linkEl = fallbackAnchor || container.querySelector(
+        'a[data-marker*="item-title"], a[data-marker*="title"], a[itemprop="url"], a[href*="_"], a[href*="/item/"], a[href*="/items/"], a[href*="itemId="], a'
+    );
+    let href = linkEl ? (linkEl.getAttribute('href') || '') : '';
+    let fullUrl = href ? (href.startsWith('http') ? href : ('https://www.avito.ru' + href)) : window.location.href;
+    let itemId = extractAvitoIdFromUrl(fullUrl);
+
+    if (!itemId && fallbackAnchor) {
+        href = fallbackAnchor.getAttribute('href') || '';
+        fullUrl = href.startsWith('http') ? href : ('https://www.avito.ru' + href);
+        itemId = extractAvitoIdFromUrl(fullUrl);
+    }
+
+    if (!itemId) {
+        const marker = container.getAttribute('data-marker') || '';
+        const markerMatch = marker.match(/\d{8,14}/);
+        if (markerMatch) itemId = markerMatch[0];
+        const dataId = container.getAttribute('data-item-id');
+        if (dataId && /^\d{8,14}$/.test(dataId)) itemId = dataId;
+    }
+
+    if (!itemId) return null;
+
+    // 2. Title
+    let title = null;
+    const titleEl = container.querySelector(
+        '[data-marker*="title"], [data-marker="item-name"], [itemprop="name"], .item-title-link, .title-root, h3, h4, [class*="title-"], [class*="Title-"], [class*="name-"]'
+    );
+    if (titleEl && titleEl.textContent.trim()) {
+        title = titleEl.textContent.trim();
+    } else if (linkEl && linkEl.getAttribute('title') && linkEl.getAttribute('title').trim()) {
+        title = linkEl.getAttribute('title').trim();
+    } else if (linkEl && linkEl.textContent.trim()) {
+        title = linkEl.textContent.trim();
+    } else if (linkEl && linkEl.getAttribute('aria-label') && linkEl.getAttribute('aria-label').trim()) {
+        title = linkEl.getAttribute('aria-label').trim();
+    } else {
+        title = `Объявление Avito ${itemId}`;
+    }
+
+    // 3. Price (missing price must not drop the listing)
+    let price = null;
+    const priceEl = container.querySelector(
+        '[data-marker*="price"], [itemprop="price"], meta[itemprop="price"], [class*="price-text"], [class*="Price-"], [class*="price-"], .price, .item-price, span[class*="price"]'
+    );
+    if (priceEl) {
+        const contentAttr = priceEl.getAttribute('content');
+        if (contentAttr && !isNaN(parseFloat(contentAttr))) {
+            price = parseFloat(contentAttr);
+        } else {
+            const digits = priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+            if (digits) price = parseFloat(digits);
+        }
+    }
+    if (price === null) {
+        const txt = container.textContent || '';
+        const m = txt.match(/(\d[\d\s]{0,10})\s*(?:₽|руб\.?|rub)/i);
+        if (m) {
+            const digits = m[1].replace(/\s+/g, '');
+            if (digits) price = parseFloat(digits);
+        }
+    }
+
+    // 4. Status
+    const cardText = container.textContent.toLowerCase();
+    let status = "active";
+    if (cardText.includes("завершено") || cardText.includes("архив") || cardText.includes("снято") ||
+        cardText.includes("черновик") || cardText.includes("отклонено") || cardText.includes("заблокировано") ||
+        cardText.includes("активировать") || cardText.includes("не активно") || cardText.includes("неактивно")) {
+        status = "inactive";
+    }
+
+    // 5. Location
+    let location = null;
+    const locEl = container.querySelector(
+        '[data-marker*="address"], [data-marker*="geo"], [data-marker*="location"], [data-marker="item-line"], .geo-root, [class*="geo-address"], [class*="address-"], [class*="location-"]'
+    );
+    if (locEl && locEl.textContent.trim()) {
+        location = locEl.textContent.trim();
+    }
+
+    // 6. Photo thumbnail
+    let photoUrl = null;
+    const photoEl = container.querySelector(
+        'img[data-marker*="photo"], img[data-marker*="image"], img[src*="img.avito.st"], img[data-src*="img.avito.st"], img[src*="avito"], img[class*="photo"], img[class*="image"], img[class*="picture"]'
+    );
+    if (photoEl) {
+        photoUrl = photoEl.getAttribute('src') || photoEl.getAttribute('data-src');
+        if (!photoUrl && photoEl.getAttribute('srcset')) {
+            photoUrl = photoEl.getAttribute('srcset').split(',')[0].trim().split(' ')[0];
+        }
+    }
+
+    return {
+        avito_id: itemId,
+        external_item_id: itemId,
+        url: fullUrl,
+        external_url: fullUrl,
+        title: title,
+        price: price,
+        status: status,
+        location: location,
+        photo_url: photoUrl
+    };
 }
 
 function extractPaginationInfo() {
@@ -1913,7 +2079,9 @@ function extractPaginationInfo() {
         } catch (e) {}
 
         // 2. DOM current page
-        const currentBtn = document.querySelector('[data-marker="pagination-button/current"], [aria-current="page"], .pagination-item_active, span[class*="active-"]');
+        const currentBtn = document.querySelector(
+            '[data-marker="pagination-button/current"], [data-marker*="page/current"], [aria-current="page"], .pagination-item_active, [class*="pagination-item-current"], [class*="pagination-page_current"], [class*="activePage"], button[aria-current="true"]'
+        );
         if (currentBtn && currentBtn.textContent.trim()) {
             const num = parseInt(currentBtn.textContent.trim());
             if (!isNaN(num) && num > 0) {
@@ -1922,7 +2090,9 @@ function extractPaginationInfo() {
         }
 
         // 3. DOM total pages
-        const pageBtns = document.querySelectorAll('[data-marker*="page("], [data-marker*="pagination-button/page"], nav[aria-label*="Пагинация"] a, .pagination-item a');
+        const pageBtns = document.querySelectorAll(
+            '[data-marker*="page("], [data-marker*="pagination-button/page"], nav[aria-label*="Пагинация"] a, nav[aria-label*="пагинация"] a, .pagination-item a, [class*="pagination"] button, [class*="pagination"] a'
+        );
         pageBtns.forEach(btn => {
             const txt = btn.textContent.trim();
             const num = parseInt(txt);
@@ -1935,7 +2105,9 @@ function extractPaginationInfo() {
         }
 
         // 4. Next button
-        const nextBtn = document.querySelector('[data-marker="pagination-button/next"], a[aria-label="Следующая страница"], .pagination-item-next a');
+        const nextBtn = document.querySelector(
+            '[data-marker="pagination-button/next"], [data-marker*="pagination-next"], [data-marker*="next-page"], a[aria-label*="Следующая"], button[aria-label*="Следующая"], a[title*="Следующая"], button[title*="Следующая"], .pagination-item-next a, .pagination-item-next button, a[rel="next"]'
+        );
         if (nextBtn) {
             const isDis = nextBtn.hasAttribute("disabled") || nextBtn.getAttribute("aria-disabled") === "true" || nextBtn.classList.contains("disabled");
             if (!isDis) {
@@ -1947,6 +2119,15 @@ function extractPaginationInfo() {
             }
         }
 
+        // 5. Load more button (infinite scroll / dynamic append)
+        const loadMoreBtn = document.querySelector(
+            '[data-marker*="load-more"], [data-marker*="more-button"], button[data-marker*="pagination-button/more"], button[class*="loadMore"], button[class*="more-button"]'
+        );
+        if (loadMoreBtn && !loadMoreBtn.disabled) {
+            hasNextPage = true;
+        }
+
+        // 6. Next URL fallback construction
         if (!nextUrl && (hasNextPage || totalPages > currentPage)) {
             try {
                 const u = new URL(window.location.href);
@@ -1976,59 +2157,51 @@ function extractMyListingsData() {
     try {
         const items = [];
         const seenIds = new Set();
-        const itemEls = document.querySelectorAll(
-            '[data-marker="item"], [data-marker="item-snippet"], [data-marker="catalog-serp/item"], .styles-root-item, .item-snippet, .iva-item-root, .items-item, article[class*="snippet"]'
-        );
 
+        // Primary Layer 1: Container cards (broad selector matching cabinet and public profiles)
+        const cardSelectors = [
+            '[data-marker="item"]',
+            '[data-marker^="item-"]',
+            '[data-marker="item-root"]',
+            '[data-marker="item-snippet"]',
+            '[data-marker^="item-snippet"]',
+            '[data-marker="catalog-serp/item"]',
+            '[data-marker^="profile-item"]',
+            '[data-marker^="extended-item"]',
+            '[data-marker="profile/item"]',
+            '[data-marker*="snippet"]',
+            '[data-item-id]',
+            'div[class*="item-snippet"]',
+            'div[class*="ItemSnippet"]',
+            'div[class*="snippet-"]',
+            'div[class*="Snippet-"]',
+            'div[class*="styles-root-"]',
+            'div[class*="styles-module-root-"]',
+            '.iva-item-root',
+            '.items-item',
+            'article'
+        ].join(', ');
+
+        const itemEls = document.querySelectorAll(cardSelectors);
         itemEls.forEach(el => {
-            const titleEl = el.querySelector('[data-marker="item-title"], [itemprop="name"], .item-title-link, .title-root, h3, a[title]');
-            const linkEl = el.querySelector('a[data-marker="item-title"], a[itemprop="url"], a[href*="/item/"], a[href*="/catalog/"], a[href*="/"]');
-            const priceEl = el.querySelector('[data-marker="item-price"], [itemprop="price"], meta[itemprop="price"], [class*="price-text"], .price, .item-price');
-            const locEl = el.querySelector('[data-marker="item-address"], .geo-root, [class*="geo-address"], [class*="address-"], [data-marker="item-line"]');
-            const photoEl = el.querySelector('img[data-marker="item-photo"], img[src*="img.avito.st"], img[class*="photo"], img[class*="image"]');
+            const parsed = parseListingCardElement(el);
+            if (parsed && parsed.avito_id && !seenIds.has(parsed.avito_id)) {
+                seenIds.add(parsed.avito_id);
+                items.push(parsed);
+            }
+        });
 
-            if (linkEl) {
-                const href = linkEl.getAttribute('href') || '';
-                const fullUrl = href.startsWith('http') ? href : ('https://www.avito.ru' + href);
-                const itemId = extractAvitoItemId(fullUrl, el.innerHTML);
-
-                if (itemId && !seenIds.has(itemId)) {
-                    seenIds.add(itemId);
-                    let title = titleEl ? titleEl.textContent.trim() : (linkEl.getAttribute('title') || `Объявление Avito ${itemId}`);
-                    let price = null;
-                    if (priceEl) {
-                        const contentAttr = priceEl.getAttribute('content');
-                        if (contentAttr && !isNaN(parseFloat(contentAttr))) {
-                            price = parseFloat(contentAttr);
-                        } else {
-                            const digits = priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '');
-                            if (digits) price = parseFloat(digits);
-                        }
-                    }
-
-                    const cardText = el.textContent.toLowerCase();
-                    let status = "active";
-                    if (cardText.includes("завершено") || cardText.includes("архив") || cardText.includes("снято")) {
-                        status = "inactive";
-                    }
-
-                    let location = locEl ? locEl.textContent.trim() : null;
-                    let photoUrl = null;
-                    if (photoEl) {
-                        photoUrl = photoEl.getAttribute('src') || photoEl.getAttribute('data-src');
-                    }
-
-                    items.push({
-                        avito_id: itemId,
-                        external_item_id: itemId,
-                        url: fullUrl,
-                        external_url: fullUrl,
-                        title: title,
-                        price: price,
-                        status: status,
-                        location: location,
-                        photo_url: photoUrl
-                    });
+        // Layer 2: Anchor fallback scan (scans ALL anchors with Avito listing URLs inside content area)
+        const anchors = document.querySelectorAll('a[href]');
+        anchors.forEach(a => {
+            const href = a.getAttribute('href') || '';
+            const itemId = extractAvitoIdFromUrl(href);
+            if (itemId && !seenIds.has(itemId)) {
+                const container = findCardContainerForAnchor(a);
+                const parsed = parseListingCardElement(container, a);
+                if (parsed && parsed.avito_id && !seenIds.has(parsed.avito_id)) {
+                    seenIds.add(parsed.avito_id);
+                    items.push(parsed);
                 }
             }
         });
@@ -2037,7 +2210,7 @@ function extractMyListingsData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.48",
+            extension_version: "0.2.49",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -2047,7 +2220,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.48",
+            extension_version: "0.2.49",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -2055,6 +2228,128 @@ function extractMyListingsData() {
             items: []
         };
     }
+}
+
+function extractMyListingsDataAsync(maxWaitMs = 10000) {
+    return new Promise(resolve => {
+        const initial = extractMyListingsData();
+        if (initial && initial.items && initial.items.length > 0) {
+            return resolve(initial);
+        }
+
+        const startTime = Date.now();
+        const interval = 250;
+        let observer = null;
+        let done = false;
+
+        function finish(res) {
+            if (done) return;
+            done = true;
+            if (observer) {
+                try { observer.disconnect(); } catch (e) {}
+            }
+            resolve(res);
+        }
+
+        function check() {
+            if (done) return;
+            const current = extractMyListingsData();
+            if (current && current.items && current.items.length > 0) {
+                return finish(current);
+            }
+            if (Date.now() - startTime >= maxWaitMs) {
+                return finish(current);
+            }
+            setTimeout(check, interval);
+        }
+
+        try {
+            observer = new MutationObserver(() => {
+                if (done) return;
+                const current = extractMyListingsData();
+                if (current && current.items && current.items.length > 0) {
+                    finish(current);
+                }
+            });
+            observer.observe(document.body || document.documentElement, {
+                childList: true,
+                subtree: true
+            });
+        } catch (e) {}
+
+        setTimeout(check, interval);
+    });
+}
+
+function hasAnyListingsCardOrAnchor() {
+    try {
+        const cardSelectors = [
+            '[data-marker="item"]',
+            '[data-marker^="item-"]',
+            '[data-marker="item-root"]',
+            '[data-marker="item-snippet"]',
+            '[data-marker^="item-snippet"]',
+            '[data-marker="catalog-serp/item"]',
+            '[data-marker^="profile-item"]',
+            '[data-marker^="extended-item"]',
+            '[data-marker="profile/item"]',
+            '[data-marker*="snippet"]',
+            '[data-item-id]',
+            'div[class*="item-snippet"]',
+            'div[class*="ItemSnippet"]',
+            'div[class*="snippet-"]',
+            'div[class*="Snippet-"]',
+            'div[class*="styles-root-"]',
+            '.iva-item-root',
+            '.items-item',
+            'article'
+        ].join(', ');
+        const card = document.querySelector(cardSelectors);
+        if (card) return true;
+
+        const anchors = document.querySelectorAll('a[href]');
+        for (const a of anchors) {
+            if (extractAvitoIdFromUrl(a.getAttribute('href'))) return true;
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
+function detectPageType() {
+    const url = window.location.href;
+    const lower = url.toLowerCase();
+
+    // 1. Definite Profile / Cabinet listings URLs
+    if (lower.includes('/profile') || lower.includes('/my/items') || lower.includes('/user/') || lower.includes('sellerid=') || lower.includes('/cabinet')) {
+        return "my_listings";
+    }
+
+    // 2. Definite Single Item View DOM marker
+    const isSingleItemMarker = !!document.querySelector(
+        '[data-marker="item-view/title-info"], [data-marker="item-view/item-description"], [data-marker="item-view/item-price"], [data-marker="item-view/header"]'
+    );
+    if (isSingleItemMarker) {
+        return "listing";
+    }
+
+    // 3. Single Item URL pattern: e.g. /item/12345 or /moskva/..._1234567890
+    const isSingleItemUrl = /_(\d{8,14})(?:[/?#]|$)/.test(url) || /\/(?:item|items)\/(\d{8,14})(?:[/?#]|$)/.test(url);
+    if (isSingleItemUrl) {
+        return "listing";
+    }
+
+    // 4. Catalog / SERP listings page
+    const itemCardCount = document.querySelectorAll(
+        '[data-marker="catalog-serp/item"], [data-marker="item"], [data-marker="item-snippet"], .iva-item-root'
+    ).length;
+    if (itemCardCount >= 2) {
+        return "my_listings";
+    }
+
+    // Default to single listing if ambiguous
+    return "listing";
 }
 
 async function fetchImageBase64(url) {
@@ -3610,17 +3905,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.action === "extract_current_page") {
         try {
-            const url = window.location.href;
-            const isSingleItemView = !!document.querySelector('[data-marker="item-view/title-info"], [data-marker="item-view/item-description"], [data-marker="item-view/item-price"]');
-            const isProfileUrl = url.includes('/profile') || url.includes('/my/items') || url.includes('/user/') || url.includes('sellerId=');
-            const itemEls = document.querySelectorAll(
-                '[data-marker="item"], [data-marker="item-snippet"], [data-marker="catalog-serp/item"], .styles-root-item, .item-snippet, .iva-item-root, .items-item, article[class*="snippet"]'
-            );
+            const pageType = detectPageType();
 
-            if (!isSingleItemView && (isProfileUrl || itemEls.length >= 2)) {
-                sendResponse(extractMyListingsData());
-            } else if (isProfileUrl && itemEls.length > 0) {
-                sendResponse(extractMyListingsData());
+            if (pageType === "my_listings") {
+                extractMyListingsDataAsync(request.maxWaitMs || 10000)
+                    .then(data => sendResponse(data || extractMyListingsData()))
+                    .catch(() => sendResponse(extractMyListingsData()));
+                return true; // Keep message channel open for async response
             } else if (request.deepScan) {
                 extractListingDataMultiPass()
                     .then(data => sendResponse(data || extractListingData()))
@@ -3635,7 +3926,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.48",
+                    extension_version: "0.2.49",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -3648,6 +3939,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             }
         }
+        return true;
     } else if (request.action === "get_photo_diagnostics") {
         sendResponse(getPhotoExtractionDiagnostics());
         return true;

@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.48";
+        let manifestVer = "0.2.49";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -245,7 +245,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         const pagination = initialResponse.pagination || { current_page: 1, total_pages: 1, has_next_page: false };
 
         bulkTitle.textContent = "Список объявлений Avito";
-        bulkDetectInfo.innerHTML = `Найдено объявлений на странице: <strong>${items.length}</strong><br>Страница: <strong>${pagination.current_page || 1}</strong> из <strong>${pagination.total_pages || 1}</strong>`;
+
+        if (items.length === 0) {
+            bulkDetectInfo.innerHTML = `Найдено объявлений на странице: <strong>0</strong><br><span style="color: #d32f2f;">Объявления не найдены. Проверьте, что список объявлений загрузился полностью.</span> <a href="#" id="bulkRescanBtn" style="font-size: 11px; text-decoration: underline; color: #1976d2; margin-left: 4px;">Повторить поиск</a>`;
+        } else {
+            bulkDetectInfo.innerHTML = `Найдено объявлений на странице: <strong>${items.length}</strong><br>Страница: <strong>${pagination.current_page || 1}</strong> из <strong>${pagination.total_pages || 1}</strong>`;
+        }
+
+        const rescanBtn = document.getElementById("bulkRescanBtn");
+        if (rescanBtn) {
+            rescanBtn.onclick = (e) => {
+                e.preventDefault();
+                bulkDetectInfo.innerHTML = `Поиск объявлений на странице (ожидание загрузки)...`;
+                inspectActiveTab();
+            };
+        }
 
         bulkTotalPages.textContent = pagination.total_pages || 1;
         bulkFoundCount.textContent = items.length;
@@ -268,9 +282,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        bulkImportAllBtn.disabled = false;
-        bulkImportCurrentBtn.disabled = false;
-        bulkMsg.textContent = "";
+        if (items.length === 0) {
+            bulkImportAllBtn.disabled = true;
+            bulkImportCurrentBtn.disabled = true;
+            bulkMsg.className = "msg msg-warning";
+            bulkMsg.textContent = "Объявления не найдены. Проверьте, что список объявлений загрузился полностью.";
+        } else {
+            bulkImportAllBtn.disabled = false;
+            bulkImportCurrentBtn.disabled = false;
+            bulkMsg.textContent = "";
+        }
 
         let cancelRequested = false;
 
@@ -322,10 +343,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page" }, async freshResp => {
                 const curItems = (freshResp && freshResp.items) || items || [];
                 if (!curItems.length) {
-                    bulkImportAllBtn.disabled = false;
-                    bulkImportCurrentBtn.disabled = false;
-                    bulkMsg.className = "msg msg-error";
-                    bulkMsg.textContent = "Объявления не найдены на текущей странице.";
+                    bulkImportAllBtn.disabled = true;
+                    bulkImportCurrentBtn.disabled = true;
+                    bulkMsg.className = "msg msg-warning";
+                    bulkMsg.textContent = "Объявления не найдены на текущей странице. Проверьте, что список объявлений загрузился полностью.";
                     return;
                 }
 
@@ -471,6 +492,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (cancelRequested) {
                     bulkMsg.className = "msg msg-warning";
                     bulkMsg.innerHTML = `⚠️ Импорт остановлен пользователем.<br>Обработано страниц: <strong>${pagesCount}</strong>, объявлений: <strong>${totalProcessed}</strong> (создано: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>).`;
+                } else if (totalProcessed === 0) {
+                    bulkMsg.className = "msg msg-warning";
+                    bulkMsg.innerHTML = `⚠️ Объявления не найдены.<br>Проверьте, что список объявлений загрузился полностью.<br>Страниц обработано: <strong>${pagesCount}</strong>, объявлений: <strong>0</strong>.`;
                 } else {
                     bulkMsg.className = "msg msg-success";
                     bulkMsg.innerHTML = `✓ Импорт успешно завершен!<br>Страниц обработано: <strong>${pagesCount}</strong>, объявлений: <strong>${totalProcessed}</strong><br>Создано новых: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>, ошибок: <strong>${allErrors.length}</strong>`;
@@ -814,7 +838,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             // 3. CONTEXT C: Avito Pages (Listings / Single Ad)
             if (isAvitoHost) {
+                actionSection.style.display = "block";
+                pageDetectInfo.innerHTML = "Сканирование страницы Avito... <span style='font-size:11px;color:#888;'>(ожидание карточек)</span>";
+                sendBtn.disabled = true;
+
                 sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
+                    actionSection.style.display = "none";
                     if (!response) {
                         actionSection.style.display = "block";
                         pageDetectInfo.textContent = "Обновите страницу Avito (F5) для активации расширения.";

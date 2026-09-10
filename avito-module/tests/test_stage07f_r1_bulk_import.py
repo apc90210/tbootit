@@ -163,7 +163,7 @@ async def test_55_item_fixture_scenario_bulk_dedup_and_enrichment():
     # Step 3: Later, Owner opens ad_017 and clicks 'Доимпортировать данные'
     item_17_payload = {
         "schema_version": 1,
-        "extension_version": "0.2.48",
+        "extension_version": "0.2.49",
         "captured_at": "2026-09-10T12:00:00Z",
         "page_type": "listing",
         "listing": {
@@ -173,13 +173,14 @@ async def test_55_item_fixture_scenario_bulk_dedup_and_enrichment():
             "price": 2700,
             "description": "Подробное описание товара после обогащения карточки.",
             "characteristics": {
+                "Категория": "Комплектующие",
                 "Процессор": "Intel Core i5-12400F",
-                "Сокет": "LGA1700",
-                "Количество ядер": "6"
+                "Память": "16GB DDR4",
+                "Состояние": "Б/у"
             },
             "photos": [
-                "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBD...",
-                "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBD..."
+                {"url": "https://img.avito.st/image/1/enriched_photo1.jpg"},
+                {"url": "https://img.avito.st/image/1/enriched_photo2.jpg"}
             ]
         }
     }
@@ -197,6 +198,7 @@ async def test_55_item_fixture_scenario_bulk_dedup_and_enrichment():
         assert res_enrich.status_code == 200
         assert res_enrich.json()["status"] == "success"
         assert res_enrich.json()["product_id"] == 217
+
         from app import storage
         called_ext_id = mock_core_import.call_args[0][0]
         assert called_ext_id == "ad_017"
@@ -208,7 +210,7 @@ async def test_55_item_fixture_scenario_bulk_dedup_and_enrichment():
 
 
 def test_extension_package_version_and_elements():
-    """Verify Chrome extension package files match Stage 07F-R1 requirements."""
+    """Verify Chrome extension package files match Stage 07F-R1-R1 requirements."""
     ext_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito"))
     
     # 1. manifest.json
@@ -216,7 +218,7 @@ def test_extension_package_version_and_elements():
     assert os.path.exists(manifest_path)
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest.get("version") == "0.2.48"
+    assert manifest.get("version") == "0.2.49"
     assert "tabs" in manifest.get("permissions", [])
 
     # 2. popup.html elements
@@ -238,7 +240,7 @@ def test_extension_package_version_and_elements():
         sw_content = f.read()
     assert "bulk_import_batch" in sw_content
     assert "sendBulkImportPayload" in sw_content
-    assert "0.2.48" in sw_content
+    assert "0.2.49" in sw_content
 
     # 4. content.js
     content_path = os.path.join(ext_dir, "content.js")
@@ -247,4 +249,4 @@ def test_extension_package_version_and_elements():
         content_js = f.read()
     assert "extractMyListingsData" in content_js
     assert "extractPaginationInfo" in content_js
-    assert "0.2.48" in content_js
+    assert "0.2.49" in content_js
