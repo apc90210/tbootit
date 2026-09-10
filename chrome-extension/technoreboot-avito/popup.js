@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.49";
+        let manifestVer = "0.2.50";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -295,13 +295,75 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         let cancelRequested = false;
 
-        function sendBulkBatch(batchItems) {
+        function sanitizeErrorMessage(err) {
+            if (!err) return "Неизвестная ошибка";
+            if (typeof err === "object") {
+                if (err.error) return sanitizeErrorMessage(err.error);
+                if (err.message) return sanitizeErrorMessage(err.message);
+                return JSON.stringify(err);
+            }
+            let s = String(err);
+            if (s.includes("Field required") && s.includes("body")) {
+                return "Ошибка отправки данных в Техноребут: сервер не получил пакет объявлений.";
+            }
+            s = s.replace(/https?:\/\/errors\.pydantic\.dev[^\s"']+/gi, '').trim();
+            return s;
+        }
+
+        async function saveBulkSessionState(state) {
+            try {
+                const storageArea = (chrome.storage && chrome.storage.session) ? chrome.storage.session : chrome.storage.local;
+                if (storageArea) {
+                    await new Promise(r => storageArea.set({ bulk_import_session: state }, r));
+                }
+            } catch (e) {}
+        }
+
+        async function getBulkSessionState() {
+            try {
+                const storageArea = (chrome.storage && chrome.storage.session) ? chrome.storage.session : chrome.storage.local;
+                if (storageArea) {
+                    return new Promise(resolve => {
+                        storageArea.get(["bulk_import_session"], res => resolve(res ? res.bulk_import_session : null));
+                    });
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        // Canonical batch submission helper for both current-page and multi-page flows
+        async function sendBulkBatch(batchItems) {
+            if (!Array.isArray(batchItems)) {
+                batchItems = batchItems ? [batchItems] : [];
+            }
+            const payload = {
+                schema_version: 1,
+                extension_version: "0.2.50",
+                captured_at: new Date().toISOString(),
+                page_type: "bulk_import",
+                listings_count: batchItems.length,
+                items: batchItems
+            };
+
             return new Promise(resolve => {
                 chrome.runtime.sendMessage({
                     action: "bulk_import_batch",
+                    payload: payload,
                     items: batchItems
                 }, res => {
-                    resolve(res || { success: false, message: "Нет ответа от background worker" });
+                    if (!res) {
+                        resolve({
+                            success: false,
+                            message: "Нет ответа от background worker",
+                            error_count: batchItems.length,
+                            errors: batchItems.map(it => ({
+                                avito_id: it.avito_id,
+                                error: "Нет ответа от background worker"
+                            }))
+                        });
+                    } else {
+                        resolve(res);
+                    }
                 });
             });
         }
@@ -331,6 +393,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
 
+        // 1. Current Page Import
         bulkImportCurrentBtn.onclick = async () => {
             if (!isPaired) return;
             bulkImportAllBtn.disabled = true;
@@ -340,11 +403,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             bulkMsg.className = "msg";
             bulkMsg.textContent = "Сбор данных и отправка в Техноребут...";
 
-            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page" }, async freshResp => {
+            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", maxWaitMs: 10000 }, async freshResp => {
                 const curItems = (freshResp && freshResp.items) || items || [];
                 if (!curItems.length) {
-                    bulkImportAllBtn.disabled = true;
-                    bulkImportCurrentBtn.disabled = true;
+                    bulkImportAllBtn.disabled = false;
+                    bulkImportCurrentBtn.disabled = false;
                     bulkMsg.className = "msg msg-warning";
                     bulkMsg.textContent = "Объявления не найдены на текущей странице. Проверьте, что список объявлений загрузился полностью.";
                     return;
@@ -356,31 +419,60 @@ document.addEventListener("DOMContentLoaded", async () => {
                 bulkImportCurrentBtn.disabled = false;
 
                 if (res && res.success) {
-                    bulkProcessedCount.textContent = res.total || curItems.length;
-                    bulkCreatedCount.textContent = res.created || 0;
-                    bulkUpdatedCount.textContent = res.updated || 0;
-                    bulkSkippedCount.textContent = res.skipped || 0;
-                    const errCount = (res.errors && res.errors.length) || 0;
+                    const created = res.created || 0;
+                    const updated = res.updated || 0;
+                    const skipped = res.skipped || 0;
+                    const errList = Array.isArray(res.errors) ? res.errors : [];
+                    const errCount = res.error_count != null ? res.error_count : errList.length;
+
+                    bulkProcessedCount.textContent = (created + updated + skipped);
+                    bulkCreatedCount.textContent = created;
+                    bulkUpdatedCount.textContent = updated;
+                    bulkSkippedCount.textContent = skipped;
                     bulkErrorsCount.textContent = errCount;
 
-                    bulkMsg.className = "msg msg-success";
-                    bulkMsg.innerHTML = `✓ Текущая страница импортирована!<br>Создано: <strong>${res.created || 0}</strong>, обновлено: <strong>${res.updated || 0}</strong>, ошибок: <strong>${errCount}</strong>`;
+                    if (errCount === 0 && (created + updated + skipped) > 0) {
+                        bulkMsg.className = "msg msg-success";
+                        bulkMsg.innerHTML = `✓ Текущая страница импортирована!<br>Отправлено: <strong>${curItems.length}</strong>, создано: <strong>${created}</strong>, обновлено: <strong>${updated}</strong>, пропущено: <strong>${skipped}</strong>`;
+                    } else if (errCount > 0) {
+                        bulkMsg.className = "msg msg-warning";
+                        bulkMsg.innerHTML = `⚠️ Текущая страница импортирована с ошибками.<br>Отправлено: <strong>${curItems.length}</strong>, создано: <strong>${created}</strong>, обновлено: <strong>${updated}</strong>, ошибок: <strong>${errCount}</strong>`;
+                    } else {
+                        bulkMsg.className = "msg msg-warning";
+                        bulkMsg.innerHTML = `⚠️ Ни одно объявление не было сохранено.`;
+                    }
 
-                    if (errCount > 0) {
+                    if (errCount > 0 && errList.length > 0) {
                         toggleBulkErrorsBtn.style.display = "inline-block";
-                        bulkErrorDetails.innerHTML = res.errors.slice(0, 10).map(e => `<div>${e.avito_id || ''}: ${e.error || JSON.stringify(e)}</div>`).join("");
+                        bulkErrorDetails.innerHTML = errList.slice(0, 10).map(e => `<div>${e.avito_id ? 'Объявление ' + e.avito_id + ': ' : ''}${sanitizeErrorMessage(e.error || e)}</div>`).join("");
                         toggleBulkErrorsBtn.onclick = () => {
                             bulkErrorDetails.style.display = bulkErrorDetails.style.display === "none" ? "block" : "none";
                             toggleBulkErrorsBtn.textContent = bulkErrorDetails.style.display === "none" ? "Показать ошибки..." : "Скрыть ошибки";
                         };
                     }
                 } else {
+                    // Full batch failure
+                    const errMsg = sanitizeErrorMessage((res && res.message) || "Ошибка отправки пакета");
+                    bulkProcessedCount.textContent = "0";
+                    bulkCreatedCount.textContent = "0";
+                    bulkUpdatedCount.textContent = "0";
+                    bulkSkippedCount.textContent = "0";
+                    bulkErrorsCount.textContent = curItems.length;
+
                     bulkMsg.className = "msg msg-error";
-                    bulkMsg.textContent = (res && res.message) || "Ошибка отправки пакета.";
+                    bulkMsg.innerHTML = `✕ Страница не импортирована:<br>${errMsg}`;
+
+                    toggleBulkErrorsBtn.style.display = "inline-block";
+                    bulkErrorDetails.innerHTML = `<div>Ошибка пакета (HTTP 422/сеть): ${errMsg}</div>`;
+                    toggleBulkErrorsBtn.onclick = () => {
+                        bulkErrorDetails.style.display = bulkErrorDetails.style.display === "none" ? "block" : "none";
+                        toggleBulkErrorsBtn.textContent = bulkErrorDetails.style.display === "none" ? "Показать ошибки..." : "Скрыть ошибки";
+                    };
                 }
             });
         };
 
+        // 2. All Pages Import
         bulkImportAllBtn.onclick = async () => {
             if (!isPaired) return;
             cancelRequested = false;
@@ -402,7 +494,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 bulkMsg.textContent = "Завершение текущей страницы и остановка...";
             };
 
-            let totalProcessed = 0;
             let totalCreated = 0;
             let totalUpdated = 0;
             let totalSkipped = 0;
@@ -411,22 +502,38 @@ document.addEventListener("DOMContentLoaded", async () => {
             const visitedUrls = new Set();
             const MAX_PAGES = 50;
             let pagesCount = 0;
+            let totalPagesReported = pagination.total_pages || 1;
+            let fatalBatchError = false;
+            let fatalBatchMessage = "";
 
             try {
                 while (pagesCount < MAX_PAGES && !cancelRequested) {
                     pagesCount++;
                     bulkProgressHeader.textContent = `Обработка страницы ${pagesCount}...`;
 
-                    const pageData = await new Promise(res => {
-                        sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page" }, resp => res(resp));
-                    });
+                    // Multi-attempt extraction to tolerate dynamic React rendering on navigated page
+                    let pageData = null;
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        pageData = await new Promise(res => {
+                            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", maxWaitMs: 12000 }, resp => res(resp));
+                        });
+                        if (pageData && pageData.items && pageData.items.length > 0) {
+                            break;
+                        }
+                        if (attempt < 2) {
+                            await new Promise(r => setTimeout(r, 1000));
+                        }
+                    }
 
                     if (!pageData || !pageData.items || pageData.items.length === 0) {
                         break;
                     }
 
                     const pagePagination = pageData.pagination || {};
-                    bulkTotalPages.textContent = pagePagination.total_pages || pagesCount;
+                    if (pagePagination.total_pages && pagePagination.total_pages > totalPagesReported) {
+                        totalPagesReported = pagePagination.total_pages;
+                    }
+                    bulkTotalPages.textContent = totalPagesReported || pagesCount;
 
                     const newItems = [];
                     for (const it of pageData.items) {
@@ -446,20 +553,49 @@ document.addEventListener("DOMContentLoaded", async () => {
                             totalSkipped += (batchRes.skipped || 0);
                             if (batchRes.errors && batchRes.errors.length) {
                                 allErrors = allErrors.concat(batchRes.errors);
+                            } else if (batchRes.error_count && batchRes.error_count > 0) {
+                                allErrors.push({ page: pagesCount, error: `Ошибок в пакете: ${batchRes.error_count}` });
                             }
                         } else {
-                            allErrors.push({ page: pagesCount, error: (batchRes && batchRes.message) || "Ошибка отправки" });
+                            fatalBatchError = true;
+                            fatalBatchMessage = sanitizeErrorMessage((batchRes && batchRes.message) || "Ошибка отправки пакета");
+                            for (const it of newItems) {
+                                allErrors.push({
+                                    page: pagesCount,
+                                    avito_id: it.avito_id,
+                                    error: fatalBatchMessage
+                                });
+                            }
+                            break;
                         }
                     }
 
-                    totalProcessed = seenAvitoIds.size;
-                    bulkProcessedCount.textContent = totalProcessed;
+                    // Accounting invariant:
+                    // totalCreated + totalUpdated + totalSkipped + allErrors.length == seenAvitoIds.size
+                    const totalProcessedSuccess = totalCreated + totalUpdated + totalSkipped;
+                    bulkProcessedCount.textContent = totalProcessedSuccess;
                     bulkCreatedCount.textContent = totalCreated;
                     bulkUpdatedCount.textContent = totalUpdated;
                     bulkSkippedCount.textContent = totalSkipped;
                     bulkErrorsCount.textContent = allErrors.length;
 
-                    if (cancelRequested) break;
+                    // Persist session state across tab navigation
+                    await saveBulkSessionState({
+                        in_progress: true,
+                        currentPage: pagesCount,
+                        totalPages: totalPagesReported,
+                        totalUniqueSubmitted: seenAvitoIds.size,
+                        totalCreated: totalCreated,
+                        totalUpdated: totalUpdated,
+                        totalSkipped: totalSkipped,
+                        totalErrors: allErrors.length,
+                        allErrors: allErrors,
+                        seenAvitoIds: Array.from(seenAvitoIds),
+                        visitedUrls: Array.from(visitedUrls),
+                        lastUpdated: Date.now()
+                    });
+
+                    if (cancelRequested || fatalBatchError) break;
 
                     if (!pagePagination.has_next_page || !pagePagination.next_page_url) {
                         break;
@@ -489,20 +625,50 @@ document.addEventListener("DOMContentLoaded", async () => {
                 bulkImportAllBtn.disabled = false;
                 bulkImportCurrentBtn.disabled = false;
 
+                const totalProcessed = totalCreated + totalUpdated + totalSkipped;
+                bulkProcessedCount.textContent = totalProcessed;
+                bulkCreatedCount.textContent = totalCreated;
+                bulkUpdatedCount.textContent = totalUpdated;
+                bulkSkippedCount.textContent = totalSkipped;
+                bulkErrorsCount.textContent = allErrors.length;
+
+                // Save final session state
+                await saveBulkSessionState({
+                    in_progress: false,
+                    completed: true,
+                    currentPage: pagesCount,
+                    totalPages: totalPagesReported,
+                    totalUniqueSubmitted: seenAvitoIds.size,
+                    totalCreated: totalCreated,
+                    totalUpdated: totalUpdated,
+                    totalSkipped: totalSkipped,
+                    totalErrors: allErrors.length,
+                    allErrors: allErrors,
+                    seenAvitoIds: Array.from(seenAvitoIds),
+                    visitedUrls: Array.from(visitedUrls),
+                    lastUpdated: Date.now()
+                });
+
                 if (cancelRequested) {
                     bulkMsg.className = "msg msg-warning";
-                    bulkMsg.innerHTML = `⚠️ Импорт остановлен пользователем.<br>Обработано страниц: <strong>${pagesCount}</strong>, объявлений: <strong>${totalProcessed}</strong> (создано: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>).`;
-                } else if (totalProcessed === 0) {
+                    bulkMsg.innerHTML = `⚠️ Импорт остановлен пользователем.<br>Страниц обработано: <strong>${pagesCount}</strong>, создано: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>, ошибок: <strong>${allErrors.length}</strong>.`;
+                } else if (fatalBatchError) {
+                    bulkMsg.className = "msg msg-error";
+                    bulkMsg.innerHTML = `✕ Импорт остановлен из-за ошибки.<br>Страница ${pagesCount} не импортирована:<br>${fatalBatchMessage}`;
+                } else if (totalProcessed === 0 || seenAvitoIds.size === 0) {
                     bulkMsg.className = "msg msg-warning";
                     bulkMsg.innerHTML = `⚠️ Объявления не найдены.<br>Проверьте, что список объявлений загрузился полностью.<br>Страниц обработано: <strong>${pagesCount}</strong>, объявлений: <strong>0</strong>.`;
+                } else if (allErrors.length > 0) {
+                    bulkMsg.className = "msg msg-warning";
+                    bulkMsg.innerHTML = `⚠️ Импорт завершён с ошибками.<br>Страниц обработано: <strong>${pagesCount}</strong> из <strong>${totalPagesReported || pagesCount}</strong><br>Создано: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>, ошибок: <strong>${allErrors.length}</strong>`;
                 } else {
                     bulkMsg.className = "msg msg-success";
-                    bulkMsg.innerHTML = `✓ Импорт успешно завершен!<br>Страниц обработано: <strong>${pagesCount}</strong>, объявлений: <strong>${totalProcessed}</strong><br>Создано новых: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>, ошибок: <strong>${allErrors.length}</strong>`;
+                    bulkMsg.innerHTML = `✓ Импорт успешно завершен!<br>Страниц обработано: <strong>${pagesCount}</strong> из <strong>${totalPagesReported || pagesCount}</strong>, объявлений: <strong>${seenAvitoIds.size}</strong><br>Создано новых: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>, ошибок: <strong>0</strong>`;
                 }
 
                 if (allErrors.length > 0) {
                     toggleBulkErrorsBtn.style.display = "inline-block";
-                    bulkErrorDetails.innerHTML = allErrors.slice(0, 10).map(e => `<div>${e.avito_id || e.page || ''}: ${e.error || JSON.stringify(e)}</div>`).join("");
+                    bulkErrorDetails.innerHTML = allErrors.slice(0, 10).map(e => `<div>${e.avito_id ? 'Объявление ' + e.avito_id + ': ' : (e.page ? 'Страница ' + e.page + ': ' : '')}${sanitizeErrorMessage(e.error || e)}</div>`).join("");
                     toggleBulkErrorsBtn.onclick = () => {
                         bulkErrorDetails.style.display = bulkErrorDetails.style.display === "none" ? "block" : "none";
                         toggleBulkErrorsBtn.textContent = bulkErrorDetails.style.display === "none" ? "Показать ошибки..." : "Скрыть ошибки";

@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.49)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.50)
 
 const BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -44,22 +44,50 @@ async function parseJsonResponseSafely(res) {
         }
     } else {
         // Non-2xx HTTP status
+        if (res.status === 422) {
+            let isMissingBody = false;
+            let pydanticDetail = "";
+            if (data && Array.isArray(data.detail)) {
+                isMissingBody = data.detail.some(e => Array.isArray(e.loc) && e.loc.includes("body"));
+                pydanticDetail = data.detail.map(e => `${(e.loc || []).join('.')}: ${e.msg || 'Поле обязательно'}`).join("; ");
+            } else if (data && typeof data.detail === "string") {
+                isMissingBody = data.detail.toLowerCase().includes("body");
+                pydanticDetail = data.detail;
+            } else if (text && text.toLowerCase().includes("body")) {
+                isMissingBody = true;
+            }
+
+            const cleanError = isMissingBody
+                ? "Ошибка отправки данных в Техноребут: сервер не получил пакет объявлений."
+                : "Ошибка валидации данных при передаче в Техноребут.";
+
+            return {
+                ok: false,
+                status: 422,
+                error: cleanError,
+                technical_details: pydanticDetail || "HTTP 422 Unprocessable Entity",
+                data: data
+            };
+        }
+
         if (data) {
             let errMsg = null;
             if (typeof data.detail === "string") {
                 errMsg = data.detail;
             } else if (data.detail && typeof data.detail === "object") {
-                errMsg = data.detail.message || data.detail.error || JSON.stringify(data.detail);
+                errMsg = data.detail.message || data.detail.error || "Ошибка обработки данных на сервере";
             } else if (data.message) {
                 errMsg = data.message;
             } else if (data.error) {
                 errMsg = data.error;
             }
             if (errMsg) {
-                return { ok: false, status: res.status, error: `Ошибка сервера ${res.status}: ${errMsg}`, data: data };
+                // Strip pydantic.dev links from user-facing error message
+                const cleanMsg = String(errMsg).replace(/https?:\/\/errors\.pydantic\.dev[^\s"']+/gi, '').trim();
+                return { ok: false, status: res.status, error: `Ошибка сервера ${res.status}: ${cleanMsg}`, data: data };
             }
         }
-        const safeText = text ? text.slice(0, 150).trim() : "Internal Server Error";
+        const safeText = text ? text.slice(0, 150).trim().replace(/https?:\/\/errors\.pydantic\.dev[^\s"']+/gi, '') : "Internal Server Error";
         return { ok: false, status: res.status, error: `Ошибка сервера ${res.status}: ${safeText}` };
     }
 }
@@ -153,31 +181,76 @@ async function sendBulkImportPayload(payload) {
         return { success: false, message: "Расширение не привязано к Техноребут." };
     }
     try {
+        let normalizedPayload = payload;
+        if (!normalizedPayload) {
+            normalizedPayload = { items: [] };
+        } else if (Array.isArray(normalizedPayload)) {
+            normalizedPayload = { items: normalizedPayload };
+        } else if (typeof normalizedPayload === "object") {
+            if (!Array.isArray(normalizedPayload.items)) {
+                normalizedPayload.items = normalizedPayload.items ? [normalizedPayload.items] : [];
+            }
+        } else {
+            normalizedPayload = { items: [] };
+        }
+
+        if (!normalizedPayload.schema_version) {
+            normalizedPayload.schema_version = 1;
+        }
+        normalizedPayload.extension_version = "0.2.50";
+        if (!normalizedPayload.captured_at) {
+            normalizedPayload.captured_at = new Date().toISOString();
+        }
+        if (!normalizedPayload.page_type) {
+            normalizedPayload.page_type = "bulk_import";
+        }
+        normalizedPayload.listings_count = normalizedPayload.items.length;
+
+        const bodyJson = JSON.stringify(normalizedPayload);
+
         const res = await fetch(`${BRIDGE_BASE_URL}/bulk-import`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "X-Extension-Token": token
             },
-            body: JSON.stringify(payload)
+            body: bodyJson
         });
         const parsed = await parseJsonResponseSafely(res);
         if (parsed.ok) {
             const data = parsed.data;
+            const errList = Array.isArray(data.errors) ? data.errors : [];
+            const errCount = data.error_count != null ? data.error_count : errList.length;
+            const createdCount = data.created || 0;
+            const updatedCount = data.updated || 0;
+            const skippedCount = data.skipped || 0;
+            const totalCount = data.total != null ? data.total : (data.count != null ? data.count : normalizedPayload.items.length);
+
             return {
                 success: true,
-                total: data.total || data.count || (data.results && data.results.length) || 0,
-                count: data.count || data.total || 0,
-                created: data.created || 0,
-                updated: data.updated || 0,
-                skipped: data.skipped || 0,
-                errors: data.errors || 0,
+                total: totalCount,
+                count: totalCount,
+                created: createdCount,
+                updated: updatedCount,
+                skipped: skippedCount,
+                errors: errList,
+                error_count: errCount,
                 results: data.results || [],
-                message: `Обработано: ${data.total || data.count || 0}. Создано: ${data.created || 0}, Обновлено: ${data.updated || 0}, Ошибок: ${data.errors || 0}.`,
+                message: `Обработано: ${totalCount}. Создано: ${createdCount}, Обновлено: ${updatedCount}, Ошибок: ${errCount}.`,
                 details: data
             };
         }
-        return { success: false, message: parsed.error || "Ошибка массового импорта", details: parsed.data };
+        return {
+            success: false,
+            message: parsed.error || "Ошибка массового импорта",
+            technical_details: parsed.technical_details,
+            details: parsed.data,
+            error_count: normalizedPayload.items.length,
+            errors: normalizedPayload.items.map(it => ({
+                avito_id: it.avito_id,
+                error: parsed.error || "Ошибка массового импорта"
+            }))
+        };
     } catch (e) {
         return { success: false, message: `Ошибка сети: ${e.message}` };
     }
@@ -311,7 +384,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === "ingest_my_listings" || request.action === "bulk_import_batch") {
-        sendBulkImportPayload(request.payload).then(sendResponse);
+        const payload = request.payload || (request.items ? { items: request.items } : null);
+        sendBulkImportPayload(payload).then(sendResponse);
         return true;
     }
     if (request.action === "fetch_publication_package") {

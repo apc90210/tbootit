@@ -5,7 +5,7 @@ import secrets
 import hashlib
 import json
 import httpx
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from fastapi import APIRouter, Request, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 
@@ -64,7 +64,7 @@ class ListingPayload(BaseModel):
 
 class MyListingsPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.49"
+    extension_version: str = "0.2.50"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "my_listings"
     listings_count: Optional[int] = 0
@@ -72,7 +72,7 @@ class MyListingsPayload(BaseModel):
 
 class BulkImportPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.49"
+    extension_version: str = "0.2.50"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "bulk_import"
     listings_count: Optional[int] = None
@@ -92,7 +92,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.2.49",
+        "version": "0.2.50",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
@@ -163,7 +163,13 @@ async def extension_heartbeat(token: str = Depends(verify_extension_token)):
 
 @router.post("/bulk-import")
 @router.post("/my-listings")
-async def receive_bulk_import(payload: BulkImportPayload, token: str = Depends(verify_extension_token)):
+async def receive_bulk_import(
+    payload: Union[BulkImportPayload, List[Dict[str, Any]]],
+    token: str = Depends(verify_extension_token)
+):
+    if isinstance(payload, list):
+        payload = BulkImportPayload(items=payload, listings_count=len(payload), extension_version="0.2.50")
+
     # 1. Save last bulk payload for diagnostics
     _save_json(MY_LISTINGS_FILE, payload.model_dump())
 
