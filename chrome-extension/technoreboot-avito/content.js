@@ -2083,6 +2083,35 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
     }
 
     // 6. Photo thumbnail (Priority: currentSrc -> data-src -> src -> srcset -> style background-image)
+    function extractBestUrlFromSrcset(srcsetStr) {
+        if (!srcsetStr || typeof srcsetStr !== 'string') return null;
+        const parts = srcsetStr.split(',').map(s => s.trim()).filter(Boolean);
+        if (!parts.length) return null;
+        let bestUrl = null;
+        let maxMetric = -1;
+        for (const part of parts) {
+            const tokens = part.split(/\s+/);
+            let u = tokens[0];
+            if (!u) continue;
+            if (u.startsWith('//')) u = 'https:' + u;
+            if (!u.startsWith('http')) continue;
+            let metric = 1;
+            if (tokens.length > 1) {
+                const desc = tokens[1];
+                if (desc.endsWith('w')) {
+                    metric = parseInt(desc.slice(0, -1), 10) || 1;
+                } else if (desc.endsWith('x')) {
+                    metric = (parseFloat(desc.slice(0, -1)) || 1) * 1000;
+                }
+            }
+            if (metric > maxMetric) {
+                maxMetric = metric;
+                bestUrl = u;
+            }
+        }
+        return bestUrl;
+    }
+
     let photoUrl = null;
     const isExcludedImg = (img) => {
         if (!img) return true;
@@ -2102,18 +2131,27 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
     let photoEl = allImgs.find(img => {
         const m = (img.getAttribute('data-marker') || '').toLowerCase();
         const s = (img.getAttribute('src') || img.getAttribute('data-src') || '').toLowerCase();
-        return m.includes('photo') || m.includes('image') || s.includes('img.avito.st');
+        return m.includes('photo') || m.includes('image') || s.includes('img.avito.st') || s.includes('avito');
     }) || allImgs[0];
 
     if (photoEl) {
-        if (photoEl.currentSrc && photoEl.currentSrc.startsWith('http')) {
-            photoUrl = photoEl.currentSrc;
-        } else if (photoEl.getAttribute('data-src') && photoEl.getAttribute('data-src').startsWith('http')) {
-            photoUrl = photoEl.getAttribute('data-src');
-        } else if (photoEl.getAttribute('data-origin-src') && photoEl.getAttribute('data-origin-src').startsWith('http')) {
-            photoUrl = photoEl.getAttribute('data-origin-src');
-        } else if (photoEl.getAttribute('src') && photoEl.getAttribute('src').startsWith('http')) {
-            photoUrl = photoEl.getAttribute('src');
+        let cur = photoEl.currentSrc || '';
+        if (cur.startsWith('//')) cur = 'https:' + cur;
+        let dSrc = photoEl.getAttribute('data-src') || '';
+        if (dSrc.startsWith('//')) dSrc = 'https:' + dSrc;
+        let dOrig = photoEl.getAttribute('data-origin-src') || '';
+        if (dOrig.startsWith('//')) dOrig = 'https:' + dOrig;
+        let sSrc = photoEl.getAttribute('src') || '';
+        if (sSrc.startsWith('//')) sSrc = 'https:' + sSrc;
+
+        if (cur && cur.startsWith('http') && !cur.startsWith('data:')) {
+            photoUrl = cur;
+        } else if (dSrc && dSrc.startsWith('http')) {
+            photoUrl = dSrc;
+        } else if (dOrig && dOrig.startsWith('http')) {
+            photoUrl = dOrig;
+        } else if (sSrc && sSrc.startsWith('http') && !sSrc.startsWith('data:')) {
+            photoUrl = sSrc;
         } else if (photoEl.getAttribute('srcset')) {
             photoUrl = extractBestUrlFromSrcset(photoEl.getAttribute('srcset'));
         }
@@ -2139,8 +2177,9 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         }
     }
 
-    if (photoUrl && !photoUrl.startsWith('http')) {
-        photoUrl = null;
+    if (photoUrl) {
+        if (photoUrl.startsWith('//')) photoUrl = 'https:' + photoUrl;
+        if (!photoUrl.startsWith('http')) photoUrl = null;
     }
 
     return {
