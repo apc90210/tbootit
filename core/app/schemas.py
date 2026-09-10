@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # Category Schemas
@@ -20,7 +20,7 @@ class Category(CategoryBase):
 
 # Product Schemas
 class ProductBase(BaseModel):
-    sku: str
+    sku: Optional[str] = None
     barcode: Optional[str] = None
     title: str
     category_id: Optional[int] = None
@@ -61,7 +61,29 @@ class ProductBase(BaseModel):
         return v if v else "store"
 
 class ProductCreate(ProductBase):
-    pass
+    category: Optional[str] = None
+    characteristics: Optional[Dict[str, Any]] = None
+
+class ProductFullUpdate(BaseModel):
+    title: str
+    category: Optional[str] = None
+    category_id: Optional[int] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    condition: Optional[str] = None
+    description: Optional[str] = None
+    purchase_price: Optional[float] = None
+    sale_price: float
+    status: Optional[str] = None
+    storage_location: Optional[str] = None
+    quantity: Optional[int] = 0
+    barcode: Optional[str] = None
+    sku: Optional[str] = None
+    characteristics: Optional[Dict[str, Any]] = None
+
+class PhotoReorderRequest(BaseModel):
+    photo_ids: List[int]
 
 class ProductUpdate(BaseModel):
     title: Optional[str] = None
@@ -299,6 +321,7 @@ class ProductDetails(Product):
     site_ready: bool = False
     avito_category_name: Optional[str] = None
     avito_characteristics: Optional[dict] = None
+    characteristics: Optional[dict] = None
     avito_source_url: Optional[str] = None
     class Config:
         from_attributes = True

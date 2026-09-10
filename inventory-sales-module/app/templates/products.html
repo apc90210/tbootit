@@ -34,7 +34,10 @@
         <a href="/inventory/products?location=workshop" class="btn {% if location == 'workshop' %}btn-primary{% endif %}" style="{% if location != 'workshop' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Мастерская</a>
         <a href="/inventory/products?location=archive" class="btn {% if location == 'archive' %}btn-primary{% endif %}" style="{% if location != 'archive' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Архив</a>
         <a href="/inventory/products?location=draft" class="btn {% if location == 'draft' %}btn-primary{% endif %}" style="{% if location != 'draft' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Черновики</a>
-        <a id="btn-add-product-json" href="/products/json" class="btn btn-success" style="background: #28a745; color: #fff; border: 1px solid #28a745; padding: 10px 20px; font-size: 16px; font-weight: bold; text-decoration: none; margin-left: auto;">+ Добавить новый товар через JSON</a>
+        <div style="margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap;">
+            <a id="btn-create-product-manual" href="/inventory/products/new" class="btn btn-primary" style="background: #007bff; color: #fff; border: 1px solid #007bff; padding: 10px 18px; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 4px;">+ Создать товар вручную</a>
+            <a id="btn-add-product-json" href="/products/json" class="btn btn-success" style="background: #28a745; color: #fff; border: 1px solid #28a745; padding: 10px 18px; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 4px;">+ Добавить новый товар через JSON</a>
+        </div>
     </div>
 
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">
@@ -201,6 +204,7 @@
                     <td>{{ item.storage_location or '—' }}</td>
                     <td>
                         <a href="/inventory/products/{{ item.id }}" class="btn">Открыть</a>
+                        <a href="/inventory/products/{{ item.id }}/edit" class="btn btn-secondary" style="background: #6c757d; color: #fff; margin-left: 2px;">Редактировать</a>
                         {% if item.status == 'in_stock' and item.storage_location == 'store' and item.quantity > 0 %}
                             <a href="/inventory/sales/new?product_id={{ item.id }}" class="btn btn-success">Продать</a>
                         {% else %}

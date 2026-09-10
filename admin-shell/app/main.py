@@ -756,6 +756,16 @@ async def products_json_page(request: Request):
 
 
 
+@app.get("/products/new")
+async def redirect_products_new_shortcut():
+    return RedirectResponse(url="/inventory/products/new", status_code=302)
+
+
+@app.get("/products/{product_id}/edit")
+async def redirect_products_edit_shortcut(product_id: int):
+    return RedirectResponse(url=f"/inventory/products/{product_id}/edit", status_code=302)
+
+
 @app.get("/products/{product_id}")
 async def redirect_products_detail_shortcut(product_id: int):
     return RedirectResponse(url=f"/inventory/products/{product_id}", status_code=302)

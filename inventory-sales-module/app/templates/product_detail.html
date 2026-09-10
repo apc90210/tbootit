@@ -163,6 +163,7 @@
 
     <div style="margin-top: 20px;">
         <a href="/inventory/products" class="btn">Назад к товарам</a>
+        <a id="btn-edit-product" href="/inventory/products/{{ product.id }}/edit" class="btn btn-primary" style="margin-left: 10px; background: #007bff; color: #fff; text-decoration: none;">✏️ Редактировать товар</a>
         {% if product.status == 'in_stock' and product.storage_location == 'store' and product.quantity > 0 %}
             <a href="/inventory/sales/new?product_id={{ product.id }}" class="btn btn-success" style="margin-left: 10px;">Продать</a>
         {% else %}

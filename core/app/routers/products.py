@@ -1,14 +1,40 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func, case
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.database import get_db
 from app import models, schemas
 from app.routers.customers import log_audit
 from app.services.barcodes import generate_barcode_for_product, generate_missing_barcodes
+from app.services.product_json_service import generate_canonical_sku
+from app.services.avito_schema_service import upsert_avito_category_schema, upsert_product_avito_attributes
 import json
 
 router = APIRouter()
+
+STANDARD_CATEGORY_CHARACTERISTICS: Dict[str, List[str]] = {
+    "Ноутбуки": [
+        "Процессор", "Оперативная память", "Объем накопителя", "Тип накопителя",
+        "Видеокарта", "Диагональ экрана", "Разрешение экрана", "Операционная система"
+    ],
+    "Системные блоки": [
+        "Процессор", "Оперативная память", "Объем накопителя", "Видеокарта",
+        "Материнская плата", "Блок питания", "Корпус"
+    ],
+    "Принтеры и МФУ": [
+        "Тип устройства", "Технология печати", "Цветность печати", "Максимальный формат",
+        "Двусторонняя печать", "Интерфейсы", "Wi-Fi"
+    ],
+    "Мониторы": [
+        "Диагональ", "Разрешение", "Тип матрицы", "Частота обновления", "Разъемы"
+    ],
+    "Комплектующие": [
+        "Тип комплектующего", "Сокет", "Тип памяти", "Объем", "Форм-фактор"
+    ],
+    "Оргтехника": [
+        "Тип устройства", "Назначение", "Интерфейсы"
+    ]
+}
 
 def log_product_event(db: Session, product_id: int, event_type: str, old_value=None, new_value=None, comment=None):
     old_val_str = json.dumps(old_value, default=str) if old_value else None
@@ -287,6 +313,36 @@ def get_meta(db: Session = Depends(get_db)):
         "storage_locations": locations
     }
 
+@router.get("/editor-meta")
+def get_editor_meta(db: Session = Depends(get_db)):
+    db_categories = [r[0] for r in db.query(models.Category.name).distinct().all() if r[0]]
+    all_categories = list(STANDARD_CATEGORY_CHARACTERISTICS.keys())
+    for c in db_categories:
+        if c not in all_categories:
+            all_categories.append(c)
+
+    return {
+        "categories": all_categories,
+        "standard_characteristics": STANDARD_CATEGORY_CHARACTERISTICS,
+        "category_characteristics": STANDARD_CATEGORY_CHARACTERISTICS,
+        "conditions": ["Б/у", "Новое", "На запчасти", "Отличное"],
+        "statuses": {
+            "in_stock": "В наличии",
+            "draft": "Черновик",
+            "reserved": "Зарезервирован",
+            "sold": "Продан",
+            "in_repair": "В ремонте",
+            "for_parts": "На запчасти",
+            "written_off": "Списан"
+        },
+        "storage_locations": {
+            "store": "Магазин",
+            "workshop": "Мастерская",
+            "archive": "Архив",
+            "draft": "Черновик"
+        }
+    }
+
 @router.get("/json/schema")
 def get_products_json_schema(db: Session = Depends(get_db)):
     from app.services.product_json_service import generate_ai_prompt
@@ -330,19 +386,88 @@ def export_products_json_post(payload: Optional[dict] = None, db: Session = Depe
 
 @router.post("/", response_model=schemas.Product)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+    # 1. Field validation
+    if not product.title or not product.title.strip():
+        raise HTTPException(status_code=400, detail="Название товара не может быть пустым")
+    if product.sale_price is not None and product.sale_price < 0:
+        raise HTTPException(status_code=400, detail="Цена продажи должна быть неотрицательной")
+    if product.purchase_price is not None and product.purchase_price < 0:
+        raise HTTPException(status_code=400, detail="Закупочная цена должна быть неотрицательной")
+    if product.quantity is not None and product.quantity < 0:
+        raise HTTPException(status_code=400, detail="Количество должно быть неотрицательным")
+
+    # 2. SKU check / generation
+    sku = (product.sku or "").strip()
+    if not sku:
+        new_sku = generate_canonical_sku()
+        while db.query(models.Product).filter(models.Product.sku == new_sku).first():
+            new_sku = generate_canonical_sku()
+        sku = new_sku
+    else:
+        existing_sku = db.query(models.Product).filter(models.Product.sku == sku).first()
+        if existing_sku:
+            raise HTTPException(status_code=409, detail=f"Товар с артикулом '{sku}' уже существует")
+
+    # 3. Barcode check
     if product.barcode and product.barcode.strip():
-        existing = db.query(models.Product).filter(models.Product.barcode == product.barcode.strip()).first()
+        bc_clean = product.barcode.strip()
+        existing = db.query(models.Product).filter(models.Product.barcode == bc_clean).first()
         if existing:
             raise HTTPException(status_code=409, detail="Barcode already exists")
-            
-    db_product = models.Product(**product.model_dump())
+
+    # 4. Extract extra non-column fields
+    data = product.model_dump()
+    cat_name = (data.pop("category", None) or "").strip()
+    chars = data.pop("characteristics", None) or {}
+
+    data["sku"] = sku
+    if "barcode" in data and data["barcode"]:
+        data["barcode"] = data["barcode"].strip()
+
+    db_product = models.Product(**data)
+
+    # 5. Resolve category if provided
+    avito_cat = None
+    if cat_name:
+        cat = db.query(models.Category).filter(models.Category.name == cat_name).first()
+        if not cat:
+            cat_slug = cat_name.lower().replace(" ", "-").replace("/", "-")
+            cat = models.Category(name=cat_name, slug=cat_slug)
+            db.add(cat)
+            db.flush()
+        db_product.category_id = cat.id
+
+        avito_cat = upsert_avito_category_schema(
+            db=db,
+            category_name=cat_name,
+            category_path=cat_name,
+            characteristics=chars
+        )
+        if avito_cat:
+            db_product.avito_category_id = avito_cat.id
+
+    # 6. Characteristics
+    if chars:
+        db_product.avito_params_json = json.dumps(chars, ensure_ascii=False)
+        db_product.source_attributes_json = json.dumps(chars, ensure_ascii=False)
+
     db.add(db_product)
+    db.flush()
+
+    if chars and db_product.avito_category_id:
+        upsert_product_avito_attributes(
+            db=db,
+            product_id=db_product.id,
+            category_id=db_product.avito_category_id,
+            characteristics=chars
+        )
+
     db.commit()
     db.refresh(db_product)
-    
+
     log_audit(db, "product", db_product.id, "create", new_value=product.model_dump())
     log_product_event(db, db_product.id, "create", comment="Product created")
-    
+
     if db_product.quantity and db_product.quantity > 0:
         mov = models.StockMovement(
             product_id=db_product.id,
@@ -353,7 +478,7 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
             reason="initial_stock"
         )
         db.add(mov)
-        
+
     db.commit()
     return db_product
 
@@ -376,17 +501,24 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
     # Avito Category and Characteristics
     avito_cat_name = db_product.avito_category.name if db_product.avito_category else db_product.avito_category_path
     avito_characteristics = {}
+    if db_product.avito_params_json:
+        try:
+            legacy_p = json.loads(db_product.avito_params_json)
+            if isinstance(legacy_p, dict):
+                avito_characteristics.update(legacy_p)
+        except Exception:
+            pass
+    if db_product.source_attributes_json:
+        try:
+            src_p = json.loads(db_product.source_attributes_json)
+            if isinstance(src_p, dict):
+                avito_characteristics.update(src_p)
+        except Exception:
+            pass
     if db_product.avito_attribute_values:
         for val_row in db_product.avito_attribute_values:
             if val_row.definition and val_row.definition.name:
                 avito_characteristics[val_row.definition.name] = val_row.value or val_row.raw_value
-    elif db_product.avito_params_json:
-        try:
-            legacy_p = json.loads(db_product.avito_params_json)
-            if isinstance(legacy_p, dict):
-                avito_characteristics = legacy_p
-        except Exception:
-            pass
 
     # Source Avito Link from ProductExternalListing
     ext_listing = db.query(models.ProductExternalListing).filter(
@@ -419,6 +551,7 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
     p_dict["stock_movements"] = movements
     p_dict["avito_category_name"] = avito_cat_name
     p_dict["avito_characteristics"] = avito_characteristics
+    p_dict["characteristics"] = avito_characteristics
     p_dict["avito_source_url"] = avito_source_url
     
     return p_dict
@@ -428,6 +561,124 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
+    return db_product
+
+@router.put("/{product_id}", response_model=schemas.Product)
+def full_update_product(product_id: int, product: schemas.ProductFullUpdate, db: Session = Depends(get_db)):
+    db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+
+    # 1. Validation
+    if not product.title or not product.title.strip():
+        raise HTTPException(status_code=400, detail="Название товара не может быть пустым")
+    if product.sale_price is not None and product.sale_price < 0:
+        raise HTTPException(status_code=400, detail="Цена продажи должна быть неотрицательной")
+    if product.purchase_price is not None and product.purchase_price < 0:
+        raise HTTPException(status_code=400, detail="Закупочная цена должна быть неотрицательной")
+    if product.quantity is not None and product.quantity < 0:
+        raise HTTPException(status_code=400, detail="Количество должно быть неотрицательным")
+
+    # 2. SKU uniqueness check
+    if product.sku and product.sku.strip():
+        sku_clean = product.sku.strip()
+        existing_sku = db.query(models.Product).filter(
+            models.Product.sku == sku_clean,
+            models.Product.id != product_id
+        ).first()
+        if existing_sku:
+            raise HTTPException(status_code=409, detail=f"Товар с артикулом '{sku_clean}' уже существует")
+        db_product.sku = sku_clean
+
+    # 3. Barcode uniqueness check
+    if product.barcode and product.barcode.strip():
+        bc_clean = product.barcode.strip()
+        existing_bc = db.query(models.Product).filter(
+            models.Product.barcode == bc_clean,
+            models.Product.id != product_id
+        ).first()
+        if existing_bc:
+            raise HTTPException(status_code=409, detail="Barcode already exists")
+        db_product.barcode = bc_clean
+    elif product.barcode is not None and not product.barcode.strip():
+        db_product.barcode = None
+
+    # 4. Update basic fields
+    old_data = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
+    old_quantity = db_product.quantity or 0
+    old_status = db_product.status
+
+    db_product.title = product.title.strip()
+    db_product.brand = product.brand.strip() if product.brand else None
+    db_product.model = product.model.strip() if product.model else None
+    db_product.serial_number = product.serial_number.strip() if product.serial_number else None
+    db_product.condition = product.condition.strip() if product.condition else None
+    db_product.description = product.description
+    db_product.purchase_price = product.purchase_price
+    db_product.sale_price = product.sale_price
+    if product.storage_location:
+        db_product.storage_location = product.storage_location
+
+    # 5. Quantity & Stock Movement
+    new_quantity = product.quantity if product.quantity is not None else old_quantity
+    if new_quantity != old_quantity:
+        db_product.quantity = new_quantity
+        delta = new_quantity - old_quantity
+        mov = models.StockMovement(
+            product_id=product_id,
+            movement_type="manual_adjustment",
+            quantity_delta=delta,
+            old_quantity=old_quantity,
+            new_quantity=new_quantity,
+            reason="editor_update",
+            comment="Количество изменено в редакторе товара"
+        )
+        db.add(mov)
+
+    # 6. Status update
+    if product.status and product.status != old_status:
+        db_product.status = product.status
+        log_product_event(db, product_id, "update_status", old_value=old_status, new_value=product.status, comment="Статус изменен в редакторе")
+
+    # 7. Category resolution
+    cat_name = (product.category or "").strip()
+    if cat_name:
+        cat = db.query(models.Category).filter(models.Category.name == cat_name).first()
+        if not cat:
+            cat_slug = cat_name.lower().replace(" ", "-").replace("/", "-")
+            cat = models.Category(name=cat_name, slug=cat_slug)
+            db.add(cat)
+            db.flush()
+        db_product.category_id = cat.id
+
+        avito_cat = upsert_avito_category_schema(db, category_name=cat_name, category_path=cat_name, characteristics=product.characteristics)
+        if avito_cat:
+            db_product.avito_category_id = avito_cat.id
+    elif product.category_id:
+        db_product.category_id = product.category_id
+
+    # 8. Characteristics
+    if product.characteristics is not None:
+        db_product.avito_params_json = json.dumps(product.characteristics, ensure_ascii=False)
+        db_product.source_attributes_json = json.dumps(product.characteristics, ensure_ascii=False)
+
+        cat_for_attr = db_product.avito_category_id
+        if not cat_for_attr and db_product.category:
+            avito_cat = upsert_avito_category_schema(db, category_name=db_product.category.name, category_path=db_product.category.name, characteristics=product.characteristics)
+            if avito_cat:
+                cat_for_attr = avito_cat.id
+                db_product.avito_category_id = cat_for_attr
+
+        if cat_for_attr:
+            upsert_product_avito_attributes(db, db_product.id, cat_for_attr, product.characteristics)
+
+    db.commit()
+    db.refresh(db_product)
+
+    new_data = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
+    log_audit(db, "product", db_product.id, "full_update", old_value=old_data, new_value=new_data)
+    log_product_event(db, db_product.id, "full_update", old_value=old_data, new_value=new_data, comment="Товар полностью обновлен через редактор")
+    db.commit()
     return db_product
 
 @router.patch("/{product_id}", response_model=schemas.Product)

@@ -243,5 +243,113 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def create_product(self, payload: dict) -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/", json=payload, timeout=15.0)
+                if response.status_code == 200:
+                    return response.json()
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def full_update_product(self, product_id: int, payload: dict) -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.put(f"{self.base_url}/api/products/{product_id}", json=payload, timeout=15.0)
+                if response.status_code == 200:
+                    return response.json()
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def get_editor_meta(self) -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/products/editor-meta", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def upload_product_photo(self, product_id: int, file_content: bytes, filename: str, content_type: str = "image/jpeg") -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                files = {"file": (filename, file_content, content_type)}
+                response = await client.post(f"{self.base_url}/api/products/{product_id}/photos", files=files, timeout=30.0)
+                if response.status_code == 200:
+                    return response.json()
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def upload_product_photos_batch(self, product_id: int, files_list: list) -> dict:
+        formatted_files = []
+        for item in files_list:
+            if len(item) == 2:
+                formatted_files.append(item)
+            elif len(item) == 3:
+                formatted_files.append(("files", item))
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/{product_id}/photos/batch", files=formatted_files, timeout=45.0)
+                if response.status_code == 200:
+                    return response.json()
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def reorder_product_photos(self, product_id: int, photo_ids: list) -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/{product_id}/photos/reorder", json={"photo_ids": photo_ids}, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def make_product_photo_main(self, product_id: int, photo_id: int) -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/{product_id}/photos/{photo_id}/make-main", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def delete_product_photo(self, product_id: int, photo_id: int) -> dict:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.delete(f"{self.base_url}/api/products/{product_id}/photos/{photo_id}", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
 core_client = CoreClient()
+
 

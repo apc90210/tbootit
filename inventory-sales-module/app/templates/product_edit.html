@@ -1,0 +1,572 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}Создание нового товара{% else %}Редактирование: {{ product.title }}{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 1100px; margin: 0 auto; padding-bottom: 50px;">
+    <!-- Верхняя панель навигации -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <a href="/inventory/products" class="btn" style="background: #6c757d; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 4px; font-size: 0.95rem;">
+                ← Назад к списку товаров
+            </a>
+            {% if not is_new and product.id %}
+            <a href="/inventory/products/{{ product.id }}" class="btn" style="background: #17a2b8; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 4px; font-size: 0.95rem; margin-left: 8px;">
+                👁️ Карточка товара
+            </a>
+            {% endif %}
+        </div>
+        <h2 style="margin: 0; font-size: 1.5rem; color: #222;">
+            {% if is_new %}
+                ✨ Создание товара вручную
+            {% else %}
+                ✏️ Редактирование товара #{{ product.id }}
+            {% endif %}
+        </h2>
+    </div>
+
+    <!-- Уведомления об успехе или ошибке -->
+    {% if msg %}
+    <div style="background: #d4edda; color: #155724; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #c3e6cb; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.2rem;">✓</span> {{ msg }}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div style="background: #f8d7da; color: #721c24; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #f5c6cb; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.2rem;">⚠️</span> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- ОСНОВНАЯ ФОРМА ТОВАРА -->
+    <form id="product-form" action="{% if is_new %}/inventory/products/new{% else %}/inventory/products/{{ product.id }}/edit{% endif %}" method="POST">
+        
+        <!-- КАРТОЧКА 1: Основные сведения -->
+        <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.15rem; color: #2d3748; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;">
+                📦 Основные сведения
+            </h3>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                    Название товара <span style="color: #e53e3e;">*</span>
+                </label>
+                <input type="text" name="title" id="product-title" required value="{{ product.title or '' }}" placeholder="Например: Ноутбук Lenovo ThinkPad T480 i5 16GB 256GB SSD" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 1rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Категория товара
+                    </label>
+                    <select name="category" id="category-select" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px; background-color: #fff;" onchange="onCategoryChange()">
+                        <option value="">— Выберите категорию —</option>
+                        {% set cur_cat = product.category_name or product.category or product.avito_category_name or '' %}
+                        {% for cat in meta.categories %}
+                            <option value="{{ cat }}" {% if cur_cat == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                        <option value="__custom__" {% if cur_cat and cur_cat not in meta.categories %}selected{% endif %}>Другая категория...</option>
+                    </select>
+                    <input type="text" name="category_custom" id="category-custom-input" value="{% if cur_cat and cur_cat not in meta.categories %}{{ cur_cat }}{% endif %}" placeholder="Введите название категории" style="{% if not (cur_cat and cur_cat not in meta.categories) %}display: none;{% endif %} width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Бренд / Производитель
+                    </label>
+                    <input type="text" name="brand" value="{{ product.brand or '' }}" placeholder="Lenovo, Asus, HP, Dell..." style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Модель
+                    </label>
+                    <input type="text" name="model" value="{{ product.model or '' }}" placeholder="ThinkPad T480, LaserJet M404..." style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Состояние
+                    </label>
+                    <select name="condition" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px; background-color: #fff;">
+                        {% set cur_cond = product.condition or 'Б/У' %}
+                        {% for cond in meta.conditions %}
+                            <option value="{{ cond }}" {% if cur_cond == cond %}selected{% endif %}>{{ cond }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- КАРТОЧКА 2: Цены и складской учет -->
+        <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.15rem; color: #2d3748; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;">
+                💰 Цены и складской учет
+            </h3>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Цена (базовая, ₽) <span style="color: #e53e3e;">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="price" required value="{{ product.price if product.price is not none else '0' }}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Цена продажи (актуальная, ₽)
+                    </label>
+                    <input type="number" step="0.01" min="0" name="sale_price" value="{{ product.sale_price if product.sale_price is not none else '' }}" placeholder="Если отличается от базовой" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Себестоимость / Закупка (₽)
+                    </label>
+                    <input type="number" step="0.01" min="0" name="cost_price" value="{{ product.cost_price if product.cost_price is not none else '' }}" placeholder="Закупочная цена" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Количество (шт.) <span style="color: #e53e3e;">*</span>
+                    </label>
+                    <input type="number" step="1" min="0" name="quantity" required value="{{ product.quantity if product.quantity is not none else 1 }}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Статус товара
+                    </label>
+                    <select name="status" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px; background-color: #fff;">
+                        {% set cur_status = product.status or 'in_stock' %}
+                        <option value="in_stock" {% if cur_status == 'in_stock' %}selected{% endif %}>В наличии (in_stock)</option>
+                        <option value="draft" {% if cur_status == 'draft' %}selected{% endif %}>Черновик (draft)</option>
+                        <option value="reserved" {% if cur_status == 'reserved' %}selected{% endif %}>В резерве (reserved)</option>
+                        <option value="sold" {% if cur_status == 'sold' %}selected{% endif %}>Продан (sold)</option>
+                        <option value="in_repair" {% if cur_status == 'in_repair' %}selected{% endif %}>В ремонте (in_repair)</option>
+                        <option value="written_off" {% if cur_status == 'written_off' %}selected{% endif %}>Списан (written_off)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Место хранения
+                    </label>
+                    <select name="storage_location" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px; background-color: #fff;">
+                        {% set cur_loc = product.storage_location or 'store' %}
+                        <option value="store" {% if cur_loc == 'store' %}selected{% endif %}>Магазин (store)</option>
+                        <option value="workshop" {% if cur_loc == 'workshop' %}selected{% endif %}>Мастерская (workshop)</option>
+                        <option value="archive" {% if cur_loc == 'archive' %}selected{% endif %}>Архив (archive)</option>
+                        <option value="draft" {% if cur_loc == 'draft' %}selected{% endif %}>Черновик (draft)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Артикул (SKU)
+                    </label>
+                    <input type="text" name="sku" value="{{ product.sku or '' }}" placeholder="Оставьте пустым для автогенерации (PRD-...)" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #374151;">
+                        Штрихкод
+                    </label>
+                    <input type="text" name="barcode" value="{{ product.barcode or '' }}" placeholder="Штрихкод (EAN-13 или внутренний)" style="width: 100%; box-sizing: border-box; padding: 9px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- КАРТОЧКА 3: Описание товара -->
+        <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.15rem; color: #2d3748; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;">
+                📝 Описание товара
+            </h3>
+            <textarea name="description" rows="5" placeholder="Подробное описание товара, техническое состояние, дефекты, комплектация, гарантия..." style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.95rem; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; line-height: 1.5;">{{ product.description or '' }}</textarea>
+        </div>
+
+        <!-- КАРТОЧКА 4: Характеристики категории (Динамические) -->
+        <div id="characteristics-card" style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 8px; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                <h3 style="margin: 0; font-size: 1.15rem; color: #2d3748; display: flex; align-items: center; gap: 8px;">
+                    ⚙️ Характеристики категории
+                    <span id="active-category-badge" style="font-size: 0.85rem; font-weight: normal; background: #ebf8ff; color: #2b6cb0; padding: 2px 10px; border-radius: 12px;">
+                        {{ cur_cat or 'Не выбрана' }}
+                    </span>
+                </h3>
+            </div>
+
+            <!-- Контейнер стандартных характеристик выбранной категории -->
+            <div id="standard-characteristics-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                <!-- Заполняется динамически JS на основе categorySchemas -->
+            </div>
+
+            <!-- Дополнительные / Пользовательские характеристики -->
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e0; border-radius: 6px; padding: 16px; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <strong style="color: #4a5568; font-size: 0.95rem;">➕ Дополнительные характеристики:</strong>
+                    <button type="button" onclick="addCustomCharacteristicRow('', '')" style="background: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+                        + Добавить характеристику
+                    </button>
+                </div>
+                <div id="custom-characteristics-container" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Динамические строки пользовательских характеристик -->
+                </div>
+                <div id="custom-empty-hint" style="font-size: 0.85rem; color: #a0aec0; font-style: italic;">
+                    Вы можете добавить любые нестандартные параметры, они будут надежно сохранены.
+                </div>
+            </div>
+        </div>
+
+        <!-- Кнопка сохранения формы -->
+        <div style="margin-bottom: 30px; display: flex; gap: 15px; align-items: center;">
+            <button type="submit" id="btn-save-product" class="btn btn-primary" style="background: #2563eb; color: #fff; padding: 12px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; box-shadow: 0 2px 4px rgba(37,99,235,0.2);">
+                {% if is_new %}💾 Создать товар{% else %}💾 Сохранить изменения{% endif %}
+            </button>
+            <a href="{% if is_new %}/inventory/products{% else %}/inventory/products/{{ product.id }}{% endif %}" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; padding: 12px 20px; font-size: 1rem; border-radius: 6px; text-decoration: none;">
+                Отмена
+            </a>
+        </div>
+    </form>
+
+    <!-- КАРТОЧКА 5: МЕНЕДЖЕР ФОТОГРАФИЙ -->
+    <div id="photo-manager-section" style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 1.2rem; color: #2d3748; display: flex; align-items: center; gap: 8px;">
+                📸 Фотографии товара
+                {% if not is_new and product.photos %}
+                    <span id="photo-count-badge" style="font-size: 0.85rem; font-weight: normal; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px;">
+                        {{ product.photos|length }}
+                    </span>
+                {% endif %}
+            </h3>
+            <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: #718096;">
+                Управляйте галереей фотографий: загружайте несколько фото, меняйте порядок отображения и назначайте главное фото.
+            </p>
+        </div>
+
+        {% if is_new %}
+        <!-- Для нового товара загрузка доступна после создания -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 16px; border-radius: 6px; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">💡</span>
+            <div>
+                <strong>Добавление фотографий:</strong><br>
+                Сохраните товар кнопкой «Создать товар» выше. После сохранения вы сразу попадете в редактор, где будет доступна мгновенная загрузка фотографий.
+            </div>
+        </div>
+        {% else %}
+        <!-- Форма загрузки фото для существующего товара -->
+        <div style="background: #f8fafc; border: 2px dashed #cbd5e0; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;" id="drop-zone">
+            <form id="photo-upload-form" action="/inventory/products/{{ product.id }}/photos/upload" method="POST" enctype="multipart/form-data" style="display: inline-block; max-width: 500px; width: 100%;">
+                <input type="file" name="files" id="photo-file-input" multiple accept="image/jpeg,image/png,image/webp" style="display: none;" onchange="handleFilesSelected(this.files)">
+                <div style="margin-bottom: 12px;">
+                    <button type="button" onclick="document.getElementById('photo-file-input').click()" class="btn btn-primary" style="background: #0284c7; color: #fff; padding: 10px 20px; font-size: 1rem; border-radius: 6px; border: none; cursor: pointer;">
+                        📁 Выбрать фотографии на диске
+                    </button>
+                </div>
+                <div style="font-size: 0.85rem; color: #64748b;">
+                    Поддерживаются форматы <strong>JPEG, PNG, WebP</strong>. Максимум <strong>15 МБ</strong> на файл.<br>
+                    Можно выбрать несколько файлов одновременно.
+                </div>
+                <div id="selected-files-list" style="margin-top: 10px; font-size: 0.9rem; color: #334155; display: none;"></div>
+                <div id="upload-progress" style="margin-top: 12px; display: none; color: #0284c7; font-weight: 600;">
+                    Загрузка фотографий... Пожалуйста, подождите.
+                </div>
+            </form>
+        </div>
+
+        <!-- Галерея существующих фотографий -->
+        <div id="photos-gallery-container">
+            {% if product.photos and product.photos|length > 0 %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px;" id="photos-grid">
+                    {% for photo in product.photos %}
+                        {% set img_url = photo.media_url if photo.media_url.startswith('/') else '/' ~ photo.media_url %}
+                        <div class="photo-card" data-photo-id="{{ photo.id }}" style="background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); display: flex; flex-direction: column; position: relative;">
+                            <!-- Превью изображения -->
+                            <div style="position: relative; width: 100%; height: 140px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+                                <a href="{{ img_url }}" target="_blank" title="Открыть оригинал">
+                                    <img src="{{ img_url }}" alt="Фото {{ loop.index }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                </a>
+                                {% if photo.sort_order == 0 or loop.first %}
+                                    <span class="badge-main" style="position: absolute; top: 6px; left: 6px; background: #16a34a; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                        ★ Главное
+                                    </span>
+                                {% else %}
+                                    <span style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                                        #{{ loop.index }}
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Кнопки управления фото -->
+                            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: auto;">
+                                <!-- Сделать главным -->
+                                {% if photo.sort_order != 0 and not loop.first %}
+                                    <button type="button" onclick="setMainPhoto({{ product.id }}, {{ photo.id }})" style="width: 100%; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px; font-size: 0.8rem; cursor: pointer; font-weight: 500;">
+                                        ★ Сделать главным
+                                    </button>
+                                {% endif %}
+
+                                <!-- Стрелки перемещения порядка -->
+                                <div style="display: flex; gap: 4px;">
+                                    <button type="button" {% if loop.first %}disabled style="flex: 1; background: #f1f5f9; color: #cbd5e0; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; font-size: 0.8rem; cursor: not-allowed;"{% else %}onclick="movePhoto({{ product.id }}, {{ photo.id }}, -1)" style="flex: 1; background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 4px; padding: 4px; font-size: 0.8rem; cursor: pointer;"{% endif %} title="Переместить левее / выше">
+                                        ← Вверх
+                                    </button>
+                                    <button type="button" {% if loop.last %}disabled style="flex: 1; background: #f1f5f9; color: #cbd5e0; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; font-size: 0.8rem; cursor: not-allowed;"{% else %}onclick="movePhoto({{ product.id }}, {{ photo.id }}, 1)" style="flex: 1; background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 4px; padding: 4px; font-size: 0.8rem; cursor: pointer;"{% endif %} title="Переместить правее / ниже">
+                                        Вниз →
+                                    </button>
+                                </div>
+
+                                <!-- Удалить фото -->
+                                <button type="button" onclick="deletePhoto({{ product.id }}, {{ photo.id }})" style="width: 100%; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; padding: 4px; font-size: 0.8rem; cursor: pointer;">
+                                    🗑️ Удалить
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div id="no-photos-msg" style="text-align: center; color: #64748b; padding: 24px; background: #f8fafc; border-radius: 6px; font-size: 0.95rem;">
+                    🖼️ У этого товара пока нет фотографий.<br>
+                    Загрузите фотографии с помощью кнопки выше.
+                </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- JavaScript для динамических характеристик и менеджера фото -->
+<script>
+// Схемы категорий и существующие характеристики
+const categorySchemas = {{ category_schemas_json | default('{}') | safe }};
+const initialCharacteristics = {{ initial_characteristics_json | default('{}') | safe }};
+const productId = {{ product.id or 'null' }};
+
+// Инициализация при загрузке страницы
+document.addEventListener("DOMContentLoaded", function() {
+    renderCategoryCharacteristics();
+});
+
+function onCategoryChange() {
+    const sel = document.getElementById("category-select");
+    const customInput = document.getElementById("category-custom-input");
+    const badge = document.getElementById("active-category-badge");
+
+    if (sel.value === "__custom__") {
+        customInput.style.display = "block";
+        customInput.required = true;
+        badge.textContent = customInput.value || "Своя категория";
+    } else {
+        customInput.style.display = "none";
+        customInput.required = false;
+        badge.textContent = sel.value || "Не выбрана";
+    }
+
+    renderCategoryCharacteristics();
+}
+
+function getSelectedCategoryName() {
+    const sel = document.getElementById("category-select");
+    if (!sel) return "";
+    if (sel.value === "__custom__") {
+        return document.getElementById("category-custom-input").value.trim();
+    }
+    return sel.value.trim();
+}
+
+function renderCategoryCharacteristics() {
+    const catName = getSelectedCategoryName();
+    const container = document.getElementById("standard-characteristics-container");
+    container.innerHTML = "";
+
+    const standardFields = categorySchemas[catName] || [];
+    const usedStandardKeys = new Set(standardFields);
+
+    if (standardFields.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1 / -1; color: #718096; font-size: 0.9rem; font-style: italic;">Для выбранной категории нет предустановленного списка характеристик. Вы можете задать их в блоке дополнительных характеристик ниже.</div>';
+    } else {
+        standardFields.forEach(fieldName => {
+            const currentVal = initialCharacteristics[fieldName] || "";
+            const div = document.createElement("div");
+            div.innerHTML = `
+                <label style="display: block; font-weight: 500; margin-bottom: 4px; font-size: 0.9rem; color: #374151;">
+                    ${escapeHtml(fieldName)}
+                </label>
+                <input type="text" name="char_${escapeAttr(fieldName)}" value="${escapeAttr(currentVal)}" placeholder="Значение..." style="width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 0.9rem; border: 1px solid #cbd5e0; border-radius: 5px;">
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // Рендерим существующие кастомные (не входящие в текущий стандартный список)
+    renderCustomCharacteristics(usedStandardKeys);
+}
+
+let customRowCount = 0;
+function renderCustomCharacteristics(usedStandardKeys) {
+    const customContainer = document.getElementById("custom-characteristics-container");
+    customContainer.innerHTML = "";
+    customRowCount = 0;
+
+    for (const [key, val] of Object.entries(initialCharacteristics)) {
+        if (!usedStandardKeys.has(key)) {
+            addCustomCharacteristicRow(key, val);
+        }
+    }
+    updateCustomEmptyHint();
+}
+
+function addCustomCharacteristicRow(name = "", val = "") {
+    const customContainer = document.getElementById("custom-characteristics-container");
+    const rowId = "custom-char-row-" + (++customRowCount);
+    const row = document.createElement("div");
+    row.id = rowId;
+    row.style.cssText = "display: flex; gap: 8px; align-items: center;";
+    row.innerHTML = `
+        <input type="text" name="custom_char_name[]" value="${escapeAttr(name)}" placeholder="Название характеристики" style="flex: 1; padding: 7px 10px; font-size: 0.9rem; border: 1px solid #cbd5e0; border-radius: 4px;">
+        <input type="text" name="custom_char_val[]" value="${escapeAttr(val)}" placeholder="Значение" style="flex: 1; padding: 7px 10px; font-size: 0.9rem; border: 1px solid #cbd5e0; border-radius: 4px;">
+        <button type="button" onclick="document.getElementById('${rowId}').remove(); updateCustomEmptyHint();" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 4px; padding: 7px 12px; cursor: pointer; font-weight: bold;" title="Удалить">✕</button>
+    `;
+    customContainer.appendChild(row);
+    updateCustomEmptyHint();
+}
+
+function updateCustomEmptyHint() {
+    const customContainer = document.getElementById("custom-characteristics-container");
+    const hint = document.getElementById("custom-empty-hint");
+    if (customContainer.children.length > 0) {
+        hint.style.display = "none";
+    } else {
+        hint.style.display = "block";
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str).replace(/"/g, "&quot;");
+}
+
+// ----------------------------------------------------
+// Photo Manager AJAX Functions
+// ----------------------------------------------------
+function handleFilesSelected(files) {
+    if (!files || files.length === 0) return;
+    
+    // Проверка размера файлов (макс 15 МБ = 15 * 1024 * 1024 байт)
+    const MAX_SIZE = 15 * 1024 * 1024;
+    for (let i = 0; i < files.length; i++) {
+        if (files[i].size > MAX_SIZE) {
+            alert(`Файл "${files[i].name}" превышает допустимый размер 15 МБ (${(files[i].size / 1024 / 1024).toFixed(1)} МБ). Пожалуйста, выберите файл меньшего размера.`);
+            return;
+        }
+    }
+
+    const form = document.getElementById("photo-upload-form");
+    const progress = document.getElementById("upload-progress");
+    progress.style.display = "block";
+
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: "POST",
+        body: formData,
+        headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" }
+    })
+    .then(r => r.json())
+    .then(data => {
+        progress.style.display = "none";
+        if (data.error) {
+            alert("Ошибка загрузки: " + (data.detail || data.error));
+        } else {
+            // Перезагружаем страницу с сохранением вкладки / позиции
+            window.location.href = window.location.pathname + "?msg=" + encodeURIComponent("Фотографии успешно загружены");
+        }
+    })
+    .catch(err => {
+        progress.style.display = "none";
+        // Fallback: submit form naturally
+        form.submit();
+    });
+}
+
+function setMainPhoto(prodId, photoId) {
+    fetch(`/inventory/products/${prodId}/photos/${photoId}/make-main`, {
+        method: "POST",
+        headers: { "Accept": "application/json" }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert("Ошибка: " + (data.detail || data.error));
+        } else {
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        window.location.reload();
+    });
+}
+
+function deletePhoto(prodId, photoId) {
+    if (!confirm("Вы уверены, что хотите удалить эту фотографию?")) {
+        return;
+    }
+
+    fetch(`/inventory/products/${prodId}/photos/${photoId}/delete`, {
+        method: "POST",
+        headers: { "Accept": "application/json" }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert("Ошибка: " + (data.detail || data.error));
+        } else {
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        window.location.reload();
+    });
+}
+
+function movePhoto(prodId, photoId, direction) {
+    const cards = Array.from(document.querySelectorAll(".photo-card"));
+    const photoIds = cards.map(c => parseInt(c.getAttribute("data-photo-id")));
+    const idx = photoIds.indexOf(photoId);
+    if (idx === -1) return;
+
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= photoIds.length) return;
+
+    // Свопаем
+    const tmp = photoIds[idx];
+    photoIds[idx] = photoIds[newIdx];
+    photoIds[newIdx] = tmp;
+
+    fetch(`/inventory/products/${prodId}/photos/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ photo_ids: photoIds })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert("Ошибка изменения порядка: " + (data.detail || data.error));
+        } else {
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        window.location.reload();
+    });
+}
+</script>
+{% endblock %}
