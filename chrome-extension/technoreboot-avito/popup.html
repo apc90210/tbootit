@@ -57,12 +57,41 @@
         <p id="fillMsg" class="msg" style="margin-top:10px;"></p>
     </div>
 
-    <!-- Main Ingest Section (Avito Listing -> Technoreboot) -->
+    <!-- Bulk Ingest Section (Avito Profile/List -> Technoreboot) -->
+    <div class="card" id="bulkSection" style="display:none;">
+        <h3 id="bulkTitle">Страница списка объявлений</h3>
+        <p id="bulkDetectInfo">Поиск объявлений на странице...</p>
+
+        <div id="bulkActionButtons">
+            <button id="bulkImportAllBtn" class="btn btn-success btn-block">Импортировать все объявления</button>
+            <button id="bulkImportCurrentBtn" class="btn btn-primary btn-block" style="margin-top:6px;">Импортировать текущую страницу</button>
+        </div>
+
+        <button id="bulkStopBtn" class="btn btn-danger btn-block" style="display:none; margin-top:8px;">Остановить импорт</button>
+
+        <div id="bulkProgressBox" class="fill-report" style="display:none; margin-top:10px;">
+            <div style="font-weight:bold; margin-bottom:4px;" id="bulkProgressHeader">Обработка объявлений...</div>
+            <div style="font-size:11px; line-height:1.6;" id="bulkProgressStats">
+                Найдено страниц: <strong id="bulkTotalPages">1</strong><br>
+                Обработано: <strong id="bulkProcessedCount">0</strong> / <span id="bulkFoundCount">0</span><br>
+                Создано: <strong id="bulkCreatedCount" style="color:#16a34a;">0</strong><br>
+                Обновлено: <strong id="bulkUpdatedCount" style="color:#2563eb;">0</strong><br>
+                Пропущено: <strong id="bulkSkippedCount">0</strong><br>
+                Ошибок: <strong id="bulkErrorsCount" style="color:#dc2626;">0</strong>
+            </div>
+            <div id="bulkErrorDetails" class="fill-details" style="display:none; margin-top:6px; font-size:11px;"></div>
+            <button id="toggleBulkErrorsBtn" class="btn btn-link" style="padding:2px 0; font-size:11px; display:none;">Показать ошибки...</button>
+        </div>
+
+        <p id="bulkMsg" class="msg" style="margin-top:10px;"></p>
+    </div>
+
+    <!-- Main Single Listing Ingest Section (Avito Listing -> Technoreboot) -->
     <div class="card" id="actionSection" style="display:none;">
-        <h3 id="pageTypeTitle">Страница Avito</h3>
+        <h3 id="pageTypeTitle">Объявление Avito</h3>
         <p id="pageDetectInfo">Загрузка информации со страницы...</p>
 
-        <button id="sendBtn" class="btn btn-success btn-block" disabled>Передать в Техноребут</button>
+        <button id="sendBtn" class="btn btn-success btn-block" disabled>Доимпортировать данные</button>
         <div id="productLinkContainer" style="display:none; margin-top:8px;">
             <button id="openProductBtn" class="btn btn-primary btn-block">🔍 Открыть товар в Техноребут</button>
         </div>
@@ -70,7 +99,7 @@
     </div>
 
     <div class="footer">
-        <small id="versionLabel">Техноребут Avito</small>
+        <small id="versionLabel">Техноребут Avito v0.2.48</small>
     </div>
 
     <script src="popup.js"></script>

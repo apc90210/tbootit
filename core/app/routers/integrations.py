@@ -161,10 +161,19 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         elif payload.parameters and payload.parameters.get("Состояние"):
             product.condition = payload.parameters.get("Состояние")
         product.avito_title = payload.title
-        product.avito_description = payload.description
+        if payload.description:
+            product.avito_description = payload.description
         if payload.parameters:
-            product.avito_params_json = json.dumps(payload.parameters, ensure_ascii=False)
-            product.source_attributes_json = json.dumps(payload.parameters, ensure_ascii=False)
+            existing_params = {}
+            if product.avito_params_json:
+                try:
+                    existing_params = json.loads(product.avito_params_json) or {}
+                except Exception:
+                    existing_params = {}
+            merged_params = dict(existing_params)
+            merged_params.update(payload.parameters)
+            product.avito_params_json = json.dumps(merged_params, ensure_ascii=False)
+            product.source_attributes_json = json.dumps(merged_params, ensure_ascii=False)
         product.source_origin = "avito"
         product.last_imported_at = now
         db.flush()
@@ -195,8 +204,10 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         ext_link.remote_status = payload.remote_status
         ext_link.remote_status_raw = payload.remote_status_raw
         ext_link.source_title = payload.title
-        ext_link.source_price = payload.price
-        ext_link.source_attributes_json = json.dumps(payload.parameters, ensure_ascii=False) if payload.parameters else None
+        if payload.price is not None:
+            ext_link.source_price = payload.price
+        if payload.parameters:
+            ext_link.source_attributes_json = product.source_attributes_json
         ext_link.last_seen_at = now
         ext_link.last_imported_at = now
         ext_link.sync_state = "synced"

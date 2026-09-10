@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.47)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.48)
 
 let pageInitialData = null;
 
@@ -1847,7 +1847,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.47",
+            extension_version: "0.2.48",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1878,7 +1878,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.47",
+            extension_version: "0.2.48",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1896,45 +1896,162 @@ function extractListingData(extraPhotos = []) {
     }
 }
 
+function extractPaginationInfo() {
+    try {
+        let currentPage = 1;
+        let totalPages = 1;
+        let nextUrl = null;
+        let hasNextPage = false;
+
+        // 1. URL search params
+        try {
+            const urlObj = new URL(window.location.href);
+            const pParam = urlObj.searchParams.get("p") || urlObj.searchParams.get("page");
+            if (pParam && !isNaN(parseInt(pParam))) {
+                currentPage = parseInt(pParam);
+            }
+        } catch (e) {}
+
+        // 2. DOM current page
+        const currentBtn = document.querySelector('[data-marker="pagination-button/current"], [aria-current="page"], .pagination-item_active, span[class*="active-"]');
+        if (currentBtn && currentBtn.textContent.trim()) {
+            const num = parseInt(currentBtn.textContent.trim());
+            if (!isNaN(num) && num > 0) {
+                currentPage = num;
+            }
+        }
+
+        // 3. DOM total pages
+        const pageBtns = document.querySelectorAll('[data-marker*="page("], [data-marker*="pagination-button/page"], nav[aria-label*="Пагинация"] a, .pagination-item a');
+        pageBtns.forEach(btn => {
+            const txt = btn.textContent.trim();
+            const num = parseInt(txt);
+            if (!isNaN(num) && num > totalPages) {
+                totalPages = num;
+            }
+        });
+        if (currentPage > totalPages) {
+            totalPages = currentPage;
+        }
+
+        // 4. Next button
+        const nextBtn = document.querySelector('[data-marker="pagination-button/next"], a[aria-label="Следующая страница"], .pagination-item-next a');
+        if (nextBtn) {
+            const isDis = nextBtn.hasAttribute("disabled") || nextBtn.getAttribute("aria-disabled") === "true" || nextBtn.classList.contains("disabled");
+            if (!isDis) {
+                hasNextPage = true;
+                const href = nextBtn.getAttribute("href");
+                if (href) {
+                    nextUrl = href.startsWith("http") ? href : ("https://www.avito.ru" + href);
+                }
+            }
+        }
+
+        if (!nextUrl && (hasNextPage || totalPages > currentPage)) {
+            try {
+                const u = new URL(window.location.href);
+                u.searchParams.set("p", String(currentPage + 1));
+                nextUrl = u.toString();
+                hasNextPage = true;
+            } catch (e) {}
+        }
+
+        return {
+            current_page: currentPage,
+            total_pages: totalPages,
+            has_next_page: hasNextPage,
+            next_page_url: nextUrl
+        };
+    } catch (err) {
+        return {
+            current_page: 1,
+            total_pages: 1,
+            has_next_page: false,
+            next_page_url: null
+        };
+    }
+}
+
 function extractMyListingsData() {
     try {
         const items = [];
-        const itemEls = document.querySelectorAll('[data-marker="item"], .styles-root-item, .item-snippet');
+        const seenIds = new Set();
+        const itemEls = document.querySelectorAll(
+            '[data-marker="item"], [data-marker="item-snippet"], [data-marker="catalog-serp/item"], .styles-root-item, .item-snippet, .iva-item-root, .items-item, article[class*="snippet"]'
+        );
+
         itemEls.forEach(el => {
-            const titleEl = el.querySelector('[data-marker="item-title"], .item-title-link, h3');
-            const linkEl = el.querySelector('a[href*="/"]');
-            const priceEl = el.querySelector('[data-marker="item-price"], .price');
+            const titleEl = el.querySelector('[data-marker="item-title"], [itemprop="name"], .item-title-link, .title-root, h3, a[title]');
+            const linkEl = el.querySelector('a[data-marker="item-title"], a[itemprop="url"], a[href*="/item/"], a[href*="/catalog/"], a[href*="/"]');
+            const priceEl = el.querySelector('[data-marker="item-price"], [itemprop="price"], meta[itemprop="price"], [class*="price-text"], .price, .item-price');
+            const locEl = el.querySelector('[data-marker="item-address"], .geo-root, [class*="geo-address"], [class*="address-"], [data-marker="item-line"]');
+            const photoEl = el.querySelector('img[data-marker="item-photo"], img[src*="img.avito.st"], img[class*="photo"], img[class*="image"]');
 
-            if (titleEl && linkEl) {
-                const href = linkEl.getAttribute('href');
-                const fullUrl = href.startsWith('http') ? href : 'https://www.avito.ru' + href;
+            if (linkEl) {
+                const href = linkEl.getAttribute('href') || '';
+                const fullUrl = href.startsWith('http') ? href : ('https://www.avito.ru' + href);
                 const itemId = extractAvitoItemId(fullUrl, el.innerHTML);
-                const priceText = priceEl ? priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '') : null;
 
-                items.push({
-                    external_item_id: itemId,
-                    external_url: fullUrl,
-                    title: titleEl.textContent.trim(),
-                    price: priceText ? parseFloat(priceText) : null,
-                    status: "active"
-                });
+                if (itemId && !seenIds.has(itemId)) {
+                    seenIds.add(itemId);
+                    let title = titleEl ? titleEl.textContent.trim() : (linkEl.getAttribute('title') || `Объявление Avito ${itemId}`);
+                    let price = null;
+                    if (priceEl) {
+                        const contentAttr = priceEl.getAttribute('content');
+                        if (contentAttr && !isNaN(parseFloat(contentAttr))) {
+                            price = parseFloat(contentAttr);
+                        } else {
+                            const digits = priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+                            if (digits) price = parseFloat(digits);
+                        }
+                    }
+
+                    const cardText = el.textContent.toLowerCase();
+                    let status = "active";
+                    if (cardText.includes("завершено") || cardText.includes("архив") || cardText.includes("снято")) {
+                        status = "inactive";
+                    }
+
+                    let location = locEl ? locEl.textContent.trim() : null;
+                    let photoUrl = null;
+                    if (photoEl) {
+                        photoUrl = photoEl.getAttribute('src') || photoEl.getAttribute('data-src');
+                    }
+
+                    items.push({
+                        avito_id: itemId,
+                        external_item_id: itemId,
+                        url: fullUrl,
+                        external_url: fullUrl,
+                        title: title,
+                        price: price,
+                        status: status,
+                        location: location,
+                        photo_url: photoUrl
+                    });
+                }
             }
         });
+
+        const pagination = extractPaginationInfo();
+
         return {
             schema_version: 1,
-            extension_version: "0.2.47",
+            extension_version: "0.2.48",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
+            pagination: pagination,
             items: items
         };
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.47",
+            extension_version: "0.2.48",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
+            pagination: { current_page: 1, total_pages: 1, has_next_page: false },
             items: []
         };
     }
@@ -3494,7 +3611,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "extract_current_page") {
         try {
             const url = window.location.href;
-            if (url.includes('/profile/items') || url.includes('/my/items')) {
+            const isSingleItemView = !!document.querySelector('[data-marker="item-view/title-info"], [data-marker="item-view/item-description"], [data-marker="item-view/item-price"]');
+            const isProfileUrl = url.includes('/profile') || url.includes('/my/items') || url.includes('/user/') || url.includes('sellerId=');
+            const itemEls = document.querySelectorAll(
+                '[data-marker="item"], [data-marker="item-snippet"], [data-marker="catalog-serp/item"], .styles-root-item, .item-snippet, .iva-item-root, .items-item, article[class*="snippet"]'
+            );
+
+            if (!isSingleItemView && (isProfileUrl || itemEls.length >= 2)) {
+                sendResponse(extractMyListingsData());
+            } else if (isProfileUrl && itemEls.length > 0) {
                 sendResponse(extractMyListingsData());
             } else if (request.deepScan) {
                 extractListingDataMultiPass()
@@ -3510,7 +3635,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.47",
+                    extension_version: "0.2.48",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

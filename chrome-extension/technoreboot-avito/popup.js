@@ -31,6 +31,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const toggleDetailsBtn = document.getElementById("toggleDetailsBtn");
     const fillMsg = document.getElementById("fillMsg");
 
+    const bulkSection = document.getElementById("bulkSection");
+    const bulkTitle = document.getElementById("bulkTitle");
+    const bulkDetectInfo = document.getElementById("bulkDetectInfo");
+    const bulkActionButtons = document.getElementById("bulkActionButtons");
+    const bulkImportAllBtn = document.getElementById("bulkImportAllBtn");
+    const bulkImportCurrentBtn = document.getElementById("bulkImportCurrentBtn");
+    const bulkStopBtn = document.getElementById("bulkStopBtn");
+    const bulkProgressBox = document.getElementById("bulkProgressBox");
+    const bulkProgressHeader = document.getElementById("bulkProgressHeader");
+    const bulkTotalPages = document.getElementById("bulkTotalPages");
+    const bulkProcessedCount = document.getElementById("bulkProcessedCount");
+    const bulkFoundCount = document.getElementById("bulkFoundCount");
+    const bulkCreatedCount = document.getElementById("bulkCreatedCount");
+    const bulkUpdatedCount = document.getElementById("bulkUpdatedCount");
+    const bulkSkippedCount = document.getElementById("bulkSkippedCount");
+    const bulkErrorsCount = document.getElementById("bulkErrorsCount");
+    const bulkErrorDetails = document.getElementById("bulkErrorDetails");
+    const toggleBulkErrorsBtn = document.getElementById("toggleBulkErrorsBtn");
+    const bulkMsg = document.getElementById("bulkMsg");
+
     const actionSection = document.getElementById("actionSection");
     const pageTypeTitle = document.getElementById("pageTypeTitle");
     const pageDetectInfo = document.getElementById("pageDetectInfo");
@@ -42,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.30";
+        let manifestVer = "0.2.48";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -149,6 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         pairSection.style.display = "none";
         prepareSection.style.display = "none";
         fillSection.style.display = "none";
+        bulkSection.style.display = "none";
         actionSection.style.display = "none";
         if (productLinkContainer) productLinkContainer.style.display = "none";
     }
@@ -212,6 +233,298 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
             } else {
                 callback(response);
+            }
+        });
+    }
+
+    function setupBulkSection(activeTab, initialResponse) {
+        bulkSection.style.display = "block";
+        actionSection.style.display = "none";
+
+        const items = initialResponse.items || [];
+        const pagination = initialResponse.pagination || { current_page: 1, total_pages: 1, has_next_page: false };
+
+        bulkTitle.textContent = "Список объявлений Avito";
+        bulkDetectInfo.innerHTML = `Найдено объявлений на странице: <strong>${items.length}</strong><br>Страница: <strong>${pagination.current_page || 1}</strong> из <strong>${pagination.total_pages || 1}</strong>`;
+
+        bulkTotalPages.textContent = pagination.total_pages || 1;
+        bulkFoundCount.textContent = items.length;
+        bulkProcessedCount.textContent = "0";
+        bulkCreatedCount.textContent = "0";
+        bulkUpdatedCount.textContent = "0";
+        bulkSkippedCount.textContent = "0";
+        bulkErrorsCount.textContent = "0";
+        bulkErrorDetails.style.display = "none";
+        toggleBulkErrorsBtn.style.display = "none";
+        bulkProgressBox.style.display = "none";
+        bulkStopBtn.style.display = "none";
+        bulkActionButtons.style.display = "block";
+
+        if (!isPaired) {
+            bulkImportAllBtn.disabled = true;
+            bulkImportCurrentBtn.disabled = true;
+            bulkMsg.className = "msg msg-error";
+            bulkMsg.textContent = "Импорт станет доступен после привязки расширения к серверу.";
+            return;
+        }
+
+        bulkImportAllBtn.disabled = false;
+        bulkImportCurrentBtn.disabled = false;
+        bulkMsg.textContent = "";
+
+        let cancelRequested = false;
+
+        function sendBulkBatch(batchItems) {
+            return new Promise(resolve => {
+                chrome.runtime.sendMessage({
+                    action: "bulk_import_batch",
+                    items: batchItems
+                }, res => {
+                    resolve(res || { success: false, message: "Нет ответа от background worker" });
+                });
+            });
+        }
+
+        function waitForTabLoad(tabId, timeoutMs = 15000) {
+            return new Promise(resolve => {
+                let resolved = false;
+                const timer = setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        chrome.tabs.onUpdated.removeListener(onUpdatedListener);
+                        resolve(false);
+                    }
+                }, timeoutMs);
+
+                function onUpdatedListener(updatedTabId, changeInfo) {
+                    if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timer);
+                            chrome.tabs.onUpdated.removeListener(onUpdatedListener);
+                            resolve(true);
+                        }
+                    }
+                }
+                chrome.tabs.onUpdated.addListener(onUpdatedListener);
+            });
+        }
+
+        bulkImportCurrentBtn.onclick = async () => {
+            if (!isPaired) return;
+            bulkImportAllBtn.disabled = true;
+            bulkImportCurrentBtn.disabled = true;
+            bulkProgressBox.style.display = "block";
+            bulkProgressHeader.textContent = "Импорт текущей страницы...";
+            bulkMsg.className = "msg";
+            bulkMsg.textContent = "Сбор данных и отправка в Техноребут...";
+
+            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page" }, async freshResp => {
+                const curItems = (freshResp && freshResp.items) || items || [];
+                if (!curItems.length) {
+                    bulkImportAllBtn.disabled = false;
+                    bulkImportCurrentBtn.disabled = false;
+                    bulkMsg.className = "msg msg-error";
+                    bulkMsg.textContent = "Объявления не найдены на текущей странице.";
+                    return;
+                }
+
+                bulkFoundCount.textContent = curItems.length;
+                const res = await sendBulkBatch(curItems);
+                bulkImportAllBtn.disabled = false;
+                bulkImportCurrentBtn.disabled = false;
+
+                if (res && res.success) {
+                    bulkProcessedCount.textContent = res.total || curItems.length;
+                    bulkCreatedCount.textContent = res.created || 0;
+                    bulkUpdatedCount.textContent = res.updated || 0;
+                    bulkSkippedCount.textContent = res.skipped || 0;
+                    const errCount = (res.errors && res.errors.length) || 0;
+                    bulkErrorsCount.textContent = errCount;
+
+                    bulkMsg.className = "msg msg-success";
+                    bulkMsg.innerHTML = `✓ Текущая страница импортирована!<br>Создано: <strong>${res.created || 0}</strong>, обновлено: <strong>${res.updated || 0}</strong>, ошибок: <strong>${errCount}</strong>`;
+
+                    if (errCount > 0) {
+                        toggleBulkErrorsBtn.style.display = "inline-block";
+                        bulkErrorDetails.innerHTML = res.errors.slice(0, 10).map(e => `<div>${e.avito_id || ''}: ${e.error || JSON.stringify(e)}</div>`).join("");
+                        toggleBulkErrorsBtn.onclick = () => {
+                            bulkErrorDetails.style.display = bulkErrorDetails.style.display === "none" ? "block" : "none";
+                            toggleBulkErrorsBtn.textContent = bulkErrorDetails.style.display === "none" ? "Показать ошибки..." : "Скрыть ошибки";
+                        };
+                    }
+                } else {
+                    bulkMsg.className = "msg msg-error";
+                    bulkMsg.textContent = (res && res.message) || "Ошибка отправки пакета.";
+                }
+            });
+        };
+
+        bulkImportAllBtn.onclick = async () => {
+            if (!isPaired) return;
+            cancelRequested = false;
+
+            bulkActionButtons.style.display = "none";
+            bulkStopBtn.style.display = "block";
+            bulkStopBtn.disabled = false;
+            bulkStopBtn.textContent = "Остановить импорт";
+            bulkProgressBox.style.display = "block";
+            bulkProgressHeader.textContent = "Пакетный импорт всех страниц...";
+            bulkMsg.className = "msg";
+            bulkMsg.textContent = "Запуск импорта...";
+
+            bulkStopBtn.onclick = () => {
+                cancelRequested = true;
+                bulkStopBtn.disabled = true;
+                bulkStopBtn.textContent = "Остановка...";
+                bulkMsg.className = "msg msg-warning";
+                bulkMsg.textContent = "Завершение текущей страницы и остановка...";
+            };
+
+            let totalProcessed = 0;
+            let totalCreated = 0;
+            let totalUpdated = 0;
+            let totalSkipped = 0;
+            let allErrors = [];
+            const seenAvitoIds = new Set();
+            const visitedUrls = new Set();
+            const MAX_PAGES = 50;
+            let pagesCount = 0;
+
+            try {
+                while (pagesCount < MAX_PAGES && !cancelRequested) {
+                    pagesCount++;
+                    bulkProgressHeader.textContent = `Обработка страницы ${pagesCount}...`;
+
+                    const pageData = await new Promise(res => {
+                        sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page" }, resp => res(resp));
+                    });
+
+                    if (!pageData || !pageData.items || pageData.items.length === 0) {
+                        break;
+                    }
+
+                    const pagePagination = pageData.pagination || {};
+                    bulkTotalPages.textContent = pagePagination.total_pages || pagesCount;
+
+                    const newItems = [];
+                    for (const it of pageData.items) {
+                        if (it.avito_id && !seenAvitoIds.has(it.avito_id)) {
+                            seenAvitoIds.add(it.avito_id);
+                            newItems.push(it);
+                        }
+                    }
+
+                    bulkFoundCount.textContent = seenAvitoIds.size;
+
+                    if (newItems.length > 0) {
+                        const batchRes = await sendBulkBatch(newItems);
+                        if (batchRes && batchRes.success) {
+                            totalCreated += (batchRes.created || 0);
+                            totalUpdated += (batchRes.updated || 0);
+                            totalSkipped += (batchRes.skipped || 0);
+                            if (batchRes.errors && batchRes.errors.length) {
+                                allErrors = allErrors.concat(batchRes.errors);
+                            }
+                        } else {
+                            allErrors.push({ page: pagesCount, error: (batchRes && batchRes.message) || "Ошибка отправки" });
+                        }
+                    }
+
+                    totalProcessed = seenAvitoIds.size;
+                    bulkProcessedCount.textContent = totalProcessed;
+                    bulkCreatedCount.textContent = totalCreated;
+                    bulkUpdatedCount.textContent = totalUpdated;
+                    bulkSkippedCount.textContent = totalSkipped;
+                    bulkErrorsCount.textContent = allErrors.length;
+
+                    if (cancelRequested) break;
+
+                    if (!pagePagination.has_next_page || !pagePagination.next_page_url) {
+                        break;
+                    }
+
+                    const nextUrl = pagePagination.next_page_url;
+                    if (visitedUrls.has(nextUrl)) {
+                        break;
+                    }
+                    visitedUrls.add(nextUrl);
+
+                    bulkMsg.textContent = `Переход на страницу ${pagesCount + 1}...`;
+                    await new Promise(r => setTimeout(r, 1200));
+                    if (cancelRequested) break;
+
+                    chrome.tabs.update(activeTab.id, { url: nextUrl });
+                    await waitForTabLoad(activeTab.id);
+                    await new Promise(r => setTimeout(r, 1500));
+                }
+            } catch (err) {
+                allErrors.push({ error: String(err) });
+            } finally {
+                bulkActionButtons.style.display = "block";
+                bulkStopBtn.style.display = "none";
+                bulkStopBtn.disabled = false;
+                bulkStopBtn.textContent = "Остановить импорт";
+                bulkImportAllBtn.disabled = false;
+                bulkImportCurrentBtn.disabled = false;
+
+                if (cancelRequested) {
+                    bulkMsg.className = "msg msg-warning";
+                    bulkMsg.innerHTML = `⚠️ Импорт остановлен пользователем.<br>Обработано страниц: <strong>${pagesCount}</strong>, объявлений: <strong>${totalProcessed}</strong> (создано: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>).`;
+                } else {
+                    bulkMsg.className = "msg msg-success";
+                    bulkMsg.innerHTML = `✓ Импорт успешно завершен!<br>Страниц обработано: <strong>${pagesCount}</strong>, объявлений: <strong>${totalProcessed}</strong><br>Создано новых: <strong>${totalCreated}</strong>, обновлено: <strong>${totalUpdated}</strong>, ошибок: <strong>${allErrors.length}</strong>`;
+                }
+
+                if (allErrors.length > 0) {
+                    toggleBulkErrorsBtn.style.display = "inline-block";
+                    bulkErrorDetails.innerHTML = allErrors.slice(0, 10).map(e => `<div>${e.avito_id || e.page || ''}: ${e.error || JSON.stringify(e)}</div>`).join("");
+                    toggleBulkErrorsBtn.onclick = () => {
+                        bulkErrorDetails.style.display = bulkErrorDetails.style.display === "none" ? "block" : "none";
+                        toggleBulkErrorsBtn.textContent = bulkErrorDetails.style.display === "none" ? "Показать ошибки..." : "Скрыть ошибки";
+                    };
+                }
+            }
+        };
+    }
+
+    function setupSingleListingSection(activeTab, response) {
+        actionSection.style.display = "block";
+        bulkSection.style.display = "none";
+        pageTypeTitle.textContent = "Карточка объявления";
+        const item = response.listing || {};
+        const detectedPhotosCount = (item.photos && item.photos.length) || 0;
+        const visibleCount = (response.diagnostics && response.diagnostics.visible_gallery_count) || 0;
+        const initialDisplayCount = Math.max(detectedPhotosCount, visibleCount);
+        const displayTitle = item.title || "Объявление Avito";
+        const displayPrice = item.price ? item.price + " ₽" : "Не указана";
+        const photoStatusText = initialDisplayCount > 0 
+            ? `Обнаружено фото: <strong>${initialDisplayCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`
+            : `Обнаружено фото: <strong>0</strong>`;
+        pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>${photoStatusText}`;
+        
+        if (isPaired) {
+            sendBtn.disabled = false;
+            sendBtn.textContent = "Доимпортировать данные";
+            resultMsg.textContent = "";
+        } else {
+            sendBtn.disabled = true;
+            sendBtn.textContent = "Доимпортировать данные";
+            resultMsg.className = "msg msg-error";
+            resultMsg.textContent = "Передача станет доступна после привязки расширения.";
+        }
+
+        // Run deep multi-pass scan (active gallery walker)
+        chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
+            if (deepResponse && deepResponse.listing) {
+                currentExtractionData = deepResponse;
+                const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
+                const deepTitle = deepResponse.listing.title || displayTitle;
+                const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
+                pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
+                if (isPaired) {
+                    sendBtn.disabled = false;
+                }
             }
         });
     }
@@ -499,11 +812,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
-            // 3. CONTEXT C: Avito Listing Page (Standard Ingestion)
+            // 3. CONTEXT C: Avito Pages (Listings / Single Ad)
             if (isAvitoHost) {
-                actionSection.style.display = "block";
                 sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
                     if (!response) {
+                        actionSection.style.display = "block";
                         pageDetectInfo.textContent = "Обновите страницу Avito (F5) для активации расширения.";
                         sendBtn.disabled = true;
                         return;
@@ -511,53 +824,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                     currentExtractionData = response;
                     if (response.error) {
+                        actionSection.style.display = "block";
                         pageDetectInfo.textContent = response.error;
                         sendBtn.disabled = true;
-                    } else if (response.page_type === "listing") {
-                        pageTypeTitle.textContent = "Карточка объявления";
-                        const item = response.listing || {};
-                        const detectedPhotosCount = (item.photos && item.photos.length) || 0;
-                        const visibleCount = (response.diagnostics && response.diagnostics.visible_gallery_count) || 0;
-                        const initialDisplayCount = Math.max(detectedPhotosCount, visibleCount);
-                        const displayTitle = item.title || "Объявление Avito";
-                        const displayPrice = item.price ? item.price + " ₽" : "Не указана";
-                        const photoStatusText = initialDisplayCount > 0 
-                            ? `Обнаружено фото: <strong>${initialDisplayCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`
-                            : `Обнаружено фото: <strong>0</strong>`;
-                        pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>${photoStatusText}`;
-                        
-                        if (isPaired) {
-                            sendBtn.disabled = false;
-                            sendBtn.textContent = "Передать объявление в Техноребут";
-                            resultMsg.textContent = "";
-                        } else {
-                            sendBtn.disabled = true;
-                            sendBtn.textContent = "Передать объявление в Техноребут";
-                            resultMsg.className = "msg msg-error";
-                            resultMsg.textContent = "Передача станет доступна после привязки расширения.";
-                        }
-
-                        // Run deep multi-pass scan (active gallery walker)
-                        chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
-                            if (deepResponse && deepResponse.listing) {
-                                currentExtractionData = deepResponse;
-                                const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
-                                const deepTitle = deepResponse.listing.title || displayTitle;
-                                const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
-                                pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
-                                if (isPaired) {
-                                    sendBtn.disabled = false;
-                                }
-                            }
-                        });
                     } else if (response.page_type === "my_listings") {
-                        pageTypeTitle.textContent = "Мои объявления";
-                        pageDetectInfo.textContent = `Обнаружено объявлений на странице: ${response.listings_count || 0}`;
-                        if (isPaired) {
-                            sendBtn.disabled = false;
-                            sendBtn.textContent = "Передать список в Техноребут";
-                            resultMsg.textContent = "";
-                        }
+                        setupBulkSection(activeTab, response);
+                    } else {
+                        setupSingleListingSection(activeTab, response);
                     }
                 });
                 return;

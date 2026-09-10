@@ -90,6 +90,8 @@ input[type="text"] {
 .btn-success:hover { background-color: #15803d; }
 .btn-secondary { background-color: #64748b; color: white; }
 .btn-secondary:hover { background-color: #475569; }
+.btn-danger { background-color: #dc2626; color: white; }
+.btn-danger:hover { background-color: #b91c1c; }
 .btn-link { background: none; border: none; color: #2563eb; cursor: pointer; text-decoration: underline; }
 
 .btn-block { width: 100%; margin-top: 8px; }

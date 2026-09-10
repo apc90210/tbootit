@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.1.8)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.48)
 
 const BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -147,13 +147,13 @@ async function sendListingPayload(payload) {
     }
 }
 
-async function sendMyListingsPayload(payload) {
+async function sendBulkImportPayload(payload) {
     const token = await getStoredToken();
     if (!token) {
         return { success: false, message: "Расширение не привязано к Техноребут." };
     }
     try {
-        const res = await fetch(`${BRIDGE_BASE_URL}/my-listings`, {
+        const res = await fetch(`${BRIDGE_BASE_URL}/bulk-import`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -164,12 +164,27 @@ async function sendMyListingsPayload(payload) {
         const parsed = await parseJsonResponseSafely(res);
         if (parsed.ok) {
             const data = parsed.data;
-            return { success: true, message: `Список объявлений получен (найдено: ${data.count || 0}).`, details: data };
+            return {
+                success: true,
+                total: data.total || data.count || (data.results && data.results.length) || 0,
+                count: data.count || data.total || 0,
+                created: data.created || 0,
+                updated: data.updated || 0,
+                skipped: data.skipped || 0,
+                errors: data.errors || 0,
+                results: data.results || [],
+                message: `Обработано: ${data.total || data.count || 0}. Создано: ${data.created || 0}, Обновлено: ${data.updated || 0}, Ошибок: ${data.errors || 0}.`,
+                details: data
+            };
         }
-        return { success: false, message: parsed.error };
+        return { success: false, message: parsed.error || "Ошибка массового импорта", details: parsed.data };
     } catch (e) {
         return { success: false, message: `Ошибка сети: ${e.message}` };
     }
+}
+
+async function sendMyListingsPayload(payload) {
+    return sendBulkImportPayload(payload);
 }
 
 async function fetchPublicationPackage(productId) {
@@ -295,8 +310,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendListingPayload(request.payload).then(sendResponse);
         return true;
     }
-    if (request.action === "ingest_my_listings") {
-        sendMyListingsPayload(request.payload).then(sendResponse);
+    if (request.action === "ingest_my_listings" || request.action === "bulk_import_batch") {
+        sendBulkImportPayload(request.payload).then(sendResponse);
         return true;
     }
     if (request.action === "fetch_publication_package") {
