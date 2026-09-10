@@ -74,7 +74,7 @@ class ProductFullUpdate(BaseModel):
     condition: Optional[str] = None
     description: Optional[str] = None
     purchase_price: Optional[float] = None
-    sale_price: float
+    sale_price: Optional[float] = None
     status: Optional[str] = None
     storage_location: Optional[str] = None
     quantity: Optional[int] = 0
@@ -311,6 +311,7 @@ class AvitoPublication(BaseModel):
     avito_description: Optional[str] = None
 
 class ProductDetails(Product):
+    price: Optional[float] = None
     margin: Optional[float] = None
     available_quantity: int = 0
     has_photos: bool = False

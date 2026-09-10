@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, Request, Query, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -106,39 +106,134 @@ async def generate_missing_barcodes_endpoint(request: Request):
     return RedirectResponse(url=f"/inventory/products?msg={msg}", status_code=303)
 
 
-def _extract_product_payload(form_data):
+def format_core_error(detail: Any) -> str:
+    """Format Core API errors into clean, friendly Russian messages without raw Pydantic output or URLs."""
+    if not detail:
+        return "Ошибка обработки данных на сервере"
+
+    if isinstance(detail, str):
+        detail_clean = detail.strip()
+        if (detail_clean.startswith("[") and detail_clean.endswith("]")) or "pydantic" in detail_clean.lower() or "float_type" in detail_clean:
+            try:
+                detail = json.loads(detail_clean)
+            except Exception:
+                import ast
+                try:
+                    parsed = ast.literal_eval(detail_clean)
+                    if isinstance(parsed, (list, dict)):
+                        detail = parsed
+                except Exception:
+                    pass
+
+    if isinstance(detail, list):
+        field_labels = {
+            "sale_price": "Цена продажи",
+            "price": "Цена продажи",
+            "purchase_price": "Закупочная цена",
+            "cost_price": "Закупочная цена",
+            "title": "Название товара",
+            "quantity": "Количество",
+            "sku": "Артикул (SKU)",
+            "barcode": "Штрихкод",
+            "status": "Статус",
+            "storage_location": "Место хранения",
+            "category": "Категория",
+        }
+        messages = []
+        for item in detail:
+            if isinstance(item, dict):
+                loc = item.get("loc", [])
+                field = str(loc[-1]) if loc else ""
+                err_type = str(item.get("type", ""))
+                msg = str(item.get("msg", ""))
+                label = field_labels.get(field, field or "Поле")
+
+                if "float" in err_type or "int" in err_type or "number" in err_type or "valid number" in msg.lower():
+                    messages.append(f"{label} должна быть корректным числом.")
+                elif "missing" in err_type or "required" in msg.lower():
+                    messages.append(f"{label} обязательно для заполнения.")
+                elif "greater_than" in err_type:
+                    messages.append(f"{label} должно быть больше нуля.")
+                else:
+                    import re
+                    clean_msg = re.sub(r'https?://\S+', '', msg).strip()
+                    messages.append(f"{label}: {clean_msg}")
+            elif isinstance(item, str):
+                messages.append(item)
+        if messages:
+            return "Не удалось сохранить товар: " + " ".join(messages)
+
+    import re
+    result = re.sub(r'https?://\S+', '', str(detail)).strip()
+    return result
+
+
+def _extract_product_payload(form_data, existing_product=None):
     title = str(form_data.get("title") or "").strip()
+    if not title and existing_product:
+        title = str(existing_product.get("title") or "").strip()
+
     category = str(form_data.get("category") or "").strip()
     if category == "__custom__":
         category = str(form_data.get("category_custom") or "").strip()
+    if not category and existing_product:
+        category = str(existing_product.get("category") or "").strip()
+
     brand = str(form_data.get("brand") or "").strip() or None
+    if not brand and existing_product:
+        brand = existing_product.get("brand")
+
     model = str(form_data.get("model") or "").strip() or None
+    if not model and existing_product:
+        model = existing_product.get("model")
+
     condition = str(form_data.get("condition") or "").strip() or None
+    if not condition and existing_product:
+        condition = existing_product.get("condition")
 
-    try:
-        price = float(form_data.get("price") or 0.0)
-    except (ValueError, TypeError):
-        price = 0.0
-
+    # Sale price: accept sale_price or price, normalize comma to dot
     sale_price_raw = form_data.get("sale_price")
+    if sale_price_raw is None:
+        sale_price_raw = form_data.get("price")
+
     sale_price = None
     if sale_price_raw is not None and str(sale_price_raw).strip():
+        val_str = str(sale_price_raw).replace(",", ".").strip()
         try:
-            sale_price = float(sale_price_raw)
+            sale_price = float(val_str)
         except (ValueError, TypeError):
-            sale_price = None
+            sale_price = -999.0  # Parsing error sentinel
+    elif sale_price_raw is None and existing_product is not None:
+        sale_price = existing_product.get("sale_price")
+        if sale_price is None:
+            sale_price = existing_product.get("price")
 
+    # Cost / Purchase price
     cost_price_raw = form_data.get("cost_price")
+    if cost_price_raw is None:
+        cost_price_raw = form_data.get("purchase_price")
+
     cost_price = None
     if cost_price_raw is not None and str(cost_price_raw).strip():
+        val_cost = str(cost_price_raw).replace(",", ".").strip()
         try:
-            cost_price = float(cost_price_raw)
+            cost_price = float(val_cost)
         except (ValueError, TypeError):
-            cost_price = None
+            cost_price = -999.0
+    elif cost_price_raw is None and existing_product is not None:
+        cost_price = existing_product.get("purchase_price")
+        if cost_price is None:
+            cost_price = existing_product.get("cost_price")
 
-    try:
-        quantity = int(form_data.get("quantity") or 0)
-    except (ValueError, TypeError):
+    quantity_raw = form_data.get("quantity")
+    if quantity_raw is not None and str(quantity_raw).strip():
+        try:
+            quantity = int(quantity_raw)
+        except (ValueError, TypeError):
+            quantity = -1
+    elif quantity_raw is None and existing_product is not None:
+        quantity = existing_product.get("quantity", 0)
+    else:
         quantity = 0
 
     status = str(form_data.get("status") or "in_stock").strip()
@@ -163,14 +258,18 @@ def _extract_product_payload(form_data):
         if cn_str and cv_str:
             characteristics[cn_str] = cv_str
 
+    if not characteristics and existing_product and existing_product.get("characteristics"):
+        characteristics = dict(existing_product.get("characteristics"))
+
     return {
         "title": title,
         "category": category or None,
         "brand": brand,
         "model": model,
         "condition": condition,
-        "price": price,
         "sale_price": sale_price,
+        "price": sale_price,
+        "purchase_price": cost_price,
         "cost_price": cost_price,
         "quantity": quantity,
         "status": status,
@@ -182,17 +281,27 @@ def _extract_product_payload(form_data):
     }
 
 
-def _validate_product_payload(payload):
-    if not payload.get("title"):
+def _validate_product_payload(payload, is_new=False, existing_product=None):
+    if not payload.get("title") or not str(payload.get("title")).strip():
         return "Название товара обязательно для заполнения"
-    if payload.get("price", 0) < 0:
-        return "Базовая цена не может быть отрицательной"
-    if payload.get("sale_price") is not None and payload["sale_price"] < 0:
-        return "Цена продажи не может быть отрицательной"
-    if payload.get("cost_price") is not None and payload["cost_price"] < 0:
-        return "Себестоимость не может быть отрицательной"
-    if payload.get("quantity", 0) < 0:
-        return "Количество не может быть отрицательным"
+
+    sale_price = payload.get("sale_price")
+    if sale_price is None or sale_price == -999.0:
+        if not is_new and existing_product and existing_product.get("sale_price") is None and sale_price is None:
+            pass
+        else:
+            return "Укажите корректную цену продажи."
+    elif sale_price < 0:
+        return "Цена продажи не может быть отрицательной."
+
+    cost_price = payload.get("cost_price")
+    if cost_price is not None and cost_price < 0:
+        return "Закупочная цена должна быть неотрицательной."
+
+    qty = payload.get("quantity")
+    if qty is None or qty < 0:
+        return "Количество должно быть неотрицательным целым числом."
+
     return None
 
 
@@ -224,7 +333,7 @@ async def new_product_form(request: Request):
 async def create_product_endpoint(request: Request):
     form_data = await request.form()
     payload = _extract_product_payload(form_data)
-    err = _validate_product_payload(payload)
+    err = _validate_product_payload(payload, is_new=True)
     if err:
         meta = await core_client.get_editor_meta()
         ctx = _prepare_editor_context(request, is_new=True, product=payload, meta=meta, error=err)
@@ -233,7 +342,7 @@ async def create_product_endpoint(request: Request):
     res = await core_client.create_product(payload)
     if res and isinstance(res, dict) and res.get("error"):
         meta = await core_client.get_editor_meta()
-        detail = res.get("detail") or "Ошибка создания товара"
+        detail = format_core_error(res.get("detail") or res.get("details") or "Ошибка создания товара")
         ctx = _prepare_editor_context(request, is_new=True, product=payload, meta=meta, error=detail)
         return templates.TemplateResponse(request=request, name="product_edit.html", context=ctx, status_code=400)
 
@@ -317,27 +426,27 @@ async def edit_product_form(request: Request, product_id: int):
 @router.post("/products/{product_id}/edit", response_class=HTMLResponse)
 async def update_product_full_endpoint(request: Request, product_id: int):
     form_data = await request.form()
-    payload = _extract_product_payload(form_data)
-    err = _validate_product_payload(payload)
+    existing = await core_client.get_product_details(product_id)
+    existing_dict = existing if existing and isinstance(existing, dict) and not existing.get("error") else None
+    payload = _extract_product_payload(form_data, existing_product=existing_dict)
+    err = _validate_product_payload(payload, is_new=False, existing_product=existing_dict)
     if err:
         meta = await core_client.get_editor_meta()
-        existing = await core_client.get_product_details(product_id)
         product_view = dict(payload)
         product_view["id"] = product_id
-        if existing and isinstance(existing, dict):
-            product_view["photos"] = existing.get("photos", [])
+        if existing_dict:
+            product_view["photos"] = existing_dict.get("photos", [])
         ctx = _prepare_editor_context(request, is_new=False, product=product_view, meta=meta, error=err)
         return templates.TemplateResponse(request=request, name="product_edit.html", context=ctx, status_code=400)
 
     res = await core_client.full_update_product(product_id, payload)
     if res and isinstance(res, dict) and res.get("error"):
         meta = await core_client.get_editor_meta()
-        existing = await core_client.get_product_details(product_id)
         product_view = dict(payload)
         product_view["id"] = product_id
-        if existing and isinstance(existing, dict):
-            product_view["photos"] = existing.get("photos", [])
-        detail = res.get("detail") or "Ошибка обновления товара"
+        if existing_dict:
+            product_view["photos"] = existing_dict.get("photos", [])
+        detail = format_core_error(res.get("detail") or res.get("details") or "Ошибка обновления товара")
         ctx = _prepare_editor_context(request, is_new=False, product=product_view, meta=meta, error=detail)
         return templates.TemplateResponse(request=request, name="product_edit.html", context=ctx, status_code=400)
 

@@ -541,6 +541,7 @@ def get_product_details(product_id: int, db: Session = Depends(get_db)):
 
     # We must convert to dict first because we need to add fields not present in the DB model directly, or use model_validate/dump
     p_dict = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
+    p_dict["price"] = db_product.sale_price
     p_dict["margin"] = margin
     p_dict["available_quantity"] = available
     p_dict["has_photos"] = len(photos) > 0
@@ -614,8 +615,10 @@ def full_update_product(product_id: int, product: schemas.ProductFullUpdate, db:
     db_product.serial_number = product.serial_number.strip() if product.serial_number else None
     db_product.condition = product.condition.strip() if product.condition else None
     db_product.description = product.description
-    db_product.purchase_price = product.purchase_price
-    db_product.sale_price = product.sale_price
+    if product.purchase_price is not None:
+        db_product.purchase_price = product.purchase_price
+    if product.sale_price is not None:
+        db_product.sale_price = product.sale_price
     if product.storage_location:
         db_product.storage_location = product.storage_location
 
