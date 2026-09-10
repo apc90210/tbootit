@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.50)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.51)
 
 let pageInitialData = null;
 
@@ -1874,7 +1874,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.50",
+            extension_version: "0.2.51",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1905,7 +1905,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.50",
+            extension_version: "0.2.51",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1996,26 +1996,71 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         title = `Объявление Avito ${itemId}`;
     }
 
-    // 3. Price (missing price must not drop the listing)
+    // 3. Price (Priority: meta content -> stable data-marker -> dedicated price node text -> narrow currency match)
     let price = null;
-    const priceEl = container.querySelector(
-        '[data-marker*="price"], [itemprop="price"], meta[itemprop="price"], [class*="price-text"], [class*="Price-"], [class*="price-"], .price, .item-price, span[class*="price"]'
-    );
-    if (priceEl) {
-        const contentAttr = priceEl.getAttribute('content');
-        if (contentAttr && !isNaN(parseFloat(contentAttr))) {
-            price = parseFloat(contentAttr);
-        } else {
-            const digits = priceEl.textContent.replace(/\s+/g, '').replace(/[^0-9]/g, '');
-            if (digits) price = parseFloat(digits);
+
+    // 3.1 Structured meta/attribute value
+    const metaPrice = container.querySelector('meta[itemprop="price"], [itemprop="price"][content], [data-marker*="price"][content]');
+    if (metaPrice) {
+        const val = metaPrice.getAttribute('content');
+        if (val && !isNaN(parseFloat(val)) && parseFloat(val) >= 0) {
+            price = parseFloat(val);
         }
     }
+
+    // 3.2 Dedicated price element with strict currency regex or digits-only
     if (price === null) {
-        const txt = container.textContent || '';
-        const m = txt.match(/(\d[\d\s]{0,10})\s*(?:₽|руб\.?|rub)/i);
-        if (m) {
-            const digits = m[1].replace(/\s+/g, '');
-            if (digits) price = parseFloat(digits);
+        const priceEl = container.querySelector(
+            '[data-marker="item-price"], [data-marker="item-price-current"], [data-marker*="price"], [itemprop="price"], span[class*="price-text"], strong[class*="price-text"], p[class*="price-text"], [class*="price-root"], [class*="Price-root"], [class*="priceText"], [class*="itemPrice"], span[class*="price-"], strong[class*="price-"], .price, .item-price'
+        );
+        if (priceEl) {
+            const pTxt = priceEl.textContent || '';
+            // Match digits immediately preceding currency symbol (prevents model numbers like HP 3055 from polluting price)
+            const curMatch = pTxt.match(/(?:^|[^\d])(\d{1,3}(?:[\s\u00A0]\d{3})*|\d+)\s*(?:₽|руб\.?|rub)/i);
+            if (curMatch) {
+                const digits = curMatch[1].replace(/[\s\u00A0]+/g, '');
+                if (digits && !isNaN(parseFloat(digits))) {
+                    price = parseFloat(digits);
+                }
+            } else {
+                // If no currency symbol, check if priceEl text is pure numbers and spaces
+                const cleanTxt = pTxt.replace(/[\s\u00A0]+/g, ' ').trim();
+                const pureDigits = cleanTxt.match(/^(\d{1,3}(?: \d{3})*|\d+)$/);
+                if (pureDigits) {
+                    const digits = pureDigits[1].replace(/\s+/g, '');
+                    if (digits && !isNaN(parseFloat(digits))) {
+                        price = parseFloat(digits);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3.3 Narrow scoped fallback inside container: find the specific leaf element containing currency symbol
+    if (price === null) {
+        const allLeafs = Array.from(container.querySelectorAll('*')).filter(el => 
+            el.children.length === 0 && /(?:₽|руб|rub)/i.test(el.textContent)
+        );
+        for (const leaf of allLeafs) {
+            const leafTxt = leaf.textContent || '';
+            const m = leafTxt.match(/(?:^|[^\d])(\d{1,3}(?:[\s\u00A0]\d{3})*|\d+)\s*(?:₽|руб\.?|rub)/i);
+            if (m) {
+                const digits = m[1].replace(/[\s\u00A0]+/g, '');
+                if (digits && !isNaN(parseFloat(digits))) {
+                    price = parseFloat(digits);
+                    break;
+                }
+            }
+            // Check parent text if leaf was just the currency sign itself
+            const pTxt = (leaf.parentElement ? leaf.parentElement.textContent : '') || '';
+            const pm = pTxt.match(/(?:^|[^\d])(\d{1,3}(?:[\s\u00A0]\d{3})*|\d+)\s*(?:₽|руб\.?|rub)/i);
+            if (pm) {
+                const digits = pm[1].replace(/[\s\u00A0]+/g, '');
+                if (digits && !isNaN(parseFloat(digits))) {
+                    price = parseFloat(digits);
+                    break;
+                }
+            }
         }
     }
 
@@ -2037,16 +2082,65 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         location = locEl.textContent.trim();
     }
 
-    // 6. Photo thumbnail
+    // 6. Photo thumbnail (Priority: currentSrc -> data-src -> src -> srcset -> style background-image)
     let photoUrl = null;
-    const photoEl = container.querySelector(
-        'img[data-marker*="photo"], img[data-marker*="image"], img[src*="img.avito.st"], img[data-src*="img.avito.st"], img[src*="avito"], img[class*="photo"], img[class*="image"], img[class*="picture"]'
-    );
+    const isExcludedImg = (img) => {
+        if (!img) return true;
+        const attr = (k) => (img.getAttribute(k) || '').toLowerCase();
+        const cls = (img.className || '').toLowerCase();
+        const alt = attr('alt');
+        const src = attr('src');
+        const marker = attr('data-marker');
+        if (marker.includes('avatar') || marker.includes('badge') || marker.includes('icon') || marker.includes('logo')) return true;
+        if (cls.includes('avatar') || cls.includes('badge') || cls.includes('icon') || cls.includes('logo')) return true;
+        if (alt.includes('аватар') || alt.includes('avatar') || alt.includes('логотип') || alt.includes('иконка')) return true;
+        if (src.includes('avatar') || src.includes('badge') || src.includes('icon') || src.includes('logo')) return true;
+        return false;
+    };
+
+    const allImgs = Array.from(container.querySelectorAll('img')).filter(img => !isExcludedImg(img));
+    let photoEl = allImgs.find(img => {
+        const m = (img.getAttribute('data-marker') || '').toLowerCase();
+        const s = (img.getAttribute('src') || img.getAttribute('data-src') || '').toLowerCase();
+        return m.includes('photo') || m.includes('image') || s.includes('img.avito.st');
+    }) || allImgs[0];
+
     if (photoEl) {
-        photoUrl = photoEl.getAttribute('src') || photoEl.getAttribute('data-src');
-        if (!photoUrl && photoEl.getAttribute('srcset')) {
-            photoUrl = photoEl.getAttribute('srcset').split(',')[0].trim().split(' ')[0];
+        if (photoEl.currentSrc && photoEl.currentSrc.startsWith('http')) {
+            photoUrl = photoEl.currentSrc;
+        } else if (photoEl.getAttribute('data-src') && photoEl.getAttribute('data-src').startsWith('http')) {
+            photoUrl = photoEl.getAttribute('data-src');
+        } else if (photoEl.getAttribute('data-origin-src') && photoEl.getAttribute('data-origin-src').startsWith('http')) {
+            photoUrl = photoEl.getAttribute('data-origin-src');
+        } else if (photoEl.getAttribute('src') && photoEl.getAttribute('src').startsWith('http')) {
+            photoUrl = photoEl.getAttribute('src');
+        } else if (photoEl.getAttribute('srcset')) {
+            photoUrl = extractBestUrlFromSrcset(photoEl.getAttribute('srcset'));
         }
+    }
+
+    if (!photoUrl) {
+        // Check picture element sources
+        const sourceEl = container.querySelector('picture source[srcset]');
+        if (sourceEl) {
+            photoUrl = extractBestUrlFromSrcset(sourceEl.getAttribute('srcset'));
+        }
+    }
+
+    if (!photoUrl) {
+        // Fallback: style background-image
+        const bgEl = container.querySelector('[style*="background-image"]');
+        if (bgEl) {
+            const bgStyle = bgEl.getAttribute('style') || '';
+            const bgMatch = bgStyle.match(/url\(['"]?(https?:\/\/[^'")]+)['"]?\)/i);
+            if (bgMatch && !bgMatch[1].includes('avatar') && !bgMatch[1].includes('icon')) {
+                photoUrl = bgMatch[1];
+            }
+        }
+    }
+
+    if (photoUrl && !photoUrl.startsWith('http')) {
+        photoUrl = null;
     }
 
     return {
@@ -2058,7 +2152,8 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         price: price,
         status: status,
         location: location,
-        photo_url: photoUrl
+        photo_url: photoUrl,
+        thumbnail_url: photoUrl
     };
 }
 
@@ -2210,7 +2305,7 @@ function extractMyListingsData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.50",
+            extension_version: "0.2.51",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -2220,7 +2315,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.50",
+            extension_version: "0.2.51",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -3926,7 +4021,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.50",
+                    extension_version: "0.2.51",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

@@ -78,7 +78,7 @@ def test_test_b_bulk_sender_emits_valid_json_body_and_structure():
 
         payload = {
             "schema_version": 1,
-            "extension_version": "0.2.50",
+            "extension_version": "0.2.51",
             "page_type": "bulk_import",
             "items": [
                 {"avito_id": "item_101", "url": "https://www.avito.ru/item/101", "title": "Товар 101", "price": 1500}
@@ -150,7 +150,7 @@ def test_test_d_and_e_50_item_batch_accounting_invariant():
 
         payload = {
             "schema_version": 1,
-            "extension_version": "0.2.50",
+            "extension_version": "0.2.51",
             "items": items_50
         }
         res = client.post(
@@ -295,7 +295,7 @@ def test_test_m_and_n_idempotency_and_enrichment():
     # 3. Enrichment: single item
     enrich_payload = {
         "schema_version": 1,
-        "extension_version": "0.2.50",
+        "extension_version": "0.2.51",
         "captured_at": "2026-09-10T14:00:00Z",
         "page_type": "listing",
         "listing": {

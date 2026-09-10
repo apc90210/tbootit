@@ -230,6 +230,20 @@ class Product(Base):
     avito_attribute_values = relationship("ProductAvitoAttributeValue", back_populates="product", cascade="all, delete-orphan")
     photos = relationship("ProductPhoto", back_populates="product", cascade="all, delete-orphan")
 
+    @property
+    def main_photo_url(self):
+        if self.photos:
+            sorted_photos = sorted(
+                self.photos,
+                key=lambda p: (p.sort_order if p.sort_order is not None else 0, p.id or 0)
+            )
+            return sorted_photos[0].media_url
+        return None
+
+    @main_photo_url.setter
+    def main_photo_url(self, val):
+        pass
+
 class ProductExternalListing(Base):
     __tablename__ = "product_external_listings"
     id = Column(Integer, primary_key=True, index=True)

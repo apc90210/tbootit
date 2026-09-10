@@ -419,6 +419,7 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
     data = product.model_dump()
     cat_name = (data.pop("category", None) or "").strip()
     chars = data.pop("characteristics", None) or {}
+    data.pop("main_photo_url", None)
 
     data["sku"] = sku
     if "barcode" in data and data["barcode"]:

@@ -173,6 +173,7 @@
         <table>
             <thead>
                 <tr>
+                    <th style="width: 50px; text-align: center;">Фото</th>
                     <th>Артикул</th>
                     <th>Штрихкод</th>
                     <th>Название</th>
@@ -186,6 +187,16 @@
             <tbody>
                 {% for item in products_data['items'] %}
                 <tr>
+                    <td style="text-align: center; vertical-align: middle; padding: 4px;">
+                        {% if item.main_photo_url %}
+                            {% set img_url = item.main_photo_url if item.main_photo_url.startswith('/') else '/' ~ item.main_photo_url %}
+                            <a href="/inventory/products/{{ item.id }}" title="Открыть товар">
+                                <img src="{{ img_url }}" alt="Превью" style="width: 42px; height: 42px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block;">
+                            </a>
+                        {% else %}
+                            <span style="color: #94a3b8;">—</span>
+                        {% endif %}
+                    </td>
                     <td>{{ item.sku or '—' }}</td>
                     <td><code>{{ item.barcode or '—' }}</code></td>
                     <td><a href="/inventory/products/{{ item.id }}" style="color: #007bff; text-decoration: none; font-weight: 500;">{{ item.title }}</a></td>
@@ -238,7 +249,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" style="text-align: center;">Ничего не найдено</td>
+                    <td colspan="9" style="text-align: center;">Ничего не найдено</td>
                 </tr>
                 {% endfor %}
             </tbody>

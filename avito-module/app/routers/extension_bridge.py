@@ -64,7 +64,7 @@ class ListingPayload(BaseModel):
 
 class MyListingsPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.50"
+    extension_version: str = "0.2.51"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "my_listings"
     listings_count: Optional[int] = 0
@@ -72,7 +72,7 @@ class MyListingsPayload(BaseModel):
 
 class BulkImportPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.50"
+    extension_version: str = "0.2.51"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "bulk_import"
     listings_count: Optional[int] = None
@@ -92,7 +92,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.2.50",
+        "version": "0.2.51",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
@@ -168,7 +168,7 @@ async def receive_bulk_import(
     token: str = Depends(verify_extension_token)
 ):
     if isinstance(payload, list):
-        payload = BulkImportPayload(items=payload, listings_count=len(payload), extension_version="0.2.50")
+        payload = BulkImportPayload(items=payload, listings_count=len(payload), extension_version="0.2.51")
 
     # 1. Save last bulk payload for diagnostics
     _save_json(MY_LISTINGS_FILE, payload.model_dump())
@@ -231,9 +231,15 @@ async def receive_bulk_import(
                 params["Адрес"] = loc
 
             photo_url = str(item.get("photo_url") or item.get("thumbnail_url") or item.get("main_photo") or "").strip()
+            photo_b64 = item.get("content_base64") or item.get("photo_base64") or item.get("thumbnail_base64")
             photos = []
-            if photo_url and photo_url.startswith("http"):
-                photos.append({"url": photo_url, "position": 0})
+            if (photo_url and photo_url.startswith("http")) or photo_b64:
+                p_item = {"position": 0}
+                if photo_url:
+                    p_item["url"] = photo_url
+                if photo_b64:
+                    p_item["content_base64"] = photo_b64
+                photos.append(p_item)
 
             core_payload = {
                 "account_key": account_key,

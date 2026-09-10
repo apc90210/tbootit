@@ -352,39 +352,60 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 pass
         db.delete(photo_row)
 
-    # Filter incoming photo variants: max 1 High-Res and max 1 Low-Res variant per canonical photo key
+    # Determine if this is a lightweight bulk import
+    is_bulk_import = (
+        bool(payload.raw_source_data and (payload.raw_source_data.get("bulk_import") or payload.raw_source_data.get("lightweight")))
+        or (payload.description is None and not payload.parameters)
+    )
+
+    existing_photos_count = db.query(models.ProductPhoto).filter(
+        models.ProductPhoto.product_id == product.id
+    ).count()
+
     incoming_raw_photos = payload.photos or []
-    grouped_incoming = {}
-    key_sequence = []
-    unkeyed_incoming = []
 
-    for item_photo in incoming_raw_photos:
-        source_url = item_photo.url
-        ckey = _get_avito_canonical_identity(source_url) if source_url else None
-        if ckey:
-            if ckey not in grouped_incoming:
-                grouped_incoming[ckey] = []
-                key_sequence.append(ckey)
-            grouped_incoming[ckey].append(item_photo)
+    if is_bulk_import:
+        if existing_photos_count > 0:
+            # Idempotency: Product already has photos (manual or previous detailed/thumbnail).
+            # Do NOT add low-quality thumbnail, do NOT delete/reorder existing gallery.
+            photos_skipped += len(incoming_raw_photos)
+            effective_photos = []
         else:
-            unkeyed_incoming.append(item_photo)
+            # Zero photos: take at most 1 thumbnail photo as canonical ProductPhoto (sort_order = 0)
+            effective_photos = incoming_raw_photos[:1]
+    else:
+        # Full listing import / enrichment: group variants and select best
+        grouped_incoming = {}
+        key_sequence = []
+        unkeyed_incoming = []
 
-    effective_photos = []
-    HIGH_RES_THRESHOLD = 300000
+        for item_photo in incoming_raw_photos:
+            source_url = item_photo.url
+            ckey = _get_avito_canonical_identity(source_url) if source_url else None
+            if ckey:
+                if ckey not in grouped_incoming:
+                    grouped_incoming[ckey] = []
+                    key_sequence.append(ckey)
+                grouped_incoming[ckey].append(item_photo)
+            else:
+                unkeyed_incoming.append(item_photo)
 
-    for ckey in key_sequence:
-        candidates = grouped_incoming[ckey]
-        high_res = [c for c in candidates if _get_avito_quality_score(c.url) >= HIGH_RES_THRESHOLD]
-        low_res = [c for c in candidates if _get_avito_quality_score(c.url) < HIGH_RES_THRESHOLD]
+        effective_photos = []
+        HIGH_RES_THRESHOLD = 300000
 
-        if high_res:
-            best_high = max(high_res, key=lambda p: _get_avito_quality_score(p.url))
-            effective_photos.append(best_high)
-        if low_res:
-            best_low = max(low_res, key=lambda p: _get_avito_quality_score(p.url))
-            effective_photos.append(best_low)
+        for ckey in key_sequence:
+            candidates = grouped_incoming[ckey]
+            high_res = [c for c in candidates if _get_avito_quality_score(c.url) >= HIGH_RES_THRESHOLD]
+            low_res = [c for c in candidates if _get_avito_quality_score(c.url) < HIGH_RES_THRESHOLD]
 
-    effective_photos.extend(unkeyed_incoming)
+            if high_res:
+                best_high = max(high_res, key=lambda p: _get_avito_quality_score(p.url))
+                effective_photos.append(best_high)
+            if low_res:
+                best_low = max(low_res, key=lambda p: _get_avito_quality_score(p.url))
+                effective_photos.append(best_low)
+
+        effective_photos.extend(unkeyed_incoming)
 
     # Track incoming content hashes and source URLs for reconciliation
     incoming_content_hashes = set()
@@ -534,7 +555,8 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         db.add(new_photo)
 
     # 3b. Avito photo set reconciliation — remove obsolete photos no longer in payload
-    if len(payload.photos) > 0:
+    # Note: Skipped for lightweight bulk imports to preserve existing product galleries
+    if not is_bulk_import and len(payload.photos) > 0:
 
         all_photos = db.query(models.ProductPhoto).filter(
             models.ProductPhoto.product_id == product.id

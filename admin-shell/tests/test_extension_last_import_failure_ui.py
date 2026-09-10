@@ -11,5 +11,5 @@ def test_extension_page_renders_cleanly():
     """Verify /avito/extension page loads with 200 OK and includes version link."""
     res = client.get("/avito/extension")
     assert res.status_code == 200
-    assert "0.2.50" in res.text
+    assert "0.2.51" in res.text
 

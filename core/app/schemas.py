@@ -110,6 +110,7 @@ class ProductStatusUpdate(BaseModel):
 
 class Product(ProductBase):
     id: int
+    main_photo_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     class Config:

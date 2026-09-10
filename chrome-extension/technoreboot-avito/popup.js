@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.50";
+        let manifestVer = "0.2.51";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -338,7 +338,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             const payload = {
                 schema_version: 1,
-                extension_version: "0.2.50",
+                extension_version: "0.2.51",
                 captured_at: new Date().toISOString(),
                 page_type: "bulk_import",
                 listings_count: batchItems.length,

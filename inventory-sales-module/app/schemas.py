@@ -14,6 +14,7 @@ class Product(BaseModel):
     storage_location: Optional[str] = None
     brand: Optional[str] = None
     model: Optional[str] = None
+    main_photo_url: Optional[str] = None
 
 class ProductListResponse(BaseModel):
     items: List[Product]
