@@ -28,12 +28,13 @@
     </div>
     {% endif %}
 
-    <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+    <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
         <a href="/inventory/products?location=all" class="btn {% if location == 'all' %}btn-primary{% endif %}" style="{% if location != 'all' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Все</a>
         <a href="/inventory/products?location=store" class="btn {% if location == 'store' %}btn-primary{% endif %}" style="{% if location != 'store' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Магазин</a>
         <a href="/inventory/products?location=workshop" class="btn {% if location == 'workshop' %}btn-primary{% endif %}" style="{% if location != 'workshop' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Мастерская</a>
         <a href="/inventory/products?location=archive" class="btn {% if location == 'archive' %}btn-primary{% endif %}" style="{% if location != 'archive' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Архив</a>
         <a href="/inventory/products?location=draft" class="btn {% if location == 'draft' %}btn-primary{% endif %}" style="{% if location != 'draft' %}background: #fff; border: 1px solid #007bff; color: #007bff;{% endif %} padding: 10px 20px; font-size: 16px;">Черновики</a>
+        <a id="btn-add-product-json" href="/products/json" class="btn btn-success" style="background: #28a745; color: #fff; border: 1px solid #28a745; padding: 10px 20px; font-size: 16px; font-weight: bold; text-decoration: none; margin-left: auto;">+ Добавить новый товар через JSON</a>
     </div>
 
     <div style="background: #fff; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px;">

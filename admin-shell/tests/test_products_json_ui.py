@@ -410,3 +410,52 @@ def test_stage07c_r1_r2_owner_payload_proxy_returns_summary_and_results():
         assert data_file["summary"]["errors"] == 0
         assert len(data_file["results"]) == 2
 
+
+def test_stage07c_r1_r3_open_product_action_markup_and_behavior():
+    """Stage 07C-R1-R3: UI contains 'Открыть товар' action for created products in new tab."""
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.get = AsyncMock(return_value=httpx.Response(200, json={"ai_prompt": "prompt", "products": []}))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        resp = client.get("/products/json")
+        assert resp.status_code == 200
+        html = resp.text
+
+        # Checks for 'Открыть товар' link markup & attributes
+        assert 'Открыть товар' in html
+        assert 'btn-open-product' in html
+        assert 'target="_blank"' in html
+        assert 'rel="noopener noreferrer"' in html
+        assert '/inventory/products/' in html
+
+
+def test_stage07c_r1_r3_inventory_products_contains_json_create_shortcut():
+    """Stage 07C-R1-R3: Verify product list proxied through admin-shell contains shortcut."""
+    fake_inventory_html = (
+        '<html><body>'
+        '<a href="/inventory/products?location=store">Магазин</a>'
+        '<a href="/inventory/products?location=workshop">Мастерская</a>'
+        '<a href="/inventory/products?location=archive">Архив</a>'
+        '<a href="/inventory/products?location=draft">Черновики</a>'
+        '<a id="btn-add-product-json" href="/products/json">+ Добавить новый товар через JSON</a>'
+        '</body></html>'
+    )
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_instance = MagicMock()
+        mock_instance.request = AsyncMock(return_value=httpx.Response(200, text=fake_inventory_html))
+        mock_instance.get = AsyncMock(return_value=httpx.Response(200, text=fake_inventory_html))
+        mock_client_cls.return_value.__aenter__.return_value = mock_instance
+
+        resp = client.get("/inventory/products")
+        assert resp.status_code == 200
+        html = resp.text
+        assert '+ Добавить новый товар через JSON' in html
+        assert 'href="/products/json"' in html
+        assert 'Магазин' in html
+        assert 'Мастерская' in html
+        assert 'Архив' in html
+        assert 'Черновики' in html
+
+

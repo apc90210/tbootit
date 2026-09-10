@@ -472,6 +472,7 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
             results.append({
                 "index": idx + 1,
                 "id": product.id,
+                "product_id": product.id,
                 "sku": product.sku,
                 "title": product.title,
                 "status": "created",
@@ -482,6 +483,7 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
             results.append({
                 "index": idx + 1,
                 "id": product.id,
+                "product_id": product.id,
                 "sku": product.sku,
                 "title": product.title,
                 "status": "updated",
