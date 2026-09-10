@@ -38,11 +38,11 @@
                     </div>
                 </div>
 
-                <!-- Card 2: Minimalist/obfuscated cabinet card relying on anchor fallback -->
+                <!-- Card 2: Minimalist/obfuscated cabinet card with srcset -->
                 <div class="styles-module-root-3kL9m snippet-wrapper" data-marker="item-8492019284">
                     <div class="media-container">
                         <a href="/moskva/tovary_dlya_kompyutera/materinskaya_plata_b550_aorus_pro_8492019284">
-                            <img src="https://20.img.avito.st/image/1/1.xyz_photo2.jpg" alt="Плата B550">
+                            <img srcset="https://20.img.avito.st/image/1/140x105.jpg 140w, https://20.img.avito.st/image/1/640x480.jpg 640w" src="https://20.img.avito.st/image/1/140x105.jpg" alt="Плата B550">
                         </a>
                     </div>
                     <div class="content-container">
@@ -56,10 +56,13 @@
                     </div>
                 </div>
 
-                <!-- Card 3: Card with duplicate anchors to same ID (photo, title, stats link) -->
+                <!-- Card 3: Card with <picture><source srcset> -->
                 <div class="card-item-container" data-marker="extended-item">
                     <a href="/items/8492019285" class="thumb-link">
-                        <img src="https://30.img.avito.st/image/1/1.xyz_photo3.jpg">
+                        <picture>
+                            <source srcset="https://30.img.avito.st/image/1/picture_high.webp 640w" type="image/webp">
+                            <img src="https://30.img.avito.st/image/1/fallback.jpg" alt="Ryzen 7 5700X">
+                        </picture>
                     </a>
                     <div class="details">
                         <h4>
@@ -72,13 +75,43 @@
                     </div>
                 </div>
 
-                <!-- Card 4: Listing with MISSING price (price=None, must NOT drop item) -->
+                <!-- Card 4: Listing with lazy-loaded data-src/data-srcset and missing price -->
                 <div class="cabinet-item" data-marker="profile-item">
+                    <div class="photo-wrapper">
+                        <a href="/profile/items/8492019286">
+                            <img data-src="https://40.img.avito.st/image/1/lazy.jpg" data-srcset="https://40.img.avito.st/image/1/lazy_high.jpg 640w" alt="DeepCool CC560">
+                        </a>
+                    </div>
                     <a href="/profile/items/8492019286" data-marker="item-title">
                         Компьютерный корпус DeepCool CC560 (Без БП)
                     </a>
                     <span class="price-tag">Цена договорная</span>
                     <span data-marker="item-address">Москва, Багратионовский проезд</span>
+                </div>
+
+                <!-- Card 5: Listing with background-image and excluded avatar -->
+                <div class="iva-item-root" data-marker="item" data-item-id="8492019287">
+                    <div class="avatar-box">
+                        <img class="user-avatar" data-marker="user-avatar" src="https://www.avito.st/avatar_ignored.png" alt="Аватар продавца">
+                    </div>
+                    <div class="item-bg-thumb" style="background-image: url('https://50.img.avito.st/image/1/bg_thumb.jpg'); width: 100px; height: 100px;"></div>
+                    <div class="item-details">
+                        <a href="/profile/items/8492019287" data-marker="item-title">
+                            Монитор Samsung Odyssey G7 27 дюймов 240Hz
+                        </a>
+                        <div data-marker="item-price">32 000 ₽</div>
+                    </div>
+                </div>
+
+                <!-- Card 6: HP LaserJet P2055 for price model-number regression protection -->
+                <div class="iva-item-root" data-marker="item" data-item-id="8492019288">
+                    <a href="/profile/items/8492019288">
+                        <img src="https://60.img.avito.st/image/1/laserjet.jpg" alt="HP LaserJet P2055">
+                    </a>
+                    <a href="/profile/items/8492019288" data-marker="item-title">
+                        Принтер HP LaserJet P2055
+                    </a>
+                    <div data-marker="item-price">3 500 ₽</div>
                 </div>
 
             </div>

@@ -218,7 +218,7 @@ def test_req_a_owner_cabinet_and_public_seller_dom_count_positive():
     with open(cab_path, "r", encoding="utf-8") as f:
         cab_html = f.read()
     cab_res = py_extract_my_listings(cab_html)
-    assert len(cab_res["items"]) == 4, f"Expected 4 items from Owner cabinet fixture, got {len(cab_res['items'])}"
+    assert len(cab_res["items"]) == 6, f"Expected 6 items from Owner cabinet fixture, got {len(cab_res['items'])}"
 
     # 2. Public Seller
     pub_path = os.path.join(FIXTURES_DIR, "real_public_seller_profile.html")
@@ -244,7 +244,7 @@ def test_req_b_c_one_card_one_id_and_duplicate_anchors_deduplication():
     # All extracted IDs must be unique
     ids = [it["avito_id"] for it in items]
     assert len(ids) == len(set(ids))
-    assert set(ids) == {"8492019283", "8492019284", "8492019285", "8492019286"}
+    assert set(ids) == {"8492019283", "8492019284", "8492019285", "8492019286", "8492019287", "8492019288"}
 
 
 def test_req_d_e_f_title_price_and_missing_price_resilience():
@@ -326,7 +326,7 @@ async def test_req_i_j_current_page_bulk_import_and_no_duplicates_on_repeat():
     with open(cab_path, "r", encoding="utf-8") as f:
         cab_html = f.read()
     extracted = py_extract_my_listings(cab_html)
-    assert len(extracted["items"]) == 4
+    assert len(extracted["items"]) == 6
 
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -342,8 +342,8 @@ async def test_req_i_j_current_page_bulk_import_and_no_duplicates_on_repeat():
         })
         assert res1.status_code == 200
         d1 = res1.json()
-        assert d1["total"] == 4
-        assert d1["created"] == 4
+        assert d1["total"] == 6
+        assert d1["created"] == 6
         assert d1["updated"] == 0
 
         # Second import run with EXACT same items -> Core mock returns 'updated'
@@ -354,35 +354,35 @@ async def test_req_i_j_current_page_bulk_import_and_no_duplicates_on_repeat():
         })
         assert res2.status_code == 200
         d2 = res2.json()
-        assert d2["total"] == 4
+        assert d2["total"] == 6
         assert d2["created"] == 0
-        assert d2["updated"] == 4, "Repeat import of existing items must result in 0 new items created"
+        assert d2["updated"] == 6, "Repeat import of existing items must result in 0 new items created"
 
 
-def test_version_0_2_51_alignment_across_extension_and_admin_shell():
-    """Verify extension version 0.2.51 is aligned across manifest, popup, content, sw, templates."""
+def test_version_0_2_52_alignment_across_extension_and_admin_shell():
+    """Verify extension version 0.2.52 is aligned across manifest, popup, content, sw, templates."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] == "0.2.51"
+    assert manifest["version"] == "0.2.52"
 
     with open(POPUP_HTML_PATH, "r", encoding="utf-8") as f:
         popup_html = f.read()
-    assert "v0.2.51" in popup_html
+    assert "v0.2.52" in popup_html
 
     with open(POPUP_JS_PATH, "r", encoding="utf-8") as f:
         popup_js = f.read()
-    assert 'let manifestVer = "0.2.51";' in popup_js
+    assert 'let manifestVer = "0.2.52";' in popup_js
 
     with open(CONTENT_JS_PATH, "r", encoding="utf-8") as f:
         content_js = f.read()
-    assert 'extension_version: "0.2.51"' in content_js
+    assert 'extension_version: "0.2.52"' in content_js
 
     # Admin Shell download page template
     tmpl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "admin-shell", "app", "templates", "avito_extension.html"))
     with open(tmpl_path, "r", encoding="utf-8") as f:
         tmpl = f.read()
-    assert "(ZIP, v0.2.51)" in tmpl
+    assert "(ZIP, v0.2.52)" in tmpl
 
     # Built zip
-    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist", "technoreboot-avito-extension-0.2.51.zip"))
+    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist", "technoreboot-avito-extension-0.2.52.zip"))
     assert os.path.exists(zip_path), f"Built zip must exist at {zip_path}"

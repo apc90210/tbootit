@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.51)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.52)
 
 let pageInitialData = null;
 
@@ -1874,7 +1874,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.51",
+            extension_version: "0.2.52",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1905,7 +1905,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.51",
+            extension_version: "0.2.52",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1923,36 +1923,77 @@ function extractListingData(extraPhotos = []) {
     }
 }
 
-function findCardContainerForAnchor(anchor) {
-    if (!anchor) return null;
-    let cur = anchor.parentElement;
-    let bestContainer = anchor.parentElement || anchor;
+function findCardContainer(node) {
+    if (!node) return null;
+    
+    // Top-level card root selectors
+    const topCardSelectors = [
+        '[data-marker="item-root"]',
+        '[data-marker="item"]',
+        '[data-marker="item-snippet"]',
+        '[data-marker="catalog-serp/item"]',
+        '[data-marker="profile/item"]',
+        '[data-marker^="profile-item"]',
+        '[data-marker^="extended-item"]',
+        '[data-marker^="item-8"]',
+        '[data-marker^="item-7"]',
+        '[data-marker^="item-6"]',
+        '[data-marker^="item-5"]',
+        '[data-marker^="item-4"]',
+        '[data-marker^="item-3"]',
+        '[data-marker^="item-2"]',
+        '[data-marker^="item-1"]',
+        '[data-marker^="item-9"]',
+        '[data-item-id]',
+        '.iva-item-root',
+        '.items-item',
+        'div[class*="styles-module-root-"]',
+        'div[class*="ItemSnippet"]',
+        'div[class*="item-snippet"]',
+        'article'
+    ].join(', ');
+
+    let candidate = null;
+    if (typeof node.closest === 'function') {
+        candidate = node.closest(topCardSelectors);
+    }
+
+    let cur = candidate || node.parentElement || node;
+    let bestContainer = cur;
     let depth = 0;
-    while (cur && cur !== document.body && cur !== document.documentElement && depth < 10) {
+    while (cur && cur !== document.body && cur !== document.documentElement && depth < 12) {
         depth++;
-        const marker = cur.getAttribute('data-marker') || '';
-        const cls = cur.className || '';
+        const marker = (cur.getAttribute('data-marker') || '').toLowerCase();
+        const cls = (cur.className || '').toString().toLowerCase();
         const tag = cur.tagName.toLowerCase();
 
-        if (marker.includes('item') || marker.includes('snippet') || marker.includes('card') ||
-            cls.includes('item') || cls.includes('snippet') || cls.includes('card') || cls.includes('Snippet') ||
-            cls.includes('iva-item') || cls.includes('styles-root') ||
-            tag === 'article' || tag === 'li' || tag === 'tr') {
+        const isRootMarker = marker === 'item' || marker === 'item-root' || marker === 'item-snippet' ||
+            marker === 'catalog-serp/item' || marker === 'profile/item' || marker.startsWith('profile-item') ||
+            marker.startsWith('extended-item') || /item-\d{8,14}/.test(marker);
+        const isRootClass = cls.includes('iva-item-root') || cls.includes('styles-module-root-') ||
+            cls.includes('items-item') || cls.includes('item-snippet') || cls.includes('itemsnippet');
+        const isRootTag = tag === 'article' || (tag === 'li' && (marker.includes('item') || cls.includes('item')));
+
+        if (isRootMarker || isRootClass || isRootTag) {
             bestContainer = cur;
-            if (marker === 'item' || marker.startsWith('item-') || marker.includes('item-snippet') ||
-                marker === 'catalog-serp/item' || marker === 'item-root' || marker.startsWith('profile-item') ||
-                marker.startsWith('extended-item') || cls.includes('iva-item-root') || tag === 'article') {
-                return cur;
-            }
         }
+
+        if (cur.parentElement && (cur.parentElement.tagName.toLowerCase() === 'article' || cur.parentElement.getAttribute('data-marker') === 'item-root')) {
+            bestContainer = cur.parentElement;
+        }
+
         cur = cur.parentElement;
     }
-    return bestContainer;
+
+    return bestContainer || candidate || node;
 }
+
+const findCardContainerForAnchor = findCardContainer;
 
 function parseListingCardElement(cardEl, fallbackAnchor = null) {
     if (!cardEl && !fallbackAnchor) return null;
-    const container = cardEl || (fallbackAnchor ? (fallbackAnchor.parentElement || fallbackAnchor) : null);
+    const baseNode = cardEl || fallbackAnchor;
+    const container = findCardContainer(baseNode) || baseNode;
     if (!container) return null;
 
     // 1. Link & Item ID
@@ -2015,7 +2056,6 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         );
         if (priceEl) {
             const pTxt = priceEl.textContent || '';
-            // Match digits immediately preceding currency symbol (prevents model numbers like HP 3055 from polluting price)
             const curMatch = pTxt.match(/(?:^|[^\d])(\d{1,3}(?:[\s\u00A0]\d{3})*|\d+)\s*(?:₽|руб\.?|rub)/i);
             if (curMatch) {
                 const digits = curMatch[1].replace(/[\s\u00A0]+/g, '');
@@ -2023,7 +2063,6 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
                     price = parseFloat(digits);
                 }
             } else {
-                // If no currency symbol, check if priceEl text is pure numbers and spaces
                 const cleanTxt = pTxt.replace(/[\s\u00A0]+/g, ' ').trim();
                 const pureDigits = cleanTxt.match(/^(\d{1,3}(?: \d{3})*|\d+)$/);
                 if (pureDigits) {
@@ -2036,7 +2075,7 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         }
     }
 
-    // 3.3 Narrow scoped fallback inside container: find the specific leaf element containing currency symbol
+    // 3.3 Narrow scoped fallback inside container: find leaf containing currency symbol
     if (price === null) {
         const allLeafs = Array.from(container.querySelectorAll('*')).filter(el => 
             el.children.length === 0 && /(?:₽|руб|rub)/i.test(el.textContent)
@@ -2051,7 +2090,6 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
                     break;
                 }
             }
-            // Check parent text if leaf was just the currency sign itself
             const pTxt = (leaf.parentElement ? leaf.parentElement.textContent : '') || '';
             const pm = pTxt.match(/(?:^|[^\d])(\d{1,3}(?:[\s\u00A0]\d{3})*|\d+)\s*(?:₽|руб\.?|rub)/i);
             if (pm) {
@@ -2082,7 +2120,7 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         location = locEl.textContent.trim();
     }
 
-    // 6. Photo thumbnail (Priority: currentSrc -> data-src -> src -> srcset -> style background-image)
+    // 6. Photo thumbnail extraction (multi-source: picture source, currentSrc, data-srcset, srcset, data-src, background-image)
     function extractBestUrlFromSrcset(srcsetStr) {
         if (!srcsetStr || typeof srcsetStr !== 'string') return null;
         const parts = srcsetStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -2120,59 +2158,83 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         const alt = attr('alt');
         const src = attr('src');
         const marker = attr('data-marker');
-        if (marker.includes('avatar') || marker.includes('badge') || marker.includes('icon') || marker.includes('logo')) return true;
-        if (cls.includes('avatar') || cls.includes('badge') || cls.includes('icon') || cls.includes('logo')) return true;
+        if (marker.includes('avatar') || marker.includes('badge') || marker.includes('icon') || marker.includes('logo') || marker.includes('delivery')) return true;
+        if (cls.includes('avatar') || cls.includes('badge') || cls.includes('icon') || cls.includes('logo') || cls.includes('delivery')) return true;
         if (alt.includes('аватар') || alt.includes('avatar') || alt.includes('логотип') || alt.includes('иконка')) return true;
-        if (src.includes('avatar') || src.includes('badge') || src.includes('icon') || src.includes('logo')) return true;
+        if (src.includes('avatar') || src.includes('badge') || src.includes('icon') || src.includes('logo') || src.includes('delivery')) return true;
+        if (src.startsWith('data:image/svg+xml')) return true;
         return false;
     };
 
-    const allImgs = Array.from(container.querySelectorAll('img')).filter(img => !isExcludedImg(img));
-    let photoEl = allImgs.find(img => {
-        const m = (img.getAttribute('data-marker') || '').toLowerCase();
-        const s = (img.getAttribute('src') || img.getAttribute('data-src') || '').toLowerCase();
-        return m.includes('photo') || m.includes('image') || s.includes('img.avito.st') || s.includes('avito');
-    }) || allImgs[0];
+    // Dedicated photo container inside card
+    const photoContainer = container.querySelector(
+        '[data-marker*="photo"], [data-marker*="image"], [class*="photo"], [class*="image"], [class*="picture"], [class*="gallery"]'
+    );
+    const searchScope = photoContainer || container;
 
-    if (photoEl) {
-        let cur = photoEl.currentSrc || '';
-        if (cur.startsWith('//')) cur = 'https:' + cur;
-        let dSrc = photoEl.getAttribute('data-src') || '';
-        if (dSrc.startsWith('//')) dSrc = 'https:' + dSrc;
-        let dOrig = photoEl.getAttribute('data-origin-src') || '';
-        if (dOrig.startsWith('//')) dOrig = 'https:' + dOrig;
-        let sSrc = photoEl.getAttribute('src') || '';
-        if (sSrc.startsWith('//')) sSrc = 'https:' + sSrc;
-
-        if (cur && cur.startsWith('http') && !cur.startsWith('data:')) {
-            photoUrl = cur;
-        } else if (dSrc && dSrc.startsWith('http')) {
-            photoUrl = dSrc;
-        } else if (dOrig && dOrig.startsWith('http')) {
-            photoUrl = dOrig;
-        } else if (sSrc && sSrc.startsWith('http') && !sSrc.startsWith('data:')) {
-            photoUrl = sSrc;
-        } else if (photoEl.getAttribute('srcset')) {
-            photoUrl = extractBestUrlFromSrcset(photoEl.getAttribute('srcset'));
+    // A. Check picture sources
+    const pictureSources = Array.from(searchScope.querySelectorAll('picture source'));
+    for (const pSrc of pictureSources) {
+        const ss = pSrc.getAttribute('srcset') || pSrc.getAttribute('data-srcset');
+        if (ss) {
+            const best = extractBestUrlFromSrcset(ss);
+            if (best && !best.includes('avatar') && !best.includes('icon') && !best.includes('logo')) {
+                photoUrl = best;
+                break;
+            }
         }
     }
 
+    // B. Check img elements
     if (!photoUrl) {
-        // Check picture element sources
-        const sourceEl = container.querySelector('picture source[srcset]');
-        if (sourceEl) {
-            photoUrl = extractBestUrlFromSrcset(sourceEl.getAttribute('srcset'));
+        let imgs = Array.from(searchScope.querySelectorAll('img')).filter(img => !isExcludedImg(img));
+        if (imgs.length === 0 && searchScope !== container) {
+            imgs = Array.from(container.querySelectorAll('img')).filter(img => !isExcludedImg(img));
+        }
+
+        let photoEl = imgs.find(img => {
+            const m = (img.getAttribute('data-marker') || '').toLowerCase();
+            const s = (img.getAttribute('src') || img.getAttribute('data-src') || '').toLowerCase();
+            return m.includes('photo') || m.includes('image') || s.includes('img.avito.st') || s.includes('avito');
+        }) || imgs[0];
+
+        if (photoEl) {
+            let cur = photoEl.currentSrc || '';
+            if (cur.startsWith('//')) cur = 'https:' + cur;
+            let dSrcset = photoEl.getAttribute('data-srcset') || '';
+            let sSrcset = photoEl.getAttribute('srcset') || '';
+            let dSrc = photoEl.getAttribute('data-src') || '';
+            if (dSrc.startsWith('//')) dSrc = 'https:' + dSrc;
+            let dOrig = photoEl.getAttribute('data-origin-src') || '';
+            if (dOrig.startsWith('//')) dOrig = 'https:' + dOrig;
+            let sSrc = photoEl.getAttribute('src') || '';
+            if (sSrc.startsWith('//')) sSrc = 'https:' + sSrc;
+
+            if (cur && cur.startsWith('http') && !cur.startsWith('data:') && !cur.includes('avatar') && !cur.includes('icon')) {
+                photoUrl = cur;
+            } else if (dSrcset) {
+                photoUrl = extractBestUrlFromSrcset(dSrcset);
+            } else if (sSrcset) {
+                photoUrl = extractBestUrlFromSrcset(sSrcset);
+            } else if (dSrc && dSrc.startsWith('http')) {
+                photoUrl = dSrc;
+            } else if (dOrig && dOrig.startsWith('http')) {
+                photoUrl = dOrig;
+            } else if (sSrc && sSrc.startsWith('http') && !sSrc.startsWith('data:')) {
+                photoUrl = sSrc;
+            }
         }
     }
 
+    // C. Fallback: CSS style background-image
     if (!photoUrl) {
-        // Fallback: style background-image
-        const bgEl = container.querySelector('[style*="background-image"]');
-        if (bgEl) {
+        const bgEls = Array.from(container.querySelectorAll('[style*="background-image"], [style*="background:"]'));
+        for (const bgEl of bgEls) {
             const bgStyle = bgEl.getAttribute('style') || '';
             const bgMatch = bgStyle.match(/url\(['"]?(https?:\/\/[^'")]+)['"]?\)/i);
-            if (bgMatch && !bgMatch[1].includes('avatar') && !bgMatch[1].includes('icon')) {
+            if (bgMatch && !bgMatch[1].includes('avatar') && !bgMatch[1].includes('icon') && !bgMatch[1].includes('logo')) {
                 photoUrl = bgMatch[1];
+                break;
             }
         }
     }
@@ -2195,6 +2257,7 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         thumbnail_url: photoUrl
     };
 }
+
 
 function extractPaginationInfo() {
     try {
@@ -2289,28 +2352,30 @@ function extractPaginationInfo() {
 
 function extractMyListingsData() {
     try {
-        const items = [];
-        const seenIds = new Set();
+        const itemsById = new Map();
 
-        // Primary Layer 1: Container cards (broad selector matching cabinet and public profiles)
+        // Primary Layer 1: Container cards (strictly root cards without leaf wildcard)
         const cardSelectors = [
-            '[data-marker="item"]',
-            '[data-marker^="item-"]',
             '[data-marker="item-root"]',
+            '[data-marker="item"]',
             '[data-marker="item-snippet"]',
-            '[data-marker^="item-snippet"]',
             '[data-marker="catalog-serp/item"]',
+            '[data-marker="profile/item"]',
             '[data-marker^="profile-item"]',
             '[data-marker^="extended-item"]',
-            '[data-marker="profile/item"]',
-            '[data-marker*="snippet"]',
+            '[data-marker^="item-8"]',
+            '[data-marker^="item-7"]',
+            '[data-marker^="item-6"]',
+            '[data-marker^="item-5"]',
+            '[data-marker^="item-4"]',
+            '[data-marker^="item-3"]',
+            '[data-marker^="item-2"]',
+            '[data-marker^="item-1"]',
+            '[data-marker^="item-9"]',
             '[data-item-id]',
-            'div[class*="item-snippet"]',
-            'div[class*="ItemSnippet"]',
-            'div[class*="snippet-"]',
-            'div[class*="Snippet-"]',
-            'div[class*="styles-root-"]',
             'div[class*="styles-module-root-"]',
+            'div[class*="ItemSnippet"]',
+            'div[class*="item-snippet"]',
             '.iva-item-root',
             '.items-item',
             'article'
@@ -2319,32 +2384,49 @@ function extractMyListingsData() {
         const itemEls = document.querySelectorAll(cardSelectors);
         itemEls.forEach(el => {
             const parsed = parseListingCardElement(el);
-            if (parsed && parsed.avito_id && !seenIds.has(parsed.avito_id)) {
-                seenIds.add(parsed.avito_id);
-                items.push(parsed);
-            }
-        });
-
-        // Layer 2: Anchor fallback scan (scans ALL anchors with Avito listing URLs inside content area)
-        const anchors = document.querySelectorAll('a[href]');
-        anchors.forEach(a => {
-            const href = a.getAttribute('href') || '';
-            const itemId = extractAvitoIdFromUrl(href);
-            if (itemId && !seenIds.has(itemId)) {
-                const container = findCardContainerForAnchor(a);
-                const parsed = parseListingCardElement(container, a);
-                if (parsed && parsed.avito_id && !seenIds.has(parsed.avito_id)) {
-                    seenIds.add(parsed.avito_id);
-                    items.push(parsed);
+            if (parsed && parsed.avito_id) {
+                const existing = itemsById.get(parsed.avito_id);
+                if (!existing) {
+                    itemsById.set(parsed.avito_id, parsed);
+                } else {
+                    if (!existing.photo_url && parsed.photo_url) {
+                        existing.photo_url = parsed.photo_url;
+                        existing.thumbnail_url = parsed.thumbnail_url;
+                    }
+                    if (existing.price === null && parsed.price !== null) {
+                        existing.price = parsed.price;
+                    }
                 }
             }
         });
 
+        // Layer 2: Anchor fallback scan (scans anchors with Avito listing URLs inside content area)
+        const anchors = document.querySelectorAll('a[href]');
+        anchors.forEach(a => {
+            const href = a.getAttribute('href') || '';
+            const itemId = extractAvitoIdFromUrl(href);
+            if (itemId) {
+                const existing = itemsById.get(itemId);
+                if (!existing || !existing.photo_url) {
+                    const parsed = parseListingCardElement(null, a);
+                    if (parsed && parsed.avito_id) {
+                        if (!existing) {
+                            itemsById.set(parsed.avito_id, parsed);
+                        } else if (!existing.photo_url && parsed.photo_url) {
+                            existing.photo_url = parsed.photo_url;
+                            existing.thumbnail_url = parsed.thumbnail_url;
+                        }
+                    }
+                }
+            }
+        });
+
+        const items = Array.from(itemsById.values());
         const pagination = extractPaginationInfo();
 
         return {
             schema_version: 1,
-            extension_version: "0.2.51",
+            extension_version: "0.2.52",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -2354,7 +2436,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.51",
+            extension_version: "0.2.52",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -2418,22 +2500,26 @@ function extractMyListingsDataAsync(maxWaitMs = 10000) {
 function hasAnyListingsCardOrAnchor() {
     try {
         const cardSelectors = [
-            '[data-marker="item"]',
-            '[data-marker^="item-"]',
             '[data-marker="item-root"]',
+            '[data-marker="item"]',
             '[data-marker="item-snippet"]',
-            '[data-marker^="item-snippet"]',
             '[data-marker="catalog-serp/item"]',
+            '[data-marker="profile/item"]',
             '[data-marker^="profile-item"]',
             '[data-marker^="extended-item"]',
-            '[data-marker="profile/item"]',
-            '[data-marker*="snippet"]',
+            '[data-marker^="item-8"]',
+            '[data-marker^="item-7"]',
+            '[data-marker^="item-6"]',
+            '[data-marker^="item-5"]',
+            '[data-marker^="item-4"]',
+            '[data-marker^="item-3"]',
+            '[data-marker^="item-2"]',
+            '[data-marker^="item-1"]',
+            '[data-marker^="item-9"]',
             '[data-item-id]',
-            'div[class*="item-snippet"]',
+            'div[class*="styles-module-root-"]',
             'div[class*="ItemSnippet"]',
-            'div[class*="snippet-"]',
-            'div[class*="Snippet-"]',
-            'div[class*="styles-root-"]',
+            'div[class*="item-snippet"]',
             '.iva-item-root',
             '.items-item',
             'article'
@@ -2450,6 +2536,7 @@ function hasAnyListingsCardOrAnchor() {
         return false;
     }
 }
+
 
 function detectPageType() {
     const url = window.location.href;
@@ -4060,7 +4147,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.51",
+                    extension_version: "0.2.52",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

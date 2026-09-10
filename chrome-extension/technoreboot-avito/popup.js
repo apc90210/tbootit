@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.31)
+// Technoreboot Avito Popup Script (v0.2.52)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.51";
+        let manifestVer = "0.2.52";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -246,10 +246,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         bulkTitle.textContent = "Список объявлений Avito";
 
+        const photoCount = items.filter(it => it.photo_url || it.thumbnail_url).length;
+
         if (items.length === 0) {
             bulkDetectInfo.innerHTML = `Найдено объявлений на странице: <strong>0</strong><br><span style="color: #d32f2f;">Объявления не найдены. Проверьте, что список объявлений загрузился полностью.</span> <a href="#" id="bulkRescanBtn" style="font-size: 11px; text-decoration: underline; color: #1976d2; margin-left: 4px;">Повторить поиск</a>`;
         } else {
-            bulkDetectInfo.innerHTML = `Найдено объявлений на странице: <strong>${items.length}</strong><br>Страница: <strong>${pagination.current_page || 1}</strong> из <strong>${pagination.total_pages || 1}</strong>`;
+            const photoBadgeColor = photoCount > 0 ? "#16a34a" : "#d32f2f";
+            bulkDetectInfo.innerHTML = `Найдено объявлений: <strong>${items.length}</strong><br>Страница: <strong>${pagination.current_page || 1}</strong> из <strong>${pagination.total_pages || 1}</strong><br>Фото найдено: <strong style="color: ${photoBadgeColor};">${photoCount} из ${items.length}</strong>`;
         }
 
         const rescanBtn = document.getElementById("bulkRescanBtn");
@@ -290,7 +293,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         } else {
             bulkImportAllBtn.disabled = false;
             bulkImportCurrentBtn.disabled = false;
-            bulkMsg.textContent = "";
+            if (photoCount === 0) {
+                bulkMsg.className = "msg msg-warning";
+                bulkMsg.innerHTML = `⚠️ Внимание: фото не найдены в карточках объявлений на этой странице (0 из ${items.length}). Импорт товаров возможен без фото.`;
+            } else {
+                bulkMsg.textContent = "";
+            }
         }
 
         let cancelRequested = false;
@@ -338,7 +346,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             const payload = {
                 schema_version: 1,
-                extension_version: "0.2.51",
+                extension_version: "0.2.52",
                 captured_at: new Date().toISOString(),
                 page_type: "bulk_import",
                 listings_count: batchItems.length,

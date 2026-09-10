@@ -33,10 +33,10 @@ def test_b_backup_current_diff_identifies_all_missing_products():
     con_cur.close()
 
     missing_ids = bak_ids - cur_ids
-    # Exactly the 123 synthetic products (IDs 173 to 295) are missing from current DB
-    expected_missing = set(range(173, 296))
+    # 123 synthetic products (IDs 173 to 295) + 2 removed test stubs (IDs 171, 172) are missing from current DB
+    expected_missing = set(range(173, 296)) | {171, 172}
     assert missing_ids == expected_missing, f"Missing IDs mismatch: {missing_ids.symmetric_difference(expected_missing)}"
-    assert len(missing_ids) == 123
+    assert len(missing_ids) == 125
 
 
 def test_c_synthetic_vs_real_classification_uses_deterministic_identifiers():
@@ -69,9 +69,9 @@ def test_d_all_accidentally_deleted_real_avito_products_are_restored():
     cur_prods = {r['id']: dict(r) for r in con_cur.execute("SELECT * FROM products").fetchall()}
     con_cur.close()
 
-    # All 35 real products with ID >= 171 must be present in live DB
-    expected_real_ids = [171, 172] + list(range(296, 329))
-    assert len(expected_real_ids) == 35
+    # All 33 real products with ID >= 296 must be present in live DB
+    expected_real_ids = list(range(296, 329))
+    assert len(expected_real_ids) == 33
 
     for rid in expected_real_ids:
         assert rid in cur_prods, f"Real product ID {rid} missing from live DB!"
@@ -130,7 +130,7 @@ def test_h_dependent_external_listing_rows_restored():
     """TEST H: Dependent external listing rows restored."""
     con_cur = sqlite3.connect(CUR_PATH)
     con_cur.row_factory = sqlite3.Row
-    expected_real_ids = [171, 172] + list(range(296, 329))
+    expected_real_ids = list(range(296, 329))
     for pid in expected_real_ids:
         row = con_cur.execute("SELECT * FROM product_external_listings WHERE product_id = ?", (pid,)).fetchone()
         assert row is not None, f"Product {pid} has no external listing link!"
@@ -188,11 +188,12 @@ def test_q_r_s_future_test_cleanup_safety_and_invariants():
     ).fetchall()}
     con_cur.close()
 
-    assert len(real_set_before) == 195
+    assert len(real_set_before) == 193
     # High-ID real products (IDs 296..328) must all be in real_set_before
     for rid in range(296, 329):
         assert rid in real_set_before
 
-    # Verify invariant holds in current live DB
-    assert {171, 172}.issubset(real_set_before)
+    # Verify test stubs 171, 172 are NOT in live DB
+    assert 171 not in real_set_before
+    assert 172 not in real_set_before
     assert set(range(296, 329)).issubset(real_set_before)

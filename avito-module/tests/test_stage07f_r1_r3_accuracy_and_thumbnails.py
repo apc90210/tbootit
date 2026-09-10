@@ -270,37 +270,37 @@ def test_test_k_l_inventory_table_renders_photo_column():
 def test_test_o_version_0_2_51_full_alignment():
     """
     TEST O:
-    Verify version 0.2.51 is aligned across manifest, popup, sw, content,
+    Verify version 0.2.52 is aligned across manifest, popup, sw, content,
     extension_bridge schemas, admin-shell, and built zip.
     """
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] == "0.2.51"
+    assert manifest["version"] == "0.2.52"
 
     with open(POPUP_HTML_PATH, "r", encoding="utf-8") as f:
         popup_html = f.read()
-    assert "v0.2.51" in popup_html
+    assert "v0.2.52" in popup_html
 
     with open(POPUP_JS_PATH, "r", encoding="utf-8") as f:
         popup_js = f.read()
-    assert 'let manifestVer = "0.2.51";' in popup_js
-    assert 'extension_version: "0.2.51"' in popup_js
+    assert 'let manifestVer = "0.2.52";' in popup_js
+    assert 'extension_version: "0.2.52"' in popup_js
 
     with open(CONTENT_JS_PATH, "r", encoding="utf-8") as f:
         content_js = f.read()
-    assert "v0.2.51" in content_js
-    assert 'extension_version: "0.2.51"' in content_js
+    assert "v0.2.52" in content_js
+    assert 'extension_version: "0.2.52"' in content_js
 
     with open(SW_PATH, "r", encoding="utf-8") as f:
         sw = f.read()
-    assert "v0.2.51" in sw
-    assert 'extension_version = "0.2.51"' in sw
+    assert "v0.2.52" in sw
+    assert 'extension_version = "0.2.52"' in sw
 
     # Check avito-module schemas
-    assert extension_bridge.MyListingsPayload.model_fields["extension_version"].default == "0.2.51"
-    assert extension_bridge.BulkImportPayload.model_fields["extension_version"].default == "0.2.51"
+    assert extension_bridge.MyListingsPayload.model_fields["extension_version"].default == "0.2.52"
+    assert extension_bridge.BulkImportPayload.model_fields["extension_version"].default == "0.2.52"
 
     # Check built zip exists and is valid
-    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist", "technoreboot-avito-extension-0.2.51.zip"))
+    zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist", "technoreboot-avito-extension-0.2.52.zip"))
     assert os.path.exists(zip_path), f"Built zip must exist at {zip_path}"
     assert os.path.getsize(zip_path) > 10000
