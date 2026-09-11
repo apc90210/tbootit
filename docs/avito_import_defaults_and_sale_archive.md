@@ -32,3 +32,29 @@ When a sale is canceled (`/api/sales/{sale_id}/cancel`):
 ## 5. Existing Data Migration
 - All 46 existing draft Avito products in `data/db/technoreboot.db` were migrated to `status = 'in_stock'` and `storage_location = 'store'`.
 - All 50 active products currently in the catalog are now in stock and located in the store.
+
+## 6. Bidirectional Archive Synchronization on Re-Import
+
+The Avito integration supports automatic bidirectional synchronization between Avito listing states and the store's inventory location / status:
+
+### A. Automatic Reactivation (Archive -> Store)
+- **Condition:** An item already exists in the database with `storage_location == "archive"`, `status in ["sold", "draft", "archived"]`, or `quantity <= 0`, and is re-imported from Avito with active status (`remote_status == "active"` or raw text containing "активно").
+- **Actions:**
+  - `status` is set to `"in_stock"` ("В наличии").
+  - `storage_location` is set to `"store"` ("Магазин").
+  - `quantity` is set to `max(quantity, 1)`.
+  - All updated attributes (price, title, description, parameters, photos) are synced.
+  - A `ProductEvent` is logged with `event_type = "avito_reactivated"`.
+- **Financial Ledger Integrity:** Historical `Sale` and `SaleItem` records remain immutable. Reactivating a previously sold listing restores physical inventory availability without altering past financial receipts.
+
+### B. Automatic Archiving (Store -> Archive)
+- **Condition:** An item is currently active in the store (`status == "in_stock"` or `storage_location != "archive"`), and is re-imported from Avito with an inactive / closed / archived status (`remote_status in ["inactive", "closed", "archived", "blocked", "removed", "sold", "old"]` or raw text containing "завершено", "архив", "снято", "неактивно", "заблокировано", "отклонено").
+- **Actions:**
+  - `status` is set to `"sold"` ("Продан / В архиве").
+  - `storage_location` is set to `"archive"` ("Архив").
+  - `quantity` is set to `0`.
+  - A `ProductEvent` is logged with `event_type = "avito_archived"`.
+
+### C. Initial Import of Inactive Listings
+- If a listing is imported from Avito for the first time with an inactive status, it is directly created in the archive with `status = "sold"`, `storage_location = "archive"`, and `quantity = 0`.
+

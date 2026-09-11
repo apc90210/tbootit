@@ -15,6 +15,7 @@ from app.database import get_db
 from app import models, schemas
 from app.config import settings
 from app.storage import check_persistent_photo_storage, get_product_photos_dir
+from app.routers.products import log_product_event
 
 router = APIRouter()
 
@@ -101,6 +102,14 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     if ext_link:
         product = db.query(models.Product).filter(models.Product.id == ext_link.product_id).first()
 
+    remote_st = (payload.remote_status or "active").lower().strip()
+    remote_st_raw = (payload.remote_status_raw or "").lower().strip()
+    is_remote_active = remote_st == "active" or "активно" in remote_st_raw
+    is_remote_inactive = (
+        remote_st in ["inactive", "closed", "archived", "blocked", "removed", "sold", "old"] or
+        any(w in remote_st_raw for w in ["завершено", "архив", "снято", "неактивно", "заблокировано", "отклонено"])
+    )
+
     if not product:
         # Create new product
         created_product = True
@@ -119,6 +128,10 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 db.flush()
             category_id = cat.id
 
+        init_status = "in_stock" if not is_remote_inactive else "sold"
+        init_location = "store" if not is_remote_inactive else "archive"
+        init_quantity = 1 if not is_remote_inactive else 0
+
         product = models.Product(
             sku=sku,
             title=payload.title,
@@ -128,9 +141,9 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             condition=payload.condition or (payload.parameters.get("Состояние", "Б/у") if payload.parameters else "Б/у"),
             description=payload.description or "",
             sale_price=payload.price or 0.0,
-            status="in_stock",
-            storage_location="store",
-            quantity=1,
+            status=init_status,
+            storage_location=init_location,
+            quantity=init_quantity,
             avito_title=payload.title,
             avito_description=payload.description,
             avito_category_path=" / ".join(payload.category_path) if payload.category_path else None,
@@ -144,6 +157,10 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         db.add(product)
         db.flush()
     else:
+        old_status = product.status
+        old_location = product.storage_location
+        old_quantity = product.quantity or 0
+
         # Update existing product fields
         product.title = payload.title
         if payload.price is not None:
@@ -176,6 +193,37 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             product.source_attributes_json = json.dumps(merged_params, ensure_ascii=False)
         product.source_origin = "avito"
         product.last_imported_at = now
+
+        # Bidirectional sync between Avito listing state and internal store/archive state
+        if is_remote_active:
+            # Direct mechanism: if product was in archive or sold/draft, pull it back to active store catalog
+            if product.storage_location == "archive" or product.status in ["sold", "draft", "archived"] or (product.quantity or 0) <= 0:
+                product.status = "in_stock"
+                product.storage_location = "store"
+                product.quantity = max(product.quantity or 0, 1)
+                log_product_event(
+                    db,
+                    product.id,
+                    "avito_reactivated",
+                    old_value={"status": old_status, "storage_location": old_location, "quantity": old_quantity},
+                    new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
+                    comment=f"Товар возвращен из архива в магазин при повторном импорте активного объявления Avito {payload.external_item_id}"
+                )
+        elif is_remote_inactive:
+            # Reverse mechanism: if product is active in store, and became inactive/closed on Avito, move it to archive
+            if product.status == "in_stock" or product.storage_location != "archive":
+                product.status = "sold"
+                product.storage_location = "archive"
+                product.quantity = 0
+                log_product_event(
+                    db,
+                    product.id,
+                    "avito_archived",
+                    old_value={"status": old_status, "storage_location": old_location, "quantity": old_quantity},
+                    new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
+                    comment=f"Товар перенесен в архив при повторном импорте неактивного объявления Avito {payload.external_item_id}"
+                )
+
         db.flush()
 
     # 2. Upsert ProductExternalListing
@@ -358,14 +406,18 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         or (payload.description is None and not payload.parameters)
     )
 
-    existing_photos_count = db.query(models.ProductPhoto).filter(
-        models.ProductPhoto.product_id == product.id
-    ).count()
+    if created_product:
+        db.query(models.ProductPhoto).filter(models.ProductPhoto.product_id == product.id).delete()
+        existing_photos_count = 0
+    else:
+        existing_photos_count = db.query(models.ProductPhoto).filter(
+            models.ProductPhoto.product_id == product.id
+        ).count()
 
     incoming_raw_photos = payload.photos or []
 
     if is_bulk_import:
-        if existing_photos_count > 0:
+        if not created_product and existing_photos_count > 0:
             # Idempotency: Product already has photos (manual or previous detailed/thumbnail).
             # Do NOT add low-quality thumbnail, do NOT delete/reorder existing gallery.
             photos_skipped += len(incoming_raw_photos)

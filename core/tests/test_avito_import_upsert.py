@@ -41,15 +41,41 @@ def test_avito_import_upsert_updates_existing_product(client, db_session):
     assert data2["status"] == "updated"
     assert data2["product_id"] == product_id_1
 
-    # Verify single Product in DB
+    # Verify single Product in DB - moved to archive via reverse sync
+    db_session.expire_all()
     prods = db_session.query(models.Product).filter(models.Product.sku == "AVITO-999888777").all()
     assert len(prods) == 1
     assert prods[0].title == "Обновленный заголовок"
     assert prods[0].sale_price == 12000.0
-    assert prods[0].status == "in_stock"
-    assert prods[0].storage_location == "store"
+    assert prods[0].status == "sold"
+    assert prods[0].storage_location == "archive"
+    assert prods[0].quantity == 0
 
     # Verify single external listing link
     links = db_session.query(models.ProductExternalListing).filter(models.ProductExternalListing.external_item_id == "999888777").all()
     assert len(links) == 1
     assert links[0].remote_status == "inactive"
+
+    # Re-import active: verify direct reactivation mechanism (pull back from archive)
+    payload3 = {
+        "account_key": "account_laptops",
+        "external_item_id": "999888777",
+        "external_url": "https://www.avito.ru/item/999888777",
+        "remote_status": "active",
+        "title": "Снова в продаже",
+        "price": 13000.0,
+        "description": "Повторно выставлен на Авито",
+        "parameters": {"Цвет": "Серебристый"}
+    }
+    res3 = client.post("/api/integrations/avito/import-item", json=payload3)
+    assert res3.status_code == 200
+    assert res3.json()["status"] == "updated"
+
+    db_session.expire_all()
+    prods_active = db_session.query(models.Product).filter(models.Product.sku == "AVITO-999888777").all()
+    assert len(prods_active) == 1
+    assert prods_active[0].title == "Снова в продаже"
+    assert prods_active[0].sale_price == 13000.0
+    assert prods_active[0].status == "in_stock"
+    assert prods_active[0].storage_location == "store"
+    assert prods_active[0].quantity == 1
