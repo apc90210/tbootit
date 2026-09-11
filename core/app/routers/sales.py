@@ -110,6 +110,7 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
         
         db_product = db.query(models.Product).filter(models.Product.id == item["product_id"]).first()
         old_status = db_product.status
+        old_location = db_product.storage_location
         old_quantity = db_product.quantity or 0
         db_product.quantity = old_quantity - item["quantity"]
         
@@ -126,8 +127,9 @@ def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
 
         if db_product.quantity == 0:
             db_product.status = "sold"
+            db_product.storage_location = "archive"
         
-        log_product_event(db, db_product.id, "sale_completed", old_value={"status": old_status, "quantity": old_quantity}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Sold {item['quantity']} items in sale {db_sale.id}. Price: {item['price']}")
+        log_product_event(db, db_product.id, "sale_completed", old_value={"status": old_status, "quantity": old_quantity, "storage_location": old_location}, new_value={"status": db_product.status, "quantity": db_product.quantity, "storage_location": db_product.storage_location}, comment=f"Sold {item['quantity']} items in sale {db_sale.id}. Price: {item['price']}")
 
     db.commit()
     db.refresh(db_sale)
@@ -176,10 +178,13 @@ def cancel_sale(sale_id: int, cancel_data: schemas.SaleCancel, db: Session = Dep
             db.add(mov)
 
             old_status = db_product.status
+            old_location = db_product.storage_location
             if db_product.status == "sold" and db_product.quantity > 0:
                 db_product.status = "in_stock"
+                if db_product.storage_location == "archive":
+                    db_product.storage_location = "store"
                 
-            log_product_event(db, db_product.id, "sale_canceled", old_value={"status": old_status, "quantity": old_quantity}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Sale {sale_id} canceled: {cancel_data.reason}")
+            log_product_event(db, db_product.id, "sale_canceled", old_value={"status": old_status, "quantity": old_quantity, "storage_location": old_location}, new_value={"status": db_product.status, "quantity": db_product.quantity, "storage_location": db_product.storage_location}, comment=f"Sale {sale_id} canceled: {cancel_data.reason}")
             
     log_audit(db, "sale", db_sale.id, "cancel", new_value={"status": "canceled", "reason": cancel_data.reason, "canceled_by": db_sale.canceled_by})
     db.commit()
@@ -267,10 +272,12 @@ def reissue_sale(sale_id: int, reissue_data: schemas.SaleReissue, db: Session = 
         db.add(mov)
         
         old_s = db_product.status
+        old_loc = db_product.storage_location
         if db_product.quantity == 0:
             db_product.status = "sold"
+            db_product.storage_location = "archive"
             
-        log_product_event(db, db_product.id, "sale_reissue_deduct", old_value={"status": old_s, "quantity": old_q}, new_value={"status": db_product.status, "quantity": db_product.quantity}, comment=f"Deducted for sale {new_sale.id}")
+        log_product_event(db, db_product.id, "sale_reissue_deduct", old_value={"status": old_s, "quantity": old_q, "storage_location": old_loc}, new_value={"status": db_product.status, "quantity": db_product.quantity, "storage_location": db_product.storage_location}, comment=f"Deducted for sale {new_sale.id}")
 
     log_audit(db, "sale", db_old_sale.id, "superseded", old_value={"status": "canceled"}, new_value={"status": "superseded", "superseded_by_sale_id": new_sale.id})
     log_audit(db, "sale", new_sale.id, "reissued", new_value={"status": "reissued", "source_sale_id": sale_id})

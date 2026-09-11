@@ -46,6 +46,8 @@ def test_avito_import_upsert_updates_existing_product(client, db_session):
     assert len(prods) == 1
     assert prods[0].title == "Обновленный заголовок"
     assert prods[0].sale_price == 12000.0
+    assert prods[0].status == "in_stock"
+    assert prods[0].storage_location == "store"
 
     # Verify single external listing link
     links = db_session.query(models.ProductExternalListing).filter(models.ProductExternalListing.external_item_id == "999888777").all()

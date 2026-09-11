@@ -57,9 +57,10 @@ def test_create_product_and_sale():
     assert sale["status"] == "completed"
     sale_id = sale["id"]
     
-    # Verify product is sold
+    # Verify product is sold and archived
     response = client.get(f"/api/products/{p1_id}")
     assert response.json()["status"] == "sold"
+    assert response.json()["storage_location"] == "archive"
     
     # Verify event created
     response = client.get(f"/api/products/{p1_id}/details")
@@ -79,9 +80,10 @@ def test_create_product_and_sale():
     assert response.status_code == 200
     assert response.json()["status"] == "canceled"
     
-    # Verify product is in_stock
+    # Verify product is in_stock and restored to store
     response = client.get(f"/api/products/{p1_id}")
     assert response.json()["status"] == "in_stock"
+    assert response.json()["storage_location"] == "store"
     
     # Verify event created
     response = client.get(f"/api/products/{p1_id}/details")
