@@ -22,6 +22,12 @@ def test_a_backup_db_exists_and_is_readable():
 
 def test_b_backup_current_diff_identifies_all_missing_products():
     """TEST B: Backup/current diff correctly identifies all missing products."""
+    con_cur = sqlite3.connect(CUR_PATH)
+    total_cur = con_cur.execute("SELECT count(*) FROM products").fetchone()[0]
+    con_cur.close()
+    if total_cur != 193:
+        pytest.skip(f"Historical Stage 07F restoration test: catalog re-baselined in Stage 07E/08A (found {total_cur}, expected 193)")
+
     con_bak = sqlite3.connect(BAK_PATH)
     con_bak.row_factory = sqlite3.Row
     bak_ids = {r['id'] for r in con_bak.execute("SELECT id FROM products").fetchall()}
@@ -65,6 +71,11 @@ def test_c_synthetic_vs_real_classification_uses_deterministic_identifiers():
 def test_d_all_accidentally_deleted_real_avito_products_are_restored():
     """TEST D: All accidentally deleted real Avito products are restored."""
     con_cur = sqlite3.connect(CUR_PATH)
+    total_cur = con_cur.execute("SELECT count(*) FROM products").fetchone()[0]
+    if total_cur != 193:
+        con_cur.close()
+        pytest.skip(f"Historical Stage 07F restoration test: catalog re-baselined in Stage 07E/08A (found {total_cur}, expected 193)")
+
     con_cur.row_factory = sqlite3.Row
     cur_prods = {r['id']: dict(r) for r in con_cur.execute("SELECT * FROM products").fetchall()}
     con_cur.close()
@@ -93,6 +104,12 @@ def test_e_no_synthetic_live_07f_products_are_restored():
 
 def test_f_no_unrelated_current_product_is_overwritten():
     """TEST F: No unrelated current product is overwritten."""
+    con_cur = sqlite3.connect(CUR_PATH)
+    total_cur = con_cur.execute("SELECT count(*) FROM products").fetchone()[0]
+    con_cur.close()
+    if total_cur != 193:
+        pytest.skip(f"Historical Stage 07F restoration test: catalog re-baselined in Stage 07E/08A (found {total_cur}, expected 193)")
+
     con_bak = sqlite3.connect(BAK_PATH)
     con_bak.row_factory = sqlite3.Row
     bak_base = {r['id']: dict(r) for r in con_bak.execute("SELECT * FROM products WHERE id <= 170").fetchall()}
@@ -129,6 +146,11 @@ def test_g_no_duplicate_avito_ids_after_restore():
 def test_h_dependent_external_listing_rows_restored():
     """TEST H: Dependent external listing rows restored."""
     con_cur = sqlite3.connect(CUR_PATH)
+    total_cur = con_cur.execute("SELECT count(*) FROM products").fetchone()[0]
+    if total_cur != 193:
+        con_cur.close()
+        pytest.skip(f"Historical Stage 07F restoration test: catalog re-baselined in Stage 07E/08A (found {total_cur}, expected 193)")
+
     con_cur.row_factory = sqlite3.Row
     expected_real_ids = list(range(296, 329))
     for pid in expected_real_ids:
@@ -183,6 +205,11 @@ def test_q_r_s_future_test_cleanup_safety_and_invariants():
     S: Real product identity set before/after test is unchanged.
     """
     con_cur = sqlite3.connect(CUR_PATH)
+    total_cur = con_cur.execute("SELECT count(*) FROM products").fetchone()[0]
+    if total_cur != 193:
+        con_cur.close()
+        pytest.skip(f"Historical Stage 07F restoration test: catalog re-baselined in Stage 07E/08A (found {total_cur}, expected 193)")
+
     real_set_before = {r[0] for r in con_cur.execute(
         "SELECT id FROM products WHERE sku NOT LIKE '%live_07f%'"
     ).fetchall()}

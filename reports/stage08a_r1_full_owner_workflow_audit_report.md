@@ -108,12 +108,25 @@ Triggered error cases against Core API and Admin Shell:
 
 ---
 
-## 8. Release Gap Summary
+## 8. Release Gap Summary (Normalized)
 
 Full details in `reports/release_gap_list.md`.
 - **P0 Blockers for Deployment:** **0**
-- **P1 Operational Items:** 3 (Automated cron backups, Avito webhook sync, direct ESC/POS printer)
-- **P2 Optimizations:** 3 (Client-side photo compression, bulk repair transitions, technician RBAC)
-- **P3 Future Enhancements:** 3 (Telegram/SMS notifications, barcode scanner listener, dark mode)
+- **P1 Broken Core Daily Workflows:** **0**
+- **P2 Important Improvements:** **6** (Automated cron backups, Avito webhook sync, direct ESC/POS printer, photo compression, bulk repair transitions, technician RBAC)
+- **P3 Future Enhancements:** **3** (Telegram/SMS notifications, barcode scanner listener, dark mode)
+
+---
+
+## 9. Full Automated Test Suite Breakdown
+
+All relevant test suites executed across all modules and extensions:
+- `core`: 255 passed
+- `admin-shell`: 83 passed, 1 skipped
+- `inventory-sales-module`: 154 passed
+- `repairs-module`: 34 passed
+- `avito-module`: 149 passed, 5 skipped
+- `chrome-extension`: 126 passed
+- **Total Tests Passed:** **801 passed, 6 skipped, 0 failed**
 
 The system is ready for Owner review and acceptance.

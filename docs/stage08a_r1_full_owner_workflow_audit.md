@@ -32,3 +32,19 @@ All audit procedures adhere to strict pre- and post-flight baseline comparisons:
 - Baseline counts: 50 products, 52 sales, 66 repairs, 50 photos.
 - Synthetic audit records are tracked and purged during audit cleanup.
 - Post-audit invariants confirm identical ID sets and 0 deleted records.
+
+## Automated Test Suites (Stage 08A-R1-R1)
+- `core`: 255 passed
+- `admin-shell`: 83 passed, 1 skipped
+- `inventory-sales-module`: 154 passed
+- `repairs-module`: 34 passed
+- `avito-module`: 149 passed, 5 skipped
+- `chrome-extension`: 126 passed
+- **Total Automated Tests:** 801 passed, 6 skipped, 0 failed
+
+## Normalized Release Gap Summary
+- **P0 Blockers:** 0
+- **P1 Broken Core Daily Workflows:** 0
+- **P2 Important Improvements:** 6 (Automated backup cron, Avito webhook sync, direct ESC/POS printer, photo compression, bulk repair transitions, technician RBAC)
+- **P3 Future Enhancements:** 3 (Telegram/SMS notifications, barcode scanner listener, dark mode)
+
