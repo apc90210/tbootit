@@ -1,0 +1,113 @@
+# Stage 07E-R1-R2 — Fresh Git Build and Full Backup Integrity Proof
+
+## Fresh Source
+RECOVERY_REPO: C:\tbootit\.recovery-test\fresh_1789131746_cbb1fe\repo
+RECOVERY_ORIGIN: https://github.com/apc90210/tbootit.git
+RECOVERY_HEAD: ee0e8e6421151f6fb15766f3cbd0bd84e131bb71
+FRESH_CLONE: true
+
+## Fresh Images
+RECOVERY_IMAGES:
+- technoreboot-recovery-fresh_1789131746_cbb1fe-core:latest
+- technoreboot-recovery-fresh_1789131746_cbb1fe-gateway:latest
+- technoreboot-recovery-fresh_1789131746_cbb1fe-admin-shell:latest
+- technoreboot-recovery-fresh_1789131746_cbb1fe-avito-module:latest
+- technoreboot-recovery-fresh_1789131746_cbb1fe-inventory-sales-module:latest
+- technoreboot-recovery-fresh_1789131746_cbb1fe-repairs-module:latest
+RECOVERY_IMAGE_IDS:
+- sha256:794dc2cbca1153860538fce56cb3f0d486d34e2c81d85f54316d259e8ca37b25
+- sha256:a63f231e5fdf5e2365a12ba7768019001b9ca9cbebb422ffb76f7f6a7bb49c3b
+- sha256:69b30c50d32bb5e33d0263309a4ebdd2c70fbba74d32021cbb66f4bfd1fe1545
+- sha256:4d60742f9e42e4726e6378c3c72688009df34d8d1aa3d4c82c231777d5440751
+- sha256:c2ba2bbf977717dcfa3fb2eef9e7c4f6f4fa6e3d238a2e557b7f1dc2136d4004
+- sha256:88faad0e6b5fe72776c59b66160eb245c43d23ecb8e8fb85fe267b2d5f0e30ec
+BUILT_FROM_RECOVERY_REPO: true
+LIVE_IMAGE_IDS_USED: false
+
+## Backup
+BACKUP_FILE: TECHNOREBOOT_BACKUP_2026-09-11_103952.zip
+BACKUP_SHA256: 25e9f697047602ac7eda0f3bb4ad422eb239ae2fb4ffae5fbf8eb27f2936eb18
+
+## Storage Integrity
+BACKUP_STORAGE_FILE_COUNT: 1236
+RESTORED_STORAGE_FILE_COUNT: 1236
+BACKUP_STORAGE_TOTAL_BYTES: 9750814
+RESTORED_STORAGE_TOTAL_BYTES: 9750814
+BACKUP_STORAGE_TREE_SHA256: 65ec8a3d9591a8a6c379b833520aa4884eb55b1a282400d294f27e9f59602d7f
+RESTORED_STORAGE_TREE_SHA256: 65ec8a3d9591a8a6c379b833520aa4884eb55b1a282400d294f27e9f59602d7f
+MISSING_FILES: 0
+EXTRA_FILES: 0
+HASH_MISMATCHES: 0
+COUNT_1236_VS_1214_EXPLANATION: Root folder has 1214 files. 9 subdirectories (24, 69, 163-169) contain 22 files (21 jpg, 1 webp). 1214 + 22 = 1236. Discrepancy was due to shallow glob vs recursive rglob.
+
+## ProductPhoto Integrity
+PRODUCT_PHOTO_ROWS: 490
+LOCAL_REFERENCES: 475
+MISSING_REFERENCED_PHOTOS: 0
+ZERO_BYTE_REFERENCED_PHOTOS: 0
+ORPHAN_MEDIA_FILES: 761
+
+## Auth Integrity
+BACKUP_AUTH_TREE_SHA256: 1a0893765b3b43230744e68be6932e7b913bed2febbe28e50cd2aeaed3f97a7d
+RESTORED_AUTH_TREE_SHA256: 1a0893765b3b43230744e68be6932e7b913bed2febbe28e50cd2aeaed3f97a7d
+AUTH_MISSING: 0
+AUTH_MISMATCHES: 0
+
+## Avito State Integrity
+BACKUP_AVITO_TREE_SHA256: 29cd969b6dc2b3df72e406c11762fc0cc1818f89988ffd790a47721db2ef0b79
+RESTORED_AVITO_TREE_SHA256: 29cd969b6dc2b3df72e406c11762fc0cc1818f89988ffd790a47721db2ef0b79
+AVITO_MISSING: 0
+AVITO_MISMATCHES: 0
+
+## Recovery Runtime
+RECOVERY_PROJECT: technoreboot-recovery-fresh_1789131746_cbb1fe
+RECOVERY_GATEWAY: https://127.0.0.1:9443
+RECOVERY_PRODUCTS: 227
+RECOVERY_SALES: 50
+RECOVERY_REPAIRS: 66
+RECOVERY_PHOTOS: 490
+OWNER_CERT_ACCEPTED: true
+NO_CERT_REJECTED: true (HTTP 403 / SSLError)
+
+## Route Proof
+ROOT: HTTP 200 OK
+INVENTORY: HTTP 200 OK (227 products)
+PRODUCT_DETAIL: HTTP 200 OK (Product #1 loaded)
+SALES: HTTP 200 OK (50 sales)
+REPORTS: HTTP 200 OK
+REPAIRS: HTTP 200 OK (66 repairs)
+AVITO_EXTENSION: HTTP 200 OK
+BACKUPS: HTTP 200 OK
+CERTIFICATES: HTTP 200 OK
+MEDIA_200: HTTP 200 OK (photo_1.jpg, 24/photo_24_1.jpg, 169/photo_169_1.jpg)
+
+## Live Isolation
+LIVE_DB_UNCHANGED: true
+LIVE_AUTH_UNCHANGED: true
+LIVE_MEDIA_UNCHANGED: true
+LIVE_PRODUCT_IDS_UNCHANGED: true
+LIVE_SALE_IDS_UNCHANGED: true
+LIVE_CONTAINERS_RESTARTED: 0
+LIVE_STACK_HEALTH_AFTER: true
+
+## Debian Bootstrap
+PREBUILT_IMAGES_REQUIRED: false
+OLD_SERVER_REQUIRED: false
+EXTERNAL_MANUAL_DEPENDENCIES: none
+
+## Exact Test Results
+- tests/test_stage07e_r1_r2_fresh_build_integrity.py: 26 passed (Tests A through Z)
+- tests/test_backup_restore.py & admin-shell/tests/test_web_backup_restore.py: 21 passed (All regression tests)
+
+## Git
+COMMIT: ee0e8e6421151f6fb15766f3cbd0bd84e131bb71 (and upcoming Stage 07E-R1-R2 commit)
+PUSH: origin/main
+HEAD_AFTER: ee0e8e6421151f6fb15766f3cbd0bd84e131bb71
+FINAL_GIT_STATUS: clean
+
+FINAL_STATUS:
+TECHNOREBOOT_STAGE07E_R1_R2_FRESH_SERVER_RECOVERY_FULLY_PROVEN
+
+OWNER_MANUAL_CHECK_REQUIRED: false
+PRODUCTION_DEPLOYMENT_NOT_STARTED: true
+DO_NOT_START_NEXT_STAGE_WITHOUT_OWNER_ACCEPTANCE: true
