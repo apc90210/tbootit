@@ -99,23 +99,21 @@ def test_content_js_extract_all_photos_resilience():
 
 
 def test_extension_manifest_and_zip_version():
-    """Verify manifest.json and built ZIP archives have version 0.2.47."""
+    """Verify manifest.json and built ZIP archives have matching version."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
     assert manifest["version"] >= "0.2.46"
 
-    target_zip = ZIP_PATH
+    current_ver = manifest.get("version")
+    target_zip = os.path.abspath(f"dist/technoreboot-avito-extension-{current_ver}.zip")
     if not os.path.exists(target_zip):
         import sys
         sys.path.insert(0, os.path.abspath("scripts"))
         from build_extension_zip import build_zip
-        built = build_zip()
-        if os.path.exists(built):
-            target_zip = built
+        target_zip = build_zip()
 
-    if not os.path.exists(target_zip):
-        pytest.skip(f"Extension zip not found at {target_zip}")
+    assert os.path.exists(target_zip), f"Extension zip could not be found or built at {target_zip}"
 
     with zipfile.ZipFile(target_zip, "r") as zf:
         names = zf.namelist()
@@ -129,3 +127,4 @@ def test_extension_manifest_and_zip_version():
         manifest_in_zip = json.loads(zf.read("manifest.json").decode("utf-8"))
         assert manifest_in_zip["version"] >= "0.2.46"
         assert manifest_in_zip["version"] == manifest["version"]
+

@@ -7,7 +7,7 @@ EXTENSION_DIR = os.path.abspath("chrome-extension/technoreboot-avito")
 CONTENT_JS_PATH = os.path.join(EXTENSION_DIR, "content.js")
 SERVICE_WORKER_PATH = os.path.join(EXTENSION_DIR, "service_worker.js")
 MANIFEST_PATH = os.path.join(EXTENSION_DIR, "manifest.json")
-LISTING_DATA_PATH = os.path.abspath("data/avito-module/ads/8355529554.json")
+LISTING_DATA_PATH = os.path.abspath("chrome-extension/technoreboot-avito/tests/fixtures/synthetic_ad_8355529554.json")
 
 
 def test_manifest_version_and_host_permissions():
@@ -162,8 +162,7 @@ def test_diagnostics_structure_and_reporting():
 
 
 def test_sample_listing_photo_integrity():
-    if not os.path.exists(LISTING_DATA_PATH):
-        pytest.skip(f"Historical captured ad fixture {LISTING_DATA_PATH} not present in clean checkout")
+    assert os.path.exists(LISTING_DATA_PATH), f"Synthetic fixture not found at {LISTING_DATA_PATH}"
     with open(LISTING_DATA_PATH, "r", encoding="utf-8") as f:
         ad_data = json.load(f)
 
