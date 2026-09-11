@@ -290,19 +290,74 @@
     </style>
 </head>
 <body>
+    <nav class="main-nav" style="background: #0f172a; color: #fff; padding: 10px 18px; margin-bottom: 20px; border-radius: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.92rem; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+        <a href="/" style="color: #fff; text-decoration: none; font-weight: 700; font-size: 1.05rem; margin-right: 8px; display: inline-flex; align-items: center; gap: 6px;">
+            <span style="background: #2563eb; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.5px;">TR</span>
+            Техноребут
+        </a>
+        <a href="/" class="nav-item" data-path="dashboard" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Панель управления</a>
+        <a href="/inventory/products" class="nav-item" data-path="products" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Товары</a>
+        <a href="/products/json" class="nav-item" data-path="products-json" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">JSON импорт / экспорт</a>
+        <a href="/inventory/sales" class="nav-item" data-path="sales" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Продажи</a>
+        <a href="/inventory/cart" class="nav-item" data-path="cart" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Корзина</a>
+        <a href="/inventory/reports/sales" class="nav-item" data-path="reports" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Отчёты</a>
+        <a href="/repairs/repairs" class="nav-item" data-path="repairs" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Ремонты</a>
+        <a href="/avito/extension" class="nav-item" data-path="avito" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Расширение Avito</a>
+        <a href="/inventory/settings/organization" class="nav-item" data-path="settings" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Настройки</a>
+        <a href="/backups" class="nav-item" data-path="backups" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; margin-left: auto;">Резервные копии</a>
+        <a href="/certificates" class="nav-item" data-path="certificates" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Доступ (mTLS)</a>
+    </nav>
+    <script>
+    (function() {
+        var p = window.location.pathname;
+        var links = document.querySelectorAll('nav.main-nav a.nav-item');
+        links.forEach(function(a) {
+            var href = a.getAttribute('href');
+            var isActive = false;
+            if (href === '/' && (p === '/' || p === '')) {
+                isActive = true;
+            } else if (href === '/inventory/products' && (p.indexOf('/inventory/products') === 0 || p === '/products' || p.indexOf('/products/') === 0) && p.indexOf('/products/json') !== 0) {
+                isActive = true;
+            } else if (href === '/products/json' && p.indexOf('/products/json') === 0) {
+                isActive = true;
+            } else if (href === '/inventory/sales' && (p.indexOf('/inventory/sales') === 0 || p.indexOf('/sales') === 0)) {
+                isActive = true;
+            } else if (href === '/inventory/cart' && (p.indexOf('/inventory/cart') === 0 || p.indexOf('/cart') === 0)) {
+                isActive = true;
+            } else if (href === '/inventory/reports/sales' && (p.indexOf('/inventory/reports') === 0 || p.indexOf('/reports') === 0)) {
+                isActive = true;
+            } else if (href === '/repairs/repairs' && p.indexOf('/repairs') === 0) {
+                isActive = true;
+            } else if (href === '/avito/extension' && (p.indexOf('/avito') === 0)) {
+                isActive = true;
+            } else if (href === '/inventory/settings/organization' && (p.indexOf('/inventory/settings') === 0 || p.indexOf('/settings') === 0)) {
+                isActive = true;
+            } else if (href === '/backups' && p.indexOf('/backups') === 0) {
+                isActive = true;
+            } else if (href === '/certificates' && p.indexOf('/certificates') === 0) {
+                isActive = true;
+            }
+            if (isActive) {
+                a.style.background = '#2563eb';
+                a.style.color = '#fff';
+                a.style.fontWeight = '600';
+            }
+            a.addEventListener('mouseenter', function() {
+                if (!isActive) {
+                    a.style.background = '#1e293b';
+                    a.style.color = '#fff';
+                }
+            });
+            a.addEventListener('mouseleave', function() {
+                if (!isActive) {
+                    a.style.background = 'transparent';
+                    a.style.color = '#cbd5e1';
+                }
+            });
+        });
+    })();
+    </script>
     <div class="container">
-        <!-- Main Navigation -->
-        <nav class="main-nav">
-            <a href="/">← Панель управления</a>
-            <a href="/inventory/products">Товары</a>
-            <span class="nav-pill-active" style="padding: 4px 10px; border-radius: 4px;">JSON импорт / экспорт</span>
-            <a href="/inventory/sales">Продажи</a>
-            <a href="/inventory/reports/sales">Отчёты</a>
-            <a href="/repairs/repairs" style="font-weight: bold; background: #28a745; border-radius: 3px;">Ремонты</a>
-            <a href="/avito/extension" style="font-weight: bold; background: #2563eb; border-radius: 3px;">Расширение Avito</a>
-            <a href="/backups" style="margin-left: auto;">Резервные копии</a>
-            <a href="/certificates">Доступ (mTLS)</a>
-        </nav>
 
         <!-- Page Header -->
         <div class="card">
