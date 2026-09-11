@@ -87,11 +87,12 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     5. Logs audit event: avito.product_imported or avito.product_updated, avito.external_link_created or avito.external_link_updated.
     """
     now = datetime.utcnow()
+    item_id_str = str(payload.external_item_id).strip()
     
-    # 1. Lookup external listing link
+    # 1. Primary lookup by Avito ID across the entire database (all statuses: in_stock, sold, archive, draft, etc.)
     ext_link = db.query(models.ProductExternalListing).filter(
         models.ProductExternalListing.marketplace == "avito",
-        models.ProductExternalListing.external_item_id == payload.external_item_id
+        models.ProductExternalListing.external_item_id == item_id_str
     ).first()
 
     status_str = "updated"
@@ -102,6 +103,12 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     if ext_link:
         product = db.query(models.Product).filter(models.Product.id == ext_link.product_id).first()
 
+    # 1b. Fallback lookup by Avito SKU across the entire database in case external listing link was missing
+    if not product:
+        product = db.query(models.Product).filter(
+            models.Product.sku == f"AVITO-{item_id_str}"
+        ).first()
+
     remote_st = (payload.remote_status or "active").lower().strip()
     remote_st_raw = (payload.remote_status_raw or "").lower().strip()
     is_remote_active = remote_st == "active" or "активно" in remote_st_raw
@@ -111,10 +118,10 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
     )
 
     if not product:
-        # Create new product
+        # Create new product only when no product with this Avito ID exists anywhere in DB
         created_product = True
         status_str = "created"
-        sku = f"AVITO-{payload.external_item_id}"
+        sku = f"AVITO-{item_id_str}"
 
         # Resolve category if category_path provided
         category_id = None
@@ -207,7 +214,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                     "avito_reactivated",
                     old_value={"status": old_status, "storage_location": old_location, "quantity": old_quantity},
                     new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
-                    comment=f"Товар возвращен из архива в магазин при повторном импорте активного объявления Avito {payload.external_item_id}"
+                    comment=f"Товар возвращен из архива в магазин при повторном импорте активного объявления Avito {item_id_str}"
                 )
         elif is_remote_inactive:
             # Reverse mechanism: if product is active in store, and became inactive/closed on Avito, move it to archive
@@ -221,7 +228,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                     "avito_archived",
                     old_value={"status": old_status, "storage_location": old_location, "quantity": old_quantity},
                     new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
-                    comment=f"Товар перенесен в архив при повторном импорте неактивного объявления Avito {payload.external_item_id}"
+                    comment=f"Товар перенесен в архив при повторном импорте неактивного объявления Avito {item_id_str}"
                 )
 
         db.flush()
@@ -233,7 +240,7 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             product_id=product.id,
             marketplace="avito",
             external_account_key=payload.account_key,
-            external_item_id=payload.external_item_id,
+            external_item_id=item_id_str,
             external_url=payload.external_url,
             remote_status=payload.remote_status,
             remote_status_raw=payload.remote_status_raw,
