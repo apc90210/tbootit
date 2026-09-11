@@ -668,7 +668,8 @@ def rewrite_location_header(loc: str, prefix: str) -> str:
 
 async def _proxy_request(request: Request, target_base_url: str, path: str, prefix: str):
     """Generic HTTP reverse proxy handler with header and location rewriting."""
-    target_url = f"{target_base_url.rstrip('/')}/{path}"
+    path_clean = path.lstrip('/') if path else ""
+    target_url = f"{target_base_url.rstrip('/')}/{path_clean}"
     query = str(request.query_params)
     if query:
         target_url = f"{target_url}?{query}"
@@ -707,13 +708,17 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
     )
 
 
+@app.api_route("/inventory", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/inventory/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route("/inventory/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_inventory(request: Request, path: str):
+async def proxy_inventory(request: Request, path: str = ""):
     return await _proxy_request(request, INVENTORY_MODULE_URL, path, "/inventory")
 
 
+@app.api_route("/repairs", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/repairs/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route("/repairs/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_repairs(request: Request, path: str):
+async def proxy_repairs(request: Request, path: str = ""):
     return await _proxy_request(request, REPAIRS_MODULE_URL, path, "/repairs")
 
 
@@ -774,6 +779,20 @@ async def redirect_products_detail_shortcut(product_id: int):
 @app.get("/products")
 async def redirect_products_list_shortcut():
     return RedirectResponse(url="/inventory/products", status_code=302)
+
+
+@app.api_route("/sales", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/sales/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_sales(request: Request, path: str = ""):
+    subpath = f"sales/{path}".rstrip('/') if path else "sales"
+    return await _proxy_request(request, INVENTORY_MODULE_URL, subpath, "/sales")
+
+
+@app.api_route("/reports/sales", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/reports/sales/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_reports_sales(request: Request, path: str = ""):
+    subpath = f"reports/sales/{path}".rstrip('/') if path else "reports/sales"
+    return await _proxy_request(request, INVENTORY_MODULE_URL, subpath, "/reports/sales")
 
 
 # ============================================================================

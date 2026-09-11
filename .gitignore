@@ -64,3 +64,6 @@ user-data-dir/
 browser_data/
 storage_state.json
 *.cookie
+
+# Disaster recovery test sandboxes
+.recovery-test/
