@@ -69,10 +69,13 @@ With `data/db/technoreboot.db.bak_before_cleanup_20260910` temporarily moved to 
 
 A fresh clone of `origin/main` was created in an isolated directory without copying `data/` or any backup files:
 
+- **FRESH_CLONE_PATH:** `C:\Users\Apc\AppData\Local\Temp\fresh_clone_tbootit_clean`
+- **FRESH_CLONE_HEAD:** `efa032c1b1c676d10f274cb831e679b39863fc90`
 - **DATA_DIRECTORY_COPIED:** `false`
 - **HISTORICAL_BACKUP_AVAILABLE:** `false`
-- **AVITO_MODULE_FROM_FRESH_CLONE:** **154 passed, 0 failed, 0 skipped**
-- **EXTENSION_FROM_FRESH_CLONE:** **126 passed, 0 failed, 0 skipped**
+- **AVITO_MODULE_FROM_FRESH_CLONE:** **154 passed, 0 failed, 0 skipped** (22.43s)
+- **EXTENSION_FROM_FRESH_CLONE:** **124 passed, 2 skipped, 0 failed** (1.00s; 2 skips for untracked historical ad file `data/avito-module/ads/8355529554.json`)
+
 
 ---
 
