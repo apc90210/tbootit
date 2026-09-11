@@ -225,7 +225,7 @@ def isolated_catalog_db(tmp_path):
     """
     Isolated disposable catalog database fixture seeded with synthetic business items.
     Verifies that bridge/import/cleanup routines preserve real business catalog data
-    without coupling to or querying the mutable live technoreboot.db.
+    without coupling to or querying any external database.
     """
     db_file = tmp_path / "catalog_preservation.db"
     conn = sqlite3.connect(str(db_file))

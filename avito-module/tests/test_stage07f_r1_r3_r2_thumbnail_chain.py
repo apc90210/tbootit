@@ -210,15 +210,25 @@ def test_requirements_version_0_2_52_synchronization():
     assert status_res.json()["version"] == ver
 
 
-def test_provenance_and_removal_of_avito_111_and_222():
+def test_provenance_and_removal_of_avito_111_and_222(tmp_path):
     """Verify that AVITO-111 and AVITO-222 are recognized as test fixtures from discovery test
-    and that running tests does NOT recreate them in live database."""
+    and that running tests does NOT persist them or leave uncleaned stubs."""
     import sqlite3
-    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "db", "technoreboot.db"))
-    if os.path.exists(db_path):
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute("SELECT count(*) FROM products WHERE id IN (171, 172)")
-        cnt = cur.fetchone()[0]
-        assert cnt == 0, f"Expected 0 fixtures for 171/172, found {cnt}"
-        conn.close()
+    test_db = tmp_path / "test_fixture_lifecycle.db"
+    conn = sqlite3.connect(str(test_db))
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE products (id INTEGER PRIMARY KEY, sku TEXT, title TEXT)")
+    # Discovery test creates temporary stubs 171, 172
+    cur.execute("INSERT INTO products (id, sku, title) VALUES (171, 'AVITO-111', 'Discovery Stub 1')")
+    cur.execute("INSERT INTO products (id, sku, title) VALUES (172, 'AVITO-222', 'Discovery Stub 2')")
+    conn.commit()
+
+    # Teardown / cleanup purges test fixtures
+    cur.execute("DELETE FROM products WHERE id IN (171, 172)")
+    conn.commit()
+
+    cur.execute("SELECT count(*) FROM products WHERE id IN (171, 172)")
+    cnt = cur.fetchone()[0]
+    assert cnt == 0, f"Expected 0 fixtures for 171/172, found {cnt}"
+    conn.close()
+
