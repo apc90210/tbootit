@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.52)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.53)
 
 const BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -197,7 +197,7 @@ async function sendBulkImportPayload(payload) {
         if (!normalizedPayload.schema_version) {
             normalizedPayload.schema_version = 1;
         }
-        normalizedPayload.extension_version = "0.2.52";
+        normalizedPayload.extension_version = "0.2.53";
         if (!normalizedPayload.captured_at) {
             normalizedPayload.captured_at = new Date().toISOString();
         }

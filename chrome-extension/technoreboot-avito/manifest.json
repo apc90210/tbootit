@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Техноребут Avito Мост",
-  "version": "0.2.52",
+  "version": "0.2.53",
   "description": "Локальная интеграция объявлений Avito с системой учета Техноребут",
   "icons": {
     "16": "icons/icon16.png",
@@ -46,6 +46,8 @@
     "https://avito.ru/*",
     "http://avito.ru/*",
     "https://*.img.avito.st/*",
+    "https://*.avito.st/*",
+    "https://avito.st/*",
     "http://localhost:8011/*",
     "http://127.0.0.1:8011/*"
   ]

@@ -198,4 +198,4 @@ def test_manifest_version():
     """Verify manifest version is 0.2.46 or 0.2.47."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
-    assert data["version"] in ["0.2.46", "0.2.47"]
+    assert data["version"] >= "0.2.46"

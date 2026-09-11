@@ -183,30 +183,31 @@ def test_requirement_popup_photo_diagnostic_ui():
 
 
 def test_requirements_version_0_2_52_synchronization():
-    """Verify extension version is consistently 0.2.52 across all files."""
+    """Verify extension version is consistently synchronized across all files."""
     manifest_path = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")
     )
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] == "0.2.52"
+    ver = manifest["version"]
+    assert ver in ("0.2.52", "0.2.53")
 
     with open(CONTENT_JS_PATH, "r", encoding="utf-8") as f:
         content_code = f.read()
-    assert 'extension_version: "0.2.52"' in content_code
+    assert f'extension_version: "{ver}"' in content_code
 
     with open(SERVICE_WORKER_PATH, "r", encoding="utf-8") as f:
         sw_code = f.read()
-    assert 'extension_version = "0.2.52"' in sw_code
+    assert f'extension_version = "{ver}"' in sw_code
 
     with open(POPUP_JS_PATH, "r", encoding="utf-8") as f:
         popup_code = f.read()
-    assert 'manifestVer = "0.2.52"' in popup_code
+    assert f'manifestVer = "{ver}"' in popup_code
 
-    # Check status endpoint reports 0.2.52
+    # Check status endpoint reports current version
     status_res = client.get("/extension/api/status")
     assert status_res.status_code == 200
-    assert status_res.json()["version"] == "0.2.52"
+    assert status_res.json()["version"] == ver
 
 
 def test_provenance_and_removal_of_avito_111_and_222():

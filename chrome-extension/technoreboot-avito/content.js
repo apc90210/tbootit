@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.52)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.53)
 
 let pageInitialData = null;
 
@@ -129,7 +129,10 @@ function validateListingImageUrl(url) {
     try {
         const parsed = new URL(u);
         const host = parsed.hostname.toLowerCase();
-        if (!host.endsWith('.img.avito.st') && host !== 'img.avito.st') {
+        // Allow all Avito CDN and image domains
+        const isAvitoHost = host === 'avito.st' || host.endsWith('.avito.st') ||
+                            host === 'avito.ru' || host.endsWith('.avito.ru');
+        if (!isAvitoHost) {
             return null;
         }
     } catch (e) {
@@ -144,8 +147,7 @@ function validateListingImageUrl(url) {
         lower.includes('/delivery/') || lower.includes('/map/') || lower.includes('/cursor/') ||
         lower.includes('/tracker/') || lower.includes('/adriver/') || lower.includes('/counter/') ||
         lower.includes('/pixel/') || lower.includes('/seller/') ||
-        lower.includes('/static/') || lower.includes('/shop/') ||
-        lower.includes('/user/') || lower.includes('/profile/') ||
+        lower.includes('/shop/') || lower.includes('/user/') || lower.includes('/static/design/') ||
         lower.endsWith('.svg') || lower.startsWith('data:') ||
         lower.endsWith('.mp4') || lower.endsWith('.m3u8') || lower.endsWith('.webm') ||
         lower.includes('video.avito.st') || lower.includes('/video/')) {
@@ -1874,7 +1876,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.52",
+            extension_version: "0.2.53",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1905,7 +1907,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.52",
+            extension_version: "0.2.53",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1923,11 +1925,26 @@ function extractListingData(extraPhotos = []) {
     }
 }
 
-function findCardContainer(node) {
+function findCardContainer(node, targetId = null) {
     if (!node) return null;
-    
-    // Top-level card root selectors
+
+    let tid = targetId;
+    if (!tid) {
+        if (node.tagName && node.tagName.toLowerCase() === 'a') {
+            tid = extractAvitoIdFromUrl(node.getAttribute('href') || '');
+        }
+        if (!tid && typeof node.getAttribute === 'function') {
+            const dId = node.getAttribute('data-item-id');
+            if (dId && /^\d{8,14}$/.test(dId)) tid = dId;
+            const dm = node.getAttribute('data-marker') || '';
+            const mm = dm.match(/\d{8,14}/);
+            if (mm) tid = mm[0];
+        }
+    }
+
+    // Top-level card root selectors (strict card roots only, no generic subcomponent wrappers)
     const topCardSelectors = [
+        'article',
         '[data-marker="item-root"]',
         '[data-marker="item"]',
         '[data-marker="item-snippet"]',
@@ -1935,22 +1952,15 @@ function findCardContainer(node) {
         '[data-marker="profile/item"]',
         '[data-marker^="profile-item"]',
         '[data-marker^="extended-item"]',
-        '[data-marker^="item-8"]',
-        '[data-marker^="item-7"]',
-        '[data-marker^="item-6"]',
-        '[data-marker^="item-5"]',
-        '[data-marker^="item-4"]',
-        '[data-marker^="item-3"]',
-        '[data-marker^="item-2"]',
-        '[data-marker^="item-1"]',
-        '[data-marker^="item-9"]',
+        '[data-marker^="item-"]',
         '[data-item-id]',
         '.iva-item-root',
         '.items-item',
-        'div[class*="styles-module-root-"]',
-        'div[class*="ItemSnippet"]',
         'div[class*="item-snippet"]',
-        'article'
+        'div[class*="ItemSnippet"]',
+        'div[class*="itemCard"]',
+        'div[class*="item-card"]',
+        'div[class*="snippet-wrapper"]'
     ].join(', ');
 
     let candidate = null;
@@ -1961,25 +1971,51 @@ function findCardContainer(node) {
     let cur = candidate || node.parentElement || node;
     let bestContainer = cur;
     let depth = 0;
-    while (cur && cur !== document.body && cur !== document.documentElement && depth < 12) {
+
+    while (cur && cur !== document.body && cur !== document.documentElement && depth < 14) {
         depth++;
+
+        // Multi-card boundary invariant: if cur contains links to multiple distinct item IDs, stop climbing!
+        if (typeof cur.querySelectorAll === 'function') {
+            const childAnchors = Array.from(cur.querySelectorAll('a[href]'));
+            const distinctIds = new Set();
+            for (const a of childAnchors) {
+                const aid = extractAvitoIdFromUrl(a.getAttribute('href') || '');
+                if (aid) {
+                    distinctIds.add(aid);
+                    if (distinctIds.size > 1) break;
+                }
+            }
+            if (distinctIds.size > 1) {
+                break;
+            }
+        }
+
         const marker = (cur.getAttribute('data-marker') || '').toLowerCase();
         const cls = (cur.className || '').toString().toLowerCase();
         const tag = cur.tagName.toLowerCase();
+        const curDataId = cur.getAttribute('data-item-id') || '';
 
+        const hasImgArea = !!(
+            cur.querySelector('img, picture, [data-marker*="photo"], [data-marker*="image"], [class*="photo"], [class*="image"]') ||
+            cur.querySelector('[style*="background-image"], [style*="background:"]')
+        );
+
+        const isExactIdMarker = tid && (marker.includes(tid) || curDataId === tid);
         const isRootMarker = marker === 'item' || marker === 'item-root' || marker === 'item-snippet' ||
             marker === 'catalog-serp/item' || marker === 'profile/item' || marker.startsWith('profile-item') ||
-            marker.startsWith('extended-item') || /item-\d{8,14}/.test(marker);
-        const isRootClass = cls.includes('iva-item-root') || cls.includes('styles-module-root-') ||
-            cls.includes('items-item') || cls.includes('item-snippet') || cls.includes('itemsnippet');
+            marker.startsWith('extended-item') || /item-\d{8,14}/.test(marker) || isExactIdMarker;
+        const isRootClass = cls.includes('iva-item-root') || cls.includes('items-item') ||
+            cls.includes('item-snippet') || cls.includes('itemsnippet') || cls.includes('itemcard') || cls.includes('item-card');
         const isRootTag = tag === 'article' || (tag === 'li' && (marker.includes('item') || cls.includes('item')));
 
         if (isRootMarker || isRootClass || isRootTag) {
             bestContainer = cur;
-        }
-
-        if (cur.parentElement && (cur.parentElement.tagName.toLowerCase() === 'article' || cur.parentElement.getAttribute('data-marker') === 'item-root')) {
-            bestContainer = cur.parentElement;
+            if (hasImgArea) {
+                break;
+            }
+        } else if (hasImgArea && !bestContainer) {
+            bestContainer = cur;
         }
 
         cur = cur.parentElement;
@@ -1990,10 +2026,234 @@ function findCardContainer(node) {
 
 const findCardContainerForAnchor = findCardContainer;
 
+function isCandidateThumbnailUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    let u = url.trim();
+    if (u.startsWith('//')) u = 'https:' + u;
+    if (!u.startsWith('http://') && !u.startsWith('https://')) return null;
+
+    try {
+        const parsed = new URL(u);
+        const host = parsed.hostname.toLowerCase();
+        const isAvitoHost = host === 'avito.st' || host.endsWith('.avito.st') ||
+                            host === 'avito.ru' || host.endsWith('.avito.ru');
+        if (!isAvitoHost) return null;
+    } catch (e) {
+        return null;
+    }
+
+    const lower = u.toLowerCase();
+    if (lower.includes('/avatar') || lower.includes('/avatars') ||
+        lower.includes('/logo') || lower.includes('/logos') ||
+        lower.includes('/icon') || lower.includes('/icons') ||
+        lower.includes('/badge') || lower.includes('/banner') ||
+        lower.includes('/delivery') || lower.includes('/map') || lower.includes('/cursor') ||
+        lower.includes('/tracker') || lower.includes('/adriver') || lower.includes('/counter') ||
+        lower.includes('/pixel') || lower.includes('.svg') || lower.includes('data:image/svg') ||
+        lower.includes('video.avito.st') || lower.endsWith('.mp4') || lower.endsWith('.m3u8') || lower.endsWith('.webm')) {
+        return null;
+    }
+
+    return u;
+}
+
+function extractBestUrlFromSrcset(srcsetStr) {
+    if (!srcsetStr || typeof srcsetStr !== 'string') return null;
+    const parts = srcsetStr.split(',').map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return null;
+    let bestUrl = null;
+    let maxMetric = -1;
+    for (const part of parts) {
+        const tokens = part.split(/\s+/);
+        let u = tokens[0];
+        if (!u) continue;
+        if (u.startsWith('//')) u = 'https:' + u;
+        const valid = isCandidateThumbnailUrl(u);
+        if (!valid) continue;
+        let metric = 1;
+        if (tokens.length > 1) {
+            const desc = tokens[1];
+            if (desc.endsWith('w')) {
+                metric = parseInt(desc.slice(0, -1), 10) || 1;
+            } else if (desc.endsWith('x')) {
+                metric = (parseFloat(desc.slice(0, -1)) || 1) * 1000;
+            }
+        }
+        if (metric > maxMetric) {
+            maxMetric = metric;
+            bestUrl = valid;
+        }
+    }
+    return bestUrl;
+}
+
+function isExcludedImg(img) {
+    if (!img) return true;
+    const attr = (k) => (img.getAttribute(k) || '').toLowerCase();
+    const cls = (img.className || '').toString().toLowerCase();
+    const alt = attr('alt');
+    const src = attr('src');
+    const marker = attr('data-marker');
+    if (marker.includes('avatar') || marker.includes('badge') || marker.includes('icon') || marker.includes('logo') || marker.includes('delivery')) return true;
+    if (cls.includes('avatar') || cls.includes('badge') || cls.includes('icon') || cls.includes('logo') || cls.includes('delivery')) return true;
+    if (alt.includes('аватар') || alt.includes('avatar') || alt.includes('логотип') || alt.includes('иконка')) return true;
+    if (src.includes('avatar') || src.includes('badge') || src.includes('icon') || src.includes('logo') || src.includes('delivery')) return true;
+    if (src.startsWith('data:image/svg+xml')) return true;
+    return false;
+}
+
+function extractCardThumbnailPhoto(container, fallbackAnchor = null, itemId = null) {
+    if (!container) return null;
+
+    function checkImg(img) {
+        if (!img || isExcludedImg(img)) return null;
+
+        // 1. visible img / currentSrc
+        if (img.currentSrc) {
+            const v = isCandidateThumbnailUrl(img.currentSrc);
+            if (v) return v;
+        }
+
+        // 2. img[srcset] / img[data-srcset]
+        const ss = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+        if (ss) {
+            const v = extractBestUrlFromSrcset(ss);
+            if (v) return v;
+        }
+
+        // 3. picture parent source
+        if (img.parentElement && img.parentElement.tagName && img.parentElement.tagName.toLowerCase() === 'picture') {
+            const sources = Array.from(img.parentElement.querySelectorAll('source'));
+            for (const s of sources) {
+                const s_ss = s.getAttribute('srcset') || s.getAttribute('data-srcset');
+                if (s_ss) {
+                    const v = extractBestUrlFromSrcset(s_ss);
+                    if (v) return v;
+                }
+            }
+        }
+
+        // 4. lazy attributes & src
+        const candidateAttrs = ['data-src', 'data-origin-src', 'data-lazy-src', 'data-load-src', 'data-url', 'src'];
+        for (const attr of candidateAttrs) {
+            const val = img.getAttribute(attr);
+            if (val && !val.startsWith('data:image/svg') && !val.startsWith('data:image/gif')) {
+                const v = isCandidateThumbnailUrl(val);
+                if (v) return v;
+            }
+        }
+
+        return null;
+    }
+
+    function checkCssBg(el) {
+        if (!el) return null;
+        const style = el.getAttribute('style') || '';
+        if (style && (style.includes('background') || style.includes('url('))) {
+            const clean = style.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+            const matches = Array.from(clean.matchAll(/url\(['"]?(https?:[^\'")]+|\/\/[^\'")]+)[\'"]?\)/gi));
+            for (const m of matches) {
+                const u = m[1].startsWith('//') ? ('https:' + m[1]) : m[1];
+                const v = isCandidateThumbnailUrl(u);
+                if (v) return v;
+            }
+        }
+        return null;
+    }
+
+    // Pass 1: Query dedicated photo/media container inside container
+    const photoWrappers = Array.from(container.querySelectorAll(
+        '[data-marker*="photo"], [data-marker*="image"], [data-marker*="slider"], [class*="photo"], [class*="image"], [class*="slider"], [class*="picture"], [class*="gallery"]'
+    ));
+
+    for (const wrapper of photoWrappers) {
+        const sources = Array.from(wrapper.querySelectorAll('picture source'));
+        for (const s of sources) {
+            const ss = s.getAttribute('srcset') || s.getAttribute('data-srcset');
+            if (ss) {
+                const v = extractBestUrlFromSrcset(ss);
+                if (v) return v;
+            }
+        }
+        const imgs = Array.from(wrapper.querySelectorAll('img'));
+        for (const img of imgs) {
+            const v = checkImg(img);
+            if (v) return v;
+        }
+        const bg = checkCssBg(wrapper);
+        if (bg) return bg;
+    }
+
+    // Pass 2: Check all imgs directly in container
+    const allImgs = Array.from(container.querySelectorAll('img'));
+    for (const img of allImgs) {
+        const v = checkImg(img);
+        if (v) return v;
+    }
+
+    // Pass 3: Check any picture sources anywhere in container
+    const allSources = Array.from(container.querySelectorAll('picture source'));
+    for (const s of allSources) {
+        const ss = s.getAttribute('srcset') || s.getAttribute('data-srcset');
+        if (ss) {
+            const v = extractBestUrlFromSrcset(ss);
+            if (v) return v;
+        }
+    }
+
+    // Pass 4: Check CSS background on any element in container
+    const bgEls = Array.from(container.querySelectorAll('[style*="background-image"], [style*="background:"]'));
+    for (const el of bgEls) {
+        const bg = checkCssBg(el);
+        if (bg) return bg;
+    }
+
+    // Pass 5: Nearby image wrapper in parent row container (Step 8)
+    if (container.parentElement && container.parentElement !== document.body && container.parentElement !== document.documentElement) {
+        const parent = container.parentElement;
+        const parentAnchors = Array.from(parent.querySelectorAll('a[href]'));
+        const pIds = new Set();
+        for (const pa of parentAnchors) {
+            const aid = extractAvitoIdFromUrl(pa.getAttribute('href') || '');
+            if (aid) pIds.add(aid);
+            if (pIds.size > 1) break;
+        }
+        if (pIds.size <= 1) {
+            const parentWrappers = Array.from(parent.querySelectorAll(
+                '[data-marker*="photo"], [data-marker*="image"], [class*="photo"], [class*="image"]'
+            ));
+            for (const pw of parentWrappers) {
+                if (container.contains(pw)) continue;
+                const pImgs = Array.from(pw.querySelectorAll('img'));
+                for (const img of pImgs) {
+                    const v = checkImg(img);
+                    if (v) return v;
+                }
+                const bg = checkCssBg(pw);
+                if (bg) return bg;
+            }
+        }
+    }
+
+    return null;
+}
+
 function parseListingCardElement(cardEl, fallbackAnchor = null) {
     if (!cardEl && !fallbackAnchor) return null;
     const baseNode = cardEl || fallbackAnchor;
-    const container = findCardContainer(baseNode) || baseNode;
+
+    let directItemId = null;
+    if (fallbackAnchor) {
+        directItemId = extractAvitoIdFromUrl(fallbackAnchor.getAttribute('href') || '');
+    } else if (cardEl) {
+        const dId = cardEl.getAttribute('data-item-id');
+        if (dId && /^\d{8,14}$/.test(dId)) directItemId = dId;
+        const marker = cardEl.getAttribute('data-marker') || '';
+        const mm = marker.match(/\d{8,14}/);
+        if (mm) directItemId = mm[0];
+    }
+
+    const container = findCardContainer(baseNode, directItemId) || baseNode;
     if (!container) return null;
 
     // 1. Link & Item ID
@@ -2002,7 +2262,7 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
     );
     let href = linkEl ? (linkEl.getAttribute('href') || '') : '';
     let fullUrl = href ? (href.startsWith('http') ? href : ('https://www.avito.ru' + href)) : window.location.href;
-    let itemId = extractAvitoIdFromUrl(fullUrl);
+    let itemId = extractAvitoIdFromUrl(fullUrl) || directItemId;
 
     if (!itemId && fallbackAnchor) {
         href = fallbackAnchor.getAttribute('href') || '';
@@ -2037,10 +2297,8 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         title = `Объявление Avito ${itemId}`;
     }
 
-    // 3. Price (Priority: meta content -> stable data-marker -> dedicated price node text -> narrow currency match)
+    // 3. Price
     let price = null;
-
-    // 3.1 Structured meta/attribute value
     const metaPrice = container.querySelector('meta[itemprop="price"], [itemprop="price"][content], [data-marker*="price"][content]');
     if (metaPrice) {
         const val = metaPrice.getAttribute('content');
@@ -2048,8 +2306,6 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
             price = parseFloat(val);
         }
     }
-
-    // 3.2 Dedicated price element with strict currency regex or digits-only
     if (price === null) {
         const priceEl = container.querySelector(
             '[data-marker="item-price"], [data-marker="item-price-current"], [data-marker*="price"], [itemprop="price"], span[class*="price-text"], strong[class*="price-text"], p[class*="price-text"], [class*="price-root"], [class*="Price-root"], [class*="priceText"], [class*="itemPrice"], span[class*="price-"], strong[class*="price-"], .price, .item-price'
@@ -2074,8 +2330,6 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
             }
         }
     }
-
-    // 3.3 Narrow scoped fallback inside container: find leaf containing currency symbol
     if (price === null) {
         const allLeafs = Array.from(container.querySelectorAll('*')).filter(el => 
             el.children.length === 0 && /(?:₽|руб|rub)/i.test(el.textContent)
@@ -2120,129 +2374,8 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         location = locEl.textContent.trim();
     }
 
-    // 6. Photo thumbnail extraction (multi-source: picture source, currentSrc, data-srcset, srcset, data-src, background-image)
-    function extractBestUrlFromSrcset(srcsetStr) {
-        if (!srcsetStr || typeof srcsetStr !== 'string') return null;
-        const parts = srcsetStr.split(',').map(s => s.trim()).filter(Boolean);
-        if (!parts.length) return null;
-        let bestUrl = null;
-        let maxMetric = -1;
-        for (const part of parts) {
-            const tokens = part.split(/\s+/);
-            let u = tokens[0];
-            if (!u) continue;
-            if (u.startsWith('//')) u = 'https:' + u;
-            if (!u.startsWith('http')) continue;
-            let metric = 1;
-            if (tokens.length > 1) {
-                const desc = tokens[1];
-                if (desc.endsWith('w')) {
-                    metric = parseInt(desc.slice(0, -1), 10) || 1;
-                } else if (desc.endsWith('x')) {
-                    metric = (parseFloat(desc.slice(0, -1)) || 1) * 1000;
-                }
-            }
-            if (metric > maxMetric) {
-                maxMetric = metric;
-                bestUrl = u;
-            }
-        }
-        return bestUrl;
-    }
-
-    let photoUrl = null;
-    const isExcludedImg = (img) => {
-        if (!img) return true;
-        const attr = (k) => (img.getAttribute(k) || '').toLowerCase();
-        const cls = (img.className || '').toLowerCase();
-        const alt = attr('alt');
-        const src = attr('src');
-        const marker = attr('data-marker');
-        if (marker.includes('avatar') || marker.includes('badge') || marker.includes('icon') || marker.includes('logo') || marker.includes('delivery')) return true;
-        if (cls.includes('avatar') || cls.includes('badge') || cls.includes('icon') || cls.includes('logo') || cls.includes('delivery')) return true;
-        if (alt.includes('аватар') || alt.includes('avatar') || alt.includes('логотип') || alt.includes('иконка')) return true;
-        if (src.includes('avatar') || src.includes('badge') || src.includes('icon') || src.includes('logo') || src.includes('delivery')) return true;
-        if (src.startsWith('data:image/svg+xml')) return true;
-        return false;
-    };
-
-    // Dedicated photo container inside card
-    const photoContainer = container.querySelector(
-        '[data-marker*="photo"], [data-marker*="image"], [class*="photo"], [class*="image"], [class*="picture"], [class*="gallery"]'
-    );
-    const searchScope = photoContainer || container;
-
-    // A. Check picture sources
-    const pictureSources = Array.from(searchScope.querySelectorAll('picture source'));
-    for (const pSrc of pictureSources) {
-        const ss = pSrc.getAttribute('srcset') || pSrc.getAttribute('data-srcset');
-        if (ss) {
-            const best = extractBestUrlFromSrcset(ss);
-            if (best && !best.includes('avatar') && !best.includes('icon') && !best.includes('logo')) {
-                photoUrl = best;
-                break;
-            }
-        }
-    }
-
-    // B. Check img elements
-    if (!photoUrl) {
-        let imgs = Array.from(searchScope.querySelectorAll('img')).filter(img => !isExcludedImg(img));
-        if (imgs.length === 0 && searchScope !== container) {
-            imgs = Array.from(container.querySelectorAll('img')).filter(img => !isExcludedImg(img));
-        }
-
-        let photoEl = imgs.find(img => {
-            const m = (img.getAttribute('data-marker') || '').toLowerCase();
-            const s = (img.getAttribute('src') || img.getAttribute('data-src') || '').toLowerCase();
-            return m.includes('photo') || m.includes('image') || s.includes('img.avito.st') || s.includes('avito');
-        }) || imgs[0];
-
-        if (photoEl) {
-            let cur = photoEl.currentSrc || '';
-            if (cur.startsWith('//')) cur = 'https:' + cur;
-            let dSrcset = photoEl.getAttribute('data-srcset') || '';
-            let sSrcset = photoEl.getAttribute('srcset') || '';
-            let dSrc = photoEl.getAttribute('data-src') || '';
-            if (dSrc.startsWith('//')) dSrc = 'https:' + dSrc;
-            let dOrig = photoEl.getAttribute('data-origin-src') || '';
-            if (dOrig.startsWith('//')) dOrig = 'https:' + dOrig;
-            let sSrc = photoEl.getAttribute('src') || '';
-            if (sSrc.startsWith('//')) sSrc = 'https:' + sSrc;
-
-            if (cur && cur.startsWith('http') && !cur.startsWith('data:') && !cur.includes('avatar') && !cur.includes('icon')) {
-                photoUrl = cur;
-            } else if (dSrcset) {
-                photoUrl = extractBestUrlFromSrcset(dSrcset);
-            } else if (sSrcset) {
-                photoUrl = extractBestUrlFromSrcset(sSrcset);
-            } else if (dSrc && dSrc.startsWith('http')) {
-                photoUrl = dSrc;
-            } else if (dOrig && dOrig.startsWith('http')) {
-                photoUrl = dOrig;
-            } else if (sSrc && sSrc.startsWith('http') && !sSrc.startsWith('data:')) {
-                photoUrl = sSrc;
-            }
-        }
-    }
-
-    // C. Fallback: CSS style background-image
-    if (!photoUrl) {
-        const bgEls = Array.from(container.querySelectorAll('[style*="background-image"], [style*="background:"]'));
-        for (const bgEl of bgEls) {
-            const bgStyle = bgEl.getAttribute('style') || '';
-            const bgMatch = bgStyle.match(/url\(['"]?(https?:\/\/[^'")]+)['"]?\)/i);
-            if (bgMatch && !bgMatch[1].includes('avatar') && !bgMatch[1].includes('icon') && !bgMatch[1].includes('logo')) {
-                photoUrl = bgMatch[1];
-                break;
-            }
-        }
-    }
-
-    if (photoUrl) {
-        if (photoUrl.startsWith('//')) photoUrl = 'https:' + photoUrl;
-        if (!photoUrl.startsWith('http')) photoUrl = null;
-    }
+    // 6. Photo thumbnail extraction (dedicated 8-step extractor)
+    const photoUrl = extractCardThumbnailPhoto(container, fallbackAnchor, itemId);
 
     return {
         avito_id: itemId,
@@ -2257,7 +2390,6 @@ function parseListingCardElement(cardEl, fallbackAnchor = null) {
         thumbnail_url: photoUrl
     };
 }
-
 
 function extractPaginationInfo() {
     try {
@@ -2356,6 +2488,7 @@ function extractMyListingsData() {
 
         // Primary Layer 1: Container cards (strictly root cards without leaf wildcard)
         const cardSelectors = [
+            'article',
             '[data-marker="item-root"]',
             '[data-marker="item"]',
             '[data-marker="item-snippet"]',
@@ -2363,22 +2496,15 @@ function extractMyListingsData() {
             '[data-marker="profile/item"]',
             '[data-marker^="profile-item"]',
             '[data-marker^="extended-item"]',
-            '[data-marker^="item-8"]',
-            '[data-marker^="item-7"]',
-            '[data-marker^="item-6"]',
-            '[data-marker^="item-5"]',
-            '[data-marker^="item-4"]',
-            '[data-marker^="item-3"]',
-            '[data-marker^="item-2"]',
-            '[data-marker^="item-1"]',
-            '[data-marker^="item-9"]',
+            '[data-marker^="item-"]',
             '[data-item-id]',
-            'div[class*="styles-module-root-"]',
-            'div[class*="ItemSnippet"]',
-            'div[class*="item-snippet"]',
             '.iva-item-root',
             '.items-item',
-            'article'
+            'div[class*="item-snippet"]',
+            'div[class*="ItemSnippet"]',
+            'div[class*="itemCard"]',
+            'div[class*="item-card"]',
+            'div[class*="snippet-wrapper"]'
         ].join(', ');
 
         const itemEls = document.querySelectorAll(cardSelectors);
@@ -2426,7 +2552,7 @@ function extractMyListingsData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.52",
+            extension_version: "0.2.53",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -2436,7 +2562,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.52",
+            extension_version: "0.2.53",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -2446,60 +2572,78 @@ function extractMyListingsData() {
     }
 }
 
-function extractMyListingsDataAsync(maxWaitMs = 10000) {
-    return new Promise(resolve => {
-        const initial = extractMyListingsData();
-        if (initial && initial.items && initial.items.length > 0) {
-            return resolve(initial);
-        }
+async function extractMyListingsDataAsync(maxWaitMs = 5000) {
+    let data = extractMyListingsData();
+    let totalItems = data.items.length;
+    let withPhotos = data.items.filter(it => it.photo_url || it.thumbnail_url).length;
 
-        const startTime = Date.now();
-        const interval = 250;
-        let observer = null;
-        let done = false;
-
-        function finish(res) {
-            if (done) return;
-            done = true;
-            if (observer) {
-                try { observer.disconnect(); } catch (e) {}
-            }
-            resolve(res);
-        }
-
-        function check() {
-            if (done) return;
-            const current = extractMyListingsData();
-            if (current && current.items && current.items.length > 0) {
-                return finish(current);
-            }
-            if (Date.now() - startTime >= maxWaitMs) {
-                return finish(current);
-            }
-            setTimeout(check, interval);
-        }
-
-        try {
-            observer = new MutationObserver(() => {
-                if (done) return;
-                const current = extractMyListingsData();
-                if (current && current.items && current.items.length > 0) {
-                    finish(current);
+    // If no items at all, wait with MutationObserver / poll up to maxWaitMs
+    if (totalItems === 0) {
+        await new Promise(resolve => {
+            const startTime = Date.now();
+            const interval = 250;
+            const check = () => {
+                data = extractMyListingsData();
+                if (data.items.length > 0 || Date.now() - startTime >= maxWaitMs) {
+                    return resolve();
                 }
-            });
-            observer.observe(document.body || document.documentElement, {
-                childList: true,
-                subtree: true
-            });
-        } catch (e) {}
+                setTimeout(check, interval);
+            };
+            setTimeout(check, interval);
+        });
+        totalItems = data.items.length;
+        withPhotos = data.items.filter(it => it.photo_url || it.thumbnail_url).length;
+    }
 
-        setTimeout(check, interval);
-    });
+    // Bounded lazy scroll trigger: if items exist but some are missing photos (real Avito cabinet)
+    if (totalItems > 0 && withPhotos < totalItems && typeof window !== 'undefined') {
+        try {
+            const initialScrollY = window.scrollY || window.pageYOffset || 0;
+            const initialScrollX = window.scrollX || window.pageXOffset || 0;
+
+            const cardNodes = Array.from(document.querySelectorAll(
+                'article, [data-marker="item-root"], [data-marker="item"], [data-marker="item-snippet"], [data-marker="profile/item"], [data-marker^="profile-item"], [data-marker^="extended-item"], [data-marker^="item-"], [data-item-id], .iva-item-root, .items-item'
+            ));
+
+            const stepSize = Math.max(1, Math.floor(cardNodes.length / 8));
+            for (let i = 0; i < cardNodes.length; i += stepSize) {
+                const node = cardNodes[i];
+                if (node && typeof node.scrollIntoView === 'function') {
+                    node.scrollIntoView({ behavior: 'instant', block: 'center' });
+                    window.dispatchEvent(new Event('scroll'));
+                    await new Promise(r => setTimeout(r, 60));
+                }
+            }
+
+            if (cardNodes.length > 0) {
+                const lastNode = cardNodes[cardNodes.length - 1];
+                if (lastNode && typeof lastNode.scrollIntoView === 'function') {
+                    lastNode.scrollIntoView({ behavior: 'instant', block: 'end' });
+                    window.dispatchEvent(new Event('scroll'));
+                    await new Promise(r => setTimeout(r, 80));
+                }
+            }
+
+            // Restore initial position
+            if (typeof window.scrollTo === 'function') {
+                window.scrollTo(initialScrollX, initialScrollY);
+                window.dispatchEvent(new Event('scroll'));
+                await new Promise(r => setTimeout(r, 50));
+            }
+
+            data = extractMyListingsData();
+        } catch (scrollErr) {
+            console.warn("Technoreboot lazy scroll trigger warning:", scrollErr);
+        }
+    }
+
+    return data;
 }
 
 function hasAnyListingsCardOrAnchor() {
     try {
         const cardSelectors = [
+            'article',
             '[data-marker="item-root"]',
             '[data-marker="item"]',
             '[data-marker="item-snippet"]',
@@ -2507,22 +2651,15 @@ function hasAnyListingsCardOrAnchor() {
             '[data-marker="profile/item"]',
             '[data-marker^="profile-item"]',
             '[data-marker^="extended-item"]',
-            '[data-marker^="item-8"]',
-            '[data-marker^="item-7"]',
-            '[data-marker^="item-6"]',
-            '[data-marker^="item-5"]',
-            '[data-marker^="item-4"]',
-            '[data-marker^="item-3"]',
-            '[data-marker^="item-2"]',
-            '[data-marker^="item-1"]',
-            '[data-marker^="item-9"]',
+            '[data-marker^="item-"]',
             '[data-item-id]',
-            'div[class*="styles-module-root-"]',
-            'div[class*="ItemSnippet"]',
-            'div[class*="item-snippet"]',
             '.iva-item-root',
             '.items-item',
-            'article'
+            'div[class*="item-snippet"]',
+            'div[class*="ItemSnippet"]',
+            'div[class*="itemCard"]',
+            'div[class*="item-card"]',
+            'div[class*="snippet-wrapper"]'
         ].join(', ');
         const card = document.querySelector(cardSelectors);
         if (card) return true;
@@ -2534,6 +2671,35 @@ function hasAnyListingsCardOrAnchor() {
         return false;
     } catch (e) {
         return false;
+    }
+}
+
+function getPhotoExtractionDiagnostics() {
+    try {
+        const data = extractMyListingsData();
+        const items = data.items || [];
+        const withPhotos = items.filter(it => it.photo_url || it.thumbnail_url);
+        const withoutPhotos = items.filter(it => !it.photo_url && !it.thumbnail_url);
+        return {
+            total_listings: items.length,
+            with_photos: withPhotos.length,
+            without_photos: withoutPhotos.length,
+            diagnostic_text: `Фото найдено: ${withPhotos.length} из ${items.length}`,
+            samples: withPhotos.slice(0, 5).map(it => ({
+                avito_id: it.avito_id,
+                title: it.title,
+                thumbnail_url: it.thumbnail_url || it.photo_url
+            }))
+        };
+    } catch (e) {
+        return {
+            total_listings: 0,
+            with_photos: 0,
+            without_photos: 0,
+            diagnostic_text: "Ошибка диагностики фото",
+            samples: [],
+            error: String(e)
+        };
     }
 }
 
@@ -4147,7 +4313,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.52",
+                    extension_version: "0.2.53",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",

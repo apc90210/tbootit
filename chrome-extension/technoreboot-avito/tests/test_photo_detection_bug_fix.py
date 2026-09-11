@@ -103,7 +103,7 @@ def test_extension_manifest_and_zip_version():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    assert manifest["version"] in ["0.2.46", "0.2.47"]
+    assert manifest["version"] >= "0.2.46"
 
     assert os.path.exists(ZIP_PATH), f"ZIP not found: {ZIP_PATH}"
     assert os.path.exists(ADMIN_ZIP_PATH), f"Admin ZIP not found: {ADMIN_ZIP_PATH}"

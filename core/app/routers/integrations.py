@@ -421,7 +421,10 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
 
         if item_photo.content_base64:
             try:
-                photo_bytes = base64.b64decode(item_photo.content_base64)
+                raw_b64 = str(item_photo.content_base64)
+                if "," in raw_b64:
+                    raw_b64 = raw_b64.split(",", 1)[1]
+                photo_bytes = base64.b64decode(raw_b64)
                 content_hash = hashlib.sha256(photo_bytes).hexdigest()
             except Exception:
                 pass

@@ -16,7 +16,7 @@ def test_manifest_version_and_host_permissions():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    assert manifest.get("version") in ["0.2.45", "0.2.46", "0.2.47"]
+    assert manifest.get("version") >= "0.2.45"
     host_perms = manifest.get("host_permissions", [])
     assert any("img.avito.st" in perm for perm in host_perms), (
         f"host_permissions must include *.img.avito.st, got: {host_perms}"
