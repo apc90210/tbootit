@@ -127,4 +127,5 @@ def test_extension_manifest_and_zip_version():
         assert "icons/icon128.png" in names
 
         manifest_in_zip = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest_in_zip["version"] in ["0.2.46", "0.2.47"]
+        assert manifest_in_zip["version"] >= "0.2.46"
+        assert manifest_in_zip["version"] == manifest["version"]
