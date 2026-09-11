@@ -106,6 +106,186 @@ async def generate_missing_barcodes_endpoint(request: Request):
     return RedirectResponse(url=f"/inventory/products?msg={msg}", status_code=303)
 
 
+@router.post("/products/batch-action")
+async def products_batch_action(request: Request):
+    content_type = request.headers.get("content-type", "")
+    action = None
+    new_status = None
+    new_location = None
+    product_ids = []
+
+    if "application/json" in content_type:
+        body = await request.json()
+        action = body.get("action")
+        new_status = body.get("status") or body.get("new_status")
+        new_location = body.get("storage_location") or body.get("new_location") or body.get("location")
+        product_ids = [int(x) for x in body.get("product_ids", []) if str(x).isdigit()]
+    else:
+        form = await request.form()
+        action = form.get("action")
+        new_status = form.get("new_status") or form.get("status")
+        new_location = form.get("new_location") or form.get("storage_location") or form.get("location")
+        raw_ids = form.getlist("product_ids[]") or form.getlist("product_ids") or []
+        if not raw_ids and form.get("ids"):
+            raw_ids = str(form.get("ids")).split(",")
+        product_ids = [int(str(x).strip()) for x in raw_ids if str(x).strip().isdigit()]
+
+    is_ajax = "application/json" in request.headers.get("accept", "") or request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+    if not product_ids:
+        err = "Не выбрано ни одного товара"
+        if is_ajax:
+            return JSONResponse({"error": True, "detail": err}, status_code=400)
+        return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+
+    if action == "set_status":
+        if not new_status:
+            err = "Не выбран статус"
+            if is_ajax:
+                return JSONResponse({"error": True, "detail": err}, status_code=400)
+            return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+        res = await core_client.batch_update_products({
+            "product_ids": product_ids,
+            "status": new_status,
+            "comment": "Массовая смена статуса"
+        })
+        if is_ajax:
+            return JSONResponse(res)
+        status_names = {"draft": "Черновик", "in_stock": "В наличии", "reserved": "В резерве", "sold": "Продан", "archived": "В архиве", "written_off": "Списан"}
+        s_label = status_names.get(new_status, new_status)
+        return RedirectResponse(f"/inventory/products?msg=Статус+{s_label}+успешно+установлен+для+{len(product_ids)}+товаров", status_code=303)
+
+    elif action == "set_location":
+        if not new_location:
+            err = "Не указано место хранения"
+            if is_ajax:
+                return JSONResponse({"error": True, "detail": err}, status_code=400)
+            return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+        res = await core_client.batch_update_products({
+            "product_ids": product_ids,
+            "storage_location": new_location,
+            "comment": "Массовая смена места хранения"
+        })
+        if is_ajax:
+            return JSONResponse(res)
+        loc_names = {"store": "Магазин", "workshop": "Мастерская", "archive": "Архив", "draft": "Черновик"}
+        l_label = loc_names.get(new_location, new_location)
+        return RedirectResponse(f"/inventory/products?msg=Место+хранения+{l_label}+успешно+установлено+для+{len(product_ids)}+товаров", status_code=303)
+
+    elif action == "add_to_cart":
+        cart = request.session.get("cart", [])
+        added_count = 0
+        skipped_count = 0
+        for pid in product_ids:
+            p_data = await core_client.get_product_details(pid)
+            if not p_data or p_data.get("error"):
+                skipped_count += 1
+                continue
+            p_status = p_data.get("status")
+            p_loc = p_data.get("storage_location")
+            p_qty = p_data.get("quantity", 0)
+            if p_status in ['in_stock', 'reserved'] and p_loc == 'store' and p_qty > 0:
+                p_title = p_data.get("title", f"Товар #{pid}")
+                p_price = float(p_data.get("sale_price") or p_data.get("price") or 0.0)
+                for item in cart:
+                    if item.get("product_id") == pid:
+                        item["quantity"] = item.get("quantity", 1) + 1
+                        break
+                else:
+                    cart.append({
+                        "product_id": pid,
+                        "title": p_title,
+                        "price": p_price,
+                        "quantity": 1
+                    })
+                added_count += 1
+            else:
+                skipped_count += 1
+        request.session["cart"] = cart
+        if is_ajax:
+            return JSONResponse({"success": True, "added": added_count, "skipped": skipped_count, "cart_total": len(cart)})
+        return RedirectResponse("/inventory/cart", status_code=303)
+
+    elif action == "print_price_tags":
+        ids_str = ",".join(str(x) for x in product_ids)
+        return RedirectResponse(f"/inventory/products/price-tags/batch?ids={ids_str}", status_code=303)
+
+    else:
+        err = f"Неизвестное действие: {action}"
+        if is_ajax:
+            return JSONResponse({"error": True, "detail": err}, status_code=400)
+        return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+
+
+@router.get("/products/price-tags/batch", response_class=HTMLResponse)
+@router.post("/products/price-tags/batch", response_class=HTMLResponse)
+async def price_tags_batch_preview(
+    request: Request,
+    ids: Optional[str] = Query(None),
+    warranty_text: Optional[str] = Query(None),
+    condition_text: Optional[str] = Query(None)
+):
+    if request.method == "POST":
+        form = await request.form()
+        if not ids:
+            raw_ids = form.getlist("product_ids[]") or form.getlist("product_ids") or []
+            if not raw_ids and form.get("ids"):
+                raw_ids = str(form.get("ids")).split(",")
+            ids = ",".join(str(x).strip() for x in raw_ids if str(x).strip().isdigit())
+        if not warranty_text:
+            warranty_text = form.get("warranty_text")
+        if not condition_text:
+            condition_text = form.get("condition_text")
+
+    if not ids:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Не указаны товары для печати ценников"}
+        )
+
+    product_ids = [int(x.strip()) for x in ids.split(",") if x.strip().isdigit()]
+    if not product_ids:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Список товаров для печати пуст"}
+        )
+
+    effective_warranty = warranty_text if warranty_text is not None else "Гарантия 30 дней"
+    effective_condition = condition_text if condition_text is not None else "Б/У"
+
+    tags = []
+    for pid in product_ids:
+        p_data = await core_client.get_product_details(pid)
+        if not p_data or p_data.get("error"):
+            continue
+
+        p_price = float(p_data.get("sale_price") or p_data.get("price") or 0.0)
+        bc_val = p_data.get("barcode") or p_data.get("sku") or str(pid)
+        bc_svg = render_barcode_svg(bc_val)
+
+        tags.append({
+            "id": pid,
+            "title": p_data.get("title", f"Товар #{pid}"),
+            "sku": p_data.get("sku") or str(pid),
+            "barcode_value": bc_val,
+            "barcode_svg": bc_svg,
+            "price": p_price,
+            "formatted_price": "{:,.0f}".format(p_price).replace(",", " "),
+            "warranty": effective_warranty,
+            "condition": p_data.get("condition") or effective_condition
+        })
+
+    return templates.TemplateResponse(
+        request=request, name="price_tag_batch.html", context={
+            "tags": tags,
+            "total_tags": len(tags),
+            "warranty_text": effective_warranty,
+            "condition_text": effective_condition,
+            "ids_string": ids
+        }
+    )
+
+
+
+
 def format_core_error(detail: Any) -> str:
     """Format Core API errors into clean, friendly Russian messages without raw Pydantic output or URLs."""
     if not detail:
@@ -566,3 +746,5 @@ async def price_tag_preview(
             "barcode_value": bc_val
         }
     )
+
+

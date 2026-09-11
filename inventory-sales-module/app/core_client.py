@@ -71,6 +71,16 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def batch_update_products(self, payload: dict):
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/products/batch", json=payload, timeout=15.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code, "detail": response.text}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
     # --- Barcode methods (Stage 04I) ---
 
     async def get_product_by_barcode(self, barcode: str):

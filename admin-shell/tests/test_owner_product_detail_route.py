@@ -1,8 +1,16 @@
+import re
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
+
+def _get_existing_product_id():
+    res = client.get("/inventory/products")
+    m = re.search(r'/inventory/products/(\d+)', res.text)
+    if m:
+        return m.group(1)
+    return "1"
 
 def test_owner_product_list_has_product_detail_links():
     """Verify owner product list at /inventory/products contains links to product details."""
@@ -13,22 +21,25 @@ def test_owner_product_list_has_product_detail_links():
 
 def test_owner_product_link_opens_product_detail():
     """Verify navigating to product detail route returns 200 without Core API error."""
-    res = client.get("/inventory/products/58")
+    pid = _get_existing_product_id()
+    res = client.get(f"/inventory/products/{pid}")
     assert res.status_code == 200
     assert "Ошибка Core API" not in res.text
     assert "Товар не найден" not in res.text
 
-def test_product_detail_58_returns_200():
-    """Verify Product 58 detail page returns 200 OK and valid page structure."""
-    res = client.get("/inventory/products/58")
+def test_product_detail_returns_200():
+    """Verify Product detail page returns 200 OK and valid page structure."""
+    pid = _get_existing_product_id()
+    res = client.get(f"/inventory/products/{pid}")
     assert res.status_code == 200
     assert "Ошибка Core API" not in res.text
     assert "Редактировать товар" in res.text
-    assert "/inventory/products/58/edit" in res.text
+    assert f"/inventory/products/{pid}/edit" in res.text
 
 
 def test_owner_product_new_and_edit_routes():
     """Verify owner product creation and editing routes proxy and redirect correctly."""
+    pid = _get_existing_product_id()
     # Product list has manual create button
     res_list = client.get("/inventory/products")
     assert res_list.status_code == 200
@@ -45,13 +56,14 @@ def test_owner_product_new_and_edit_routes():
     assert res_new_redirect.status_code == 302
     assert res_new_redirect.headers["location"] == "/inventory/products/new"
 
-    # /inventory/products/58/edit proxies cleanly
-    res_edit = client.get("/inventory/products/58/edit")
+    # /inventory/products/{pid}/edit proxies cleanly
+    res_edit = client.get(f"/inventory/products/{pid}/edit")
     assert res_edit.status_code == 200
     assert "Редактирование товара" in res_edit.text
 
-    # /products/58/edit shortcut redirects to /inventory/products/58/edit
-    res_edit_redirect = client.get("/products/58/edit", follow_redirects=False)
+    # /products/{pid}/edit shortcut redirects to /inventory/products/{pid}/edit
+    res_edit_redirect = client.get(f"/products/{pid}/edit", follow_redirects=False)
     assert res_edit_redirect.status_code == 302
-    assert res_edit_redirect.headers["location"] == "/inventory/products/58/edit"
+    assert res_edit_redirect.headers["location"] == f"/inventory/products/{pid}/edit"
+
 

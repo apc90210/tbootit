@@ -169,10 +169,77 @@
     </div>
 
     {% if products_data %}
-        <p>Всего найдено: {{ products_data.total }}</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+            <p style="margin: 0; font-size: 0.95rem; color: #475569;">Всего найдено: <strong>{{ products_data.total }}</strong></p>
+        </div>
+
+        <!-- Панель массовых операций (Batch Operations Bar) -->
+        <div id="batch-actions-bar" style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 12px 18px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; transition: all 0.2s ease;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-weight: 600; font-size: 0.95rem; color: #334155;">
+                    Выбрано: <strong id="batch-selected-count" style="color: #0284c7; font-size: 1.15rem;">0</strong> товаров
+                </span>
+                <button type="button" id="batch-deselect-btn" class="btn" style="background: #e2e8f0; color: #475569; padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; display: none; border: none; cursor: pointer;">
+                    Снять выбор
+                </button>
+            </div>
+
+            <div id="batch-controls-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; opacity: 0.45; pointer-events: none; transition: opacity 0.2s ease;">
+                <!-- Печать ценников -->
+                <button type="button" id="btn-batch-print-tags" class="btn" style="background: #0ea5e9; color: #fff; padding: 7px 15px; border-radius: 5px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Распечатать ценники 58x40 для выбранных товаров">
+                    🏷️ Печать ценников (58×40)
+                </button>
+
+                <!-- Массовая продажа / В корзину -->
+                <button type="button" id="btn-batch-add-cart" class="btn" style="background: #22c55e; color: #fff; padding: 7px 15px; border-radius: 5px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Добавить выбранные товары в корзину для оформления продажи">
+                    🛒 Продать (в корзину)
+                </button>
+
+                <!-- Смена статуса -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <select id="batch-status-select" style="padding: 7px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: #fff;">
+                        <option value="">Сменить статус...</option>
+                        <option value="in_stock">В наличии</option>
+                        <option value="draft">Черновик</option>
+                        <option value="reserved">В резерве</option>
+                        <option value="archived">В архиве</option>
+                        <option value="written_off">Списан</option>
+                    </select>
+                    <button type="button" id="btn-batch-apply-status" class="btn" style="background: #475569; color: #fff; padding: 7px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                        Применить
+                    </button>
+                </div>
+
+                <!-- Смена места хранения -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <select id="batch-location-select" style="padding: 7px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: #fff;">
+                        <option value="">Место хранения...</option>
+                        <option value="store">Магазин</option>
+                        <option value="workshop">Мастерская</option>
+                        <option value="archive">Архив</option>
+                        <option value="draft">Черновик</option>
+                    </select>
+                    <button type="button" id="btn-batch-apply-location" class="btn" style="background: #475569; color: #fff; padding: 7px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                        Применить
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Скрытая форма для отправки массовых действий -->
+        <form id="batch-action-form" action="/inventory/products/batch-action" method="POST" style="display: none;">
+            <input type="hidden" name="action" id="batch-form-action" value="">
+            <input type="hidden" name="new_status" id="batch-form-status" value="">
+            <input type="hidden" name="new_location" id="batch-form-location" value="">
+            <input type="hidden" name="ids" id="batch-form-ids" value="">
+        </form>
+
         <table>
             <thead>
                 <tr>
+                    <th style="width: 38px; text-align: center;">
+                        <input type="checkbox" id="select-all-products" title="Выбрать все на странице" style="cursor: pointer; width: 18px; height: 18px;">
+                    </th>
                     <th style="width: 50px; text-align: center;">Фото</th>
                     <th>Артикул</th>
                     <th>Штрихкод</th>
@@ -186,7 +253,17 @@
             </thead>
             <tbody>
                 {% for item in products_data['items'] %}
-                <tr>
+                <tr class="product-row" data-product-id="{{ item.id }}">
+                    <td style="text-align: center; vertical-align: middle; padding: 4px;">
+                        <input type="checkbox" class="product-select-cb" value="{{ item.id }}"
+                               data-id="{{ item.id }}"
+                               data-title="{{ item.title }}"
+                               data-price="{{ item.sale_price if item.sale_price else item.price }}"
+                               data-status="{{ item.status }}"
+                               data-location="{{ item.storage_location }}"
+                               data-quantity="{{ item.quantity }}"
+                               style="cursor: pointer; width: 18px; height: 18px;">
+                    </td>
                     <td style="text-align: center; vertical-align: middle; padding: 4px;">
                         {% if item.main_photo_url %}
                             {% set img_url = item.main_photo_url if item.main_photo_url.startswith('/') else '/' ~ item.main_photo_url %}
@@ -207,6 +284,7 @@
                         {% elif item.status == 'draft' %}Черновик
                         {% elif item.status == 'in_repair' %}В ремонте
                         {% elif item.status == 'written_off' %}Списан
+                        {% elif item.status == 'archived' %}В архиве
                         {% else %}{{ item.status }}
                         {% endif %}
                     </td>
@@ -249,7 +327,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" style="text-align: center;">Ничего не найдено</td>
+                    <td colspan="10" style="text-align: center; padding: 20px; color: #64748b;">Ничего не найдено</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -268,5 +346,173 @@
                 <button class="btn" disabled style="margin-left: 10px;">Вперед</button>
             {% endif %}
         </div>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAllCb = document.getElementById('select-all-products');
+            const rowCbs = Array.from(document.querySelectorAll('.product-select-cb'));
+            const selectedCountEl = document.getElementById('batch-selected-count');
+            const deselectBtn = document.getElementById('batch-deselect-btn');
+            const controlsGroup = document.getElementById('batch-controls-group');
+            const actionsBar = document.getElementById('batch-actions-bar');
+            const form = document.getElementById('batch-action-form');
+            const formAction = document.getElementById('batch-form-action');
+            const formStatus = document.getElementById('batch-form-status');
+            const formLocation = document.getElementById('batch-form-location');
+            const formIds = document.getElementById('batch-form-ids');
+
+            let lastCheckedIndex = null;
+
+            function updateBatchUI() {
+                const checked = rowCbs.filter(cb => cb.checked);
+                const count = checked.length;
+                selectedCountEl.textContent = count;
+
+                if (count > 0) {
+                    controlsGroup.style.opacity = '1';
+                    controlsGroup.style.pointerEvents = 'auto';
+                    deselectBtn.style.display = 'inline-block';
+                    actionsBar.style.borderColor = '#93c5fd';
+                    actionsBar.style.background = '#f0f9ff';
+                } else {
+                    controlsGroup.style.opacity = '0.45';
+                    controlsGroup.style.pointerEvents = 'none';
+                    deselectBtn.style.display = 'none';
+                    actionsBar.style.borderColor = '#e2e8f0';
+                    actionsBar.style.background = '#f8fafc';
+                }
+
+                if (selectAllCb) {
+                    if (rowCbs.length > 0 && checked.length === rowCbs.length) {
+                        selectAllCb.checked = true;
+                        selectAllCb.indeterminate = false;
+                    } else if (checked.length > 0) {
+                        selectAllCb.checked = false;
+                        selectAllCb.indeterminate = true;
+                    } else {
+                        selectAllCb.checked = false;
+                        selectAllCb.indeterminate = false;
+                    }
+                }
+            }
+
+            if (selectAllCb) {
+                selectAllCb.addEventListener('change', function() {
+                    const isChecked = this.checked;
+                    rowCbs.forEach(cb => { cb.checked = isChecked; });
+                    updateBatchUI();
+                });
+            }
+
+            rowCbs.forEach((cb, idx) => {
+                cb.addEventListener('click', function(e) {
+                    if (e.shiftKey && lastCheckedIndex !== null) {
+                        const start = Math.min(lastCheckedIndex, idx);
+                        const end = Math.max(lastCheckedIndex, idx);
+                        const state = this.checked;
+                        for (let i = start; i <= end; i++) {
+                            rowCbs[i].checked = state;
+                        }
+                    }
+                    lastCheckedIndex = idx;
+                    updateBatchUI();
+                });
+            });
+
+            if (deselectBtn) {
+                deselectBtn.addEventListener('click', function() {
+                    rowCbs.forEach(cb => { cb.checked = false; });
+                    updateBatchUI();
+                });
+            }
+
+            function getSelectedIds() {
+                return rowCbs.filter(cb => cb.checked).map(cb => cb.value);
+            }
+
+            // 1. Печать ценников
+            const printTagsBtn = document.getElementById('btn-batch-print-tags');
+            if (printTagsBtn) {
+                printTagsBtn.addEventListener('click', function() {
+                    const ids = getSelectedIds();
+                    if (ids.length === 0) {
+                        alert('Выберите хотя бы один товар для печати ценников.');
+                        return;
+                    }
+                    const url = '/inventory/products/price-tags/batch?ids=' + encodeURIComponent(ids.join(','));
+                    window.open(url, '_blank');
+                });
+            }
+
+            // 2. Продать (в корзину)
+            const addCartBtn = document.getElementById('btn-batch-add-cart');
+            if (addCartBtn) {
+                addCartBtn.addEventListener('click', function() {
+                    const ids = getSelectedIds();
+                    if (ids.length === 0) {
+                        alert('Выберите хотя бы один товар для продажи.');
+                        return;
+                    }
+                    formAction.value = 'add_to_cart';
+                    formIds.value = ids.join(',');
+                    form.submit();
+                });
+            }
+
+            // 3. Смена статуса
+            const applyStatusBtn = document.getElementById('btn-batch-apply-status');
+            const statusSelect = document.getElementById('batch-status-select');
+            if (applyStatusBtn && statusSelect) {
+                applyStatusBtn.addEventListener('click', function() {
+                    const ids = getSelectedIds();
+                    if (ids.length === 0) {
+                        alert('Выберите хотя бы один товар.');
+                        return;
+                    }
+                    const newStatus = statusSelect.value;
+                    if (!newStatus) {
+                        alert('Пожалуйста, выберите целевой статус.');
+                        statusSelect.focus();
+                        return;
+                    }
+                    const statusName = statusSelect.options[statusSelect.selectedIndex].text;
+                    if (confirm(`Установить статус "${statusName}" для ${ids.length} выбранных товаров?`)) {
+                        formAction.value = 'set_status';
+                        formStatus.value = newStatus;
+                        formIds.value = ids.join(',');
+                        form.submit();
+                    }
+                });
+            }
+
+            // 4. Смена места хранения
+            const applyLocationBtn = document.getElementById('btn-batch-apply-location');
+            const locationSelect = document.getElementById('batch-location-select');
+            if (applyLocationBtn && locationSelect) {
+                applyLocationBtn.addEventListener('click', function() {
+                    const ids = getSelectedIds();
+                    if (ids.length === 0) {
+                        alert('Выберите хотя бы один товар.');
+                        return;
+                    }
+                    const newLocation = locationSelect.value;
+                    if (!newLocation) {
+                        alert('Пожалуйста, выберите место хранения.');
+                        locationSelect.focus();
+                        return;
+                    }
+                    const locationName = locationSelect.options[locationSelect.selectedIndex].text;
+                    if (confirm(`Переместить ${ids.length} выбранных товаров в "${locationName}"?`)) {
+                        formAction.value = 'set_location';
+                        formLocation.value = newLocation;
+                        formIds.value = ids.join(',');
+                        form.submit();
+                    }
+                });
+            }
+
+            updateBatchUI();
+        });
+        </script>
     {% endif %}
 {% endblock %}

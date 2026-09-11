@@ -878,3 +878,16 @@ class ProductAvitoAttributesResponse(BaseModel):
     attributes: List[ProductAvitoAttributeValueSchema] = []
     class Config:
         from_attributes = True
+
+class ProductBatchRequest(BaseModel):
+    product_ids: List[int]
+    status: Optional[str] = None
+    storage_location: Optional[str] = None
+    action: Optional[str] = None
+    comment: Optional[str] = None
+
+class ProductBatchResponse(BaseModel):
+    success: bool
+    updated_count: int
+    product_ids: List[int]
+    message: Optional[str] = None

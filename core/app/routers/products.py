@@ -858,3 +858,49 @@ def generate_barcode_endpoint(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     res = generate_barcode_for_product(db, product, actor="operator")
     return res
+
+@router.post("/batch", response_model=schemas.ProductBatchResponse)
+def batch_update_products(batch_req: schemas.ProductBatchRequest, db: Session = Depends(get_db)):
+    if not batch_req.product_ids:
+        return schemas.ProductBatchResponse(
+            success=True,
+            updated_count=0,
+            product_ids=[],
+            message="Список товаров пуст"
+        )
+
+    products = db.query(models.Product).filter(models.Product.id.in_(batch_req.product_ids)).all()
+    updated_ids = []
+
+    for product in products:
+        old_status = product.status
+        old_location = product.storage_location
+        changed = False
+
+        if batch_req.status and batch_req.status.strip():
+            target_status = batch_req.status.strip()
+            if product.status != target_status:
+                product.status = target_status
+                log_audit(db, "product", product.id, "batch_update_status", old_value={"status": old_status}, new_value={"status": target_status})
+                log_product_event(db, product.id, "batch_update_status", old_value=old_status, new_value=target_status, comment=batch_req.comment or "Массовое изменение статуса")
+                changed = True
+
+        if batch_req.storage_location and batch_req.storage_location.strip():
+            target_loc = batch_req.storage_location.strip()
+            if product.storage_location != target_loc:
+                product.storage_location = target_loc
+                log_audit(db, "product", product.id, "batch_update_location", old_value={"storage_location": old_location}, new_value={"storage_location": target_loc})
+                log_product_event(db, product.id, "batch_update_location", old_value=old_location, new_value=target_loc, comment=batch_req.comment or "Массовое изменение места хранения")
+                changed = True
+
+        if changed or batch_req.action == "touch":
+            updated_ids.append(product.id)
+
+    db.commit()
+
+    return schemas.ProductBatchResponse(
+        success=True,
+        updated_count=len(updated_ids),
+        product_ids=updated_ids,
+        message=f"Успешно обновлено {len(updated_ids)} товаров"
+    )
