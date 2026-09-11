@@ -79,11 +79,11 @@ def test_sold_product_reactivated_from_archive_via_avito_reimport(client, db_ses
     # Verify event logged
     events = db_session.query(models.ProductEvent).filter(
         models.ProductEvent.product_id == p_id,
-        models.ProductEvent.event_type == "avito_reactivated"
+        models.ProductEvent.event_type == "avito_import_reactivated"
     ).all()
     assert len(events) >= 1
 
-    # 4. Reverse mechanism: listing is closed/inactive on Avito, re-importing moves product to archive
+    # 4. Stage 07G-R1 rule: listing is closed/inactive on Avito -> physical stock remains intact in store!
     inactive_payload = {
         "account_key": "account_laptops",
         "external_item_id": item_id,
@@ -99,25 +99,16 @@ def test_sold_product_reactivated_from_archive_via_avito_reimport(client, db_ses
 
     db_session.expire_all()
     prod = db_session.query(models.Product).filter(models.Product.id == p_id).first()
-    assert prod.status == "sold"
-    assert prod.storage_location == "archive"
-    assert prod.quantity == 0
-
-    events_archived = db_session.query(models.ProductEvent).filter(
-        models.ProductEvent.product_id == p_id,
-        models.ProductEvent.event_type == "avito_archived"
-    ).all()
-    assert len(events_archived) >= 1
-
-    # 5. Reactivate once more: pulls back out of archive
-    r_reimport2 = client.post("/api/integrations/avito/import-item", json=reactivate_payload)
-    assert r_reimport2.status_code == 200
-
-    db_session.expire_all()
-    prod = db_session.query(models.Product).filter(models.Product.id == p_id).first()
+    # Physical stock is NOT zeroed
     assert prod.status == "in_stock"
     assert prod.storage_location == "store"
     assert prod.quantity == 1
+
+    # External metadata updated
+    ext = db_session.query(models.ProductExternalListing).filter(
+        models.ProductExternalListing.product_id == p_id
+    ).first()
+    assert ext.remote_status == "inactive"
 
 def test_new_product_imported_as_inactive_starts_in_archive(client, db_session):
     """

@@ -135,9 +135,9 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 db.flush()
             category_id = cat.id
 
-        init_status = "in_stock" if not is_remote_inactive else "sold"
-        init_location = "store" if not is_remote_inactive else "archive"
-        init_quantity = 1 if not is_remote_inactive else 0
+        init_status = "in_stock" if is_remote_active else "sold"
+        init_location = "store" if is_remote_active else "archive"
+        init_quantity = 1 if is_remote_active else 0
 
         product = models.Product(
             sku=sku,
@@ -201,9 +201,10 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         product.source_origin = "avito"
         product.last_imported_at = now
 
-        # Bidirectional sync between Avito listing state and internal store/archive state
+        # Stage 07G-R1: Active Avito import confirms physical stock presence.
+        # A deliberate import of an active Avito listing means this physical product exists and is available again.
+        # If product was archived, sold, draft, or out of stock (quantity <= 0), reactivate it to store.
         if is_remote_active:
-            # Direct mechanism: if product was in archive or sold/draft, pull it back to active store catalog
             if product.storage_location == "archive" or product.status in ["sold", "draft", "archived"] or (product.quantity or 0) <= 0:
                 product.status = "in_stock"
                 product.storage_location = "store"
@@ -211,25 +212,12 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 log_product_event(
                     db,
                     product.id,
-                    "avito_reactivated",
+                    "avito_import_reactivated",
                     old_value={"status": old_status, "storage_location": old_location, "quantity": old_quantity},
                     new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
-                    comment=f"Товар возвращен из архива в магазин при повторном импорте активного объявления Avito {item_id_str}"
+                    comment=f"Товар восстановлен в наличии в магазине при импорте активного объявления Avito {item_id_str}"
                 )
-        elif is_remote_inactive:
-            # Reverse mechanism: if product is active in store, and became inactive/closed on Avito, move it to archive
-            if product.status == "in_stock" or product.storage_location != "archive":
-                product.status = "sold"
-                product.storage_location = "archive"
-                product.quantity = 0
-                log_product_event(
-                    db,
-                    product.id,
-                    "avito_archived",
-                    old_value={"status": old_status, "storage_location": old_location, "quantity": old_quantity},
-                    new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
-                    comment=f"Товар перенесен в архив при повторном импорте неактивного объявления Avito {item_id_str}"
-                )
+        # Inactive/closed/blocked/removed/archived remote states update external metadata only; physical stock remains untouched.
 
         db.flush()
 

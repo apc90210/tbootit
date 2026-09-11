@@ -41,22 +41,28 @@ def test_avito_import_upsert_updates_existing_product(client, db_session):
     assert data2["status"] == "updated"
     assert data2["product_id"] == product_id_1
 
-    # Verify single Product in DB - moved to archive via reverse sync
+    # Verify single Product in DB - physical stock unchanged by remote inactive status
     db_session.expire_all()
     prods = db_session.query(models.Product).filter(models.Product.sku == "AVITO-999888777").all()
     assert len(prods) == 1
     assert prods[0].title == "Обновленный заголовок"
     assert prods[0].sale_price == 12000.0
-    assert prods[0].status == "sold"
-    assert prods[0].storage_location == "archive"
-    assert prods[0].quantity == 0
+    assert prods[0].status == "in_stock"
+    assert prods[0].storage_location == "store"
+    assert prods[0].quantity == 1
 
-    # Verify single external listing link
+    # Verify single external listing link received inactive remote status
     links = db_session.query(models.ProductExternalListing).filter(models.ProductExternalListing.external_item_id == "999888777").all()
     assert len(links) == 1
     assert links[0].remote_status == "inactive"
 
-    # Re-import active: verify direct reactivation mechanism (pull back from archive)
+    # Simulate local sale moving product to sold / archive / 0
+    prods[0].status = "sold"
+    prods[0].storage_location = "archive"
+    prods[0].quantity = 0
+    db_session.commit()
+
+    # Re-import active: verify deliberate active import restores stock from archive
     payload3 = {
         "account_key": "account_laptops",
         "external_item_id": "999888777",
