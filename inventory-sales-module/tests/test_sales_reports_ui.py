@@ -358,28 +358,31 @@ def test_reports_table_contains_itogo_za_period():
         assert "Итого за период" in response.text
 # === Stage 04G-R2 new tests ===
 
-def test_reports_sales_default_calls_core_with_ytd():
-    from datetime import date
-    today = date.today()
+def test_reports_sales_default_calls_core_with_week():
     mock_client = AsyncMock(return_value=MOCK_EMPTY_REPORT)
     with patch("app.routers.reports.core_client.get_sales_report", mock_client):
         response = client.get("/reports/sales")
         assert response.status_code == 200
         mock_client.assert_called_once()
         _, kwargs = mock_client.call_args
-        assert kwargs.get("period") == "custom"
-        assert kwargs.get("date_from") == date(today.year, 1, 1).isoformat()
-        assert kwargs.get("date_to") == today.isoformat()
+        assert kwargs.get("period") == "week"
 
-def test_reports_sales_default_html_inputs_contain_ytd():
-    from datetime import date
+def test_reports_sales_default_activates_week_button():
+    from datetime import date, timedelta
     today = date.today()
-    with _patch_report(MOCK_EMPTY_REPORT):
+    monday = (today - timedelta(days=today.weekday())).isoformat()
+    today_str = today.isoformat()
+    mock_data = MOCK_EMPTY_REPORT.copy()
+    mock_data["period"] = "week"
+    mock_data["date_from"] = monday
+    mock_data["date_to"] = today_str
+    with _patch_report(mock_data):
         response = client.get("/reports/sales")
         assert response.status_code == 200
         text = response.text
-        assert f'value="{date(today.year, 1, 1).isoformat()}"' in text
-        assert f'value="{today.isoformat()}"' in text
+        assert 'period=week" class="btn btn-outline-primary active"' in text
+        assert f'id="date_from" name="date_from" value="{monday}"' in text
+        assert f'id="date_to" name="date_to" value="{today_str}"' in text
 
 def test_reports_sales_one_sided_dates_200():
     with _patch_report(MOCK_EMPTY_REPORT):

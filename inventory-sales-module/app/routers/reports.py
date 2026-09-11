@@ -67,9 +67,7 @@ async def sales_report(
     if date_from or date_to:
         period = "custom"
     elif not period:
-        period = "custom"
-        date_from = date(today.year, 1, 1).isoformat()
-        date_to = today.isoformat()
+        period = "week"
 
     # If custom period with empty dates, fall back to year-to-date
     if period == "custom" and not date_from and not date_to:
