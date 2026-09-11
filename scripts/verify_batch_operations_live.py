@@ -61,44 +61,67 @@ def main():
         assert 'id="btn-batch-print-tags"' in html, "Missing print tags button"
         assert 'id="btn-batch-add-cart"' in html, "Missing add to cart button"
         assert 'id="batch-status-select"' in html, "Missing status select"
+        assert '— Статус (не менять) —' in html, "Missing default status placeholder"
         assert 'id="batch-location-select"' in html, "Missing location select"
-        print("[PASS] All batch UI elements rendered in /inventory/products")
+        assert '— Место (не менять) —' in html, "Missing default location placeholder"
+        assert 'id="btn-batch-apply-changes"' in html, "Missing unified apply changes button"
+        print("[PASS] All unified batch UI elements rendered in /inventory/products")
 
-        # 4. Test Batch Status Update
-        print("\n--- Testing Batch Status Update ---")
+        # 4. Test Simultaneous Batch Status and Location Update (One Action)
+        print("\n--- Testing Simultaneous Batch Status & Location Update (One Action) ---")
         res = client.post(
             "https://127.0.0.1:8443/inventory/products/batch-action",
             data={
-                "action": "set_status",
+                "action": "apply_changes",
                 "new_status": "in_stock",
-                "ids": test_ids_str
-            },
-            follow_redirects=True
-        )
-        assert res.status_code == 200, f"Expected 200, got {res.status_code}"
-        cur.execute(f"SELECT status FROM products WHERE id IN ({test_ids_str})")
-        statuses = [r[0] for r in cur.fetchall()]
-        assert all(s == "in_stock" for s in statuses), f"Expected all in_stock, got {statuses}"
-        print(f"[PASS] Batch status successfully updated to in_stock for {len(test_ids)} products")
-
-        # 5. Test Batch Storage Location Update
-        print("\n--- Testing Batch Storage Location Update ---")
-        res = client.post(
-            "https://127.0.0.1:8443/inventory/products/batch-action",
-            data={
-                "action": "set_location",
                 "new_location": "workshop",
                 "ids": test_ids_str
             },
             follow_redirects=True
         )
         assert res.status_code == 200, f"Expected 200, got {res.status_code}"
-        cur.execute(f"SELECT storage_location FROM products WHERE id IN ({test_ids_str})")
-        locations = [r[0] for r in cur.fetchall()]
-        assert all(loc == "workshop" for loc in locations), f"Expected all workshop, got {locations}"
-        print(f"[PASS] Batch location successfully updated to workshop for {len(test_ids)} products")
+        cur.execute(f"SELECT status, storage_location FROM products WHERE id IN ({test_ids_str})")
+        rows = cur.fetchall()
+        assert all(r[0] == "in_stock" and r[1] == "workshop" for r in rows), f"Expected in_stock and workshop, got {rows}"
+        print(f"[PASS] Both status and location updated simultaneously for {len(test_ids)} products")
 
-        # 6. Test Batch Price Tags (58x40)
+        # 5. Test Batch Status-Only Update (Location Not Changed)
+        print("\n--- Testing Batch Status-Only Update ---")
+        res = client.post(
+            "https://127.0.0.1:8443/inventory/products/batch-action",
+            data={
+                "action": "apply_changes",
+                "new_status": "archived",
+                "new_location": "",
+                "ids": test_ids_str
+            },
+            follow_redirects=True
+        )
+        assert res.status_code == 200, f"Expected 200, got {res.status_code}"
+        cur.execute(f"SELECT status, storage_location FROM products WHERE id IN ({test_ids_str})")
+        rows = cur.fetchall()
+        assert all(r[0] == "archived" and r[1] == "workshop" for r in rows), f"Expected archived and workshop, got {rows}"
+        print(f"[PASS] Status updated to archived while storage_location remained workshop")
+
+        # 6. Test Batch Location-Only Update (Status Not Changed)
+        print("\n--- Testing Batch Location-Only Update ---")
+        res = client.post(
+            "https://127.0.0.1:8443/inventory/products/batch-action",
+            data={
+                "action": "apply_changes",
+                "new_status": "",
+                "new_location": "store",
+                "ids": test_ids_str
+            },
+            follow_redirects=True
+        )
+        assert res.status_code == 200, f"Expected 200, got {res.status_code}"
+        cur.execute(f"SELECT status, storage_location FROM products WHERE id IN ({test_ids_str})")
+        rows = cur.fetchall()
+        assert all(r[0] == "archived" and r[1] == "store" for r in rows), f"Expected archived and store, got {rows}"
+        print(f"[PASS] Location updated to store while status remained archived")
+
+        # 7. Test Batch Price Tags (58x40)
         print("\n--- Testing Batch Price Tags Preview (58x40) ---")
         res = client.get(f"https://127.0.0.1:8443/inventory/products/price-tags/batch?ids={test_ids_str}")
         assert res.status_code == 200, f"Expected 200, got {res.status_code}"
@@ -111,10 +134,10 @@ def main():
         assert "window.print()" in tag_html
         print("[PASS] Batch price tags page rendered 3 tags with barcodes and print handler")
 
-        # 7. Test Batch Add to Cart
+        # 8. Test Batch Add to Cart
         print("\n--- Testing Batch Add to Cart ---")
         # First ensure they are in_stock and in store
-        cur.execute(f"UPDATE products SET storage_location = 'store' WHERE id IN ({test_ids_str})")
+        cur.execute(f"UPDATE products SET status = 'in_stock', storage_location = 'store' WHERE id IN ({test_ids_str})")
         conn.commit()
         res = client.post(
             "https://127.0.0.1:8443/inventory/products/batch-action",

@@ -138,39 +138,47 @@ async def products_batch_action(request: Request):
             return JSONResponse({"error": True, "detail": err}, status_code=400)
         return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
 
-    if action == "set_status":
-        if not new_status:
+    status_names = {"draft": "Черновик", "in_stock": "В наличии", "reserved": "В резерве", "sold": "Продан", "archived": "В архиве", "written_off": "Списан"}
+    loc_names = {"store": "Магазин", "workshop": "Мастерская", "archive": "Архив", "draft": "Черновик"}
+
+    if action in ["apply_changes", "update_fields", "set_status", "set_location"]:
+        if action == "set_status" and not new_status:
             err = "Не выбран статус"
             if is_ajax:
                 return JSONResponse({"error": True, "detail": err}, status_code=400)
             return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
-        res = await core_client.batch_update_products({
-            "product_ids": product_ids,
-            "status": new_status,
-            "comment": "Массовая смена статуса"
-        })
-        if is_ajax:
-            return JSONResponse(res)
-        status_names = {"draft": "Черновик", "in_stock": "В наличии", "reserved": "В резерве", "sold": "Продан", "archived": "В архиве", "written_off": "Списан"}
-        s_label = status_names.get(new_status, new_status)
-        return RedirectResponse(f"/inventory/products?msg=Статус+{s_label}+успешно+установлен+для+{len(product_ids)}+товаров", status_code=303)
 
-    elif action == "set_location":
-        if not new_location:
+        if action == "set_location" and not new_location:
             err = "Не указано место хранения"
             if is_ajax:
                 return JSONResponse({"error": True, "detail": err}, status_code=400)
             return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
-        res = await core_client.batch_update_products({
-            "product_ids": product_ids,
-            "storage_location": new_location,
-            "comment": "Массовая смена места хранения"
-        })
+
+        if not new_status and not new_location:
+            err = "Не выбран статус или место хранения для применения"
+            if is_ajax:
+                return JSONResponse({"error": True, "detail": err}, status_code=400)
+            return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+
+        payload = {"product_ids": product_ids}
+        msg_parts = []
+        if new_status:
+            payload["status"] = new_status
+            msg_parts.append(f"статус «{status_names.get(new_status, new_status)}»")
+        if new_location:
+            payload["storage_location"] = new_location
+            msg_parts.append(f"место «{loc_names.get(new_location, new_location)}»")
+
+        payload["comment"] = f"Массовое обновление: {', '.join(msg_parts)}"
+        res = await core_client.batch_update_products(payload)
         if is_ajax:
             return JSONResponse(res)
-        loc_names = {"store": "Магазин", "workshop": "Мастерская", "archive": "Архив", "draft": "Черновик"}
-        l_label = loc_names.get(new_location, new_location)
-        return RedirectResponse(f"/inventory/products?msg=Место+хранения+{l_label}+успешно+установлено+для+{len(product_ids)}+товаров", status_code=303)
+
+        import urllib.parse
+        msg_str = f"Для {len(product_ids)} товаров успешно обновлено: {', '.join(msg_parts)}"
+        encoded = urllib.parse.quote_plus(msg_str)
+        return RedirectResponse(f"/inventory/products?msg={encoded}", status_code=303)
+
 
     elif action == "add_to_cart":
         cart = request.session.get("cart", [])

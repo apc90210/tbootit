@@ -195,31 +195,26 @@
                     🛒 Продать (в корзину)
                 </button>
 
-                <!-- Смена статуса -->
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <select id="batch-status-select" style="padding: 7px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: #fff;">
-                        <option value="">Сменить статус...</option>
+                <!-- Единый блок смены статуса и места хранения (одна кнопка Применить) -->
+                <div style="display: flex; align-items: center; gap: 6px; background: #fff; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <select id="batch-status-select" style="padding: 7px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: #fff; cursor: pointer;">
+                        <option value="">— Статус (не менять) —</option>
                         <option value="in_stock">В наличии</option>
                         <option value="draft">Черновик</option>
                         <option value="reserved">В резерве</option>
                         <option value="archived">В архиве</option>
                         <option value="written_off">Списан</option>
                     </select>
-                    <button type="button" id="btn-batch-apply-status" class="btn" style="background: #475569; color: #fff; padding: 7px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
-                        Применить
-                    </button>
-                </div>
 
-                <!-- Смена места хранения -->
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <select id="batch-location-select" style="padding: 7px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: #fff;">
-                        <option value="">Место хранения...</option>
+                    <select id="batch-location-select" style="padding: 7px 10px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: #fff; cursor: pointer;">
+                        <option value="">— Место (не менять) —</option>
                         <option value="store">Магазин</option>
                         <option value="workshop">Мастерская</option>
                         <option value="archive">Архив</option>
                         <option value="draft">Черновик</option>
                     </select>
-                    <button type="button" id="btn-batch-apply-location" class="btn" style="background: #475569; color: #fff; padding: 7px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+
+                    <button type="button" id="btn-batch-apply-changes" class="btn" style="background: #2563eb; color: #fff; padding: 7px 16px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600;" title="Применить выбранный статус и/или место хранения к отмеченным товарам">
                         Применить
                     </button>
                 </div>
@@ -459,51 +454,41 @@
                 });
             }
 
-            // 3. Смена статуса
-            const applyStatusBtn = document.getElementById('btn-batch-apply-status');
+            // 3. Единое применение статуса и/или места хранения (одна кнопка Применить)
+            const applyChangesBtn = document.getElementById('btn-batch-apply-changes');
             const statusSelect = document.getElementById('batch-status-select');
-            if (applyStatusBtn && statusSelect) {
-                applyStatusBtn.addEventListener('click', function() {
+            const locationSelect = document.getElementById('batch-location-select');
+
+            if (applyChangesBtn && statusSelect && locationSelect) {
+                applyChangesBtn.addEventListener('click', function() {
                     const ids = getSelectedIds();
                     if (ids.length === 0) {
                         alert('Выберите хотя бы один товар.');
                         return;
                     }
                     const newStatus = statusSelect.value;
-                    if (!newStatus) {
-                        alert('Пожалуйста, выберите целевой статус.');
+                    const newLocation = locationSelect.value;
+
+                    if (!newStatus && !newLocation) {
+                        alert('Выберите статус или место хранения для применения.');
                         statusSelect.focus();
                         return;
                     }
-                    const statusName = statusSelect.options[statusSelect.selectedIndex].text;
-                    if (confirm(`Установить статус "${statusName}" для ${ids.length} выбранных товаров?`)) {
-                        formAction.value = 'set_status';
-                        formStatus.value = newStatus;
-                        formIds.value = ids.join(',');
-                        form.submit();
-                    }
-                });
-            }
 
-            // 4. Смена места хранения
-            const applyLocationBtn = document.getElementById('btn-batch-apply-location');
-            const locationSelect = document.getElementById('batch-location-select');
-            if (applyLocationBtn && locationSelect) {
-                applyLocationBtn.addEventListener('click', function() {
-                    const ids = getSelectedIds();
-                    if (ids.length === 0) {
-                        alert('Выберите хотя бы один товар.');
-                        return;
+                    const parts = [];
+                    if (newStatus) {
+                        const statusName = statusSelect.options[statusSelect.selectedIndex].text;
+                        parts.push(`статус «${statusName}»`);
                     }
-                    const newLocation = locationSelect.value;
-                    if (!newLocation) {
-                        alert('Пожалуйста, выберите место хранения.');
-                        locationSelect.focus();
-                        return;
+                    if (newLocation) {
+                        const locationName = locationSelect.options[locationSelect.selectedIndex].text;
+                        parts.push(`место хранения «${locationName}»`);
                     }
-                    const locationName = locationSelect.options[locationSelect.selectedIndex].text;
-                    if (confirm(`Переместить ${ids.length} выбранных товаров в "${locationName}"?`)) {
-                        formAction.value = 'set_location';
+
+                    const confirmMsg = `Применить ${parts.join(' и ')} для ${ids.length} выбранных товаров?`;
+                    if (confirm(confirmMsg)) {
+                        formAction.value = 'apply_changes';
+                        formStatus.value = newStatus;
                         formLocation.value = newLocation;
                         formIds.value = ids.join(',');
                         form.submit();

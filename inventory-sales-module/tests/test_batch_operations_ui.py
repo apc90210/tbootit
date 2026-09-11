@@ -59,9 +59,89 @@ def test_batch_checkboxes_and_toolbar_present_in_products_page(client):
         assert 'id="btn-batch-print-tags"' in html
         assert 'id="btn-batch-add-cart"' in html
         assert 'id="batch-status-select"' in html
-        assert 'id="btn-batch-apply-status"' in html
+        assert '— Статус (не менять) —' in html
         assert 'id="batch-location-select"' in html
-        assert 'id="btn-batch-apply-location"' in html
+        assert '— Место (не менять) —' in html
+        assert 'id="btn-batch-apply-changes"' in html
+
+
+def test_batch_action_apply_changes_both_status_and_location(client):
+    with patch.object(core_client, "batch_update_products", new=AsyncMock(return_value={"success": True, "updated_count": 2})) as mock_batch:
+        res = client.post(
+            "/products/batch-action",
+            data={
+                "action": "apply_changes",
+                "new_status": "in_stock",
+                "new_location": "store",
+                "ids": "101,102"
+            },
+            follow_redirects=False
+        )
+        assert res.status_code == 303
+        assert "/inventory/products?" in res.headers["location"]
+        mock_batch.assert_called_once_with({
+            "product_ids": [101, 102],
+            "status": "in_stock",
+            "storage_location": "store",
+            "comment": "Массовое обновление: статус «В наличии», место «Магазин»"
+        })
+
+
+def test_batch_action_apply_changes_only_status(client):
+    with patch.object(core_client, "batch_update_products", new=AsyncMock(return_value={"success": True, "updated_count": 2})) as mock_batch:
+        res = client.post(
+            "/products/batch-action",
+            data={
+                "action": "apply_changes",
+                "new_status": "archived",
+                "new_location": "",
+                "ids": "101,102"
+            },
+            follow_redirects=False
+        )
+        assert res.status_code == 303
+        assert "/inventory/products?" in res.headers["location"]
+        mock_batch.assert_called_once_with({
+            "product_ids": [101, 102],
+            "status": "archived",
+            "comment": "Массовое обновление: статус «В архиве»"
+        })
+
+
+def test_batch_action_apply_changes_only_location(client):
+    with patch.object(core_client, "batch_update_products", new=AsyncMock(return_value={"success": True, "updated_count": 2})) as mock_batch:
+        res = client.post(
+            "/products/batch-action",
+            data={
+                "action": "apply_changes",
+                "new_status": "",
+                "new_location": "workshop",
+                "ids": "101,102"
+            },
+            follow_redirects=False
+        )
+        assert res.status_code == 303
+        assert "/inventory/products?" in res.headers["location"]
+        mock_batch.assert_called_once_with({
+            "product_ids": [101, 102],
+            "storage_location": "workshop",
+            "comment": "Массовое обновление: место «Мастерская»"
+        })
+
+
+def test_batch_action_apply_changes_neither_selected_fails(client):
+    res = client.post(
+        "/products/batch-action",
+        data={
+            "action": "apply_changes",
+            "new_status": "",
+            "new_location": "",
+            "ids": "101,102"
+        },
+        follow_redirects=False
+    )
+    assert res.status_code == 303
+    assert "error=" in res.headers["location"]
 
 
 def test_batch_action_set_status(client):
@@ -80,7 +160,7 @@ def test_batch_action_set_status(client):
         mock_batch.assert_called_once_with({
             "product_ids": [101, 102],
             "status": "draft",
-            "comment": "Массовая смена статуса"
+            "comment": "Массовое обновление: статус «Черновик»"
         })
 
 
@@ -100,7 +180,7 @@ def test_batch_action_set_location(client):
         mock_batch.assert_called_once_with({
             "product_ids": [101, 102],
             "storage_location": "workshop",
-            "comment": "Массовая смена места хранения"
+            "comment": "Массовое обновление: место «Мастерская»"
         })
 
 
