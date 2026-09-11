@@ -53,9 +53,8 @@ This audit completes the missing requirements identified in Stage 08A-R1 review:
 ### 2.1 Avito Module Test Suite
 - **Command:** `pytest avito-module\tests`
 - **Total Collected:** 154
-- **Passed:** 149
-- **Failed:** 0
-- **Skipped:** 5 (point-in-time restoration tests from Stage 07F)
+- **Initial Run (Stage 08A-R1-R1):** 149 passed, 5 skipped, 0 failed
+- **Resolved Run (Stage 08A-R1-R2):** **154 passed, 0 skipped, 0 failed** (all 5 live-DB-coupled skips eliminated via isolated disposable temp DB fixtures; see `reports/stage08a_r1_r2_deterministic_avito_tests_report.md`)
 
 ### 2.2 Chrome Extension Test Suite
 - **Command:** `pytest chrome-extension\technoreboot-avito\tests`

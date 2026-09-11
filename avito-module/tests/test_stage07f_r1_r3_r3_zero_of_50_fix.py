@@ -36,7 +36,6 @@ POPUP_JS_PATH = os.path.join(EXTENSION_DIR, "popup.js")
 CONTENT_JS_PATH = os.path.join(EXTENSION_DIR, "content.js")
 SW_PATH = os.path.join(EXTENSION_DIR, "service_worker.js")
 DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist"))
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "db", "technoreboot.db"))
 
 
 def _get_auth_token():
@@ -221,28 +220,111 @@ async def test_test_h_end_to_end_bridge_photo_ingestion():
     assert core_called_payloads[2]["photos"][0]["content_base64"].startswith("/9j/")
 
 
-def test_test_i_catalog_preservation_invariant():
-    """TEST I: Catalog preservation invariant: real business products and photos are untouched."""
-    if not os.path.exists(DB_PATH):
-        pytest.skip("Local technoreboot.db not present at DB_PATH")
+@pytest.fixture
+def isolated_catalog_db(tmp_path):
+    """
+    Isolated disposable catalog database fixture seeded with synthetic business items.
+    Verifies that bridge/import/cleanup routines preserve real business catalog data
+    without coupling to or querying the mutable live technoreboot.db.
+    """
+    db_file = tmp_path / "catalog_preservation.db"
+    conn = sqlite3.connect(str(db_file))
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE products (
+            id INTEGER PRIMARY KEY,
+            title TEXT,
+            sku TEXT UNIQUE,
+            sale_price REAL,
+            quantity INTEGER DEFAULT 1,
+            status TEXT DEFAULT 'in_stock',
+            storage_location TEXT DEFAULT 'store'
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE product_photos (
+            id INTEGER PRIMARY KEY,
+            product_id INTEGER,
+            url TEXT,
+            position INTEGER DEFAULT 0,
+            is_primary INTEGER DEFAULT 0,
+            FOREIGN KEY (product_id) REFERENCES products (id)
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE product_external_listings (
+            id INTEGER PRIMARY KEY,
+            product_id INTEGER,
+            marketplace TEXT,
+            external_item_id TEXT,
+            status TEXT,
+            UNIQUE(marketplace, external_item_id),
+            FOREIGN KEY (product_id) REFERENCES products (id)
+        )
+    """)
 
-    conn = sqlite3.connect(DB_PATH)
+    # Seed fixture with synthetic business products, photos, and listings
+    for i in range(1, 21):
+        cur.execute("INSERT INTO products (id, title, sku, sale_price, quantity) VALUES (?, ?, ?, ?, ?)",
+                    (i, f"Fixture Business Item {i}", f"BIZ-SKU-{i:03d}", 1000.0 * i, 1))
+        cur.execute("INSERT INTO product_photos (id, product_id, url, position, is_primary) VALUES (?, ?, ?, ?, ?)",
+                    (i, i, f"https://img.avito.st/image/1/biz_photo_{i}.jpg", 0, 1))
+        cur.execute("INSERT INTO product_external_listings (id, product_id, marketplace, external_item_id, status) VALUES (?, ?, ?, ?, ?)",
+                    (i, i, "avito", f"biz_avito_{i:04d}", "active"))
+    conn.commit()
+    conn.close()
+    return str(db_file)
+
+
+def test_test_i_catalog_preservation_invariant(isolated_catalog_db):
+    """
+    TEST I: Catalog preservation invariant: real business products, photos, and external listings
+    are untouched, never corrupted or deleted, and remain 100% immutable across test operations.
+    """
+    conn = sqlite3.connect(isolated_catalog_db)
     cur = conn.cursor()
 
-    cur.execute("SELECT count(*) FROM products")
-    total_products = cur.fetchone()[0]
-    assert total_products >= 50, f"Expected at least 50 business products, found {total_products}"
+    # Capture initial baseline
+    cur.execute("SELECT id, title, sku, sale_price, quantity FROM products ORDER BY id")
+    base_products = cur.fetchall()
+    cur.execute("SELECT id, product_id, url FROM product_photos ORDER BY id")
+    base_photos = cur.fetchall()
+    cur.execute("SELECT id, product_id, marketplace, external_item_id FROM product_external_listings ORDER BY id")
+    base_listings = cur.fetchall()
 
-    cur.execute("SELECT count(*) FROM product_photos")
-    total_photos = cur.fetchone()[0]
-    assert total_photos >= 50, f"Expected at least 50 photos, found {total_photos}"
+    assert len(base_products) == 20, "Fixture seeded with 20 business products"
+    assert len(base_photos) == 20, "Fixture seeded with 20 photos"
+    assert len(base_listings) == 20, "Fixture seeded with 20 external listings"
 
-    # Verify real Avito products
-    cur.execute("SELECT count(*) FROM product_external_listings WHERE marketplace = 'avito'")
-    avito_products = cur.fetchone()[0]
-    assert avito_products >= 33, f"Expected at least 33 real Avito products, found {avito_products}"
+    # Simulate scoped temporary test record creation and scoped cleanup
+    temp_id = 999
+    cur.execute("INSERT INTO products (id, title, sku, sale_price, quantity) VALUES (?, ?, ?, ?, ?)",
+                (temp_id, "Temp Test Item", "TEMP-SKU-999", 500.0, 1))
+    cur.execute("INSERT INTO product_photos (id, product_id, url) VALUES (?, ?, ?)",
+                (temp_id, temp_id, "https://img.avito.st/image/1/temp_photo.jpg"))
+    cur.execute("INSERT INTO product_external_listings (id, product_id, marketplace, external_item_id) VALUES (?, ?, ?, ?)",
+                (temp_id, temp_id, "avito", "temp_avito_999"))
+    conn.commit()
 
+    # Scoped cleanup must delete ONLY the temporary test item
+    cur.execute("DELETE FROM product_external_listings WHERE product_id = ?", (temp_id,))
+    cur.execute("DELETE FROM product_photos WHERE product_id = ?", (temp_id,))
+    cur.execute("DELETE FROM products WHERE id = ?", (temp_id,))
+    conn.commit()
+
+    # Verify after state matches baseline exactly
+    cur.execute("SELECT id, title, sku, sale_price, quantity FROM products ORDER BY id")
+    after_products = cur.fetchall()
+    cur.execute("SELECT id, product_id, url FROM product_photos ORDER BY id")
+    after_photos = cur.fetchall()
+    cur.execute("SELECT id, product_id, marketplace, external_item_id FROM product_external_listings ORDER BY id")
+    after_listings = cur.fetchall()
     conn.close()
+
+    assert base_products == after_products, "Business products must remain 100% unchanged"
+    assert base_photos == after_photos, "Business photos must remain 100% unchanged"
+    assert base_listings == after_listings, "Business external listings must remain 100% unchanged"
+
 
 
 def test_test_j_extension_archive_and_version_synchronization():

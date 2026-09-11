@@ -122,11 +122,12 @@ Full details in `reports/release_gap_list.md`.
 
 All relevant test suites executed across all modules and extensions:
 - `core`: 255 passed
-- `admin-shell`: 83 passed, 1 skipped
+- `admin-shell`: 83 passed, 1 skipped (platform-specific packaging)
 - `inventory-sales-module`: 154 passed
 - `repairs-module`: 34 passed
-- `avito-module`: 149 passed, 5 skipped
+- `avito-module`: 154 passed, 0 skipped (deterministic temp DB fixtures, Stage 08A-R1-R2)
 - `chrome-extension`: 126 passed
-- **Total Tests Passed:** **801 passed, 6 skipped, 0 failed**
+- **Total Tests Passed:** **806 passed, 1 skipped, 0 failed**
 
 The system is ready for Owner review and acceptance.
+
