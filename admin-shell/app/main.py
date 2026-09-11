@@ -719,7 +719,16 @@ async def proxy_inventory(request: Request, path: str = ""):
 @app.api_route("/repairs/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route("/repairs/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_repairs(request: Request, path: str = ""):
-    return await _proxy_request(request, REPAIRS_MODULE_URL, path, "/repairs")
+    path_clean = path.strip('/')
+    if not path_clean:
+        subpath = "repairs"
+    elif path_clean == "repairs" or path_clean.startswith("repairs/"):
+        subpath = path_clean
+    elif path_clean.startswith("static/"):
+        subpath = path_clean
+    else:
+        subpath = f"repairs/{path_clean}"
+    return await _proxy_request(request, REPAIRS_MODULE_URL, subpath, "/repairs")
 
 
 @app.api_route("/media/{path:path}", methods=["GET", "HEAD"])
