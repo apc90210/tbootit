@@ -285,7 +285,7 @@ def execute_bootstrap_restore(
             up_cmd = ["docker", "compose", "-p", compose_project]
             if compose_file:
                 up_cmd.extend(["-f", str(compose_file)])
-            up_cmd.extend(["up", "-d"])
+            up_cmd.extend(["up", "-d", "--build"])
             res = subprocess.run(up_cmd, cwd=str(repo_root), capture_output=True, text=True)
             if res.returncode != 0:
                 raise RuntimeError(f"docker compose up failed: {res.stderr}")
