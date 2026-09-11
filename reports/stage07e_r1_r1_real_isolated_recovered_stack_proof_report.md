@@ -122,9 +122,9 @@ All 21 regression tests in tests/test_backup_restore.py and admin-shell/tests/te
 Total automated tests passed: 47/47 (100%).
 
 ## Git
-COMMIT: (to be generated)
+COMMIT: 4804c70e034b9241660fb3f32cd69f252592c56a
 PUSH: origin/main
-HEAD_AFTER: (to be generated)
+HEAD_AFTER: 4804c70e034b9241660fb3f32cd69f252592c56a
 FINAL_GIT_STATUS: clean
 
 FINAL_STATUS:
