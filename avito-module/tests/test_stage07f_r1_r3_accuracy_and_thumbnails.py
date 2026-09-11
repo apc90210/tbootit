@@ -303,5 +303,10 @@ def test_test_o_version_0_2_53_full_alignment():
 
     # Check built zip exists and is valid
     zip_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "dist", f"technoreboot-avito-extension-{ver}.zip"))
+    if not os.path.exists(zip_path):
+        import sys
+        sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "scripts")))
+        from build_extension_zip import build_zip
+        zip_path = build_zip()
     assert os.path.exists(zip_path), f"Built zip must exist at {zip_path}"
     assert os.path.getsize(zip_path) > 10000

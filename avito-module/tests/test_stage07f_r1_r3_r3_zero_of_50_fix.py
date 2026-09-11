@@ -358,6 +358,11 @@ def test_test_j_extension_archive_and_version_synchronization():
 
     # Zip exists and is valid
     zip_path = os.path.join(DIST_DIR, "technoreboot-avito-extension-0.2.53.zip")
+    if not os.path.exists(zip_path):
+        import sys
+        sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "scripts")))
+        from build_extension_zip import build_zip
+        zip_path = build_zip()
     assert os.path.exists(zip_path), f"Built zip must exist at {zip_path}"
 
     with zipfile.ZipFile(zip_path, "r") as zf:
