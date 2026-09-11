@@ -33,13 +33,13 @@ All audit procedures adhere to strict pre- and post-flight baseline comparisons:
 - Synthetic audit records are tracked and purged during audit cleanup.
 - Post-audit invariants confirm identical ID sets and 0 deleted records.
 
-## Automated Test Suites (Stage 08A-R1-R3)
+## Automated Test Suites (Stage 08A-R1-R4)
 - `core`: 255 passed
 - `admin-shell`: 83 passed, 1 skipped (packaging)
 - `inventory-sales-module`: 154 passed
 - `repairs-module`: 34 passed
 - `avito-module`: 154 passed, 0 skipped (self-contained synthetic fixtures, zero runtime DB dependencies, Stage 08A-R1-R3)
-- `chrome-extension`: 126 passed
+- `chrome-extension`: 126 passed, 0 skipped (self-contained synthetic fixtures, zero runtime ad file dependencies, Stage 08A-R1-R4)
 - **Total Automated Tests:** 806 passed, 1 skipped, 0 failed
 
 

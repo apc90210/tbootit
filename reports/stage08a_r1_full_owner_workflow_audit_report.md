@@ -126,7 +126,7 @@ All relevant test suites executed across all modules and extensions:
 - `inventory-sales-module`: 154 passed
 - `repairs-module`: 34 passed
 - `avito-module`: 154 passed, 0 skipped (self-contained synthetic fixtures, zero runtime DB dependencies, Stage 08A-R1-R3)
-- `chrome-extension`: 126 passed
+- `chrome-extension`: 126 passed, 0 skipped (self-contained synthetic fixtures, zero runtime ad file dependencies, Stage 08A-R1-R4)
 - **Total Tests Passed:** **806 passed, 1 skipped, 0 failed**
 
 The system is ready for Owner review and acceptance.
