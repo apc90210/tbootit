@@ -484,25 +484,41 @@ def create_vds_release_checkpoint(
         raise RuntimeError(f"Не удалось создать backup на VDS: {vds_backup_run.stderr.strip()}")
 
     vds_backup_name = None
+    vds_backup_path = None
+    vds_backup_sha = None
     for line in vds_backup_run.stdout.splitlines():
-        if "TECHNOREBOOT_BACKUP_" in line and ".zip" in line:
-            for part in line.split():
+        if line.startswith("VDS_PRE_STAGE_BACKUP_FILE="):
+            vds_backup_name = line.split("=", 1)[1].strip()
+        elif line.startswith("VDS_PRE_STAGE_BACKUP_PATH="):
+            vds_backup_path = line.split("=", 1)[1].strip()
+        elif line.startswith("VDS_PRE_STAGE_BACKUP_SHA256="):
+            vds_backup_sha = line.split("=", 1)[1].strip()
+        elif "TECHNOREBOOT_BACKUP_" in line and ".zip" in line:
+            for part in line.replace("=", " ").split():
                 if part.startswith("TECHNOREBOOT_BACKUP_") and part.endswith(".zip"):
                     vds_backup_name = part
-                    break
+
     if not vds_backup_name:
-        raise RuntimeError("Не удалось определить имя созданного бэкапа на VDS!")
+        raise RuntimeError(f"Не удалось определить имя созданного бэкапа на VDS! Вывод: {vds_backup_run.stdout.strip()[:200]}")
 
-    vds_backup_path = f"/srv/technoreboot/data/backups/{vds_backup_name}"
+    if not vds_backup_path:
+        vds_backup_path = f"/srv/technoreboot/data/backups/{vds_backup_name}"
 
-    # 2. Get VDS backup SHA256
-    sha_res = subprocess.run(
-        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, f"sha256sum {vds_backup_path}"],
-        capture_output=True, text=True, timeout=15
+    # Also persist to /srv/technoreboot/data/backups/ if created in /tmp
+    subprocess.run(
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, f"mkdir -p /srv/technoreboot/data/backups && cp -n {vds_backup_path} /srv/technoreboot/data/backups/{vds_backup_name} 2>/dev/null || true"],
+        capture_output=True, timeout=15
     )
-    if sha_res.returncode != 0:
-        raise RuntimeError("Не удалось получить контрольную сумму бэкапа на VDS!")
-    vds_backup_sha = sha_res.stdout.split()[0]
+
+    # 2. Get VDS backup SHA256 if not provided
+    if not vds_backup_sha:
+        sha_res = subprocess.run(
+            ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, f"sha256sum {vds_backup_path}"],
+            capture_output=True, text=True, timeout=15
+        )
+        if sha_res.returncode != 0:
+            raise RuntimeError("Не удалось получить контрольную сумму бэкапа на VDS!")
+        vds_backup_sha = sha_res.stdout.split()[0]
 
     # 3. Copy backup to LOCAL recovery
     local_backup_file = local_checkpoint_dir / "business-backup.zip"
@@ -682,16 +698,22 @@ def execute_sync_vds_to_local(job_id: str, request_data: Dict[str, Any]):
         raise RuntimeError(f"Ошибка создания бэкапа на VDS: {vds_backup_out.stderr.strip()}")
 
     remote_snapshot_name = None
+    remote_snapshot_path = None
     for line in vds_backup_out.stdout.splitlines():
-        if "TECHNOREBOOT_BACKUP_" in line and ".zip" in line:
-            for part in line.split():
+        if line.startswith("VDS_PRE_STAGE_BACKUP_FILE="):
+            remote_snapshot_name = line.split("=", 1)[1].strip()
+        elif line.startswith("VDS_PRE_STAGE_BACKUP_PATH="):
+            remote_snapshot_path = line.split("=", 1)[1].strip()
+        elif "TECHNOREBOOT_BACKUP_" in line and ".zip" in line:
+            for part in line.replace("=", " ").split():
                 if part.startswith("TECHNOREBOOT_BACKUP_") and part.endswith(".zip"):
                     remote_snapshot_name = part
-                    break
+
     if not remote_snapshot_name:
         raise RuntimeError("Не удалось определить имя созданного бэкапа на VDS!")
 
-    remote_snapshot_path = f"/srv/technoreboot/data/backups/{remote_snapshot_name}"
+    if not remote_snapshot_path:
+        remote_snapshot_path = f"/srv/technoreboot/data/backups/{remote_snapshot_name}"
     local_recovery_dir = REPO_ROOT / ".local-recovery"
     local_recovery_dir.mkdir(parents=True, exist_ok=True)
     local_snapshot_file = local_recovery_dir / remote_snapshot_name
@@ -1081,8 +1103,11 @@ def execute_rollback_vds_code_only(job_id: str, request_data: Dict[str, Any]):
     safety_backup_name = "unknown"
     if safety_backup_run.returncode == 0:
         for line in safety_backup_run.stdout.splitlines():
-            if "TECHNOREBOOT_BACKUP_" in line and ".zip" in line:
-                for part in line.split():
+            if line.startswith("VDS_PRE_STAGE_BACKUP_FILE="):
+                safety_backup_name = line.split("=", 1)[1].strip()
+                break
+            elif "TECHNOREBOOT_BACKUP_" in line and ".zip" in line:
+                for part in line.replace("=", " ").split():
                     if part.startswith("TECHNOREBOOT_BACKUP_") and part.endswith(".zip"):
                         safety_backup_name = part
                         break
