@@ -36,6 +36,16 @@ STANDARD_CATEGORY_CHARACTERISTICS: Dict[str, List[str]] = {
     ]
 }
 
+VALID_TRANSITIONS: Dict[str, List[str]] = {
+    "draft": ["in_stock", "archived"],
+    "imported": ["in_stock", "archived", "reserved", "sold", "written_off"],
+    "in_stock": ["reserved", "sold", "written_off", "archived", "draft"],
+    "reserved": ["in_stock", "sold", "archived"],
+    "sold": ["archived"],
+    "written_off": ["archived"],
+    "archived": ["in_stock"]
+}
+
 def log_product_event(db: Session, product_id: int, event_type: str, old_value=None, new_value=None, comment=None):
     old_val_str = json.dumps(old_value, default=str) if old_value else None
     new_val_str = json.dumps(new_value, default=str) if new_value else None
@@ -641,6 +651,9 @@ def full_update_product(product_id: int, product: schemas.ProductFullUpdate, db:
 
     # 6. Status update
     if product.status and product.status != old_status:
+        allowed = VALID_TRANSITIONS.get(old_status, [])
+        if product.status not in allowed:
+            raise HTTPException(status_code=400, detail=f"Invalid transition from {old_status} to {product.status}")
         db_product.status = product.status
         log_product_event(db, product_id, "update_status", old_value=old_status, new_value=product.status, comment="Статус изменен в редакторе")
 
@@ -717,16 +730,6 @@ def update_product(product_id: int, product: schemas.ProductUpdate, db: Session 
     log_product_event(db, db_product.id, "update", old_value=old_data, new_value=new_data, comment="Product updated")
     db.commit()
     return db_product
-
-VALID_TRANSITIONS = {
-    "draft": ["in_stock", "archived", "imported", "reserved", "sold", "written_off"],
-    "imported": ["in_stock", "archived", "reserved", "sold", "written_off", "draft"],
-    "in_stock": ["reserved", "sold", "written_off", "archived", "draft"],
-    "reserved": ["in_stock", "sold", "archived", "draft"],
-    "sold": ["archived"],
-    "written_off": ["archived", "draft"],
-    "archived": ["imported", "draft", "in_stock"]
-}
 
 @router.post("/{product_id}/status", response_model=schemas.Product)
 @router.patch("/{product_id}/status", response_model=schemas.Product)
@@ -880,7 +883,8 @@ def batch_update_products(batch_req: schemas.ProductBatchRequest, db: Session = 
 
         if batch_req.status and batch_req.status.strip():
             target_status = batch_req.status.strip()
-            if product.status != target_status:
+            allowed = VALID_TRANSITIONS.get(product.status, [])
+            if product.status != target_status and target_status in allowed:
                 product.status = target_status
                 log_audit(db, "product", product.id, "batch_update_status", old_value={"status": old_status}, new_value={"status": target_status})
                 log_product_event(db, product.id, "batch_update_status", old_value=old_status, new_value=target_status, comment=batch_req.comment or "Массовое изменение статуса")

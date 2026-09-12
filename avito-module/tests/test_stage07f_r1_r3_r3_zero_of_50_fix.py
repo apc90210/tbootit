@@ -332,7 +332,7 @@ def test_test_j_extension_archive_and_version_synchronization():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     ver = manifest["version"]
-    assert ver in ("0.2.53", "0.2.54", "0.2.55")
+    assert ver in ("0.2.53", "0.2.54", "0.2.55", "0.2.56")
 
     with open(POPUP_HTML_PATH, "r", encoding="utf-8") as f:
         assert f"v{ver}" in f.read()

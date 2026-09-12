@@ -137,3 +137,7 @@ def test_post_status_valid_invalid():
     # invalid: sold -> in_stock (sold items can only be archived)
     status_resp5 = client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
     assert status_resp5.status_code == 400
+
+    # invalid: sold -> draft (sold items cannot be drafted)
+    status_resp6 = client.post(f"/api/products/{pid}/status", json={"status": "draft"})
+    assert status_resp6.status_code == 400

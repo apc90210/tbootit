@@ -8,17 +8,29 @@ from validate_extension_package import validate_extension_directory, validate_ex
 import json
 
 def get_version():
-    manifest_path = os.path.abspath("chrome-extension/technoreboot-avito/manifest.json")
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("version", "0.2.30")
+    candidates = [
+        os.path.abspath("chrome-extension/technoreboot-avito/manifest.json"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "chrome-extension", "technoreboot-avito", "manifest.json"))
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("version", "0.2.56")
+    return "0.2.56"
 
 def build_zip():
     version = get_version()
-    extension_dir = os.path.abspath("chrome-extension/technoreboot-avito")
-    dist_dir = os.path.abspath("dist")
-    admin_app_dir = os.path.abspath("admin-shell/app")
+    candidates = [
+        os.path.abspath("chrome-extension/technoreboot-avito"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "chrome-extension", "technoreboot-avito"))
+    ]
+    extension_dir = next((p for p in candidates if os.path.exists(p)), candidates[0])
+    
+    dist_dir = os.path.abspath("dist") if os.path.exists("dist") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dist"))
+    admin_app_dir = os.path.abspath("admin-shell/app") if os.path.exists("admin-shell/app") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "admin-shell", "app"))
     os.makedirs(dist_dir, exist_ok=True)
+    os.makedirs(admin_app_dir, exist_ok=True)
     
     # 1. Validate source directory first
     validate_extension_directory(extension_dir)

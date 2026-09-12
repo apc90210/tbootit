@@ -364,7 +364,7 @@ def test_version_alignment_across_extension_and_admin_shell():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     ver = manifest["version"]
-    assert ver in ("0.2.52", "0.2.53", "0.2.54", "0.2.55")
+    assert ver in ("0.2.52", "0.2.53", "0.2.54", "0.2.55", "0.2.56")
 
     with open(POPUP_HTML_PATH, "r", encoding="utf-8") as f:
         popup_html = f.read()

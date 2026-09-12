@@ -190,7 +190,7 @@ def test_requirements_version_0_2_52_synchronization():
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     ver = manifest["version"]
-    assert ver in ("0.2.52", "0.2.53", "0.2.54", "0.2.55")
+    assert ver in ("0.2.52", "0.2.53", "0.2.54", "0.2.55", "0.2.56")
 
     with open(CONTENT_JS_PATH, "r", encoding="utf-8") as f:
         content_code = f.read()

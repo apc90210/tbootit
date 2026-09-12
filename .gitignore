@@ -71,3 +71,6 @@ storage_state.json
 # Local Deployment Secrets (Stage 08C-R1)
 .secrets/
 
+# Local recovery backups
+.local-recovery/
+

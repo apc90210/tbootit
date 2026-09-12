@@ -5,7 +5,11 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-# Insert avito-module into sys.path
+# Clean sys.path and sys.modules from other microservices
+sys.path = [p for p in sys.path if not any(m in p.lower() for m in ["inventory-sales-module", "core", "admin-shell", "repairs-module"])]
+for k in list(sys.modules.keys()):
+    if k == "app" or k.startswith("app."):
+        del sys.modules[k]
 sys.path.insert(0, os.path.abspath("avito-module"))
 from app.main import app
 from app.routers import extension_bridge
@@ -38,7 +42,7 @@ def test_fresh_code_redeem_success():
     status_data = status_res.json()
     assert status_data["paired"] is True
     assert status_data["token_valid"] is True
-    assert status_data["version"] in ("0.2.54", "0.2.55")
+    assert status_data["version"] in ("0.2.54", "0.2.55", "0.2.56")
 
 def test_unknown_code_rejected_400():
     """Requirement: unknown code -> 400 with 'Код подключения не найден'"""
@@ -153,15 +157,16 @@ def test_local_and_vds_pairing_stores_independent():
     assert "/srv/technoreboot" not in os.path.abspath(storage_dir)
 
 def test_extension_package_version_and_dynamic_origin():
-    """Verify Chrome extension source files include dynamic origin support, persistence, and v0.2.55."""
+    """Verify Chrome extension source files include dynamic origin support, persistence, and v0.2.56."""
     ext_dir = os.path.abspath("chrome-extension/technoreboot-avito")
 
     # manifest.json
     manifest_path = os.path.join(ext_dir, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] == "0.2.55"
+    assert manifest["version"] == "0.2.56"
     assert "https://144.31.50.134/*" in manifest["host_permissions"]
+    assert "https://*/*" not in manifest["host_permissions"]
 
     # service_worker.js
     sw_path = os.path.join(ext_dir, "service_worker.js")
@@ -169,7 +174,7 @@ def test_extension_package_version_and_dynamic_origin():
         sw_code = f.read()
     assert "getServerUrl" in sw_code
     assert "setServerUrl" in sw_code
-    assert "0.2.55" in sw_code
+    assert "0.2.56" in sw_code
 
     # popup.js
     popup_js_path = os.path.join(ext_dir, "popup.js")
@@ -186,7 +191,7 @@ def test_extension_package_version_and_dynamic_origin():
         popup_html = f.read()
     assert 'id="serverUrlInput"' in popup_html
     assert 'id="saveServerUrlBtn"' in popup_html
-    assert "v0.2.55" in popup_html
+    assert "v0.2.56" in popup_html
 
     # admin-shell template
     template_path = os.path.abspath("admin-shell/app/templates/avito_extension.html")
@@ -194,4 +199,4 @@ def test_extension_package_version_and_dynamic_origin():
         tmpl = f.read()
     assert "serverUrlDisplay" in tmpl
     assert "copyServerUrl" in tmpl
-    assert "v0.2.55" in tmpl
+    assert "v0.2.56" in tmpl

@@ -218,7 +218,7 @@ def test_extension_package_version_and_elements():
     assert os.path.exists(manifest_path)
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest.get("version") in ("0.2.52", "0.2.53", "0.2.54", "0.2.55")
+    assert manifest.get("version") in ("0.2.52", "0.2.53", "0.2.54", "0.2.55", "0.2.56")
     assert "tabs" in manifest.get("permissions", [])
 
     # 2. popup.html elements

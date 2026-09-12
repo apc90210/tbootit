@@ -242,9 +242,16 @@
                     <td>{% if p.sale_price and p.purchase_price %}{{ "%.0f"|format(p.sale_price - p.purchase_price) }} ₽{% else %}—{% endif %}</td>
                     <td><strong>{{ product_meta.product_statuses.get(p.status, p.status) }}</strong></td>
                     <td>
+                        {% if p.status == 'in_stock' %}
+                        <button onclick="setDraftStatus({{ p.id }}, 'draft')" style="padding:3px 8px;font-size:0.8em;background:#6c757d;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-right:4px;" title="Убрать в черновик">Убрать в черновик</button>
+                        {% elif p.status == 'draft' %}
+                        <button onclick="setDraftStatus({{ p.id }}, 'in_stock')" style="padding:3px 8px;font-size:0.8em;background:#28a745;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-right:4px;" title="Вернуть в наличие">Вернуть в наличие</button>
+                        {% endif %}
                         <select id="ps_{{ p.id }}" style="font-size:0.8em;padding:3px;">
                             {% for key, val in product_meta.product_statuses.items() %}
+                            {% if p.status == 'in_stock' or (key != 'draft' and p.status != 'draft') or (p.status == 'draft' and key in ['draft', 'in_stock', 'archived']) %}
                             <option value="{{ key }}" {% if p.status == key %}selected{% endif %}>{{ val }}</option>
+                            {% endif %}
                             {% endfor %}
                         </select>
                         <button onclick="changeProductStatus({{ p.id }})" style="padding:3px 8px;font-size:0.8em;">OK</button>
@@ -521,6 +528,10 @@
     {% endif %}
 
     // ---- Product status ----
+    async function setDraftStatus(id, newStatus) {
+        const r = await apiCall('/admin-api/products/' + id + '/status', 'PATCH', { status: newStatus });
+        if (r) window.location.reload();
+    }
     async function changeProductStatus(id) {
         const s = document.getElementById('ps_' + id).value;
         const r = await apiCall('/admin-api/products/' + id + '/status', 'PATCH', { status: s });

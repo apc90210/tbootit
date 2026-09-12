@@ -188,9 +188,17 @@ def test_g_mtls_required():
     assert "proxy_pass http://admin-shell:8010/internal-auth/verify;" in template_content
 
 
+def _get_auth_manager():
+    auth_mgr_dir = str(PROJECT_ROOT / "admin-shell" / "app")
+    if auth_mgr_dir not in sys.path:
+        sys.path.insert(0, auth_mgr_dir)
+    from auth_manager import AuthManager
+    return AuthManager
+
+
 def test_h_owner_cert_accepted(tmp_path):
     """TEST H: OWNER-like certificate is accepted by auth_manager."""
-    from auth_manager import AuthManager
+    AuthManager = _get_auth_manager()
     am = AuthManager(auth_dir=str(tmp_path))
     registry = am._read_registry()
     owner_rec = next(r for r in registry if r.get("is_owner"))
@@ -208,7 +216,7 @@ def test_h_owner_cert_accepted(tmp_path):
 
 def test_i_no_cert_rejected(tmp_path):
     """TEST I: Request without client certificate is rejected with 403 Forbidden."""
-    from auth_manager import AuthManager
+    AuthManager = _get_auth_manager()
     am = AuthManager(auth_dir=str(tmp_path))
 
     # verify_status not SUCCESS (e.g. NONE or missing)
@@ -225,7 +233,7 @@ def test_i_no_cert_rejected(tmp_path):
 
 def test_j_backups_owner_only(tmp_path):
     """TEST J: /backups route is strictly OWNER-only; USER cert receives 403."""
-    from auth_manager import AuthManager
+    AuthManager = _get_auth_manager()
     am = AuthManager(auth_dir=str(tmp_path))
     registry = am._read_registry()
     owner_rec = next(r for r in registry if r.get("is_owner"))
@@ -233,31 +241,41 @@ def test_j_backups_owner_only(tmp_path):
     # Create worker/USER certificate using create_user_certificate
     worker_rec = am.create_user_certificate("worker1")
 
-    # USER cert accessing /backups -> 403
-    ok, code, msg, cert = am.verify_request(
-        verify_status="SUCCESS",
-        client_serial=worker_rec["serial_hex"],
-        client_fingerprint=worker_rec["fingerprint_sha256"],
-        request_uri="/backups",
-    )
-    assert ok is False
-    assert code == 403
-    assert "OWNER" in msg and "required" in msg
-
-    # OWNER cert accessing /backups -> 200
-    ok, code, msg, cert = am.verify_request(
+    # 1. OWNER certificate allowed
+    ok_owner, code_owner, _, _ = am.verify_request(
         verify_status="SUCCESS",
         client_serial=owner_rec["serial_hex"],
         client_fingerprint=owner_rec["fingerprint_sha256"],
         request_uri="/backups",
     )
-    assert ok is True
-    assert code == 200
+    assert ok_owner is True
+    assert code_owner == 200
+
+    # 2. USER/worker certificate rejected with 403 Forbidden
+    ok_user, code_user, msg_user, _ = am.verify_request(
+        verify_status="SUCCESS",
+        client_serial=worker_rec["serial_hex"],
+        client_fingerprint=worker_rec["fingerprint_sha256"],
+        request_uri="/backups",
+    )
+    assert ok_user is False
+    assert code_user == 403
+    assert "OWNER certificate required" in msg_user
+
+    # Also test API route /admin-api/backups
+    ok_user_api, code_user_api, _, _ = am.verify_request(
+        verify_status="SUCCESS",
+        client_serial=worker_rec["serial_hex"],
+        client_fingerprint=worker_rec["fingerprint_sha256"],
+        request_uri="/admin-api/backups",
+    )
+    assert ok_user_api is False
+    assert code_user_api == 403
 
 
 def test_k_certificates_owner_only(tmp_path):
     """TEST K: /certificates route is strictly OWNER-only; USER cert receives 403."""
-    from auth_manager import AuthManager
+    AuthManager = _get_auth_manager()
     am = AuthManager(auth_dir=str(tmp_path))
     registry = am._read_registry()
     owner_rec = next(r for r in registry if r.get("is_owner"))

@@ -64,7 +64,7 @@ class ListingPayload(BaseModel):
 
 class MyListingsPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.55"
+    extension_version: str = "0.2.56"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "my_listings"
     listings_count: Optional[int] = 0
@@ -72,7 +72,7 @@ class MyListingsPayload(BaseModel):
 
 class BulkImportPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.55"
+    extension_version: str = "0.2.56"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "bulk_import"
     listings_count: Optional[int] = None
@@ -92,7 +92,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.2.55",
+        "version": "0.2.56",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
