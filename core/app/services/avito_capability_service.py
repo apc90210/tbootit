@@ -24,6 +24,8 @@ def get_avito_capabilities(db: Optional[Session] = None) -> Dict[str, Any]:
         "browser_bridge": True,
         "browser_assisted_available": True,
         "manual_available": True,
+        "official_api_available": False,
+        "can_deactivate_listing": False,
         "canonical_schema_source": canonical_schema_source,
         "autoload_schema_present": has_official_schemas,
         "autoload_publish": False

@@ -107,4 +107,22 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Operations UI Card 3 & Table** | **ACTIVE** | Rollback button, modal confirmation, and checkpoint history table on `/system/operations` |
 | **Automated Tests** | **74 PASSED (0 FAILED)** | Full coverage for preflight, checkpoints, rollback RBAC, and rollback schema guard |
 
+---
+
+## 7. Avito Post-Sale Deactivation Status (Stage 09A LOCAL)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **LOCAL ONLY** | Development and automated validation on `https://localhost:8443` |
+| **Sale Integration** | **ACTIVE** | Post-sale follow-up card on sales receipt (`[ Не сейчас ]` / `[ Снять с Avito ]`) |
+| **Sale Non-Block Invariant** | **ENFORCED** | Sale commits before Avito follow-up; Avito failures never block or revert sales |
+| **Stock Non-Mutation** | **ENFORCED** | Physical inventory is never mutated by Avito task state changes |
+| **Persistent Task Model** | **ACTIVE (`avito_post_sale_tasks`)** | Idempotent on `(sale_id, product_id, avito_listing_id, action)`. 7 discrete states. |
+| **Retry Limit & Fallback** | **ACTIVE (3 Attempts)** | Auto-transitions to `manual_required` upon reaching 3 failed attempts |
+| **Official API Capability** | `OFFICIAL_API_AVAILABLE = false` | Capability probe `can_deactivate_listing = false` (extension mode used) |
+| **Chrome Extension Version** | `0.2.57` | Added task channel helpers (`/tasks/next`, `/tasks/{id}/started`, `/tasks/{id}/success`, `/tasks/{id}/failed`) |
+| **Cleanup Queue UI** | **ACTIVE (`/avito/post-sale`)** | Filterable queue table with retry, queue, and cancel actions |
+| **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
+
+
 

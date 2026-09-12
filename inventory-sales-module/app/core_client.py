@@ -210,6 +210,30 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def get_sale_avito_tasks(self, sale_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/sales/{sale_id}/avito-tasks", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"sale_id": sale_id, "count": 0, "tasks": []}
+            except Exception as e:
+                return {"sale_id": sale_id, "count": 0, "tasks": [], "error": str(e)}
+
+    async def deactivate_sale_avito(self, sale_id: int, payload: Optional[dict] = None):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/sales/{sale_id}/avito-deactivate",
+                    json=payload or {},
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
     async def get_organization_settings(self):
         from app.defaults import get_effective_settings
         async with httpx.AsyncClient(trust_env=False) as client:

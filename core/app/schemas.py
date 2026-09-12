@@ -891,3 +891,38 @@ class ProductBatchResponse(BaseModel):
     updated_count: int
     product_ids: List[int]
     message: Optional[str] = None
+
+class AvitoPostSaleTaskBase(BaseModel):
+    sale_id: int
+    product_id: int
+    external_listing_id: Optional[int] = None
+    avito_listing_id: str
+    listing_url: Optional[str] = None
+    status: str = "suggested"
+    action: str = "deactivate"
+    requested_by: Optional[str] = None
+    execution_mode: str = "extension"
+
+class AvitoPostSaleTaskCreate(AvitoPostSaleTaskBase):
+    pass
+
+class AvitoPostSaleTaskResponse(AvitoPostSaleTaskBase):
+    id: int
+    requested_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    attempt_count: int = 0
+    last_error: Optional[str] = None
+    result_metadata: Optional[str] = None
+    product_title: Optional[str] = None
+    product_sku: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class AvitoPostSaleTaskListResponse(BaseModel):
+    items: List[AvitoPostSaleTaskResponse]
+    total: int
+    limit: int
+    offset: int
+

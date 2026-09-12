@@ -152,6 +152,17 @@ async def sale_detail(request: Request, sale_id: int):
             context={"message": "Ошибка Core API"},
         )
 
+    # Fetch any Avito post-sale tasks for this sale
+    avito_tasks = []
+    try:
+        tasks_resp = await core_client.get_sale_avito_tasks(sale_id)
+        if tasks_resp and isinstance(tasks_resp, dict):
+            avito_tasks = tasks_resp.get("tasks", [])
+    except Exception:
+        avito_tasks = []
+
+    avito_dismissed = request.query_params.get("avito_dismissed") == "1"
+
     return templates.TemplateResponse(
         request=request,
         name="sales_detail.html",
@@ -159,8 +170,22 @@ async def sale_detail(request: Request, sale_id: int):
             "sale": sale,
             "payment_methods": PAYMENT_METHODS,
             "sale_status_labels": SALE_STATUS_LABELS,
+            "avito_tasks": avito_tasks,
+            "avito_dismissed": avito_dismissed,
         },
     )
+
+@router.post("/sales/{sale_id}/avito-deactivate")
+async def sale_avito_deactivate_endpoint(request: Request, sale_id: int):
+    """Queue post-sale Avito deactivation task(s)."""
+    await core_client.deactivate_sale_avito(sale_id)
+    return RedirectResponse(url=f"/sales/{sale_id}", status_code=303)
+
+@router.post("/sales/{sale_id}/avito-dismiss")
+async def sale_avito_dismiss_endpoint(request: Request, sale_id: int):
+    """Dismiss post-sale Avito prompt for current view ('Не сейчас'). Task remains in pending queue."""
+    return RedirectResponse(url=f"/sales/{sale_id}?avito_dismissed=1", status_code=303)
+
 
 @router.get("/sales/{sale_id}/receipt", response_class=HTMLResponse)
 async def sale_receipt(request: Request, sale_id: int):

@@ -229,6 +229,7 @@ class Product(Base):
     canonical_category = relationship("AvitoCanonicalCategory", back_populates="products")
     avito_attribute_values = relationship("ProductAvitoAttributeValue", back_populates="product", cascade="all, delete-orphan")
     photos = relationship("ProductPhoto", back_populates="product", cascade="all, delete-orphan")
+    avito_post_sale_tasks = relationship("AvitoPostSaleTask", back_populates="product", cascade="all, delete-orphan")
 
     @property
     def main_photo_url(self):
@@ -266,6 +267,7 @@ class ProductExternalListing(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     product = relationship("Product", back_populates="external_listings")
+    post_sale_tasks = relationship("AvitoPostSaleTask", back_populates="external_listing")
 
 class ProductCardImport(Base):
     __tablename__ = "product_cards"
@@ -433,6 +435,7 @@ class Sale(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     items = relationship("SaleItem", back_populates="sale")
+    avito_post_sale_tasks = relationship("AvitoPostSaleTask", back_populates="sale")
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
@@ -470,3 +473,29 @@ class OrganizationSettings(Base):
     no_warranty_text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class AvitoPostSaleTask(Base):
+    __tablename__ = "avito_post_sale_tasks"
+    __table_args__ = (
+        UniqueConstraint("sale_id", "product_id", "avito_listing_id", "action", name="uix_sale_prod_avito_deact"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), index=True, nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), index=True, nullable=False)
+    external_listing_id = Column(Integer, ForeignKey("product_external_listings.id"), nullable=True, index=True)
+    avito_listing_id = Column(String, index=True, nullable=False)
+    listing_url = Column(String, nullable=True)
+    status = Column(String, default="suggested", index=True, nullable=False)
+    action = Column(String, default="deactivate", nullable=False)
+    requested_by = Column(String, nullable=True)
+    requested_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    attempt_count = Column(Integer, default=0, nullable=False)
+    last_error = Column(Text, nullable=True)
+    execution_mode = Column(String, default="extension", nullable=False)
+    result_metadata = Column(Text, nullable=True)
+
+    sale = relationship("Sale", back_populates="avito_post_sale_tasks")
+    product = relationship("Product", back_populates="avito_post_sale_tasks")
+    external_listing = relationship("ProductExternalListing", back_populates="post_sale_tasks")

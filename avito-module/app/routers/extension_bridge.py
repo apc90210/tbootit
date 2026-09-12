@@ -6,7 +6,7 @@ import hashlib
 import json
 import httpx
 from typing import Optional, List, Dict, Any, Union
-from fastapi import APIRouter, Request, HTTPException, Header, Depends
+from fastapi import APIRouter, Request, HTTPException, Header, Depends, Response, Body
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -64,7 +64,7 @@ class ListingPayload(BaseModel):
 
 class MyListingsPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.56"
+    extension_version: str = "0.2.57"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "my_listings"
     listings_count: Optional[int] = 0
@@ -72,7 +72,7 @@ class MyListingsPayload(BaseModel):
 
 class BulkImportPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.56"
+    extension_version: str = "0.2.57"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "bulk_import"
     listings_count: Optional[int] = None
@@ -92,7 +92,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.2.56",
+        "version": "0.2.57",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
@@ -510,4 +510,97 @@ async def get_extension_publication_package(
             "warnings": pre_data.get("warnings", [])
         }
     }
+
+
+def _is_valid_avito_target(listing_url: str, avito_listing_id: str) -> bool:
+    if not listing_url or not avito_listing_id:
+        return False
+    import urllib.parse
+    try:
+        parsed = urllib.parse.urlparse(listing_url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = (parsed.hostname or "").lower()
+        if hostname != "avito.ru" and not hostname.endswith(".avito.ru"):
+            return False
+        if str(avito_listing_id) not in listing_url:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+@router.get("/tasks/next")
+async def get_next_extension_task(token: str = Depends(verify_extension_token)):
+    """Fetch next queued post-sale deactivation task for paired Chrome extension."""
+    core_base = settings.CORE_API_BASE_URL.rstrip('/')
+    url = f"{core_base}/api/avito/post-sale-tasks/next"
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        try:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                return {"task": None}
+            data = resp.json()
+            task = data.get("task")
+            if not task:
+                return {"task": None}
+
+            # Security validation: only avito.ru domain and matching ID
+            listing_url = task.get("listing_url", "")
+            avito_id = str(task.get("avito_listing_id", ""))
+            if not _is_valid_avito_target(listing_url, avito_id):
+                fail_url = f"{core_base}/api/avito/post-sale-tasks/{task['task_id']}/failed"
+                await client.post(fail_url, json={
+                    "error": f"Security validation failed: invalid target URL or Avito ID ({listing_url})",
+                    "can_retry": False
+                })
+                return {"task": None}
+
+            return {"task": task}
+        except Exception as e:
+            return {"task": None, "error": str(e)}
+
+
+@router.post("/tasks/{task_id}/started")
+async def extension_task_started(task_id: int, token: str = Depends(verify_extension_token)):
+    core_base = settings.CORE_API_BASE_URL.rstrip('/')
+    url = f"{core_base}/api/avito/post-sale-tasks/{task_id}/started"
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        try:
+            resp = await client.post(url)
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Core API error: {str(e)}")
+
+
+@router.post("/tasks/{task_id}/success")
+async def extension_task_success(
+    task_id: int,
+    payload: Optional[Dict[str, Any]] = Body(default=None),
+    token: str = Depends(verify_extension_token)
+):
+    core_base = settings.CORE_API_BASE_URL.rstrip('/')
+    url = f"{core_base}/api/avito/post-sale-tasks/{task_id}/success"
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        try:
+            resp = await client.post(url, json=payload or {})
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Core API error: {str(e)}")
+
+
+@router.post("/tasks/{task_id}/failed")
+async def extension_task_failed(
+    task_id: int,
+    payload: Optional[Dict[str, Any]] = Body(default=None),
+    token: str = Depends(verify_extension_token)
+):
+    core_base = settings.CORE_API_BASE_URL.rstrip('/')
+    url = f"{core_base}/api/avito/post-sale-tasks/{task_id}/failed"
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        try:
+            resp = await client.post(url, json=payload or {})
+            return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Core API error: {str(e)}")
 

@@ -1002,6 +1002,193 @@
         }
       ]
     },
+    "avito_post_sale_tasks": {
+      "columns": [
+        {
+          "default": null,
+          "name": "action",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "attempt_count",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "avito_listing_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "execution_mode",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "external_listing_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "finished_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "last_error",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "listing_url",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "requested_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "requested_by",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "result_metadata",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "sale_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "started_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "status",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "external_listing_id",
+          "to_column": "id",
+          "to_table": "product_external_listings"
+        },
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        },
+        {
+          "from_column": "sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "avito_listing_id"
+          ],
+          "name": "ix_avito_post_sale_tasks_avito_listing_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "external_listing_id"
+          ],
+          "name": "ix_avito_post_sale_tasks_external_listing_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_post_sale_tasks_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "product_id"
+          ],
+          "name": "ix_avito_post_sale_tasks_product_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "sale_id"
+          ],
+          "name": "ix_avito_post_sale_tasks_sale_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "name": "ix_avito_post_sale_tasks_status",
+          "unique": false
+        },
+        {
+          "columns": [
+            "sale_id",
+            "product_id",
+            "avito_listing_id",
+            "action"
+          ],
+          "name": "sqlite_autoindex_avito_post_sale_tasks_1",
+          "unique": true
+        }
+      ]
+    },
     "categories": {
       "columns": [
         {
@@ -1674,14 +1861,6 @@
       "indexes": [
         {
           "columns": [
-            "marketplace",
-            "external_item_id"
-          ],
-          "name": "ix_product_ext_listings_market_item",
-          "unique": true
-        },
-        {
-          "columns": [
             "external_account_key"
           ],
           "name": "ix_product_external_listings_external_account_key",
@@ -1798,6 +1977,13 @@
         }
       ],
       "indexes": [
+        {
+          "columns": [
+            "content_hash"
+          ],
+          "name": "ix_product_photos_content_hash",
+          "unique": false
+        },
         {
           "columns": [
             "id"
@@ -2062,7 +2248,7 @@
           "type": "TEXT"
         },
         {
-          "default": "'avito'",
+          "default": null,
           "name": "source_origin",
           "nullable": true,
           "primary_key": 0,
@@ -2106,12 +2292,29 @@
       ],
       "foreign_keys": [
         {
+          "from_column": "avito_category_id",
+          "to_column": "id",
+          "to_table": "avito_categories"
+        },
+        {
+          "from_column": "canonical_category_id",
+          "to_column": "id",
+          "to_table": "avito_canonical_categories"
+        },
+        {
           "from_column": "category_id",
           "to_column": "id",
           "to_table": "categories"
         }
       ],
       "indexes": [
+        {
+          "columns": [
+            "avito_category_id"
+          ],
+          "name": "ix_products_avito_category_id",
+          "unique": false
+        },
         {
           "columns": [
             "barcode"
@@ -2124,6 +2327,13 @@
             "brand"
           ],
           "name": "ix_products_brand",
+          "unique": false
+        },
+        {
+          "columns": [
+            "canonical_category_id"
+          ],
+          "name": "ix_products_canonical_category_id",
           "unique": false
         },
         {
@@ -2159,14 +2369,14 @@
     "repair_orders": {
       "columns": [
         {
-          "default": null,
+          "default": "CURRENT_TIMESTAMP",
           "name": "accepted_at",
           "nullable": true,
           "primary_key": 0,
           "type": "DATETIME"
         },
         {
-          "default": "0",
+          "default": null,
           "name": "access_code_provided",
           "nullable": true,
           "primary_key": 0,
@@ -2285,7 +2495,7 @@
           "type": "TEXT"
         },
         {
-          "default": "500.0",
+          "default": null,
           "name": "diagnostic_fee",
           "nullable": true,
           "primary_key": 0,
@@ -2369,7 +2579,7 @@
           "type": "FLOAT"
         },
         {
-          "default": "'normal'",
+          "default": null,
           "name": "priority",
           "nullable": true,
           "primary_key": 0,
@@ -2428,37 +2638,23 @@
       "indexes": [
         {
           "columns": [
-            "number"
+            "id"
           ],
-          "name": "idx_repair_orders_number",
-          "unique": true
+          "name": "ix_repair_orders_id",
+          "unique": false
         },
         {
           "columns": [
-            "customer_phone"
+            "number"
           ],
-          "name": "idx_repair_orders_phone",
-          "unique": false
+          "name": "ix_repair_orders_number",
+          "unique": true
         },
         {
           "columns": [
             "serial_number"
           ],
-          "name": "idx_repair_orders_serial",
-          "unique": false
-        },
-        {
-          "columns": [
-            "status"
-          ],
-          "name": "idx_repair_orders_status",
-          "unique": false
-        },
-        {
-          "columns": [
-            "id"
-          ],
-          "name": "ix_repair_orders_id",
+          "name": "ix_repair_orders_serial_number",
           "unique": false
         },
         {
@@ -2530,13 +2726,6 @@
         }
       ],
       "indexes": [
-        {
-          "columns": [
-            "repair_id"
-          ],
-          "name": "idx_repair_history_repair_id",
-          "unique": false
-        },
         {
           "columns": [
             "id"
@@ -2800,11 +2989,17 @@
         },
         {
           "columns": [
-            "source_type",
             "source_id"
           ],
-          "name": "ix_sales_source_type_source_id",
-          "unique": true
+          "name": "ix_sales_source_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "source_type"
+          ],
+          "name": "ix_sales_source_type",
+          "unique": false
         },
         {
           "columns": [

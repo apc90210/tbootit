@@ -1,12 +1,19 @@
 import httpx
 from typing import Optional, Dict, Any, List
 
+OFFICIAL_API_AVAILABLE = False
+
 class AvitoOfficialApiClient:
     def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None):
         self.client_id = client_id
         self.client_secret = client_secret
         self.base_url = "https://api.avito.ru"
         self.access_token = None
+
+    @property
+    def can_deactivate_listing(self) -> bool:
+        # Currently official API does not support deactivation or credentials are unconfigured
+        return False
 
     def is_configured(self) -> bool:
         return bool(self.client_id and self.client_secret)

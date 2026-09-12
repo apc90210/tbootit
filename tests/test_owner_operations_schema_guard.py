@@ -97,11 +97,19 @@ def test_schema_guard_detects_table_diff():
     assert any("new_audit_log_v2" in d for d in diffs)
 
 
-def test_deployment_compatibility_flag_check():
-    """Verify check_deployment_compatibility_flag reads tracked json."""
-    ok, msg = check_deployment_compatibility_flag()
+def test_deployment_compatibility_flag_check(tmp_path):
+    """Verify check_deployment_compatibility_flag reads tracked json and respects flags."""
+    from scripts.db_schema_contract import check_deployment_compatibility_flag
+    fake_compat = tmp_path / "compat.json"
+    fake_compat.write_text(json.dumps({"requires_manual_migration": False, "database_change": False}), encoding="utf-8")
+    ok, msg = check_deployment_compatibility_flag(fake_compat)
     assert ok is True
     assert "SAFE" in msg or "compatible" in msg.lower()
+
+    fake_compat.write_text(json.dumps({"requires_manual_migration": True, "database_change": True, "reason": "Test"}), encoding="utf-8")
+    ok2, msg2 = check_deployment_compatibility_flag(fake_compat)
+    assert ok2 is False
+    assert "Manual migration" in msg2 or "migration" in msg2.lower()
 
 
 def test_update_blocked_when_migration_flag_true(monkeypatch, tmp_path):

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "requires_manual_migration": false,
-  "database_change": false,
-  "reason": "Stage 08D-R1R5: Schema contract verified matching canonical database.",
-  "schema_contract_sha256": "ce11b10dc33ecd3ab6804bf65e12fc55a840ce3f308b5cd2da4a6869b8e904d7",
-  "reviewed_at_commit": "1e9b62390ce247bbe0b9ac5c4ccce437d07ddf0e"
+  "requires_manual_migration": true,
+  "database_change": true,
+  "reason": "Stage 09A LOCAL: Added avito_post_sale_tasks table for post-sale deactivation automation. VDS deployment deferred to future migration stage.",
+  "schema_contract_sha256": "ae36c0163d7dcd5fa4a4f8e977008566f84f1016b2aa3d686bd31228f43aa886",
+  "reviewed_at_commit": "aa593781b7feef0ea732bcd6b2b761b79bf3ff87"
 }

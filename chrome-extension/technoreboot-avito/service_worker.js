@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.56)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.57)
 
 const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -223,7 +223,7 @@ async function sendBulkImportPayload(payload) {
         if (!normalizedPayload.schema_version) {
             normalizedPayload.schema_version = 1;
         }
-        normalizedPayload.extension_version = "0.2.56";
+        normalizedPayload.extension_version = "0.2.57";
         if (!normalizedPayload.captured_at) {
             normalizedPayload.captured_at = new Date().toISOString();
         }
@@ -430,8 +430,84 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         downloadPhotoFromCdn(request.candidate_urls, request.max_bytes).then(sendResponse);
         return true;
     }
+    if (request.action === "fetch_next_task") {
+        fetchNextPostSaleTask().then(sendResponse);
+        return true;
+    }
+    if (request.action === "report_task_success") {
+        reportTaskSuccess(request.task_id, request.result_data).then(sendResponse);
+        return true;
+    }
+    if (request.action === "report_task_failed") {
+        reportTaskFailed(request.task_id, request.error, request.can_retry).then(sendResponse);
+        return true;
+    }
     return true;
 });
+
+async function fetchNextPostSaleTask() {
+    const token = await getStoredToken();
+    if (!token) {
+        return { success: false, message: "Расширение не привязано к Техноребут." };
+    }
+    try {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/tasks/next`, {
+            method: "GET",
+            headers: {
+                "X-Extension-Token": token,
+                "Accept": "application/json"
+            }
+        });
+        const parsed = await parseJsonResponseSafely(res);
+        if (parsed.ok) {
+            return { success: true, task: parsed.data.task || null };
+        }
+        return { success: false, message: parsed.error, details: parsed.data };
+    } catch (e) {
+        return { success: false, message: `Ошибка связи: ${e.message}` };
+    }
+}
+
+async function reportTaskSuccess(taskId, resultData = {}) {
+    const token = await getStoredToken();
+    if (!token) return { success: false, message: "Не привязано" };
+    try {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/tasks/${taskId}/success`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Extension-Token": token
+            },
+            body: JSON.stringify(resultData)
+        });
+        const parsed = await parseJsonResponseSafely(res);
+        return { success: parsed.ok, data: parsed.data };
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+}
+
+async function reportTaskFailed(taskId, errorMsg, canRetry = true) {
+    const token = await getStoredToken();
+    if (!token) return { success: false, message: "Не привязано" };
+    try {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/tasks/${taskId}/failed`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Extension-Token": token
+            },
+            body: JSON.stringify({ error: errorMsg, can_retry: canRetry })
+        });
+        const parsed = await parseJsonResponseSafely(res);
+        return { success: parsed.ok, data: parsed.data };
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+}
 
 
 

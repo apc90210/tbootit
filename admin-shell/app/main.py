@@ -527,6 +527,55 @@ async def proxy_start_import(account_key: str, request: Request):
         resp = await client.post(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}/import", data=data)
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
 
+# --- Avito Post-Sale Cleanup Queue ---
+
+@app.get("/avito/post-sale", response_class=HTMLResponse)
+async def avito_post_sale_page(request: Request, status: Optional[str] = None):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            params = {}
+            if status:
+                params["status"] = status
+            resp = await client.get(f"{CORE_API_URL}/api/avito/post-sale-tasks", params=params, timeout=10)
+            tasks_data = resp.json() if resp.status_code == 200 else {"items": [], "total": 0}
+        except Exception:
+            tasks_data = {"items": [], "total": 0}
+
+    return templates.TemplateResponse("avito_post_sale.html", {
+        "request": request,
+        "tasks": tasks_data.get("items", []),
+        "total": tasks_data.get("total", 0),
+        "selected_status": status or "",
+        "is_owner": _is_owner(request),
+    }, media_type="text/html; charset=utf-8")
+
+@app.get("/admin-api/avito/post-sale-tasks")
+async def proxy_get_post_sale_tasks(request: Request, status: Optional[str] = None):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        params = {}
+        if status:
+            params["status"] = status
+        resp = await client.get(f"{CORE_API_URL}/api/avito/post-sale-tasks", params=params)
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/post-sale-tasks/{task_id}/queue")
+async def proxy_queue_post_sale_task(task_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{CORE_API_URL}/api/avito/post-sale-tasks/{task_id}/queue")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/post-sale-tasks/{task_id}/retry")
+async def proxy_retry_post_sale_task(task_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{CORE_API_URL}/api/avito/post-sale-tasks/{task_id}/retry")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/post-sale-tasks/{task_id}/cancel")
+async def proxy_cancel_post_sale_task(task_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{CORE_API_URL}/api/avito/post-sale-tasks/{task_id}/cancel")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
 # --- Extension Bridge Proxy Routes ---
 
 @app.get("/avito/extension", response_class=HTMLResponse)
@@ -552,7 +601,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.56"
+    version = "0.2.57"
     try:
         for manifest_candidate in [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")),

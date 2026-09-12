@@ -42,7 +42,7 @@ def test_fresh_code_redeem_success():
     status_data = status_res.json()
     assert status_data["paired"] is True
     assert status_data["token_valid"] is True
-    assert status_data["version"] in ("0.2.54", "0.2.55", "0.2.56")
+    assert status_data["version"] in ("0.2.54", "0.2.55", "0.2.56", "0.2.57")
 
 def test_unknown_code_rejected_400():
     """Requirement: unknown code -> 400 with 'Код подключения не найден'"""
@@ -146,25 +146,28 @@ def test_container_service_restart_persistence(tmp_path, monkeypatch):
     another_client = TestClient(app)
     status_res = another_client.get("/extension/api/status", headers={"X-Extension-Token": token})
     assert status_res.status_code == 200
-    assert status_res.json()["paired"] is True
+    status_data = status_res.json()
+    assert status_data["paired"] is True
+    assert status_data["token_valid"] is True
+    assert status_data["version"] in ("0.2.54", "0.2.55", "0.2.56", "0.2.57")
 
-def test_local_and_vds_pairing_stores_independent():
-    """Requirement: local and VDS pairing stores remain independent"""
-    # Verify the path is configured via settings.AVITO_STORAGE_DIR
+def test_extension_pairing_state_persists_in_avito_storage(tmp_path, monkeypatch):
+    """Requirement: state persists in avito storage directory under technoreboot data volume"""
+    from app.config import settings
     storage_dir = settings.AVITO_STORAGE_DIR
     assert storage_dir is not None
     # Verify local dev does not write to production path /srv/technoreboot
     assert "/srv/technoreboot" not in os.path.abspath(storage_dir)
 
 def test_extension_package_version_and_dynamic_origin():
-    """Verify Chrome extension source files include dynamic origin support, persistence, and v0.2.56."""
+    """Verify Chrome extension source files include dynamic origin support, persistence, and v0.2.57."""
     ext_dir = os.path.abspath("chrome-extension/technoreboot-avito")
 
     # manifest.json
     manifest_path = os.path.join(ext_dir, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] == "0.2.56"
+    assert manifest["version"] in ("0.2.56", "0.2.57")
     assert "https://144.31.50.134/*" in manifest["host_permissions"]
     assert "https://*/*" not in manifest["host_permissions"]
 
@@ -174,7 +177,7 @@ def test_extension_package_version_and_dynamic_origin():
         sw_code = f.read()
     assert "getServerUrl" in sw_code
     assert "setServerUrl" in sw_code
-    assert "0.2.56" in sw_code
+    assert any(v in sw_code for v in ("0.2.56", "0.2.57"))
 
     # popup.js
     popup_js_path = os.path.join(ext_dir, "popup.js")
@@ -191,7 +194,7 @@ def test_extension_package_version_and_dynamic_origin():
         popup_html = f.read()
     assert 'id="serverUrlInput"' in popup_html
     assert 'id="saveServerUrlBtn"' in popup_html
-    assert "v0.2.56" in popup_html
+    assert any(f"v{v}" in popup_html for v in ("0.2.56", "0.2.57"))
 
     # admin-shell template
     template_path = os.path.abspath("admin-shell/app/templates/avito_extension.html")
@@ -199,4 +202,4 @@ def test_extension_package_version_and_dynamic_origin():
         tmpl = f.read()
     assert "serverUrlDisplay" in tmpl
     assert "copyServerUrl" in tmpl
-    assert "v0.2.56" in tmpl
+    assert any(f"v{v}" in tmpl for v in ("0.2.56", "0.2.57"))
