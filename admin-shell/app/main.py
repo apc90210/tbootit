@@ -234,6 +234,8 @@ async def proxy_dev_reset(request: Request):
     _require_owner(request)
     is_prod = (
         os.getenv("ENVIRONMENT") == "production"
+        or os.getenv("APP_ENV") == "production"
+        or os.getenv("DATA_DIR") == "/data"
         or os.getenv("TECHNOREBOOT_DATA_ROOT", "").startswith("/srv")
         or "/srv/" in os.getenv("TECHNOREBOOT_DATA_ROOT", "")
     )

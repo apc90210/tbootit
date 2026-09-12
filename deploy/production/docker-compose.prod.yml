@@ -49,6 +49,8 @@ services:
       - REPAIRS_MODULE_URL=http://repairs-module:8040
       - AUTH_STORAGE_DIR=/app/auth-data
       - DATA_DIR=/data
+      - ENVIRONMENT=production
+      - APP_ENV=production
     volumes:
       - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/auth:/app/auth-data
       - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}:/data
