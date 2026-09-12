@@ -132,3 +132,15 @@ To guarantee reliable operation on a 1 vCPU / 2 GB RAM server:
 4. **Development Tools Disabled**:
    - Uvicorn `--reload` flag is completely disabled in production.
    - Memory-heavy debugging processes are omitted.
+
+---
+
+## 8. Fresh-Clone Production Proof Verification (Stage 08B-R1-R1)
+
+The entire production baseline is verified by cloning directly from `origin/main` into an isolated temporary directory outside the working tree:
+1. **Zero Local File Dependency**: Proven that zero source files, certificates, or configuration files are copied from the local development workspace (`C:\tbootit`).
+2. **Fresh Image Build**: All 6 production container images are built directly from fresh-clone source files. Image ID inspection confirms zero reliance on pre-existing local image layers.
+3. **Fail-Fast Secret Validation**: Pydantic models in `core` and `inventory-sales-module` immediately abort startup on `dev-token`, `technoreboot_secret_cart_key_mvp`, or empty secrets in production mode.
+4. **mTLS & RBAC Enforcement**: Tests verify HTTPS mTLS authentication, unauthenticated rejection (403), Owner full route access (200), and User route-level blocking on sensitive administrative endpoints (403 on `/backups` and `/certificates`).
+5. **Live Workspace Integrity**: Live SQLite database (`technoreboot.db`) and all running dev containers are verified completely untouched throughout tests.
+

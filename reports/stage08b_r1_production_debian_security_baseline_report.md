@@ -63,10 +63,10 @@
 ---
 
 ## Fresh Build Proof
-- **FRESH_CLONE:** Verified in isolated sandbox checkout
-- **FRESH_CLONE_HEAD:** `a81d087883a26f6ee604280396c73ce33df7877f`
+- **FRESH_CLONE:** Verified in isolated sandbox checkout directly from `origin/main` (outside workspace, 0 files copied)
+- **FRESH_CLONE_HEAD:** `0a056f2352064f2326fe917249b552804cadb0d1` (matches `origin/main` exactly)
 - **PREBUILT_IMAGES_REQUIRED:** `false` (built directly from fresh clone Dockerfiles)
-- **BUILD_RESULT:** PASS (all 5 application images built deterministically from source)
+- **BUILD_RESULT:** PASS (all images built deterministically from fresh clone source)
 
 ---
 
