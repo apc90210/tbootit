@@ -37,12 +37,18 @@ When the Owner attempted to pair the extension in their browser on VDS:
   2. **Popup Server Address UI:** Added labeled `serverUrlInput` field to `popup.html` above pairing code input. Pre-filled from stored server URL. On clicking "Подключить", popup passes `server_url` to service worker.
   3. **VDS Host Permissions:** Added `https://144.31.50.134/*` and `https://*/*` to `manifest.json` `host_permissions`.
   4. **Admin Extension Page Guidance:** Updated `admin-shell/app/templates/avito_extension.html` to auto-detect and display the exact server URL (`https://144.31.50.134/admin-api/avito-extension`) with a 1-click "📋 Скопировать" button, and updated step 6 of instructions.
-  5. **Version Bump:** Bumped extension version to `0.2.54` across `manifest.json`, `service_worker.js`, `popup.js`, `popup.html`, `content.js`, `extension_bridge.py` schemas, and rebuilt the downloadable ZIP package `admin-shell/app/technoreboot-avito-extension.zip`.
+  5. **Version Bump:** Bumped extension version to `0.2.55` across `manifest.json`, `service_worker.js`, `popup.js`, `popup.html`, `content.js`, `extension_bridge.py` schemas, and rebuilt the downloadable ZIP package `admin-shell/app/technoreboot-avito-extension-0.2.55.zip` and `technoreboot-avito-extension.zip`.
+  6. **Popup Blur Reset & URL Persistence Fix (v0.2.55):**
+     - Resolved ephemeral popup reset: Chrome destroys popup DOM on blur. When reopened, `get_status` previously returned default localhost URL, wiping out whatever URL the Owner entered.
+     - Added explicit **«Зафиксировать»** button with visual feedback (`✓ Адрес зафиксирован!`).
+     - Auto-saves server URL into `chrome.storage.local` on `input`, `change`, `paste`, `blur`, and `Enter`.
+     - Auto-detects server URL from the active tab if on `144.31.50.134`.
+     - Guarded `get_status` so it never overwrites the server URL input if already populated.
 - **PAIRING_STATE_PERSISTENCE:** `/srv/technoreboot/data/avito-module/extension_pair_codes.json` (persistent Docker volume mount).
 - **PAIRING_TTL:** 600 seconds (10 minutes).
 - **ONE_TIME_USE:** `true` (`entry["used"] = True` on redemption).
 - **EXTENSION_VERSION_BEFORE:** `0.2.53`
-- **EXTENSION_VERSION_AFTER:** `0.2.54`
+- **EXTENSION_VERSION_AFTER:** `0.2.55`
 - **PRODUCTION_TARGET:** `https://144.31.50.134`
 
 ---
@@ -89,13 +95,14 @@ When the Owner attempted to pair the extension in their browser on VDS:
 - **PAIRING_HTTP_STATUS:** `200` (`status: "paired"`, issued `ext_tok_...`)
 - **UNKNOWN_CODE_HTTP_STATUS:** `400` (`detail: "Код подключения не найден."`)
 - **REUSED_CODE_HTTP_STATUS:** `400` (`detail: "Срок действия кода подключения истёк. Сгенерируйте новый код."`)
+- **EXTENSION_VERSION_VERIFIED_ON_VDS:** `0.2.55`
 
 ---
 
 ## Git
-- **COMMIT:** `520f8bb84deaad452b0c7e63c1e772b4dd1d5eb7`
+- **COMMIT:** `823c8f1a24`
 - **PUSH:** `true` (`origin/main`)
-- **HEAD_AFTER:** `520f8bb84deaad452b0c7e63c1e772b4dd1d5eb7`
+- **HEAD_AFTER:** `823c8f1a24`
 - **FINAL_GIT_STATUS:** clean
 
 ---
@@ -107,6 +114,7 @@ FINAL_STATUS:
 TECHNOREBOOT_STAGE08D_R1R3_AVITO_EXTENSION_PAIRING_VDS_FIXED
 
 PRODUCTION_URL: https://144.31.50.134
+EXTENSION_VERSION: 0.2.55
 BUSINESS_DATA_PRESERVED: true
 FUTURE_DEPLOYS_CODE_ONLY: true
 DO_NOT_START_NEXT_STAGE_WITHOUT_OWNER_ACCEPTANCE: true
@@ -117,16 +125,17 @@ DO_NOT_START_NEXT_STAGE_WITHOUT_OWNER_ACCEPTANCE: true
 ## Instructions for Owner Manual Browser Check
 
 1. Open `https://144.31.50.134/avito/extension` in Google Chrome (authenticated with Owner certificate).
-2. Download the updated extension package: click **«Скачать расширение (ZIP, v0.2.54)»**.
+2. Download the updated extension package: click **«Скачать расширение (ZIP, v0.2.55)»**.
 3. In Chrome, navigate to `chrome://extensions`:
    - Turn **«Режим разработчика»** ON (top right).
    - If previous extension exists: click **«Удалить»** (or reload after replacing files).
-   - Unpack the downloaded `technoreboot-avito-extension-0.2.54.zip` and click **«Загрузить распакованное расширение»**.
+   - Unpack the downloaded `technoreboot-avito-extension-0.2.55.zip` and click **«Загрузить распакованное расширение»**.
 4. On `https://144.31.50.134/avito/extension`:
-   - Click **«Сгенерировать код подключения»**.
+   - Click **«Создать новый код подключения»**.
    - Copy the server URL displayed in the box: `https://144.31.50.134/admin-api/avito-extension` (click **«📋 Скопировать»**).
 5. Click the **«Техноребут Avito»** extension icon in your Chrome toolbar:
-   - Paste the server URL into the **«Адрес сервера Техноребут»** input.
+   - Notice: the server URL will either be **automatically detected** from your active tab or you can paste it and click **«Зафиксировать»** (it turns green with `✓ Адрес зафиксирован!`).
+   - You can safely close or switch away from the popup to copy the code — the address will **never reset** back to localhost!
    - Enter the 6-digit pairing code.
    - Click **«Подключить»**.
-6. **Expected outcome:** Badge turns green **«Подключен»**, message displays **«Расширение успешно привязано к серверу»**, pairing card closes. No «Код подключения не найден» error.
+6. **Expected outcome:** Badge turns green **«Подключен»**, message displays **«Расширение успешно привязано к серверу»**, pairing card closes.
