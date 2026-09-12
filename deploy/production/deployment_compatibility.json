@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "requires_manual_migration": false,
+  "database_change": false,
+  "reason": "Stage 08D-R1R5: Schema contract verified matching canonical database.",
+  "schema_contract_sha256": "ce11b10dc33ecd3ab6804bf65e12fc55a840ce3f308b5cd2da4a6869b8e904d7",
+  "reviewed_at_commit": "1e9b62390ce247bbe0b9ac5c4ccce437d07ddf0e"
+}

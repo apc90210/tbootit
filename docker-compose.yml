@@ -40,6 +40,7 @@ services:
       - ./admin-shell/tests:/app/tests
       - ./data/auth:/app/auth-data
       - ./data:/data
+      - ./deploy:/app/deploy:ro
     depends_on:
       - core
       - avito-module

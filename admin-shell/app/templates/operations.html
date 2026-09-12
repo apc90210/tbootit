@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ТЕХНОРЕБУТ — УПРАВЛЕНИЕ ОПЕРАЦИЯМИ</title>
+    <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --success-bg: #dcfce7;
+            --danger: #dc2626;
+            --danger-bg: #fee2e2;
+            --warning: #d97706;
+            --warning-bg: #fef3c7;
+            --info: #0284c7;
+            --info-bg: #e0f2fe;
+            --terminal-bg: #0f172a;
+            --terminal-text: #38bdf8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 20px;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+        }
+
+        nav.main-nav {
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 18px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            font-size: 0.92rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+
+        nav.main-nav a.brand {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05rem;
+            margin-right: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        nav.main-nav a.nav-item {
+            color: #cbd5e1;
+            text-decoration: none;
+            padding: 6px 11px;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        nav.main-nav a.nav-item:hover {
+            background: #1e293b;
+            color: #fff;
+        }
+
+        nav.main-nav a.nav-item.active {
+            background: #2563eb;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1120px;
+            margin: 0 auto;
+        }
+
+        .header-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-main);
+        }
+
+        .env-badge-container {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-dev { background: var(--success-bg); color: #166534; border: 1px solid #86efac; }
+        .badge-prod { background: var(--danger-bg); color: #991b1b; border: 1px solid #fca5a5; }
+        .badge-info { background: var(--info-bg); color: #0369a1; border: 1px solid #7dd3fc; }
+        .badge-warn { background: var(--warning-bg); color: #92400e; border: 1px solid #fde68a; }
+
+        .banner {
+            padding: 14px 18px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            font-size: 0.94rem;
+            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .banner-warning { background: var(--warning-bg); border: 1px solid #fde68a; color: #92400e; }
+        .banner-danger { background: var(--danger-bg); border: 1px solid #fca5a5; color: #991b1b; }
+        .banner-info { background: var(--info-bg); border: 1px solid #bae6fd; color: #0369a1; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .card-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 860px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.96rem;
+            cursor: pointer;
+            text-decoration: none;
+            border: none;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; opacity: 0.7; }
+
+        .btn-update { background: #0f172a; color: #fff; }
+        .btn-update:hover:not(:disabled) { background: #1e293b; }
+        .btn-update:disabled { background: #64748b; cursor: not-allowed; opacity: 0.7; }
+
+        .btn-secondary { background: #fff; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-secondary:hover { background: #f1f5f9; }
+
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+
+        .action-desc {
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            min-height: 66px;
+        }
+
+        .info-kv {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f8fafc;
+            border: 1px solid #edf2f7;
+            border-radius: 6px;
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            font-size: 0.88rem;
+        }
+
+        .kv-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kv-key { color: var(--text-muted); font-weight: 500; }
+        .kv-val { font-weight: 600; font-family: monospace; color: var(--text-main); }
+
+        /* Progress & Terminal */
+        .progress-bar-container {
+            background: #e2e8f0;
+            border-radius: 9999px;
+            height: 10px;
+            width: 100%;
+            overflow: hidden;
+            margin: 14px 0 10px;
+        }
+
+        .progress-bar-fill {
+            background: #2563eb;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .terminal-box {
+            background: var(--terminal-bg);
+            color: #f1f5f9;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 0.86rem;
+            line-height: 1.55;
+            height: 240px;
+            overflow-y: auto;
+            border: 1px solid #1e293b;
+        }
+
+        .terminal-box .log-line {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .terminal-box .log-prefix { color: #38bdf8; }
+        .terminal-box .log-error { color: #f87171; font-weight: 600; }
+        .terminal-box .log-success { color: #4ade80; font-weight: 600; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.88rem;
+        }
+
+        th, td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            letter-spacing: 0.04em;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.65);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 26px;
+            max-width: 540px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-card h3 {
+            margin-top: 0;
+            font-size: 1.3rem;
+            color: var(--text-main);
+            margin-bottom: 12px;
+        }
+
+        .modal-body {
+            color: #334155;
+            font-size: 0.94rem;
+            line-height: 1.55;
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse-anim 1.5s infinite;
+        }
+
+        @keyframes pulse-anim {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="main-nav">
+            <a href="/" class="brand">
+                <span style="background: #2563eb; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.5px;">TR</span>
+                Техноребут
+            </a>
+            <a href="/" class="nav-item">Панель управления</a>
+            <a href="/inventory/products" class="nav-item">Товары</a>
+            <a href="/products/json" class="nav-item">JSON импорт / экспорт</a>
+            <a href="/inventory/sales" class="nav-item">Продажи</a>
+            <a href="/inventory/cart" class="nav-item">Корзина</a>
+            <a href="/inventory/reports/sales" class="nav-item">Отчёты</a>
+            <a href="/repairs/repairs" class="nav-item">Ремонты</a>
+            <a href="/avito/extension" class="nav-item">Расширение Avito</a>
+            <a href="/inventory/settings/organization" class="nav-item">Настройки</a>
+            <a href="/system/operations" class="nav-item active" style="margin-left: auto;">Операции</a>
+            <a href="/backups" class="nav-item">Резервные копии</a>
+            <a href="/certificates" class="nav-item">Доступ (mTLS)</a>
+        </nav>
+
+        <!-- Header -->
+        <div class="header-title">
+            <div>
+                <h1>Управление операциями системы</h1>
+                <div style="color: var(--text-muted); font-size: 0.92rem; margin-top: 4px;">
+                    Синхронизация продуктивных данных и развертывание кода с защитой схемы БД
+                </div>
+            </div>
+            <div class="env-badge-container">
+                {% if is_local_dev %}
+                <span class="badge badge-dev">
+                    <span class="pulse"></span> DEV ОКРУЖЕНИЕ (LOCAL)
+                </span>
+                {% else %}
+                <span class="badge badge-prod">
+                    <span class="pulse"></span> VDS PRODUCTION
+                </span>
+                {% endif %}
+                <span class="badge badge-info" id="schema-badge">СХЕМА: ПРОВЕРКА...</span>
+            </div>
+        </div>
+
+        <!-- Architecture Rules Banner -->
+        {% if not is_local_dev %}
+        <div class="banner banner-danger">
+            <div style="font-size: 1.3rem;">⚠️</div>
+            <div>
+                <strong>ВНИМАНИЕ: Панель открыта на продуктивном сервере VDS!</strong><br>
+                Операции синхронизации данных и обновления VDS разрешены <u>исключительно</u> из локальной рабочей станции разработчика (DEV). На VDS кнопки отключены в целях абсолютной защиты продуктивных данных.
+            </div>
+        </div>
+        {% else %}
+        <div class="banner banner-info">
+            <div style="font-size: 1.25rem;">ℹ️</div>
+            <div>
+                <strong>Архитектурные правила ТехноРебут:</strong><br>
+                • <strong>КОД:</strong> <code>LOCAL DEV ➔ Git ➔ VDS</code> (развертывание через <code>update_code_only.sh</code> без сброса базы и медиа).<br>
+                • <strong>БИЗНЕС-ДАННЫЕ:</strong> <code>VDS ➔ LOCAL</code> (VDS — единственный канонический источник товаров, продаж, ремонтов и фото).<br>
+                • <strong>СТРОГИЙ ЗАПРЕТ:</strong> Перезапись продуктивной БД или медиафайлов VDS локальными данными категорически исключена.
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Two Action Cards -->
+        <div class="grid-2">
+            <!-- Card 1: Sync VDS -> Local -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>1. Данные: VDS ➔ LOCAL</h2>
+                    <span class="badge badge-dev">Бизнес-данные</span>
+                </div>
+                <div class="action-desc">
+                    Односторонняя синхронизация продуктивных данных с VDS в локальную среду. Загружает актуальную базу данных SQLite и файлы медиа/фото. Создает резервную копию локальной базы перед обновлением.
+                </div>
+
+                <div class="info-kv">
+                    <div class="kv-row">
+                        <span class="kv-key">Последняя синхронизация:</span>
+                        <span class="kv-val" id="sync-last-time">—</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Статус последней операции:</span>
+                        <span class="kv-val" id="sync-last-status">—</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Контрольная сумма БД:</span>
+                        <span class="kv-val" id="sync-last-hash">—</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Товары / Фотографии:</span>
+                        <span class="kv-val" id="sync-last-counts">—</span>
+                    </div>
+                </div>
+
+                <button id="btn-sync" class="btn btn-primary" style="width: 100%;" {% if not is_local_dev %}disabled{% endif %}>
+                    <span>📥</span> Синхронизировать данные с VDS
+                </button>
+            </div>
+
+            <!-- Card 2: Update Git -> VDS -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>2. Код: Git ➔ VDS</h2>
+                    <span class="badge badge-prod">Code-Only</span>
+                </div>
+                <div class="action-desc">
+                    Развертывание коммитов из ветки <code>origin/main</code> на VDS без изменения данных. Автоматический safety backup на VDS, сборка и перезапуск контейнеров с сохранением БД и медиа.
+                </div>
+
+                <div class="info-kv">
+                    <div class="kv-row">
+                        <span class="kv-key">Защита схемы БД (Guard):</span>
+                        <span class="kv-val" id="update-schema-status">Проверка...</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Последнее обновление VDS:</span>
+                        <span class="kv-val" id="update-last-time">—</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Коммит на VDS:</span>
+                        <span class="kv-val" id="update-last-commit">—</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Резервная копия VDS:</span>
+                        <span class="kv-val" id="update-last-backup">—</span>
+                    </div>
+                </div>
+
+                <button id="btn-update" class="btn btn-update" style="width: 100%;" {% if not is_local_dev %}disabled{% endif %}>
+                    <span>🚀</span> UPDATE VDS (Code Only)
+                </button>
+            </div>
+        </div>
+
+        <!-- Real-time Execution Card -->
+        <div class="card" id="execution-card">
+            <div class="card-header">
+                <h2>Консоль выполнения операций</h2>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span class="badge" id="job-status-badge" style="background: #e2e8f0; color: #475569;">IDLE</span>
+                    <span style="font-size: 0.85rem; color: var(--text-muted);" id="job-id-text">Ожидание команд</span>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                <span id="job-step-text" style="font-weight: 500;">Нет активных задач</span>
+                <span id="job-step-counter" style="color: var(--text-muted); font-family: monospace;">0 / 10</span>
+            </div>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progress-bar"></div>
+            </div>
+
+            <div class="terminal-box" id="terminal-box">
+                <div class="log-line"><span class="log-prefix">[READY]</span> Готов к выполнению операций. Выберите действие выше.</div>
+            </div>
+        </div>
+
+        <!-- Audit History Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Журнал аудита операций</h2>
+                <button class="btn btn-secondary" onclick="loadAuditLog()" style="padding: 4px 12px; font-size: 0.82rem;">
+                    🔄 Обновить
+                </button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>Операция</th>
+                            <th>Статус</th>
+                            <th>Локальный HEAD</th>
+                            <th>VDS HEAD</th>
+                            <th>Резервная копия</th>
+                            <th>Итог</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-table-body">
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                Загрузка журнала аудита...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1: Sync Confirmation -->
+    <div class="modal-overlay" id="modal-sync">
+        <div class="modal-card">
+            <h3>Подтверждение синхронизации VDS ➔ LOCAL</h3>
+            <div class="modal-body">
+                Вы собираетесь синхронизировать продуктивные бизнес-данные с сервера VDS в локальное окружение разработки:<br><br>
+                • <strong>Локальная база данных SQLite</strong> и каталог фотографий будут заменены актуальными данными с VDS.<br>
+                • Перед заменой текущая локальная база будет сохранена в <code>.local-recovery/</code>.<br>
+                • Локальные контейнеры <code>core</code> и <code>inventory</code> будут временно перезапущены.<br>
+                • <strong>Продуктивный сервер VDS не затрагивается</strong> (только чтение бэкапа).<br><br>
+                Продолжить?
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('modal-sync')">Отмена</button>
+                <button class="btn btn-primary" id="confirm-sync-btn" onclick="executeSync()">Запустить синхронизацию</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Update Confirmation -->
+    <div class="modal-overlay" id="modal-update">
+        <div class="modal-card">
+            <h3>Подтверждение обновления VDS (Code-Only)</h3>
+            <div class="modal-body">
+                Вы собираетесь развернуть актуальный код из репозитория на продуктивный сервер VDS:<br><br>
+                • Будут получены коммиты из ветки <code>origin/main</code>.<br>
+                • На VDS будет создан автоматический safety backup базы и хранилища.<br>
+                • Контейнеры на VDS будут пересобраны и перезапущены.<br>
+                • <strong>База данных и медиафайлы VDS <u>НЕ</u> сбрасываются</strong> и остаются нетронутыми.<br>
+                • Схема базы данных проверена Schema Guard.<br><br>
+                Продолжить?
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('modal-update')">Отмена</button>
+                <button class="btn btn-update" id="confirm-update-btn" onclick="executeUpdate()">Запустить UPDATE VDS</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const IS_LOCAL_DEV = {{ 'true' if is_local_dev else 'false' }};
+        let pollTimer = null;
+        let isJobActive = false;
+
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        document.getElementById('btn-sync').addEventListener('click', () => {
+            if (!IS_LOCAL_DEV) return;
+            openModal('modal-sync');
+        });
+
+        document.getElementById('btn-update').addEventListener('click', () => {
+            if (!IS_LOCAL_DEV) return;
+            openModal('modal-update');
+        });
+
+        async function executeSync() {
+            closeModal('modal-sync');
+            try {
+                const resp = await fetch('/admin-api/system/operations/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('Ошибка запуска: ' + (data.detail || data.message || 'Неизвестная ошибка'));
+                    return;
+                }
+                pollStatus();
+            } catch (err) {
+                alert('Сетевая ошибка при запуске синхронизации: ' + err.message);
+            }
+        }
+
+        async function executeUpdate() {
+            closeModal('modal-update');
+            try {
+                const resp = await fetch('/admin-api/system/operations/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    alert('Ошибка запуска: ' + (data.detail || data.message || 'Неизвестная ошибка'));
+                    return;
+                }
+                pollStatus();
+            } catch (err) {
+                alert('Сетевая ошибка при запуске обновления: ' + err.message);
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const resp = await fetch('/admin-api/system/operations/status');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                renderStatus(data);
+            } catch (e) {
+                console.error('Error polling status:', e);
+            }
+        }
+
+        function renderStatus(data) {
+            const schemaBadge = document.getElementById('schema-badge');
+            const updateSchemaStatus = document.getElementById('update-schema-status');
+            const btnUpdate = document.getElementById('btn-update');
+            const btnSync = document.getElementById('btn-sync');
+
+            // Schema Guard Status
+            if (data.schema_guard) {
+                if (data.schema_guard.safe_to_deploy) {
+                    schemaBadge.textContent = 'СХЕМА: СОВМЕСТИМА';
+                    schemaBadge.className = 'badge badge-dev';
+                    updateSchemaStatus.textContent = 'Совместима (изменений нет)';
+                    updateSchemaStatus.style.color = 'var(--success)';
+                    if (IS_LOCAL_DEV && !data.is_locked) {
+                        btnUpdate.disabled = false;
+                    }
+                } else {
+                    schemaBadge.textContent = 'СХЕМА: РУЧНАЯ МИГРАЦИЯ';
+                    schemaBadge.className = 'badge badge-warn';
+                    updateSchemaStatus.textContent = 'ТРЕБУЕТСЯ МИГРАЦИЯ (БЛОК)';
+                    updateSchemaStatus.style.color = 'var(--danger)';
+                    btnUpdate.disabled = true;
+                    btnUpdate.title = 'Обновление заблокировано: требуется миграция схемы базы данных';
+                }
+            }
+
+            // Lock & Buttons
+            if (data.is_locked) {
+                btnSync.disabled = true;
+                btnUpdate.disabled = true;
+            } else if (IS_LOCAL_DEV) {
+                btnSync.disabled = false;
+                if (data.schema_guard && data.schema_guard.safe_to_deploy) {
+                    btnUpdate.disabled = false;
+                }
+            }
+
+            // Last Sync
+            if (data.last_sync) {
+                document.getElementById('sync-last-time').textContent = formatTime(data.last_sync.timestamp);
+                document.getElementById('sync-last-status').textContent = data.last_sync.status || 'COMPLETED';
+                document.getElementById('sync-last-hash').textContent = (data.last_sync.db_sha256 || '—').substring(0, 12) + '...';
+                document.getElementById('sync-last-counts').textContent = `Товаров: ${data.last_sync.products_count ?? '—'} | Фото: ${data.last_sync.photos_count ?? '—'}`;
+            }
+
+            // Last Update
+            if (data.last_update) {
+                document.getElementById('update-last-time').textContent = formatTime(data.last_update.timestamp);
+                document.getElementById('update-last-commit').textContent = (data.last_update.commit || '—').substring(0, 10);
+                document.getElementById('update-last-backup').textContent = data.last_update.backup_file || '—';
+            }
+
+            // Current Active Job
+            const jobBadge = document.getElementById('job-status-badge');
+            const jobIdText = document.getElementById('job-id-text');
+            const jobStepText = document.getElementById('job-step-text');
+            const jobStepCounter = document.getElementById('job-step-counter');
+            const progressBar = document.getElementById('progress-bar');
+            const terminalBox = document.getElementById('terminal-box');
+
+            if (data.current_job && (data.current_job.status === 'RUNNING' || data.current_job.status === 'QUEUED')) {
+                isJobActive = true;
+                const c = data.current_job;
+                jobBadge.textContent = c.status;
+                jobBadge.style.background = c.status === 'RUNNING' ? 'var(--info-bg)' : 'var(--warning-bg)';
+                jobBadge.style.color = c.status === 'RUNNING' ? 'var(--info)' : 'var(--warning)';
+                jobIdText.textContent = `${c.operation} (${c.job_id})`;
+                jobStepText.textContent = c.step || 'Выполняется...';
+                jobStepCounter.textContent = `${c.step_index || 0} / ${c.total_steps || 10}`;
+
+                const pct = Math.round(((c.step_index || 0) / (c.total_steps || 10)) * 100);
+                progressBar.style.width = pct + '%';
+                progressBar.style.background = 'var(--primary)';
+
+                if (c.log_lines && c.log_lines.length > 0) {
+                    renderLogs(c.log_lines);
+                }
+            } else if (data.current_job && (data.current_job.status === 'COMPLETED' || data.current_job.status === 'FAILED')) {
+                const c = data.current_job;
+                jobBadge.textContent = c.status;
+                jobBadge.style.background = c.status === 'COMPLETED' ? 'var(--success-bg)' : 'var(--danger-bg)';
+                jobBadge.style.color = c.status === 'COMPLETED' ? 'var(--success)' : 'var(--danger)';
+                jobIdText.textContent = `${c.operation} (${c.job_id})`;
+                jobStepText.textContent = c.step || (c.status === 'COMPLETED' ? 'Завершено успешно' : 'Завершено с ошибкой');
+                jobStepCounter.textContent = `${c.total_steps || 10} / ${c.total_steps || 10}`;
+                progressBar.style.width = '100%';
+                progressBar.style.background = c.status === 'COMPLETED' ? 'var(--success)' : 'var(--danger)';
+
+                if (c.log_lines && c.log_lines.length > 0) {
+                    renderLogs(c.log_lines);
+                }
+                if (isJobActive) {
+                    isJobActive = false;
+                    loadAuditLog();
+                }
+            }
+        }
+
+        function renderLogs(lines) {
+            const box = document.getElementById('terminal-box');
+            box.innerHTML = lines.map(l => {
+                let cls = 'log-line';
+                if (l.includes('ОШИБКА') || l.includes('FAILED') || l.includes('BLOCKED')) cls += ' log-error';
+                else if (l.includes('успешно') || l.includes('COMPLETED') || l.includes('OK')) cls += ' log-success';
+                return `<div class="${cls}"><span class="log-prefix">&gt;</span> ${escapeHtml(l)}</div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function loadAuditLog() {
+            try {
+                const resp = await fetch('/admin-api/system/operations/audit');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const tbody = document.getElementById('audit-table-body');
+                if (!data.records || data.records.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">История операций пока пуста</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.records.slice().reverse().map(r => {
+                    const badgeClass = r.result_status === 'COMPLETED' ? 'badge-dev' : (r.result_status === 'FAILED' ? 'badge-prod' : 'badge-warn');
+                    return `
+                        <tr>
+                            <td>${formatTime(r.finished_at || r.started_at)}</td>
+                            <td><strong>${escapeHtml(r.operation_type)}</strong></td>
+                            <td><span class="badge ${badgeClass}">${escapeHtml(r.result_status)}</span></td>
+                            <td><code>${(r.local_head || '—').substring(0, 8)}</code></td>
+                            <td><code>${(r.vds_head_after || r.vds_head_before || '—').substring(0, 8)}</code></td>
+                            <td>${escapeHtml(r.backup_file || '—')}</td>
+                            <td>${escapeHtml(r.summary || '—')}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading audit log:', e);
+            }
+        }
+
+        function formatTime(isoStr) {
+            if (!isoStr) return '—';
+            try {
+                const d = new Date(isoStr);
+                return d.toLocaleString('ru-RU', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch (e) {
+                return isoStr;
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Initialize polling
+        pollStatus();
+        loadAuditLog();
+        pollTimer = setInterval(pollStatus, 2000);
+    </script>
+</body>
+</html>

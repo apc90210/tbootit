@@ -1,0 +1,2916 @@
+{
+  "format_version": 1,
+  "tables": {
+    "audit_log": {
+      "columns": [
+        {
+          "default": null,
+          "name": "action",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "entity_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "entity_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "new_value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "old_value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "entity_id"
+          ],
+          "name": "ix_audit_log_entity_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "entity_type"
+          ],
+          "name": "ix_audit_log_entity_type",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_audit_log_id",
+          "unique": false
+        }
+      ]
+    },
+    "avito_attribute_definitions": {
+      "columns": [
+        {
+          "default": null,
+          "name": "category_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "external_key",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "is_active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "multiple",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "name",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "observed_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "required",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "sort_order",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "type",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "unit",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "category_id",
+          "to_column": "id",
+          "to_table": "avito_categories"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "category_id"
+          ],
+          "name": "ix_avito_attribute_definitions_category_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "external_key"
+          ],
+          "name": "ix_avito_attribute_definitions_external_key",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_attribute_definitions_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "category_id",
+            "external_key"
+          ],
+          "name": "sqlite_autoindex_avito_attribute_definitions_1",
+          "unique": true
+        }
+      ]
+    },
+    "avito_attribute_options": {
+      "columns": [
+        {
+          "default": null,
+          "name": "attribute_definition_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "external_option_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "is_active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "label",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "last_seen_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "sort_order",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "value",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "attribute_definition_id",
+          "to_column": "id",
+          "to_table": "avito_attribute_definitions"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "attribute_definition_id"
+          ],
+          "name": "ix_avito_attribute_options_attribute_definition_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_attribute_options_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "attribute_definition_id",
+            "value"
+          ],
+          "name": "sqlite_autoindex_avito_attribute_options_1",
+          "unique": true
+        }
+      ]
+    },
+    "avito_canonical_categories": {
+      "columns": [
+        {
+          "default": null,
+          "name": "active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "capability_source",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "display_name",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "internal_key",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "observed_category_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "official_slug",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "official_source",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "observed_category_id",
+          "to_column": "id",
+          "to_table": "avito_categories"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "display_name"
+          ],
+          "name": "ix_avito_canonical_categories_display_name",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_canonical_categories_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "internal_key"
+          ],
+          "name": "ix_avito_canonical_categories_internal_key",
+          "unique": true
+        },
+        {
+          "columns": [
+            "observed_category_id"
+          ],
+          "name": "ix_avito_canonical_categories_observed_category_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "official_slug"
+          ],
+          "name": "ix_avito_canonical_categories_official_slug",
+          "unique": false
+        }
+      ]
+    },
+    "avito_canonical_field_rules": {
+      "columns": [
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "dependencies_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "field_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "ordinal",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "raw_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "required",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "required_by_dependency",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "rule_source",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "values_range_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "field_id",
+          "to_column": "id",
+          "to_table": "avito_canonical_fields"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "field_id"
+          ],
+          "name": "ix_avito_canonical_field_rules_field_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_canonical_field_rules_id",
+          "unique": false
+        }
+      ]
+    },
+    "avito_canonical_field_values": {
+      "columns": [
+        {
+          "default": null,
+          "name": "active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "field_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "official_value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "rule_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "source",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "value",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "field_id",
+          "to_column": "id",
+          "to_table": "avito_canonical_fields"
+        },
+        {
+          "from_column": "rule_id",
+          "to_column": "id",
+          "to_table": "avito_canonical_field_rules"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "field_id"
+          ],
+          "name": "ix_avito_canonical_field_values_field_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_canonical_field_values_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "rule_id"
+          ],
+          "name": "ix_avito_canonical_field_values_rule_id",
+          "unique": false
+        }
+      ]
+    },
+    "avito_canonical_fields": {
+      "columns": [
+        {
+          "default": null,
+          "name": "active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "category_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "data_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "display_name",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "field_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "internal_key",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "official_source",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "official_tag",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "category_id",
+          "to_column": "id",
+          "to_table": "avito_canonical_categories"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "category_id"
+          ],
+          "name": "ix_avito_canonical_fields_category_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_canonical_fields_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "internal_key"
+          ],
+          "name": "ix_avito_canonical_fields_internal_key",
+          "unique": false
+        },
+        {
+          "columns": [
+            "official_tag"
+          ],
+          "name": "ix_avito_canonical_fields_official_tag",
+          "unique": false
+        },
+        {
+          "columns": [
+            "category_id",
+            "internal_key"
+          ],
+          "name": "sqlite_autoindex_avito_canonical_fields_1",
+          "unique": true
+        }
+      ]
+    },
+    "avito_categories": {
+      "columns": [
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "external_category_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "is_active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "name",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "observed_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "parent_external_category_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "path",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "external_category_id"
+          ],
+          "name": "ix_avito_categories_external_category_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_categories_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "name"
+          ],
+          "name": "ix_avito_categories_name",
+          "unique": false
+        }
+      ]
+    },
+    "avito_observed_field_mappings": {
+      "columns": [
+        {
+          "default": null,
+          "name": "active",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "BOOLEAN"
+        },
+        {
+          "default": null,
+          "name": "canonical_field_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "category_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "confidence",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "mapping_source",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "observed_name",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "observed_name_normalized",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "canonical_field_id",
+          "to_column": "id",
+          "to_table": "avito_canonical_fields"
+        },
+        {
+          "from_column": "category_id",
+          "to_column": "id",
+          "to_table": "avito_categories"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_field_id"
+          ],
+          "name": "ix_avito_observed_field_mappings_canonical_field_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "category_id"
+          ],
+          "name": "ix_avito_observed_field_mappings_category_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_avito_observed_field_mappings_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "observed_name_normalized"
+          ],
+          "name": "ix_avito_observed_field_mappings_observed_name_normalized",
+          "unique": false
+        },
+        {
+          "columns": [
+            "category_id",
+            "observed_name_normalized"
+          ],
+          "name": "sqlite_autoindex_avito_observed_field_mappings_1",
+          "unique": true
+        }
+      ]
+    },
+    "categories": {
+      "columns": [
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "name",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "slug",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_categories_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "name"
+          ],
+          "name": "ix_categories_name",
+          "unique": true
+        },
+        {
+          "columns": [
+            "slug"
+          ],
+          "name": "ix_categories_slug",
+          "unique": true
+        }
+      ]
+    },
+    "customers": {
+      "columns": [
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "email",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "name",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "phone",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "email"
+          ],
+          "name": "ix_customers_email",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_customers_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "name"
+          ],
+          "name": "ix_customers_name",
+          "unique": false
+        },
+        {
+          "columns": [
+            "phone"
+          ],
+          "name": "ix_customers_phone",
+          "unique": false
+        }
+      ]
+    },
+    "organization_settings": {
+      "columns": [
+        {
+          "default": null,
+          "name": "address",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "default_cashier_name",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "default_customer_label",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "inn",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "no_warranty_text",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "organization_name",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "phone",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "warranty_text",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_organization_settings_id",
+          "unique": false
+        }
+      ]
+    },
+    "product_avito_attribute_values": {
+      "columns": [
+        {
+          "default": null,
+          "name": "attribute_definition_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "option_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "raw_value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "attribute_definition_id",
+          "to_column": "id",
+          "to_table": "avito_attribute_definitions"
+        },
+        {
+          "from_column": "option_id",
+          "to_column": "id",
+          "to_table": "avito_attribute_options"
+        },
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "attribute_definition_id"
+          ],
+          "name": "ix_product_avito_attribute_values_attribute_definition_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_product_avito_attribute_values_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "option_id"
+          ],
+          "name": "ix_product_avito_attribute_values_option_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "product_id"
+          ],
+          "name": "ix_product_avito_attribute_values_product_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "product_id",
+            "attribute_definition_id"
+          ],
+          "name": "sqlite_autoindex_product_avito_attribute_values_1",
+          "unique": true
+        }
+      ]
+    },
+    "product_cards": {
+      "columns": [
+        {
+          "default": null,
+          "name": "avito_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "normalized_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "source_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "validation_errors",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "validation_status",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_product_cards_id",
+          "unique": false
+        }
+      ]
+    },
+    "product_events": {
+      "columns": [
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "event_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "new_value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "old_value",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "event_type"
+          ],
+          "name": "ix_product_events_event_type",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_product_events_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "product_id"
+          ],
+          "name": "ix_product_events_product_id",
+          "unique": false
+        }
+      ]
+    },
+    "product_external_listings": {
+      "columns": [
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "external_account_key",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "external_item_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "external_url",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "last_imported_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "last_pushed_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "last_seen_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "marketplace",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "remote_status",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "remote_status_raw",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_attributes_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "source_title",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "sync_error",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "sync_state",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "marketplace",
+            "external_item_id"
+          ],
+          "name": "ix_product_ext_listings_market_item",
+          "unique": true
+        },
+        {
+          "columns": [
+            "external_account_key"
+          ],
+          "name": "ix_product_external_listings_external_account_key",
+          "unique": false
+        },
+        {
+          "columns": [
+            "external_item_id"
+          ],
+          "name": "ix_product_external_listings_external_item_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_product_external_listings_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "marketplace"
+          ],
+          "name": "ix_product_external_listings_marketplace",
+          "unique": false
+        },
+        {
+          "columns": [
+            "product_id"
+          ],
+          "name": "ix_product_external_listings_product_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "remote_status"
+          ],
+          "name": "ix_product_external_listings_remote_status",
+          "unique": false
+        }
+      ]
+    },
+    "product_photos": {
+      "columns": [
+        {
+          "default": null,
+          "name": "content_hash",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "filename",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "media_url",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sort_order",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "source_url",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "storage_path",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_product_photos_id",
+          "unique": false
+        }
+      ]
+    },
+    "products": {
+      "columns": [
+        {
+          "default": null,
+          "name": "avito_address",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_category_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "avito_category_path",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_condition",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_contact_name",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_goods_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_params_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_phone",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_seller_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "avito_title",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "barcode",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "brand",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "canonical_category_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "category_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "condition",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "is_published_avito",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "is_published_site",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "last_imported_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "market_price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "min_price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "model",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "notes",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "purchase_price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "quantity",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "reserved_quantity",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sale_price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "serial_number",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "site_description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "site_title",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "sku",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_attributes_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_json",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "'avito'",
+          "name": "source_origin",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "source_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "status",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "storage_location",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "title",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "category_id",
+          "to_column": "id",
+          "to_table": "categories"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "barcode"
+          ],
+          "name": "ix_products_barcode",
+          "unique": true
+        },
+        {
+          "columns": [
+            "brand"
+          ],
+          "name": "ix_products_brand",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_products_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "sku"
+          ],
+          "name": "ix_products_sku",
+          "unique": true
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "name": "ix_products_status",
+          "unique": false
+        },
+        {
+          "columns": [
+            "title"
+          ],
+          "name": "ix_products_title",
+          "unique": false
+        }
+      ]
+    },
+    "repair_orders": {
+      "columns": [
+        {
+          "default": null,
+          "name": "accepted_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": "0",
+          "name": "access_code_provided",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "appearance",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "assigned_to",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "brand",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "canceled_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "closed_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "completeness",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "customer_comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "customer_email",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "customer_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "customer_name",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "customer_phone",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "device_serial",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "device_title",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "device_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "diagnosis_text",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "500.0",
+          "name": "diagnostic_fee",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "diagnostics_result",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "estimated_repair_amount",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "internal_note",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "issued_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "model",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "number",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "parts_description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "planned_parts_text",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "planned_works_text",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": "'normal'",
+          "name": "priority",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "problem_description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "reported_issue",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "serial_number",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "status",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "updated_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "work_description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "customer_id",
+          "to_column": "id",
+          "to_table": "customers"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "number"
+          ],
+          "name": "idx_repair_orders_number",
+          "unique": true
+        },
+        {
+          "columns": [
+            "customer_phone"
+          ],
+          "name": "idx_repair_orders_phone",
+          "unique": false
+        },
+        {
+          "columns": [
+            "serial_number"
+          ],
+          "name": "idx_repair_orders_serial",
+          "unique": false
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "name": "idx_repair_orders_status",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_repair_orders_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "name": "ix_repair_orders_status",
+          "unique": false
+        }
+      ]
+    },
+    "repair_status_history": {
+      "columns": [
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "changed_at",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "changed_by",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "new_status",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "old_status",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "repair_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "repair_id",
+          "to_column": "id",
+          "to_table": "repair_orders"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "repair_id"
+          ],
+          "name": "idx_repair_history_repair_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_repair_status_history_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "repair_id"
+          ],
+          "name": "ix_repair_status_history_repair_id",
+          "unique": false
+        }
+      ]
+    },
+    "sale_items": {
+      "columns": [
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "price",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "quantity",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sale_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "title",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        },
+        {
+          "from_column": "sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_sale_items_id",
+          "unique": false
+        }
+      ]
+    },
+    "sales": {
+      "columns": [
+        {
+          "default": null,
+          "name": "cancel_reason",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "canceled_by",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "cancelled_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "customer_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "original_sale_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "payment_method",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "reissued_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "replaced_by_sale_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "source_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "source_sale_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "source_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "status",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "superseded_by_sale_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "total_amount",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
+          "name": "warranty_days",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "warranty_enabled",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "customer_id",
+          "to_column": "id",
+          "to_table": "customers"
+        },
+        {
+          "from_column": "original_sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        },
+        {
+          "from_column": "replaced_by_sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        },
+        {
+          "from_column": "source_sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        },
+        {
+          "from_column": "superseded_by_sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_sales_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "source_type",
+            "source_id"
+          ],
+          "name": "ix_sales_source_type_source_id",
+          "unique": true
+        },
+        {
+          "columns": [
+            "status"
+          ],
+          "name": "ix_sales_status",
+          "unique": false
+        }
+      ]
+    },
+    "stock_movements": {
+      "columns": [
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "created_at",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "movement_type",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "new_quantity",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "old_quantity",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "product_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "quantity_delta",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "reason",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "product_id",
+          "to_column": "id",
+          "to_table": "products"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_stock_movements_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "movement_type"
+          ],
+          "name": "ix_stock_movements_movement_type",
+          "unique": false
+        },
+        {
+          "columns": [
+            "product_id"
+          ],
+          "name": "ix_stock_movements_product_id",
+          "unique": false
+        }
+      ]
+    }
+  }
+}

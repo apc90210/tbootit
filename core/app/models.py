@@ -330,7 +330,7 @@ class RepairOrder(Base):
     __tablename__ = "repair_orders"
     id = Column(Integer, primary_key=True, index=True)
     number = Column(String, unique=True, index=True, nullable=True)
-    status = Column(String, default="received", index=True, nullable=False)
+    status = Column(String, default="received", index=True, nullable=True)
 
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     customer_name = Column(String, nullable=True)
@@ -348,11 +348,11 @@ class RepairOrder(Base):
     customer_comment = Column(Text, nullable=True)
     internal_note = Column(Text, nullable=True)
 
-    access_code_provided = Column(Boolean, default=False, nullable=False)
+    access_code_provided = Column(Integer, default=0, nullable=True)
 
     assigned_to = Column(String, nullable=True)
-    priority = Column(String, default="normal", nullable=False)
-    diagnostic_fee = Column(Integer, default=500, nullable=False)
+    priority = Column(String, default="normal", nullable=True)
+    diagnostic_fee = Column(Float, default=500.0, nullable=True)
 
     # Stage05B Simple Diagnosis and Manual Estimate
     diagnosis_text = Column(Text, nullable=True)
@@ -360,8 +360,8 @@ class RepairOrder(Base):
     planned_parts_text = Column(Text, nullable=True)
     estimated_repair_amount = Column(Integer, nullable=True)
 
-    accepted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    accepted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
     issued_at = Column(DateTime(timezone=True), nullable=True)

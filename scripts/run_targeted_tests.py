@@ -3,8 +3,8 @@ import sys
 
 tests_to_run = [
     ("core", ["python", "-m", "pytest", "tests/test_product_safety_and_draft.py", "tests/test_products.py", "tests/test_products_search_filters.py", "-p", "no:warnings"]),
-    ("admin-shell", ["python", "-m", "pytest", "tests/test_seller_rbac_and_data_safety.py", "tests/test_certificate_auth.py", "tests/test_unified_top_navigation_bar.py", "tests/test_extension_download_manifest_valid.py", "tests/test_extension_download_is_current_version.py", "-p", "no:warnings"]),
-    (".", ["python", "-m", "pytest", "tests/test_production_data_guard.py", "tests/test_stage08b_r1_production_baseline.py", "tests/test_hard_delete_audit.py", "tests/test_stage08d_r1r3_pairing_lifecycle.py", "-p", "no:warnings"])
+    ("admin-shell", ["python", "-m", "pytest", "tests/test_seller_rbac_and_data_safety.py", "tests/test_certificate_auth.py", "tests/test_unified_top_navigation_bar.py", "tests/test_extension_download_manifest_valid.py", "tests/test_extension_download_is_current_version.py", "tests/test_owner_operations_rbac.py", "-p", "no:warnings"]),
+    (".", ["python", "-m", "pytest", "tests/test_production_data_guard.py", "tests/test_stage08b_r1_production_baseline.py", "tests/test_hard_delete_audit.py", "tests/test_stage08d_r1r3_pairing_lifecycle.py", "tests/test_owner_operations_rbac.py", "tests/test_owner_operations_environment_guard.py", "tests/test_owner_operations_schema_guard.py", "tests/test_owner_operations_direction_guard.py", "-p", "no:warnings"])
 ]
 
 all_ok = True

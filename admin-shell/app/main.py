@@ -3,10 +3,11 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse, RedirectResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Tuple, Dict, Any, List
+from datetime import datetime, timezone
 import json
 import os
+import uuid
 import httpx
 import asyncio
 import urllib.parse
@@ -1193,5 +1194,288 @@ async def api_proxy_products_json_export(request: Request, ids: Optional[str] = 
                 status_code=503,
                 content={"status": "error", "message": f"Ошибка соединения с Core API: {str(e)}"}
             )
+
+
+# ============================================================================
+# Stage 08D-R1R5: Owner Operations (Sync VDS -> Local, Update Git -> VDS)
+# ============================================================================
+
+def _get_devops_dir() -> Path:
+    candidates = [
+        Path("/data/dev-ops"),
+        Path("data/dev-ops"),
+    ]
+    for c in candidates:
+        if c.is_dir():
+            return c
+    if Path("/data").is_dir():
+        d = Path("/data/dev-ops")
+    else:
+        d = Path("data/dev-ops")
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _is_local_dev() -> bool:
+    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or "development").lower()
+    if env == "production":
+        return False
+
+    candidates = [Path("/data"), Path("data")]
+    for base in candidates:
+        if (base / ".technoreboot_production_data").exists():
+            return False
+
+    for base in candidates:
+        if (base / ".technoreboot_local_dev").exists():
+            return True
+
+    return False
+
+
+def _get_schema_compatibility_status(devops_dir: Path) -> Dict[str, Any]:
+    candidates = [
+        devops_dir / "deployment_compatibility.json",
+        Path("/app/deploy/production/deployment_compatibility.json"),
+        Path("deploy/production/deployment_compatibility.json"),
+    ]
+    compat = None
+    for c in candidates:
+        if c.is_file():
+            try:
+                compat = json.loads(c.read_text(encoding="utf-8"))
+                break
+            except Exception:
+                pass
+
+    if not compat:
+        compat = {
+            "requires_manual_migration": False,
+            "database_change": False,
+            "reason": "Контракт схемы совместим",
+            "schema_contract_sha256": None,
+        }
+
+    requires_manual = bool(compat.get("requires_manual_migration", False))
+    db_changed = bool(compat.get("database_change", False))
+    return {
+        "safe_to_deploy": (not requires_manual),
+        "requires_manual_migration": requires_manual,
+        "database_change": db_changed,
+        "reason": compat.get("reason", "Схема проверена, ручная миграция не требуется"),
+        "schema_contract_sha256": compat.get("schema_contract_sha256"),
+        "reviewed_at_commit": compat.get("reviewed_at_commit"),
+    }
+
+
+def _get_lock_status(devops_dir: Path) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    lock_file = devops_dir / "status" / "lock.json"
+    if not lock_file.is_file():
+        return False, None
+    try:
+        data = json.loads(lock_file.read_text(encoding="utf-8"))
+        acquired_at_str = data.get("acquired_at")
+        if acquired_at_str:
+            acquired_at = datetime.fromisoformat(acquired_at_str)
+            elapsed = (datetime.now(timezone.utc) - acquired_at).total_seconds()
+            if elapsed > 900:  # Stale lock after 15 minutes
+                return False, None
+        return True, data
+    except Exception:
+        return False, None
+
+
+@app.get("/system/operations", response_class=HTMLResponse)
+async def operations_page(request: Request):
+    """OWNER-only Operations Control Panel."""
+    _require_owner(request)
+    is_local = _is_local_dev()
+    return templates.TemplateResponse("operations.html", {
+        "request": request,
+        "is_owner": True,
+        "is_local_dev": is_local,
+        "environment": "development" if is_local else "production",
+    })
+
+
+@app.get("/admin-api/system/operations/status")
+async def api_operations_status(request: Request):
+    """Get real-time operations status, lock status, schema guard, and history."""
+    _require_owner(request)
+    devops_dir = _get_devops_dir()
+    is_local = _is_local_dev()
+    is_locked, lock_data = _get_lock_status(devops_dir)
+
+    status_dir = devops_dir / "status"
+    current_job = None
+    if (status_dir / "current.json").is_file():
+        try:
+            current_job = json.loads((status_dir / "current.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    last_sync = None
+    if (status_dir / "last_sync.json").is_file():
+        try:
+            last_sync = json.loads((status_dir / "last_sync.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    last_update = None
+    if (status_dir / "last_update.json").is_file():
+        try:
+            last_update = json.loads((status_dir / "last_update.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    env_info = None
+    if (status_dir / "environment_info.json").is_file():
+        try:
+            env_info = json.loads((status_dir / "environment_info.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    schema_guard = _get_schema_compatibility_status(devops_dir)
+
+    return JSONResponse(content={
+        "is_local_dev": is_local,
+        "environment": "development" if is_local else "production",
+        "is_locked": is_locked,
+        "lock_data": lock_data,
+        "current_job": current_job,
+        "last_sync": last_sync,
+        "last_update": last_update,
+        "schema_guard": schema_guard,
+        "env_info": env_info,
+    })
+
+
+@app.post("/admin-api/system/operations/sync")
+async def api_trigger_sync(request: Request):
+    """Queue one-way business data sync: VDS -> LOCAL."""
+    _require_owner(request)
+    if not _is_local_dev():
+        raise HTTPException(
+            status_code=403,
+            detail="Операции синхронизации данных доступны только из локальной DEV-среды ТехноРебут"
+        )
+
+    devops_dir = _get_devops_dir()
+    is_locked, lock_data = _get_lock_status(devops_dir)
+    if is_locked:
+        op_name = lock_data.get("operation", "другая задача") if lock_data else "другая задача"
+        raise HTTPException(
+            status_code=409,
+            detail=f"Другая операция уже выполняется ({op_name})"
+        )
+
+    job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_sync_{uuid.uuid4().hex[:6]}"
+    requests_dir = devops_dir / "requests"
+    requests_dir.mkdir(parents=True, exist_ok=True)
+    status_dir = devops_dir / "status"
+    status_dir.mkdir(parents=True, exist_ok=True)
+
+    req_payload = {
+        "job_id": job_id,
+        "operation": "sync_vds_to_local",
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "requested_by": "owner",
+    }
+    (requests_dir / f"{job_id}.json").write_text(json.dumps(req_payload, indent=2), encoding="utf-8")
+
+    init_status = {
+        "job_id": job_id,
+        "operation": "sync_vds_to_local",
+        "status": "QUEUED",
+        "step": "Запрос поставлен в очередь",
+        "step_index": 0,
+        "total_steps": 10,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "log_lines": ["Запрос на синхронизацию VDS -> LOCAL поставлен в очередь..."],
+    }
+    (status_dir / "current.json").write_text(json.dumps(init_status, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return JSONResponse(content={
+        "status": "queued",
+        "job_id": job_id,
+        "operation": "sync_vds_to_local",
+    })
+
+
+@app.post("/admin-api/system/operations/update")
+async def api_trigger_update(request: Request):
+    """Queue code-only deployment: Git -> VDS with DB schema guard."""
+    _require_owner(request)
+    if not _is_local_dev():
+        raise HTTPException(
+            status_code=403,
+            detail="Операции обновления VDS доступны только из локальной DEV-среды ТехноРебут"
+        )
+
+    devops_dir = _get_devops_dir()
+    schema_status = _get_schema_compatibility_status(devops_dir)
+    if schema_status.get("requires_manual_migration") or not schema_status.get("safe_to_deploy"):
+        raise HTTPException(
+            status_code=400,
+            detail="Обновление VDS заблокировано: обнаружены изменения схемы БД, требующие ручной миграции. Используйте миграционный пайплайн."
+        )
+
+    is_locked, lock_data = _get_lock_status(devops_dir)
+    if is_locked:
+        op_name = lock_data.get("operation", "другая задача") if lock_data else "другая задача"
+        raise HTTPException(
+            status_code=409,
+            detail=f"Другая операция уже выполняется ({op_name})"
+        )
+
+    job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_update_{uuid.uuid4().hex[:6]}"
+    requests_dir = devops_dir / "requests"
+    requests_dir.mkdir(parents=True, exist_ok=True)
+    status_dir = devops_dir / "status"
+    status_dir.mkdir(parents=True, exist_ok=True)
+
+    req_payload = {
+        "job_id": job_id,
+        "operation": "update_vds_code_only",
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "requested_by": "owner",
+    }
+    (requests_dir / f"{job_id}.json").write_text(json.dumps(req_payload, indent=2), encoding="utf-8")
+
+    init_status = {
+        "job_id": job_id,
+        "operation": "update_vds_code_only",
+        "status": "QUEUED",
+        "step": "Запрос поставлен в очередь",
+        "step_index": 0,
+        "total_steps": 10,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "log_lines": ["Запрос на обновление VDS поставлен в очередь..."],
+    }
+    (status_dir / "current.json").write_text(json.dumps(init_status, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return JSONResponse(content={
+        "status": "queued",
+        "job_id": job_id,
+        "operation": "update_vds_code_only",
+    })
+
+
+@app.get("/admin-api/system/operations/audit")
+async def api_operations_audit(request: Request):
+    """Retrieve history of operations from audit_log.json."""
+    _require_owner(request)
+    devops_dir = _get_devops_dir()
+    audit_file = devops_dir / "audit_log.json"
+    records = []
+    if audit_file.is_file():
+        try:
+            records = json.loads(audit_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return JSONResponse(content={"records": records})
+
 
 

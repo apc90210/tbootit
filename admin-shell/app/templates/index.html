@@ -71,7 +71,8 @@
         <a href="/avito/extension" class="nav-item" data-path="avito" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Расширение Avito</a>
         <a href="/inventory/settings/organization" class="nav-item" data-path="settings" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Настройки</a>
         {% if is_owner %}
-        <a href="/backups" class="nav-item" data-path="backups" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; margin-left: auto;">Резервные копии</a>
+        <a href="/system/operations" class="nav-item" data-path="operations" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; margin-left: auto;">Операции</a>
+        <a href="/backups" class="nav-item" data-path="backups" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Резервные копии</a>
         <a href="/certificates" class="nav-item" data-path="certificates" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Доступ (mTLS)</a>
         {% endif %}
     </nav>
@@ -99,6 +100,8 @@
             } else if (href === '/avito/extension' && (p.indexOf('/avito') === 0)) {
                 isActive = true;
             } else if (href === '/inventory/settings/organization' && (p.indexOf('/inventory/settings') === 0 || p.indexOf('/settings') === 0)) {
+                isActive = true;
+            } else if (href === '/system/operations' && p.indexOf('/system/operations') === 0) {
                 isActive = true;
             } else if (href === '/backups' && p.indexOf('/backups') === 0) {
                 isActive = true;

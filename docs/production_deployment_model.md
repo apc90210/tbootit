@@ -141,3 +141,22 @@ FORBIDDEN:  LOCAL DEV -> VDS (NEVER reverse the data arrow during normal operati
    Confirm all 6 containers are healthy and business counts match pre-deploy values.
 7. **Later Refresh Local Replica:**
    Refresh local business data on demand using `scripts/sync_vds_business_to_local.py`.
+
+---
+
+## 8. Owner Operations & Database Schema Guard (Stage 08D-R1R5)
+
+Stage 08D-R1R5 introduces the Owner Operations Control Panel (`/system/operations`) with automated Database Schema Guard:
+
+### 1. Operations Panel (`/system/operations`)
+- **Role:** Strict OWNER-only access enforced at both UI and API levels (HTTP 403 for USER role).
+- **Environment Isolation:** Sync and Update actions are permitted exclusively from the local development workstation (`LOCAL DEV`). On VDS production, actions are blocked by code and buttons are disabled.
+- **Two Canonical Buttons:**
+  - `[ Синхронизировать данные с VDS ]`: One-way snapshot sync from live VDS to local replica with pre-sync local safety backup in `.local-recovery/`.
+  - `[ UPDATE VDS ]`: Automated code-only deploy (`origin/main` -> VDS) executed after preflight Git clean check, DB schema compatibility check, and remote safety backup.
+
+### 2. Database Schema Guard
+- **Canonical Contract:** Tracked at `deploy/production/schema_contract.json` (SHA256: `ce11b10dc33ecd3ab6804bf65e12fc55a840ce3f308b5cd2da4a6869b8e904d7`).
+- **Compatibility Flag:** Tracked at `deploy/production/deployment_compatibility.json`. If `requires_manual_migration == true` or structural changes exist between SQLAlchemy code models and canonical VDS schema, code deployment is hard-blocked.
+- **Host Runner Daemon:** `scripts/local_ops_runner.py` runs in the background on the host, processing atomic requests from `data/dev-ops/requests/`, enforcing single-job concurrency locking (`lock.json`), and recording audit history in `data/dev-ops/audit_log.json`.
+

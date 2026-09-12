@@ -78,3 +78,18 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Production Target** | `https://144.31.50.134` | Extension communicates via `https://144.31.50.134/admin-api/avito-extension` |
 | **Pairing Lifecycle Proof** | **PASSED (HTTP 200)** | Fresh code generation, validation, one-time-use redemption verified on VDS |
 
+---
+
+## 5. Owner Operations & DB Schema Guard Status (Stage 08D-R1R5)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Owner Operations Page** | **ACTIVE (`/system/operations`)** | Web UI with real-time status, console logs, and confirmation modals |
+| **RBAC Enforcement** | **ACTIVE (OWNER ONLY)** | USER role returns 403 Forbidden on page and all action endpoints |
+| **Environment Guard** | **ACTIVE** | Local dev workstation enabled; VDS production hard-blocks all operations |
+| **Schema Guard Contract** | **ACTIVE (`ce11b10d...`)** | 23 tables, normalized types, 100% parity verified between code and VDS SQLite |
+| **Manual Migration Flag** | `requires_manual_migration=false` | Deployment compatibility tracked in `deploy/production/deployment_compatibility.json` |
+| **Host Runner Daemon** | **RUNNING (`scripts/local_ops_runner.py`)** | Processes queued requests, enforces atomic locking, logs audit records |
+| **Automated Tests** | **54 PASSED (0 FAILED)** | Full coverage for RBAC, Environment Guard, Schema Guard, Direction Guard |
+
+
