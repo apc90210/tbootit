@@ -90,7 +90,23 @@
 2. `tests/test_owner_operations_environment_guard.py` — блокировка операций на VDS (403), разрешение в DEV.
 3. `tests/test_owner_operations_schema_guard.py` — выявление новых колонок, таблиц, изменений типов, блокировка при `requires_manual_migration=true`.
 4. `tests/test_owner_operations_direction_guard.py` — защита от реверсивной синхронизации и локальных sentinel проверок.
-- **Итог единого раннера (`scripts/run_targeted_tests.py`):** **54 PASSED, 0 FAILED**.
+- **Итог единого раннера (`scripts/run_targeted_tests.py`):** **100 PASSED, 0 FAILED** (Core: 18, Admin-shell: 28, Root: 54).
+
+### 3.6. Живые эксплуатационные тесты через веб-панель и Runner Daemon
+Были выполнены обе операции в боевом режиме:
+1. **UPDATE VDS (`POST /admin-api/system/operations/update`)**:
+   - Job ID: `20260912_163204_update_e5b3ad`
+   - Результат: **SUCCESS**
+   - Коммит: `e2805f1f942afcfcab4447909ca2c2c07356da97`
+   - VDS pre-update snapshot: `TECHNOREBOOT_BACKUP_2026-09-12_163214.zip`
+   - Состояние VDS: все 6 сервисов healthy, бизнес-данные 100% сохранены (`products: 149, sales: 0, repairs: 0, photos: 149, listings: 149`, SHA256 базы данных `da6e2808...` неизменен).
+2. **SYNC VDS -> LOCAL (`POST /admin-api/system/operations/sync`)**:
+   - Job ID: `20260912_163328_sync_e925b7`
+   - Результат: **SUCCESS**
+   - Snapshot VDS: `TECHNOREBOOT_BACKUP_2026-09-12_163334.zip` (SHA256: `ee1916d5...`)
+   - Локальная резервная копия: `.local-recovery/pre_sync_20260912_193353.zip`
+   - Локальное состояние: 149 товаров, 149 файлов хранилища. Паритет с VDS: **100% (0 несовпадений)**.
+   - Лок `lock.json` автоматически освобожден, записи зафиксированы в `data/dev-ops/audit_log.json`.
 
 ---
 
@@ -101,12 +117,14 @@
 | `tests/test_product_safety_and_draft.py` (Core) | **18 PASSED** | Безопасность товаров и черновиков |
 | `admin-shell` targeted suite | **28 PASSED** | RBAC продавца, mTLS, навигация, расширение |
 | Root targeted suite | **54 PASSED** | Все инварианты, guards и lifecycle |
-| Общий статус тестов | **PASSED (0 FAILED)** | 100% покрытие |
+| Общий статус тестов | **100 PASSED (0 FAILED)** | 100% покрытие |
 | Проверка схемы VDS vs Код | **SAFE (0 diffs)** | Схема полностью идентична |
 | Контрольная сумма контракта | `ce11b10d...` | Зафиксирована в `schema_contract.json` |
+| Боевой тест UPDATE VDS | **SUCCESS** | Сборка контейнеров, сохранение данных |
+| Боевой тест SYNC VDS -> LOCAL | **SUCCESS** | Создание копии в `.local-recovery/`, паритет 100% |
 
 ---
 
 ## 5. Готовность к приемке
 
-Стадия STAGE 08D-R1R5 полностью реализована, протестирована и готова к финальной приемке владельцем.
+Стадия STAGE 08D-R1R5 полностью реализована, протестирована на живом продакшене VDS и в локальной среде, и готова к финальной приемке владельцем.
