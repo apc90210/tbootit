@@ -197,7 +197,13 @@ def create_backup(target_file: Optional[Path] = None) -> Tuple[Path, Dict[str, A
         storage_files, storage_bytes = copy_tree_files(storage_src, storage_dst)
 
         # 3. Auth & PKI
-        auth_src = Path("/app/auth-data") if Path("/app/auth-data").is_dir() else (data_dir / "auth")
+        auth_env = os.environ.get("AUTH_STORAGE_DIR")
+        if auth_env and Path(auth_env).is_dir():
+            auth_src = Path(auth_env)
+        elif sys.platform != "win32" and Path("/app/auth-data").is_dir():
+            auth_src = Path("/app/auth-data")
+        else:
+            auth_src = data_dir / "auth"
         auth_dst = staging_dir / "auth"
         auth_files, auth_bytes = copy_tree_files(auth_src, auth_dst)
         auth_metrics = inspect_auth_pki(auth_dst)
