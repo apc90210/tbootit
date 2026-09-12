@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-12  
 **Target Server:** 144.31.50.134 (`atanov821.serv.host`)  
-**Stage:** Stage 08C-R1-R2 — Real VDS Full Pre-Cutover Deployment With Provided SSH Access  
+**Stage:** Stage 08C-R1-R3 — Final Runtime Head VDS Rebuild and Re-Verification  
 
 ---
 
@@ -21,7 +21,8 @@
 
 ## 2. Deployed Source & Restored Data
 - **Remote Repository:** `/srv/technoreboot/app`
-- **Git Commit:** `f78dad75734b4cae95cd5742677327a4d5448cd8` (matches GitHub `origin/main` exactly)
+- **Git Commit:** `7e19c953936db92ee448616a70001c6bc8871b28` (matches GitHub `origin/main` exactly, rebuilt from source with `--no-cache`)
+- **Images Built:** `890e8b0edb70`, `f08174cdf93d`, `eec54bf6f523`, `44d608f40048`, `9ec065122baa`, `72ba65eb42c1`
 - **Restored Backup Archive:** `TECHNOREBOOT_BACKUP_2026-09-12_102533.zip`
 - **Restored Data Root:** `/srv/technoreboot/data`
 - **Restored Business State:**

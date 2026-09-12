@@ -100,9 +100,9 @@ SOURCE_BIND_MOUNTS: 0
 
 ## VDS Build
 BUILD_RESULT: PASS
-REMOTE_BUILD_HEAD: f78dad75734b4cae95cd5742677327a4d5448cd8
+REMOTE_BUILD_HEAD: 7e19c953936db92ee448616a70001c6bc8871b28 (rebuilt in Stage 08C-R1-R3)
 REMOTE_IMAGES: 6 services (core, admin-shell, inventory-sales, repairs, avito, gateway)
-REMOTE_IMAGE_IDS: distinct fresh images built from source on VDS
+REMOTE_IMAGE_IDS: 890e8b0edb70, f08174cdf93d, eec54bf6f523, 44d608f40048, 9ec065122baa, 72ba65eb42c1
 
 ## Runtime Proof
 ALL_SERVICES_RUNNING: true

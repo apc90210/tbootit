@@ -1,7 +1,7 @@
-# ТехноРебут — Stage 08C-R1 / 08C-R1-R2: Real VDS Pre-Cutover Deployment Runbook
+# ТехноРебут — Stage 08C-R1 / 08C-R1-R2 / 08C-R1-R3: Real VDS Pre-Cutover Deployment Runbook
 
 ## 1. Overview
-This document records the exact procedure, configuration standards, and verification steps performed during the first deployment of **ТехноРебут** to the real Debian Virtual Dedicated Server (VDS), operating in pre-cutover mode.
+This document records the exact procedure, configuration standards, and verification steps performed during the deployment and final runtime-head rebuild of **ТехноРебут** on the real Debian Virtual Dedicated Server (VDS), operating in pre-cutover mode.
 
 ---
 
