@@ -92,4 +92,19 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Host Runner Daemon** | **RUNNING (`scripts/local_ops_runner.py`)** | Processes queued requests, enforces atomic locking, logs audit records |
 | **Automated Tests** | **54 PASSED (0 FAILED)** | Full coverage for RBAC, Environment Guard, Schema Guard, Direction Guard |
 
+---
+
+## 6. Fast Rollback & Release Checkpoints Status (Stage 08D-R1R6)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **VDS Health Preflight** | **ACTIVE (`HEALTHY`)** | Probes SSH, HTTPS 443, Docker engine, 6/6 containers, SQLite quick_check, disk free space |
+| **Pre-Update Release Checkpoint** | **ACTIVE** | Backs up VDS, copies to `.local-recovery/vds-releases/`, verifies SHA-256 match, tags images |
+| **Checkpoint Retention Policy** | **ACTIVE (>= 3)** | Retains at least 3 recent checkpoints, preserves `last_known_good_vds_release.json` |
+| **Fast Rollback (Code-Only)** | **ACTIVE** | Reverts code/containers to target checkpoint commit, preserves SQLite business DB & storage |
+| **Rollback Schema Guard** | **ACTIVE** | Verifies live VDS schema contract matches target release before permitting rollback |
+| **Automated Rollback** | **ACTIVE** | Reverts code and containers automatically if deployment or health check fails |
+| **Operations UI Card 3 & Table** | **ACTIVE** | Rollback button, modal confirmation, and checkpoint history table on `/system/operations` |
+| **Automated Tests** | **74 PASSED (0 FAILED)** | Full coverage for preflight, checkpoints, rollback RBAC, and rollback schema guard |
+
 

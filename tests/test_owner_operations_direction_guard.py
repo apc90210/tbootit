@@ -5,6 +5,9 @@ import pytest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+scripts_dir = str(REPO_ROOT / "scripts")
+if scripts_dir not in sys.path:
+    sys.path.insert(0, scripts_dir)
 
 
 def test_no_local_to_vds_data_upload_scripts():
@@ -21,7 +24,7 @@ def test_no_local_to_vds_data_upload_scripts():
 
 def test_sync_runner_aborts_if_production_sentinel_local(tmp_path, monkeypatch):
     """Local ops runner must strictly refuse sync if .technoreboot_production_data exists locally."""
-    from scripts import local_ops_runner
+    import local_ops_runner
     
     fake_data = tmp_path / "data"
     fake_data.mkdir()
@@ -37,7 +40,7 @@ def test_sync_runner_aborts_if_production_sentinel_local(tmp_path, monkeypatch):
 
 def test_sync_requires_local_dev_sentinel(tmp_path, monkeypatch):
     """Local ops runner must require .technoreboot_local_dev."""
-    from scripts import local_ops_runner
+    import local_ops_runner
     
     fake_data = tmp_path / "data"
     fake_data.mkdir()

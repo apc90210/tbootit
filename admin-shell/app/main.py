@@ -1268,6 +1268,33 @@ def _get_schema_compatibility_status(devops_dir: Path) -> Dict[str, Any]:
     }
 
 
+def _get_vds_checkpoints(devops_dir: Path) -> List[Dict[str, Any]]:
+    candidates = [
+        devops_dir / "checkpoints",
+        devops_dir.parent / ".local-recovery" / "vds-releases",
+        Path(".local-recovery/vds-releases"),
+        Path("/app/.local-recovery/vds-releases"),
+    ]
+    checkpoints = []
+    seen_ids = set()
+    for root in candidates:
+        if root.is_dir():
+            for c_dir in root.iterdir():
+                if c_dir.is_dir():
+                    m_file = c_dir / "checkpoint.json"
+                    if m_file.is_file():
+                        try:
+                            data = json.loads(m_file.read_text(encoding="utf-8"))
+                            cid = data.get("checkpoint_id")
+                            if cid and cid not in seen_ids:
+                                seen_ids.add(cid)
+                                checkpoints.append(data)
+                        except Exception:
+                            pass
+    checkpoints.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return checkpoints
+
+
 def _get_lock_status(devops_dir: Path) -> Tuple[bool, Optional[Dict[str, Any]]]:
     lock_file = devops_dir / "status" / "lock.json"
     if not lock_file.is_file():
@@ -1337,6 +1364,25 @@ async def api_operations_status(request: Request):
 
     schema_guard = _get_schema_compatibility_status(devops_dir)
 
+    checkpoints_list = _get_vds_checkpoints(devops_dir)
+    latest_checkpoint = checkpoints_list[0] if checkpoints_list else None
+
+    last_known_good = None
+    if (status_dir / "last_known_good_vds_release.json").is_file():
+        try:
+            last_known_good = json.loads((status_dir / "last_known_good_vds_release.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    rollback_available = False
+    rollback_reason = "Нет доступных точек восстановления"
+    if latest_checkpoint:
+        if latest_checkpoint.get("rollback_allowed", False):
+            rollback_available = True
+            rollback_reason = "Доступен быстрый откат кода (без изменения БД)"
+        else:
+            rollback_reason = latest_checkpoint.get("rollback_reason", "Откат заблокирован")
+
     return JSONResponse(content={
         "is_local_dev": is_local,
         "environment": "development" if is_local else "production",
@@ -1347,6 +1393,11 @@ async def api_operations_status(request: Request):
         "last_update": last_update,
         "schema_guard": schema_guard,
         "env_info": env_info,
+        "checkpoints_list": checkpoints_list,
+        "latest_checkpoint": latest_checkpoint,
+        "last_known_good": last_known_good,
+        "rollback_available": rollback_available,
+        "rollback_reason": rollback_reason,
     })
 
 
@@ -1460,6 +1511,90 @@ async def api_trigger_update(request: Request):
         "status": "queued",
         "job_id": job_id,
         "operation": "update_vds_code_only",
+    })
+
+
+@app.post("/admin-api/system/operations/rollback")
+async def api_trigger_rollback(request: Request):
+    """Queue fast code-only rollback to last known-good release checkpoint."""
+    _require_owner(request)
+    if not _is_local_dev():
+        raise HTTPException(
+            status_code=403,
+            detail="Операции отката VDS доступны только из локальной DEV-среды ТехноРебут"
+        )
+
+    devops_dir = _get_devops_dir()
+    is_locked, lock_data = _get_lock_status(devops_dir)
+    if is_locked:
+        op_name = lock_data.get("operation", "другая задача") if lock_data else "другая задача"
+        raise HTTPException(
+            status_code=409,
+            detail=f"Другая операция уже выполняется ({op_name})"
+        )
+
+    req_body = {}
+    try:
+        req_body = await request.json()
+    except Exception:
+        pass
+
+    target_checkpoint_id = req_body.get("checkpoint_id")
+    checkpoints = _get_vds_checkpoints(devops_dir)
+    target_cp = None
+    if target_checkpoint_id:
+        for cp in checkpoints:
+            if cp.get("checkpoint_id") == target_checkpoint_id:
+                target_cp = cp
+                break
+    elif checkpoints:
+        target_cp = checkpoints[0]
+
+    if not target_cp:
+        raise HTTPException(
+            status_code=400,
+            detail="Откат VDS заблокирован: нет доступных точек восстановления"
+        )
+
+    if not target_cp.get("rollback_allowed", True):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Откат заблокирован: {target_cp.get('rollback_reason', 'Несовместимая версия')}"
+        )
+
+    job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_rollback_{uuid.uuid4().hex[:6]}"
+    requests_dir = devops_dir / "requests"
+    requests_dir.mkdir(parents=True, exist_ok=True)
+    status_dir = devops_dir / "status"
+    status_dir.mkdir(parents=True, exist_ok=True)
+
+    req_payload = {
+        "job_id": job_id,
+        "operation": "rollback_vds_code_only",
+        "checkpoint_id": target_cp.get("checkpoint_id"),
+        "requested_at": datetime.now(timezone.utc).isoformat(),
+        "requested_by": "owner",
+    }
+    (requests_dir / f"{job_id}.json").write_text(json.dumps(req_payload, indent=2), encoding="utf-8")
+
+    init_status = {
+        "job_id": job_id,
+        "operation": "rollback_vds_code_only",
+        "status": "QUEUED",
+        "step": "Запрос поставлен в очередь",
+        "step_index": 0,
+        "total_steps": 10,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "log_lines": [f"Запрос на откат VDS к точке {target_cp.get('checkpoint_id')} поставлен в очередь..."],
+    }
+    (status_dir / "current.json").write_text(json.dumps(init_status, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return JSONResponse(content={
+        "status": "queued",
+        "job_id": job_id,
+        "operation": "rollback_vds_code_only",
+        "target_checkpoint_id": target_cp.get("checkpoint_id"),
     })
 
 

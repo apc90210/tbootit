@@ -160,3 +160,25 @@ Stage 08D-R1R5 introduces the Owner Operations Control Panel (`/system/operation
 - **Compatibility Flag:** Tracked at `deploy/production/deployment_compatibility.json`. If `requires_manual_migration == true` or structural changes exist between SQLAlchemy code models and canonical VDS schema, code deployment is hard-blocked.
 - **Host Runner Daemon:** `scripts/local_ops_runner.py` runs in the background on the host, processing atomic requests from `data/dev-ops/requests/`, enforcing single-job concurrency locking (`lock.json`), and recording audit history in `data/dev-ops/audit_log.json`.
 
+---
+
+## 9. VDS Health Preflight, Release Checkpoints & Fast Rollback (Stage 08D-R1R6)
+
+Stage 08D-R1R6 extends the Operations Control Panel with automated safety preflights and non-destructive release checkpoints:
+
+### 1. VDS Health Preflight
+- Evaluates SSH connectivity, HTTPS 443 availability, Docker engine, 6/6 container statuses, SQLite quick_check, and free disk space (>= 500 MB).
+- Degraded or unreachable VDS strictly blocks `UPDATE VDS`.
+- **Never snapshot a dead VDS:** Snapshotting is forbidden if the server is in a degraded or unreachable state.
+
+### 2. Release Checkpoint Model
+- Stored at `.local-recovery/vds-releases/<checkpoint_id>/` and on VDS.
+- Pulls VDS business backup, verifies SHA-256 match, tags current container images (`technoreboot-rollback/<checkpoint_id>/<service>`), and saves `checkpoint.json` manifest.
+- Retention policy keeps at least 3 recent checkpoints, never deleting the last known-good release (`data/dev-ops/status/last_known_good_vds_release.json`).
+
+### 3. Fast Rollback (Code-Only)
+- Button `[ Откатить VDS к последней рабочей версии ]` on `/system/operations`.
+- Rollback Schema Guard compares live VDS database schema with target release contract before switching code.
+- Normal rollback is **CODE-ONLY**: switches Git branch/commit and restarts containers. SQLite business data and storage media are **never overwritten or restored**.
+- Automated rollback triggers if code deployment fails during `UPDATE VDS`.
+
