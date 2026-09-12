@@ -24,7 +24,7 @@ With the VDS application stack in a stopped state (`0` running containers), pers
 - `repairs`: 66 (IDs `[1..66]`)
 - `product_photos`: 50 (IDs `[1..48, 50, 51]`)
 - `external_listings`: 50 (IDs `[1..50]`)
-- `media_storage`: 281 media files
+- `media_storage`: 281 immediate product_photos entries (271 files + 10 dirs) / 315 recursive product_photos files / 1,529 total storage files (proven with 100% byte-level parity in Stage 08C-R1-R4)
 - `client_ca_sha256`: `a9b4d288cddf74f6337848a833240efdfba412e3e55f37953a5a72533d009d8d` (identical to local workstation)
 - `owner_identity_exists`: True
 - `revoked_certificates`: 14

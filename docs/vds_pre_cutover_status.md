@@ -31,7 +31,7 @@
   - Repairs: 66 (`[1..66]`)
   - Product Photos: 50 (`[1..48, 50, 51]`)
   - External Listings: 50 (`[1..50]`)
-  - Media Files: 315 files verified in `/srv/technoreboot/data/storage`
+  - Media Files: 1,529 total regular files (315 recursive product photos; 271 immediate files + 10 subdirectories = 281 shallow entries) verified with 100% byte-for-byte SHA256 parity in Stage 08C-R1-R4
   - Client CA Fingerprint: `32CEFDD1C8D896D8589DED9C95FF7298791B4ACF2857912D45C3E5894B8BD7AA` (identical to local master CA)
   - OWNER Certificate: Verified and accepted
   - Revocation Registry: 14 revoked certificates preserved
