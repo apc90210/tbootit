@@ -67,3 +67,7 @@ storage_state.json
 
 # Disaster recovery test sandboxes
 .recovery-test/
+
+# Local Deployment Secrets (Stage 08C-R1)
+.secrets/
+
