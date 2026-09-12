@@ -276,7 +276,7 @@ def test_test_o_version_0_2_53_full_alignment():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     ver = manifest["version"]
-    assert ver in ("0.2.53", "0.2.54")
+    assert ver in ("0.2.53", "0.2.54", "0.2.55")
 
     with open(POPUP_HTML_PATH, "r", encoding="utf-8") as f:
         popup_html = f.read()

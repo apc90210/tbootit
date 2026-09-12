@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.54)
+// Technoreboot Avito Popup Script (v0.2.55)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pairBtn = document.getElementById("pairBtn");
     const pairMsg = document.getElementById("pairMsg");
     const serverUrlInput = document.getElementById("serverUrlInput");
+    const saveServerUrlBtn = document.getElementById("saveServerUrlBtn");
+    const serverUrlMsg = document.getElementById("serverUrlMsg");
 
     // Sections
     const prepareSection = document.getElementById("prepareSection");
@@ -63,7 +65,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.54";
+        let manifestVer = "0.2.55";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -137,45 +139,142 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // --- Status Check ---
-    chrome.runtime.sendMessage({ action: "get_status" }, response => {
-        if (!response || !response.online) {
-            isServerOnline = false;
-            isPaired = false;
-            connBadge.className = "badge badge-offline";
-            connBadge.textContent = "Offline";
-            statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу контейнеров).";
-            hideAllCards();
-            // Show pairing section so user can set server URL
-            pairSection.style.display = "block";
-            if (serverUrlInput && response && response.server_url) {
-                serverUrlInput.value = response.server_url;
-            }
-        } else if (!response.paired) {
-            isServerOnline = true;
-            isPaired = false;
-            connBadge.className = "badge badge-offline";
-            connBadge.textContent = "Не привязан";
-            statusMsg.textContent = "Сервер Техноребут в сети. Введите код для привязки.";
-            hideAllCards();
-            pairSection.style.display = "block";
-            if (serverUrlInput && response.server_url) {
-                serverUrlInput.value = response.server_url;
-            }
-            inspectActiveTab();
-        } else {
-            isServerOnline = true;
-            isPaired = true;
-            connBadge.className = "badge badge-online";
-            connBadge.textContent = "Подключен";
-            statusMsg.textContent = "Расширение подключено к Техноребут.";
-            hideAllCards();
-            if (serverUrlInput && response.server_url) {
-                serverUrlInput.value = response.server_url;
-            }
-            inspectActiveTab();
+    function normalizeServerUrl(rawUrl) {
+        if (!rawUrl || typeof rawUrl !== "string") return "";
+        let u = rawUrl.trim().replace(/\/+$/, "");
+        if (!u) return "";
+        if (!u.startsWith("http://") && !u.startsWith("https://")) {
+            u = "https://" + u;
         }
-    });
+        if (!u.includes("/admin-api/avito-extension")) {
+            try {
+                const parsed = new URL(u);
+                u = `${parsed.protocol}//${parsed.host}/admin-api/avito-extension`;
+            } catch (e) {
+                if (!u.endsWith("/admin-api/avito-extension")) {
+                    u = u.replace(/\/+$/, "") + "/admin-api/avito-extension";
+                }
+            }
+        }
+        return u;
+    }
+
+    async function persistServerUrl(notifyUser = false) {
+        if (!serverUrlInput) return null;
+        const rawVal = serverUrlInput.value;
+        if (!rawVal || !rawVal.trim()) return null;
+        const normalized = normalizeServerUrl(rawVal);
+        if (normalized) {
+            serverUrlInput.value = normalized;
+            if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.set({ server_base_url: normalized });
+            }
+            if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({ action: "set_server_url", server_url: normalized });
+            }
+            if (notifyUser && serverUrlMsg) {
+                serverUrlMsg.className = "msg msg-success";
+                serverUrlMsg.textContent = "✓ Адрес зафиксирован!";
+                serverUrlMsg.style.display = "block";
+                setTimeout(() => {
+                    if (serverUrlMsg && serverUrlMsg.textContent === "✓ Адрес зафиксирован!") {
+                        serverUrlMsg.style.display = "none";
+                    }
+                }, 3000);
+                checkStatus();
+            }
+        }
+        return normalized;
+    }
+
+    if (saveServerUrlBtn) {
+        saveServerUrlBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            persistServerUrl(true);
+        });
+    }
+
+    if (serverUrlInput) {
+        serverUrlInput.addEventListener("input", () => persistServerUrl(false));
+        serverUrlInput.addEventListener("change", () => persistServerUrl(false));
+        serverUrlInput.addEventListener("paste", () => setTimeout(() => persistServerUrl(false), 50));
+        serverUrlInput.addEventListener("blur", () => persistServerUrl(false));
+        serverUrlInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                persistServerUrl(true);
+            }
+        });
+    }
+
+    // Load persisted server URL from storage immediately
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["server_base_url"], res => {
+            if (res && res.server_base_url && serverUrlInput && !serverUrlInput.value) {
+                serverUrlInput.value = res.server_base_url;
+            }
+        });
+    }
+
+    // Auto-detect server URL from current active tab if not yet set
+    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
+        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+            if (tabs && tabs.length > 0 && tabs[0].url) {
+                const tabUrl = tabs[0].url;
+                if (!serverUrlInput.value || serverUrlInput.value.includes("localhost")) {
+                    if (tabUrl.includes("144.31.50.134")) {
+                        serverUrlInput.value = "https://144.31.50.134/admin-api/avito-extension";
+                        persistServerUrl(false);
+                        checkStatus();
+                    }
+                }
+            }
+        });
+    }
+
+    // --- Status Check ---
+    function checkStatus() {
+        chrome.runtime.sendMessage({ action: "get_status" }, response => {
+            if (!response || !response.online) {
+                isServerOnline = false;
+                isPaired = false;
+                connBadge.className = "badge badge-offline";
+                connBadge.textContent = "Offline";
+                statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу контейнеров).";
+                hideAllCards();
+                // Show pairing section so user can set server URL
+                pairSection.style.display = "block";
+                if (serverUrlInput && !serverUrlInput.value && response && response.server_url) {
+                    serverUrlInput.value = response.server_url;
+                }
+            } else if (!response.paired) {
+                isServerOnline = true;
+                isPaired = false;
+                connBadge.className = "badge badge-offline";
+                connBadge.textContent = "Не привязан";
+                statusMsg.textContent = "Сервер Техноребут в сети. Введите код для привязки.";
+                hideAllCards();
+                pairSection.style.display = "block";
+                if (serverUrlInput && !serverUrlInput.value && response.server_url) {
+                    serverUrlInput.value = response.server_url;
+                }
+                inspectActiveTab();
+            } else {
+                isServerOnline = true;
+                isPaired = true;
+                connBadge.className = "badge badge-online";
+                connBadge.textContent = "Подключен";
+                statusMsg.textContent = "Расширение подключено к Техноребут.";
+                hideAllCards();
+                if (serverUrlInput && !serverUrlInput.value && response.server_url) {
+                    serverUrlInput.value = response.server_url;
+                }
+                inspectActiveTab();
+            }
+        });
+    }
+
+    checkStatus();
 
     function hideAllCards() {
         pairSection.style.display = "none";
@@ -197,10 +296,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        // Read server URL from input
+        // Read and persist normalized server URL from input
         let serverUrl = null;
         if (serverUrlInput && serverUrlInput.value && serverUrlInput.value.trim()) {
-            serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
+            serverUrl = normalizeServerUrl(serverUrlInput.value);
+            persistServerUrl(false);
         }
 
         pairMsg.className = "msg";
@@ -364,7 +464,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             const payload = {
                 schema_version: 1,
-                extension_version: "0.2.54",
+                extension_version: "0.2.55",
                 captured_at: new Date().toISOString(),
                 page_type: "bulk_import",
                 listings_count: batchItems.length,
@@ -1106,7 +1206,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                             (photosImported + photosSkipped));
 
                         if (openProductBtn && productLinkContainer) {
-                            const targetUrl = `http://localhost:8011/inventory/products/${res.product_id}`;
+                            let baseOrigin = "http://localhost:8011";
+                            const currentServerUrl = (serverUrlInput && serverUrlInput.value) ? serverUrlInput.value : "";
+                            if (currentServerUrl) {
+                                try {
+                                    const parsed = new URL(currentServerUrl);
+                                    baseOrigin = `${parsed.protocol}//${parsed.host}`;
+                                } catch (e) {}
+                            }
+                            const targetUrl = `${baseOrigin}/inventory/products/${res.product_id}`;
                             openProductBtn.onclick = () => {
                                 chrome.tabs.create({ url: targetUrl });
                             };

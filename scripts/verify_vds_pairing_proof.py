@@ -18,17 +18,17 @@ with httpx.Client(cert=OWNER_CERT, verify=True, timeout=15.0, trust_env=False) a
     print("\n[Step 1] Opening production extension page: /avito/extension")
     r_page = client.get(f"{BASE_URL}/avito/extension")
     assert r_page.status_code == 200, f"Page load failed: {r_page.status_code}"
-    assert "v0.2.54" in r_page.text, "Page must display v0.2.54"
+    assert "v0.2.55" in r_page.text, "Page must display v0.2.55"
     assert "serverUrlDisplay" in r_page.text, "Page must contain serverUrlDisplay"
     assert "copyServerUrl" in r_page.text, "Page must contain copyServerUrl"
-    print("  [PASS] Production extension page renders v0.2.54 with server URL guidance")
+    print("  [PASS] Production extension page renders v0.2.55 with server URL guidance")
 
-    # 1b. Verify download endpoint returns v0.2.54 zip
+    # 1b. Verify download endpoint returns v0.2.55 zip
     print("\n[Step 1b] Verifying extension download package")
     r_dl = client.get(f"{BASE_URL}/avito/extension/download")
     assert r_dl.status_code == 200, f"Download failed: {r_dl.status_code}"
     disposition = r_dl.headers.get("content-disposition", "")
-    assert "0.2.54" in disposition, f"Expected 0.2.54 in disposition: {disposition}"
+    assert "0.2.55" in disposition, f"Expected 0.2.55 in disposition: {disposition}"
     print(f"  [PASS] Download serves: {disposition}")
 
     # 2. Generate a new 6-digit code
@@ -92,7 +92,7 @@ with httpx.Client(cert=OWNER_CERT, verify=True, timeout=15.0, trust_env=False) a
     assert st_data.get("online") is True
     assert st_data.get("paired") is True
     assert st_data.get("token_valid") is True
-    assert st_data.get("version") == "0.2.54"
+    assert st_data.get("version") == "0.2.55"
     print(f"  [PASS] Extension status verified online & paired (v{st_data.get('version')})")
 
     # 6. Verify second unknown code returns 400

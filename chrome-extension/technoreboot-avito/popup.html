@@ -19,9 +19,11 @@
     <div class="card" id="pairSection" style="display:none;">
         <h3>Подключение к Техноребут</h3>
         <p class="small">Адрес сервера Техноребут (заполняется автоматически со страницы расширения):</p>
-        <div class="form-row" style="margin-bottom:8px;">
-            <input type="url" id="serverUrlInput" placeholder="https://144.31.50.134/admin-api/avito-extension" style="flex:1; font-size:12px;" value="http://localhost:8011/admin-api/avito-extension">
+        <div class="form-row" style="margin-bottom:6px; display:flex; gap:6px;">
+            <input type="url" id="serverUrlInput" placeholder="https://144.31.50.134/admin-api/avito-extension" style="flex:1; font-size:12px;">
+            <button id="saveServerUrlBtn" class="btn btn-secondary" style="white-space:nowrap; padding:4px 10px; font-size:12px;">Зафиксировать</button>
         </div>
+        <p id="serverUrlMsg" class="msg" style="margin-bottom:8px; display:none;"></p>
         <p class="small">Введите 6-значный код подключения со страницы <code>/avito/extension</code> в Техноребут:</p>
         <div class="form-row">
             <input type="text" id="pairCodeInput" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="123456">
@@ -103,7 +105,7 @@
     </div>
 
     <div class="footer">
-        <small id="versionLabel">Техноребут Avito v0.2.54</small>
+        <small id="versionLabel">Техноребут Avito v0.2.55</small>
     </div>
 
     <script src="popup.js"></script>

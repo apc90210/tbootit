@@ -1,4 +1,4 @@
-﻿// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.54)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.55)
 
 let pageInitialData = null;
 
@@ -1876,7 +1876,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.54",
+            extension_version: "0.2.55",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1907,7 +1907,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.54",
+            extension_version: "0.2.55",
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -2552,7 +2552,7 @@ function extractMyListingsData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.54",
+            extension_version: "0.2.55",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -2562,7 +2562,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.54",
+            extension_version: "0.2.55",
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -4313,7 +4313,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.54",
+                    extension_version: "0.2.55",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
