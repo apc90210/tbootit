@@ -157,7 +157,9 @@
                 <button onclick="checkAuth('{{ p.account_key }}')">Проверить авторизацию</button>
                 <a href="/avito/probe?account={{ p.account_key }}" class="btn">Пробный импорт</a>
                 <button onclick="showEditModal('{{ p.account_key }}', '{{ p.display_name }}')">Переименовать</button>
+                {% if is_owner %}
                 <button class="btn-danger" onclick="deleteProfile('{{ p.account_key }}')">Удалить</button>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
@@ -254,6 +256,7 @@
             }
         }
 
+        {% if is_owner %}
         async function deleteProfile(key) {
             if (!confirm('Удалить этот профиль аккаунта?')) return;
             try {
@@ -268,6 +271,7 @@
                 showAlert('Ошибка при удалении: ' + e.message);
             }
         }
+        {% endif %}
 
         async function checkAuth(key) {
             try {

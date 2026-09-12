@@ -119,11 +119,21 @@ def test_post_status_valid_invalid():
     assert status_resp.status_code == 200
     assert status_resp.json()["status"] == "in_stock"
     
-    # invalid: in_stock -> draft
+    # valid: in_stock -> draft (sellers can move products to draft)
     status_resp2 = client.post(f"/api/products/{pid}/status", json={"status": "draft"})
-    assert status_resp2.status_code == 400
-    
-    # valid: in_stock -> sold
-    status_resp3 = client.post(f"/api/products/{pid}/status", json={"status": "sold"})
+    assert status_resp2.status_code == 200
+    assert status_resp2.json()["status"] == "draft"
+
+    # valid: draft -> in_stock (restore back from draft)
+    status_resp3 = client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
     assert status_resp3.status_code == 200
-    assert status_resp3.json()["status"] == "sold"
+    assert status_resp3.json()["status"] == "in_stock"
+
+    # valid: in_stock -> sold
+    status_resp4 = client.post(f"/api/products/{pid}/status", json={"status": "sold"})
+    assert status_resp4.status_code == 200
+    assert status_resp4.json()["status"] == "sold"
+
+    # invalid: sold -> in_stock (sold items can only be archived)
+    status_resp5 = client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
+    assert status_resp5.status_code == 400

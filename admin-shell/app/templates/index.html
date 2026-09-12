@@ -70,8 +70,10 @@
         <a href="/repairs/repairs" class="nav-item" data-path="repairs" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Ремонты</a>
         <a href="/avito/extension" class="nav-item" data-path="avito" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Расширение Avito</a>
         <a href="/inventory/settings/organization" class="nav-item" data-path="settings" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Настройки</a>
+        {% if is_owner %}
         <a href="/backups" class="nav-item" data-path="backups" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; margin-left: auto;">Резервные копии</a>
         <a href="/certificates" class="nav-item" data-path="certificates" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Доступ (mTLS)</a>
+        {% endif %}
     </nav>
     <script>
     (function() {
@@ -125,10 +127,12 @@
     </script>
 
 
+    {% if is_owner %}
     <div class="actions">
         <button class="btn-primary" onclick="seedData()">Заполнить тестовыми данными</button>
         <button onclick="devReset()" style="color:red;border-color:red;">Сбросить БД</button>
     </div>
+    {% endif %}
 
     <h2>Обзор</h2>
     <div class="dashboard">
@@ -504,6 +508,7 @@
     }
 
     // ---- Seed / Reset ----
+    {% if is_owner %}
     async function seedData() {
         const r = await apiCall('/admin-api/seed', 'POST');
         if (r) { alert(r.message); window.location.reload(); }
@@ -513,6 +518,7 @@
         const r = await apiCall('/admin-api/dev-reset', 'POST');
         if (r) window.location.reload();
     }
+    {% endif %}
 
     // ---- Product status ----
     async function changeProductStatus(id) {

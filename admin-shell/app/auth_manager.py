@@ -432,7 +432,15 @@ class AuthManager:
             uri.startswith("/admin-api/certificates") or
             uri == "/backups" or
             uri.startswith("/backups/") or
-            uri.startswith("/admin-api/backups")
+            uri.startswith("/admin-api/backups") or
+            uri == "/admin-api/dev-reset" or
+            uri.startswith("/admin-api/dev-reset") or
+            uri == "/admin-api/seed" or
+            uri.startswith("/admin-api/seed") or
+            uri == "/dev-reset" or
+            uri.startswith("/dev-reset") or
+            uri == "/seed" or
+            uri.startswith("/seed")
         )
 
         if is_owner_only_path and not matching_cert.get("is_owner"):

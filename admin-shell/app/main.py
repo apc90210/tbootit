@@ -23,6 +23,37 @@ templates = Jinja2Templates(directory=templates_dir)
 auth_manager = AuthManager()
 
 
+def _is_owner(request: Request) -> bool:
+    client_serial = request.headers.get("x-client-cert-serial")
+    if client_serial:
+        ok, code, msg, cert = auth_manager.verify_request(
+            request.headers.get("x-client-cert-verify", "SUCCESS"),
+            client_serial,
+            request.headers.get("x-client-cert-fingerprint"),
+            request.url.path,
+        )
+        return bool(ok and cert and cert.get("is_owner"))
+    if request.headers.get("x-auth-is-owner") == "1":
+        return True
+    return False
+
+
+def _require_owner(request: Request):
+    if not _is_owner(request):
+        raise HTTPException(status_code=403, detail="Owner certificate required")
+    client_serial = request.headers.get("x-client-cert-serial")
+    if client_serial:
+        _, _, _, cert = auth_manager.verify_request(
+            request.headers.get("x-client-cert-verify", "SUCCESS"),
+            client_serial,
+            request.headers.get("x-client-cert-fingerprint"),
+            request.url.path,
+        )
+        return cert
+    return {"is_owner": True}
+
+
+
 
 
 CORE_API_URL = os.getenv("CORE_API_URL", "http://127.0.0.1:8000")
@@ -103,14 +134,16 @@ async def dashboard(request: Request):
         "sales": sales,
         "db_schema": db_schema,
         "audit_log": audit_log,
-        "core_url": CORE_API_URL
+        "core_url": CORE_API_URL,
+        "is_owner": _is_owner(request),
     })
 
 class StatusUpdate(BaseModel):
     status: str
 
 @app.post("/admin-api/seed")
-async def proxy_seed():
+async def proxy_seed(request: Request):
+    _require_owner(request)
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/admin/seed")
@@ -197,7 +230,18 @@ async def proxy_create_sale(request: Request):
             raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
 
 @app.post("/admin-api/dev-reset")
-async def proxy_dev_reset():
+async def proxy_dev_reset(request: Request):
+    _require_owner(request)
+    is_prod = (
+        os.getenv("ENVIRONMENT") == "production"
+        or os.getenv("TECHNOREBOOT_DATA_ROOT", "").startswith("/srv")
+        or "/srv/" in os.getenv("TECHNOREBOOT_DATA_ROOT", "")
+    )
+    if is_prod:
+        raise HTTPException(
+            status_code=403,
+            detail="dev-reset is strictly forbidden in production environment. Use /backups for recovery.",
+        )
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.post(f"{CORE_API_URL}/api/admin/dev-reset")
@@ -345,7 +389,8 @@ async def avito_accounts_page(request: Request):
 
     return templates.TemplateResponse("avito_accounts.html", {
         "request": request,
-        "profiles": profiles
+        "profiles": profiles,
+        "is_owner": _is_owner(request),
     })
 
 @app.get("/avito/accounts/{account_key}/browser", response_class=HTMLResponse)
@@ -414,7 +459,8 @@ async def proxy_create_profile(request: Request):
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
 
 @app.delete("/admin-api/avito/profiles/{account_key}")
-async def proxy_delete_profile(account_key: str):
+async def proxy_delete_profile(account_key: str, request: Request):
+    _require_owner(request)
     async with httpx.AsyncClient(trust_env=False) as client:
         resp = await client.delete(f"{AVITO_MODULE_URL}/accounts/api/profiles/{account_key}")
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
@@ -854,19 +900,7 @@ async def internal_auth_verify(request: Request):
     )
 
 
-def _require_owner(request: Request):
-    client_serial = request.headers.get("x-client-cert-serial")
-    if not client_serial:
-        raise HTTPException(status_code=403, detail="Owner certificate required")
-    ok, code, msg, cert = auth_manager.verify_request(
-        request.headers.get("x-client-cert-verify", "SUCCESS"),
-        client_serial,
-        request.headers.get("x-client-cert-fingerprint"),
-        request.url.path,
-    )
-    if not ok or not (cert and cert.get("is_owner")):
-        raise HTTPException(status_code=403, detail="Owner certificate required")
-    return cert
+
 
 
 @app.get("/certificates", response_class=HTMLResponse)

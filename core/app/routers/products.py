@@ -720,15 +720,16 @@ def update_product(product_id: int, product: schemas.ProductUpdate, db: Session 
 
 VALID_TRANSITIONS = {
     "draft": ["in_stock", "archived", "imported", "reserved", "sold", "written_off"],
-    "imported": ["in_stock", "archived", "reserved", "sold", "written_off"],
-    "in_stock": ["reserved", "sold", "written_off", "archived"],
-    "reserved": ["in_stock", "sold", "archived"],
+    "imported": ["in_stock", "archived", "reserved", "sold", "written_off", "draft"],
+    "in_stock": ["reserved", "sold", "written_off", "archived", "draft"],
+    "reserved": ["in_stock", "sold", "archived", "draft"],
     "sold": ["archived"],
-    "written_off": ["archived"],
+    "written_off": ["archived", "draft"],
     "archived": ["imported", "draft", "in_stock"]
 }
 
 @router.post("/{product_id}/status", response_model=schemas.Product)
+@router.patch("/{product_id}/status", response_model=schemas.Product)
 def update_product_status(product_id: int, status_update: schemas.ProductStatusUpdate, db: Session = Depends(get_db)):
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
