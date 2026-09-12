@@ -429,10 +429,13 @@ class AuthManager:
         is_owner_only_path = (
             uri == "/certificates" or
             uri.startswith("/certificates/") or
-            uri.startswith("/admin-api/certificates")
+            uri.startswith("/admin-api/certificates") or
+            uri == "/backups" or
+            uri.startswith("/backups/") or
+            uri.startswith("/admin-api/backups")
         )
 
         if is_owner_only_path and not matching_cert.get("is_owner"):
-            return False, 403, "OWNER certificate required for certificate administration", matching_cert
+            return False, 403, "OWNER certificate required", matching_cert
 
         return True, 200, "Access granted", matching_cert

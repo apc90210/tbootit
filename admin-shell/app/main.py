@@ -29,7 +29,13 @@ CORE_API_URL = os.getenv("CORE_API_URL", "http://127.0.0.1:8000")
 AVITO_MODULE_URL = os.getenv("AVITO_MODULE_URL", "http://127.0.0.1:8020")
 AVITO_NOVNC_URL = os.getenv("AVITO_NOVNC_URL", "http://127.0.0.1:6080")
 INVENTORY_MODULE_URL = os.getenv("INVENTORY_MODULE_URL", "http://127.0.0.1:8030")
+
 REPAIRS_MODULE_URL = os.getenv("REPAIRS_MODULE_URL", "http://127.0.0.1:8040")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "admin-shell"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -48,11 +54,12 @@ async def dashboard(request: Request):
         except Exception:
             products = []
             
+        default_meta = {"product_statuses": {}, "repair_statuses": {}, "brands": [], "storage_locations": []}
         try:
             meta_resp = await client.get(f"{CORE_API_URL}/api/products/meta")
-            product_meta = meta_resp.json() if meta_resp.status_code == 200 else {}
+            product_meta = meta_resp.json() if meta_resp.status_code == 200 else default_meta
         except Exception:
-            product_meta = {}
+            product_meta = default_meta
 
             
         try:

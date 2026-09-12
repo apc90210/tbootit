@@ -7,7 +7,7 @@ class CoreClient:
         self.base_url = settings.core_api_base_url.rstrip("/")
         
     async def health(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/health", timeout=5.0)
                 if response.status_code == 200:
@@ -17,7 +17,7 @@ class CoreClient:
                 return {"core_available": False, "error": str(e)}
 
     async def get_products(self, params: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/products/", params=params, timeout=10.0)
                 if response.status_code == 200:
@@ -27,7 +27,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_product_filter_options(self, params: dict = None):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/products/filter-options", params=params or {}, timeout=10.0)
                 if response.status_code == 200:
@@ -38,7 +38,7 @@ class CoreClient:
 
     async def get_product(self, product_id: int):
         # Fallback to get_product_details if preferred, this just gets basic info
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/products/{product_id}", timeout=10.0)
                 if response.status_code == 200:
@@ -50,7 +50,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_product_details(self, product_id: int):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/products/{product_id}/details", timeout=10.0)
                 if response.status_code == 200:
@@ -62,7 +62,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def update_product(self, product_id: int, payload: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.patch(f"{self.base_url}/api/products/{product_id}", json=payload, timeout=10.0)
                 if response.status_code == 200:
@@ -72,7 +72,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def batch_update_products(self, payload: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/batch", json=payload, timeout=15.0)
                 if response.status_code == 200:
@@ -84,7 +84,7 @@ class CoreClient:
     # --- Barcode methods (Stage 04I) ---
 
     async def get_product_by_barcode(self, barcode: str):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/products/by-barcode/{barcode.strip()}", timeout=10.0)
                 if response.status_code == 200:
@@ -99,7 +99,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def generate_product_barcode(self, product_id: int):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/{product_id}/barcode/generate", timeout=10.0)
                 if response.status_code == 200:
@@ -109,7 +109,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def generate_missing_barcodes(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/barcodes/generate-missing", timeout=10.0)
                 if response.status_code == 200:
@@ -122,7 +122,7 @@ class CoreClient:
 
     async def create_sale(self, payload: dict):
         """Create a sale through Core API POST /api/sales/."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(
                     f"{self.base_url}/api/sales/",
@@ -143,7 +143,7 @@ class CoreClient:
 
     async def get_sale(self, sale_id: int):
         """Get single sale by ID from Core API."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/sales/{sale_id}", timeout=10.0)
                 if response.status_code == 200:
@@ -156,7 +156,7 @@ class CoreClient:
 
     async def get_sales(self, params: dict = None):
         """Get list of sales from Core API."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(
                     f"{self.base_url}/api/sales/",
@@ -171,7 +171,7 @@ class CoreClient:
 
     async def get_sales_today(self):
         """Get today's sales from Core API."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/sales/today", timeout=10.0)
                 if response.status_code == 200:
@@ -181,7 +181,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def cancel_sale(self, sale_id: int, reason: str, canceled_by: str = "Администратор"):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(
                     f"{self.base_url}/api/sales/{sale_id}/cancel",
@@ -198,7 +198,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def reissue_sale(self, sale_id: int, payload: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/sales/{sale_id}/reissue", json=payload, timeout=10.0)
                 if response.status_code == 200:
@@ -212,7 +212,7 @@ class CoreClient:
 
     async def get_organization_settings(self):
         from app.defaults import get_effective_settings
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/settings/organization", timeout=10.0)
                 if response.status_code == 200:
@@ -222,7 +222,7 @@ class CoreClient:
                 return get_effective_settings({"error": True, "details": str(e)})
 
     async def update_organization_settings(self, payload: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.put(f"{self.base_url}/api/settings/organization", json=payload, timeout=10.0)
                 if response.status_code == 200:
@@ -238,7 +238,7 @@ class CoreClient:
             params["date_from"] = date_from
         if date_to and str(date_to).strip():
             params["date_to"] = date_to
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/reports/sales", params=params, timeout=10.0)
                 if response.status_code == 200:
@@ -254,7 +254,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def create_product(self, payload: dict) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/", json=payload, timeout=15.0)
                 if response.status_code == 200:
@@ -269,7 +269,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def full_update_product(self, product_id: int, payload: dict) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.put(f"{self.base_url}/api/products/{product_id}", json=payload, timeout=15.0)
                 if response.status_code == 200:
@@ -284,7 +284,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_editor_meta(self) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/products/editor-meta", timeout=10.0)
                 if response.status_code == 200:
@@ -294,7 +294,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def upload_product_photo(self, product_id: int, file_content: bytes, filename: str, content_type: str = "image/jpeg") -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 files = {"file": (filename, file_content, content_type)}
                 response = await client.post(f"{self.base_url}/api/products/{product_id}/photos", files=files, timeout=30.0)
@@ -316,7 +316,7 @@ class CoreClient:
                 formatted_files.append(item)
             elif len(item) == 3:
                 formatted_files.append(("files", item))
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/{product_id}/photos/batch", files=formatted_files, timeout=45.0)
                 if response.status_code == 200:
@@ -331,7 +331,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def reorder_product_photos(self, product_id: int, photo_ids: list) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/{product_id}/photos/reorder", json={"photo_ids": photo_ids}, timeout=10.0)
                 if response.status_code == 200:
@@ -341,7 +341,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def make_product_photo_main(self, product_id: int, photo_id: int) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/products/{product_id}/photos/{photo_id}/make-main", timeout=10.0)
                 if response.status_code == 200:
@@ -351,7 +351,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def delete_product_photo(self, product_id: int, photo_id: int) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.delete(f"{self.base_url}/api/products/{product_id}/photos/{photo_id}", timeout=10.0)
                 if response.status_code == 200:

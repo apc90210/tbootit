@@ -1,0 +1,202 @@
+services:
+  core:
+    build: ../../core
+    container_name: ${CONTAINER_NAME_PREFIX:-technoreboot-prod}-core
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    volumes:
+      - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/db:/data/db
+      - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/storage:/data/storage
+      - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/backups:/data/backups
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=sqlite:////data/db/technoreboot.db
+      - STORAGE_ROOT=/data/storage
+      - BACKUP_ROOT=/data/backups
+      - API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - technoreboot-network
+
+  admin-shell:
+    build: ../../admin-shell
+    container_name: ${CONTAINER_NAME_PREFIX:-technoreboot-prod}-admin-shell
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      - CORE_API_URL=http://core:8000
+      - CORE_API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
+      - AVITO_MODULE_URL=http://avito-module:8020
+      - AVITO_NOVNC_URL=http://avito-module:6080
+      - INVENTORY_MODULE_URL=http://inventory-sales-module:8030
+      - REPAIRS_MODULE_URL=http://repairs-module:8040
+      - AUTH_STORAGE_DIR=/app/auth-data
+      - DATA_DIR=/data
+    volumes:
+      - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/auth:/app/auth-data
+      - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      core:
+        condition: service_healthy
+      inventory-sales-module:
+        condition: service_healthy
+      repairs-module:
+        condition: service_healthy
+      avito-module:
+        condition: service_healthy
+    networks:
+      - technoreboot-network
+
+  inventory-sales-module:
+    build: ../../inventory-sales-module
+    container_name: ${CONTAINER_NAME_PREFIX:-technoreboot-prod}-inventory-sales
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      - INVENTORY_SALES_MODULE_NAME=technoreboot-inventory-sales-module
+      - CORE_API_BASE_URL=http://core:8000
+      - APP_ENV=production
+      - CART_SESSION_SECRET=${CART_SESSION_SECRET:?CART_SESSION_SECRET is required in production}
+      - PYTHONPATH=/app
+      - ROOT_PATH=/inventory
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      core:
+        condition: service_healthy
+    networks:
+      - technoreboot-network
+
+  repairs-module:
+    build: ../../repairs-module
+    container_name: ${CONTAINER_NAME_PREFIX:-technoreboot-prod}-repairs
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      - REPAIRS_MODULE_NAME=technoreboot-repairs-module
+      - CORE_API_BASE_URL=http://core:8000
+      - PYTHONPATH=/app
+      - ROOT_PATH=/repairs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8040/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      core:
+        condition: service_healthy
+    networks:
+      - technoreboot-network
+
+  avito-module:
+    build: ../../avito-module
+    container_name: ${CONTAINER_NAME_PREFIX:-technoreboot-prod}-avito
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      - AVITO_MODULE_NAME=technoreboot-avito-module
+      - AVITO_MODULE_MODE=parser_mvp
+      - CORE_API_BASE_URL=http://core:8000
+      - AVITO_STORAGE_DIR=/app/data
+      - AVITO_REQUEST_DELAY_SECONDS=3
+      - AVITO_MAX_PAGES_PER_RUN=2
+      - DISPLAY=:99
+    volumes:
+      - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/avito-module:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      core:
+        condition: service_healthy
+    networks:
+      - technoreboot-network
+
+  gateway:
+    image: nginx:alpine
+    container_name: ${CONTAINER_NAME_PREFIX:-technoreboot-prod}-gateway
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      - TECHNOREBOOT_HOSTNAME=${TECHNOREBOOT_HOSTNAME:?TECHNOREBOOT_HOSTNAME is required in production}
+      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx
+      - NGINX_ENVSUBST_TEMPLATE_SUFFIX=.template
+      - NGINX_ENVSUBST_FILTER=TECHNOREBOOT_HOSTNAME
+    volumes:
+      - ./nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - ${SERVER_TLS_CERT_PATH:?SERVER_TLS_CERT_PATH is required in production}:/etc/nginx/certs/server/server.crt:ro
+      - ${SERVER_TLS_KEY_PATH:?SERVER_TLS_KEY_PATH is required in production}:/etc/nginx/certs/server/server.key:ro
+      - ${CLIENT_CA_CERT_PATH:?CLIENT_CA_CERT_PATH is required in production}:/etc/nginx/certs/ca/ca.crt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      admin-shell:
+        condition: service_healthy
+    networks:
+      - technoreboot-network
+
+networks:
+  technoreboot-network:
+    driver: bridge

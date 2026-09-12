@@ -7,7 +7,7 @@ class CoreClient:
         self.base_url = settings.core_api_base_url.rstrip("/")
 
     async def health(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/health", timeout=5.0)
                 if response.status_code == 200:
@@ -17,7 +17,7 @@ class CoreClient:
                 return {"core_available": False, "error": str(e)}
 
     async def get_repair_options(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/repairs/options", timeout=10.0)
                 if response.status_code == 200:
@@ -27,7 +27,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def create_repair(self, payload: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/repairs/", json=payload, timeout=10.0)
                 if response.status_code in [200, 201]:
@@ -42,7 +42,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_repairs(self, params: dict = None):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/repairs/", params=params or {}, timeout=10.0)
                 if response.status_code == 200:
@@ -52,7 +52,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_repair(self, repair_id: int):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/repairs/{repair_id}", timeout=10.0)
                 if response.status_code == 200:
@@ -64,7 +64,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_repair_by_number(self, number: str):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/repairs/by-number/{number}", timeout=10.0)
                 if response.status_code == 200:
@@ -74,7 +74,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def update_repair(self, repair_id: int, payload: dict):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.patch(f"{self.base_url}/api/repairs/{repair_id}", json=payload, timeout=10.0)
                 if response.status_code == 200:
@@ -96,7 +96,7 @@ class CoreClient:
         changed_by: Optional[str] = None,
         estimated_repair_amount: Optional[int] = None
     ):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 payload = {"status": status, "comment": comment, "changed_by": changed_by}
                 if estimated_repair_amount is not None:
@@ -114,7 +114,7 @@ class CoreClient:
                 return {"error": True, "details": str(e)}
 
     async def get_organization_settings(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 response = await client.get(f"{self.base_url}/api/settings/organization", timeout=10.0)
                 if response.status_code == 200:
