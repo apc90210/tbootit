@@ -254,20 +254,78 @@ def check_deployment_compatibility_flag(
 
 
 def check_live_vds_schema(ssh_key: str, vds_host: str) -> Dict[str, Any]:
-    """Query live schema contract directly from production VDS via SSH."""
+    """Query live schema contract directly from production VDS via SSH (pure standard library)."""
     import subprocess
     remote_script = """
-import sqlite3, json, sys
-sys.path.insert(0, '/srv/technoreboot/app')
-from scripts.db_schema_contract import extract_contract_from_sqlite_conn
+import sqlite3, json
 
 conn = sqlite3.connect('file:/srv/technoreboot/data/db/technoreboot.db?mode=ro', uri=True)
-contract = extract_contract_from_sqlite_conn(conn)
+cur = conn.cursor()
+cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+table_names = [r[0] for r in cur.fetchall()]
+tables = {}
+for tbl in table_names:
+    cur.execute(f"PRAGMA table_info('{tbl}');")
+    cols = []
+    for r in cur.fetchall():
+        cid, name, col_type, notnull, dflt_val, pk = r
+        t = col_type.upper().strip() if col_type else "TEXT"
+        if t.startswith("VARCHAR") or t.startswith("NVARCHAR") or t.startswith("CHAR"):
+            t = "TEXT"
+        elif t.startswith("TIMESTAMP"):
+            t = "DATETIME"
+        elif t.startswith("NUMERIC") or t.startswith("DECIMAL") or t.startswith("REAL") or t.startswith("DOUBLE"):
+            t = "FLOAT"
+        elif t.startswith("INT") or t.startswith("TINYINT") or t.startswith("SMALLINT") or t.startswith("BIGINT"):
+            t = "INTEGER"
+        elif t.startswith("BOOL"):
+            t = "BOOLEAN"
+        cols.append({
+            "name": name,
+            "type": t,
+            "nullable": bool(notnull == 0),
+            "primary_key": int(pk),
+            "default": str(dflt_val) if dflt_val is not None else None,
+        })
+    cols.sort(key=lambda c: c["name"])
+    
+    cur.execute(f"PRAGMA foreign_key_list('{tbl}');")
+    fks = []
+    for r in cur.fetchall():
+        id_, seq, target_table, from_col, to_col, on_update, on_delete, match = r
+        fks.append({
+            "from_column": from_col,
+            "target_table": target_table,
+            "target_column": to_col,
+            "on_delete": (on_delete or "NO ACTION").upper(),
+            "on_update": (on_update or "NO ACTION").upper(),
+        })
+    fks.sort(key=lambda x: (x["from_column"], x["target_table"]))
+    
+    cur.execute(f"PRAGMA index_list('{tbl}');")
+    indexes = []
+    for r in cur.fetchall():
+        seq, name, unique, origin, partial = r
+        if origin == "pk": continue
+        cur.execute(f"PRAGMA index_info('{name}');")
+        idx_cols = [c[2] for c in sorted(cur.fetchall(), key=lambda x: x[0])]
+        indexes.append({
+            "name": name,
+            "unique": bool(unique),
+            "columns": idx_cols,
+        })
+    indexes.sort(key=lambda x: x["name"])
+    
+    tables[tbl] = {
+        "columns": cols,
+        "foreign_keys": fks,
+        "indexes": indexes,
+    }
 conn.close()
-print(json.dumps(contract))
+print(json.dumps({"format_version": 1, "tables": tables}))
 """
-    cmd = ["ssh", "-i", ssh_key, vds_host, f"python3 -c \"{remote_script}\""]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    cmd = ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "python3 -"]
+    res = subprocess.run(cmd, input=remote_script, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError(f"Failed to query VDS schema: {res.stderr.strip() or res.stdout.strip()}")
     return json.loads(res.stdout.strip())
@@ -286,6 +344,11 @@ def main():
     comp_p = subparsers.add_parser("compare", help="Compare database file against contract")
     comp_p.add_argument("--db", required=True, help="Path to SQLite DB")
     comp_p.add_argument("--contract", default=str(DEFAULT_CONTRACT_PATH), help="Contract path")
+    
+    vds_p = subparsers.add_parser("check-vds", help="Check live VDS database schema against contract")
+    vds_p.add_argument("--key", default="C:/Users/Apc/.ssh/id_ed25519", help="SSH private key path")
+    vds_p.add_argument("--vds", default="root@144.31.50.134", help="VDS host")
+    vds_p.add_argument("--contract", default=str(DEFAULT_CONTRACT_PATH), help="Contract path")
     
     args = parser.parse_args()
     
@@ -326,6 +389,18 @@ def main():
                 print(f"  - {d}", file=sys.stderr)
             sys.exit(1)
         print(f"Database {db_p} matches contract: SAFE")
+        
+    elif args.command == "check-vds":
+        vds_contract = check_live_vds_schema(args.key, args.vds)
+        c_path = Path(args.contract)
+        tracked_contract = json.loads(c_path.read_text(encoding="utf-8"))
+        is_safe, diffs = compare_schema_contracts(tracked_contract, vds_contract)
+        if not is_safe:
+            print(f"SCHEMA MISMATCH between VDS and tracked contract:", file=sys.stderr)
+            for d in diffs:
+                print(f"  - {d}", file=sys.stderr)
+            sys.exit(1)
+        print("VDS live database matches tracked contract: SAFE")
         
     else:
         parser.print_help()

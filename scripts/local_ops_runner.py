@@ -201,21 +201,21 @@ def execute_sync_vds_to_local(job_id: str, request_data: Dict[str, Any]):
     
     # Check SSH access and VDS production guard
     ssh_check = subprocess.run(
-        ["ssh", "-i", ssh_key, vds_host, "test -f /srv/technoreboot/data/.technoreboot_production_data && echo OK"],
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "test -f /srv/technoreboot/data/.technoreboot_production_data && echo OK"],
         capture_output=True, text=True
     )
     if ssh_check.returncode != 0 or "OK" not in ssh_check.stdout:
         raise RuntimeError(f"VDS недоступен по SSH или отсутствует production sentinel: {ssh_check.stderr.strip()}")
         
     vds_head = subprocess.run(
-        ["ssh", "-i", ssh_key, vds_host, "git -C /srv/technoreboot/app rev-parse HEAD"],
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "git -C /srv/technoreboot/app rev-parse HEAD"],
         capture_output=True, text=True
     ).stdout.strip()
 
     # 2. Создание snapshot VDS
     update_current_status(job_id, "sync_vds_to_local", "RUNNING", "Создание snapshot VDS", 2, total_steps, "Генерация свежего бэкапа данных на VDS...")
     vds_backup_out = subprocess.run(
-        ["ssh", "-i", ssh_key, vds_host, "python3 /srv/technoreboot/app/scripts/vds_backup.py"],
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "python3 /srv/technoreboot/app/scripts/vds_backup.py"],
         capture_output=True, text=True
     )
     if vds_backup_out.returncode != 0:
@@ -388,14 +388,14 @@ def execute_update_vds_code_only(job_id: str, request_data: Dict[str, Any]):
     # Step 3: Проверка VDS
     update_current_status(job_id, "update_vds_code_only", "RUNNING", "Проверка VDS", 3, total_steps, "Проверка production guard и сервисов VDS...")
     ssh_check = subprocess.run(
-        ["ssh", "-i", ssh_key, vds_host, "test -f /srv/technoreboot/data/.technoreboot_production_data && echo OK"],
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "test -f /srv/technoreboot/data/.technoreboot_production_data && echo OK"],
         capture_output=True, text=True
     )
     if ssh_check.returncode != 0 or "OK" not in ssh_check.stdout:
         raise RuntimeError("VDS недоступен по SSH или отсутствует production sentinel!")
         
     vds_head_before = subprocess.run(
-        ["ssh", "-i", ssh_key, vds_host, "git -C /srv/technoreboot/app rev-parse HEAD"],
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "git -C /srv/technoreboot/app rev-parse HEAD"],
         capture_output=True, text=True
     ).stdout.strip()
 
@@ -403,7 +403,7 @@ def execute_update_vds_code_only(job_id: str, request_data: Dict[str, Any]):
     update_current_status(job_id, "update_vds_code_only", "RUNNING", "Выполнение обновления кода на VDS", 5, total_steps, "Запуск deploy/production/update_code_only.sh на VDS...")
     
     deploy_res = subprocess.run(
-        ["ssh", "-i", ssh_key, vds_host, "bash /srv/technoreboot/app/deploy/production/update_code_only.sh origin/main"],
+        ["ssh", "-i", ssh_key, "-o", "ConnectTimeout=15", vds_host, "bash /srv/technoreboot/app/deploy/production/update_code_only.sh origin/main"],
         capture_output=True, text=True
     )
     if deploy_res.returncode != 0:
