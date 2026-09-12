@@ -102,3 +102,14 @@ Future code updates will inevitably introduce schema modifications. The followin
 - **Internal Service Ports:** Ports 8000 (Core), 8010 (Admin Shell), 8020 (Avito), 8030 (Inventory), 8040 (Repairs), and 6080 (noVNC) are bound exclusively to the private Docker bridge network (`technoreboot-network`) and never published to the host interfaces.
 - **Firewall:** Linux `nftables` active, restricting traffic and preserving Docker forward chains.
 - **Authentication:** mTLS enforced at Nginx gateway with client certificate verification against the persistent Technoreboot Client CA.
+
+---
+
+## 6. Extension Pairing Architecture & State Persistence Rules
+
+In accordance with Stage 08D-R1R3 requirements:
+1. **Canonical Persistent State:** Pairing code generation and redemption use canonical persistent state files stored at `${TECHNOREBOOT_DATA_ROOT}/avito-module/extension_pair_codes.json` and `extension_tokens.json`.
+2. **Persistence Across Rebuilds & Deploys:** The directory `/srv/technoreboot/data/avito-module` is mounted as a persistent host volume into the `avito-module` container (`/app/data`). Pairing codes and issued tokens survive container recreations, rebuilds, and code-only deployments.
+3. **Environment Independence:** Local development pairing state (`data/avito-module/...`) is completely isolated and independent from VDS production state (`/srv/technoreboot/data/avito-module/...`). Neither environment can overwrite or redeem codes from the other.
+4. **Code Normalization & Security:** 6-digit pairing codes are formatted with leading zeros (`%06d`), validated as exact strings, have a 10-minute TTL, and are strictly one-time-use. Issued tokens are SHA-256 hashed and authenticated on every extension request.
+5. **Dynamic Server Origin:** The Chrome Extension (v0.2.54+) supports dynamic server base URL configuration via popup UI and `chrome.storage.local`, allowing it to communicate directly with production VDS (`https://144.31.50.134/admin-api/avito-extension`) or local dev sandbox.

@@ -1,6 +1,22 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.53)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.54)
 
-const BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
+const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
+
+async function getServerUrl() {
+    return new Promise(resolve => {
+        chrome.storage.local.get(["server_base_url"], result => {
+            resolve(result.server_base_url || DEFAULT_BRIDGE_BASE_URL);
+        });
+    });
+}
+
+async function setServerUrl(url) {
+    return new Promise(resolve => {
+        chrome.storage.local.set({ server_base_url: url }, () => {
+            resolve();
+        });
+    });
+}
 
 async function getStoredToken() {
     return new Promise(resolve => {
@@ -94,8 +110,9 @@ async function parseJsonResponseSafely(res) {
 
 async function checkBridgeStatus() {
     try {
+        const bridgeUrl = await getServerUrl();
         const token = await getStoredToken();
-        const res = await fetch(`${BRIDGE_BASE_URL}/status`, {
+        const res = await fetch(`${bridgeUrl}/status`, {
             headers: token ? { "X-Extension-Token": token } : {}
         });
         const parsed = await parseJsonResponseSafely(res);
@@ -110,18 +127,25 @@ async function checkBridgeStatus() {
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.1.9"
+                version: data.version || "0.1.9",
+                server_url: bridgeUrl
             };
         }
-        return { online: false, error: parsed.error };
+        return { online: false, error: parsed.error, server_url: bridgeUrl };
     } catch (e) {
-        return { online: false, error: e.message };
+        const bridgeUrl = await getServerUrl();
+        return { online: false, error: e.message, server_url: bridgeUrl };
     }
 }
 
-async function pairExtension(code) {
+async function pairExtension(code, serverUrl) {
     try {
-        const res = await fetch(`${BRIDGE_BASE_URL}/pairing/pair`, {
+        // If a server URL is provided, store it and use it for pairing
+        if (serverUrl) {
+            await setServerUrl(serverUrl);
+        }
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/pairing/pair`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ pair_code: code })
@@ -129,7 +153,7 @@ async function pairExtension(code) {
         const parsed = await parseJsonResponseSafely(res);
         if (parsed.ok && parsed.data.status === "paired" && parsed.data.extension_token) {
             await setStoredToken(parsed.data.extension_token);
-            return { success: true, message: "Расширение успешно привязано к Техноребут!" };
+            return { success: true, message: "Расширение успешно привязано к Техноребут!", server_url: bridgeUrl };
         }
         return { success: false, message: parsed.error || (parsed.data && parsed.data.detail) || "Неверный код подключения." };
     } catch (e) {
@@ -137,13 +161,15 @@ async function pairExtension(code) {
     }
 }
 
+
 async function sendListingPayload(payload) {
     const token = await getStoredToken();
     if (!token) {
         return { success: false, message: "Расширение не привязано к Техноребут. Введите код подключения." };
     }
     try {
-        const res = await fetch(`${BRIDGE_BASE_URL}/listing`, {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/listing`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -197,7 +223,7 @@ async function sendBulkImportPayload(payload) {
         if (!normalizedPayload.schema_version) {
             normalizedPayload.schema_version = 1;
         }
-        normalizedPayload.extension_version = "0.2.53";
+        normalizedPayload.extension_version = "0.2.54";
         if (!normalizedPayload.captured_at) {
             normalizedPayload.captured_at = new Date().toISOString();
         }
@@ -208,7 +234,8 @@ async function sendBulkImportPayload(payload) {
 
         const bodyJson = JSON.stringify(normalizedPayload);
 
-        const res = await fetch(`${BRIDGE_BASE_URL}/bulk-import`, {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/bulk-import`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -266,7 +293,8 @@ async function fetchPublicationPackage(productId) {
         return { success: false, message: "Расширение не привязано к Техноребут." };
     }
     try {
-        const res = await fetch(`${BRIDGE_BASE_URL}/publication-package/${productId}`, {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/publication-package/${productId}`, {
             method: "GET",
             headers: {
                 "X-Extension-Token": token,
@@ -376,7 +404,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === "pair") {
-        pairExtension(request.code).then(sendResponse);
+        pairExtension(request.code, request.server_url).then(sendResponse);
+        return true;
+    }
+    if (request.action === "set_server_url") {
+        setServerUrl(request.server_url).then(() => {
+            sendResponse({ success: true });
+        });
         return true;
     }
     if (request.action === "ingest_listing") {
@@ -398,5 +432,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return true;
 });
+
 
 

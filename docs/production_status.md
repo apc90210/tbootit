@@ -60,3 +60,17 @@ LOCAL BUSINESS DATA MUST NEVER BE RESTORED TO VDS
 - Ordinary deployments will never invoke `bootstrap_restore.py`, local data sync, or auth wipe.
 - In-place SQLite backups occur automatically before every code change.
 - Invariant verification checks ensure pre-update and post-update business record counts match identically.
+
+---
+
+## 4. Chrome Extension Pairing Status (Stage 08D-R1R3)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Extension Version** | `0.2.54` | Aligned across manifest, popup, service worker, content script, and backend schemas |
+| **Host Permissions** | `https://144.31.50.134/*`, `https://*/*` | Enables fetch communication with production VDS IP gateway |
+| **Server Base URL** | Dynamic / Configurable | Extension popup permits manual entry / auto-detection of server base URL |
+| **Pairing State Persistence** | Persistent Volume | Stored in `/srv/technoreboot/data/avito-module/extension_pair_codes.json` |
+| **Production Target** | `https://144.31.50.134` | Extension communicates via `https://144.31.50.134/admin-api/avito-extension` |
+| **Pairing Lifecycle Proof** | **PASSED (HTTP 200)** | Fresh code generation, validation, one-time-use redemption verified on VDS |
+

@@ -107,7 +107,7 @@
         </p>
         <p>Привязанных расширений: <strong>{{ extension_status.active_tokens_count or 0 }}</strong></p>
         
-        <a href="/avito/extension/download" class="btn btn-primary btn-lg">Скачать расширение (ZIP, v0.2.53)</a>
+        <a href="/avito/extension/download" class="btn btn-primary btn-lg">Скачать расширение (ZIP, v0.2.54)</a>
     </div>
 
     <!-- Last Ingest Card -->
@@ -143,6 +143,12 @@
             <div id="codeDisplay" class="code-display">------</div>
         </div>
 
+        <div id="serverUrlContainer" style="margin-top: 15px; padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <p style="margin: 0 0 5px 0; font-weight: bold; color: #475569;">Адрес сервера для расширения:</p>
+            <code id="serverUrlDisplay" style="font-size: 1.1em; color: #2563eb; word-break: break-all;">загрузка...</code>
+            <button onclick="copyServerUrl()" class="btn" style="margin-top: 8px; font-size: 0.85em; padding: 5px 12px;">📋 Скопировать</button>
+        </div>
+
         <div id="codeError" style="display:none; margin-top: 15px; color: #dc2626; font-weight: bold; padding: 10px; background: #fee2e2; border-radius: 4px; border: 1px solid #f87171;"></div>
     </div>
 
@@ -155,12 +161,34 @@
             <li>Откройте Google Chrome и перейдите на страницу <code>chrome://extensions</code>.</li>
             <li>В правом верхнем углу включите тумблер <strong>«Режим разработчика»</strong>.</li>
             <li>Нажмите <strong>«Загрузить распакованное расширение»</strong> и выберите распакованную папку.</li>
-            <li>Нажмите на иконку расширения <strong>«Техноребут Avito»</strong> в панели браузера и введите код подключения.</li>
+            <li>Нажмите на иконку расширения <strong>«Техноребут Avito»</strong> в панели браузера. Вставьте адрес сервера (отображён выше) и введите код подключения.</li>
             <li>Откройте ваше объявление на Avito и нажмите <strong>«Передать объявление в Техноребут»</strong>.</li>
         </ol>
     </div>
 
     <script>
+        // Auto-detect and display server URL for extension
+        (function() {
+            var serverUrlEl = document.getElementById('serverUrlDisplay');
+            if (serverUrlEl) {
+                var origin = window.location.origin;
+                var serverUrl = origin + '/admin-api/avito-extension';
+                serverUrlEl.textContent = serverUrl;
+            }
+        })();
+
+        function copyServerUrl() {
+            var serverUrlEl = document.getElementById('serverUrlDisplay');
+            if (serverUrlEl && navigator.clipboard) {
+                navigator.clipboard.writeText(serverUrlEl.textContent).then(function() {
+                    var btn = event.target;
+                    var orig = btn.textContent;
+                    btn.textContent = '✓ Скопировано!';
+                    setTimeout(function() { btn.textContent = orig; }, 2000);
+                });
+            }
+        }
+
         async function generateCode() {
             const btn = document.getElementById('genCodeBtn');
             const errDiv = document.getElementById('codeError');

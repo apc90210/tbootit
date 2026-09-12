@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.53)
+// Technoreboot Avito Popup Script (v0.2.54)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const pairCodeInput = document.getElementById("pairCodeInput");
     const pairBtn = document.getElementById("pairBtn");
     const pairMsg = document.getElementById("pairMsg");
+    const serverUrlInput = document.getElementById("serverUrlInput");
 
     // Sections
     const prepareSection = document.getElementById("prepareSection");
@@ -62,7 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.53";
+        let manifestVer = "0.2.54";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -145,6 +146,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             connBadge.textContent = "Offline";
             statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу контейнеров).";
             hideAllCards();
+            // Show pairing section so user can set server URL
+            pairSection.style.display = "block";
+            if (serverUrlInput && response && response.server_url) {
+                serverUrlInput.value = response.server_url;
+            }
         } else if (!response.paired) {
             isServerOnline = true;
             isPaired = false;
@@ -153,6 +159,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             statusMsg.textContent = "Сервер Техноребут в сети. Введите код для привязки.";
             hideAllCards();
             pairSection.style.display = "block";
+            if (serverUrlInput && response.server_url) {
+                serverUrlInput.value = response.server_url;
+            }
             inspectActiveTab();
         } else {
             isServerOnline = true;
@@ -161,6 +170,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             connBadge.textContent = "Подключен";
             statusMsg.textContent = "Расширение подключено к Техноребут.";
             hideAllCards();
+            if (serverUrlInput && response.server_url) {
+                serverUrlInput.value = response.server_url;
+            }
             inspectActiveTab();
         }
     });
@@ -185,11 +197,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
+        // Read server URL from input
+        let serverUrl = null;
+        if (serverUrlInput && serverUrlInput.value && serverUrlInput.value.trim()) {
+            serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
+        }
+
         pairMsg.className = "msg";
         pairMsg.textContent = "Подключение...";
         pairBtn.disabled = true;
 
-        chrome.runtime.sendMessage({ action: "pair", code: cleanCode }, res => {
+        chrome.runtime.sendMessage({ action: "pair", code: cleanCode, server_url: serverUrl }, res => {
             pairBtn.disabled = false;
             if (res && res.success) {
                 isPaired = true;
@@ -346,7 +364,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             const payload = {
                 schema_version: 1,
-                extension_version: "0.2.53",
+                extension_version: "0.2.54",
                 captured_at: new Date().toISOString(),
                 page_type: "bulk_import",
                 listings_count: batchItems.length,

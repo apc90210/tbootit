@@ -328,36 +328,37 @@ def test_test_i_catalog_preservation_invariant(isolated_catalog_db):
 
 
 def test_test_j_extension_archive_and_version_synchronization():
-    """TEST J: Extension archive validation: technoreboot-avito-extension-0.2.53.zip is valid, version 0.2.53 aligned."""
+    """TEST J: Extension archive validation: technoreboot-avito-extension-{version}.zip is valid, version aligned."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] == "0.2.53"
+    ver = manifest["version"]
+    assert ver in ("0.2.53", "0.2.54")
 
     with open(POPUP_HTML_PATH, "r", encoding="utf-8") as f:
-        assert "v0.2.53" in f.read()
+        assert f"v{ver}" in f.read()
 
     with open(POPUP_JS_PATH, "r", encoding="utf-8") as f:
         popup_js = f.read()
-        assert 'let manifestVer = "0.2.53";' in popup_js
-        assert 'extension_version: "0.2.53"' in popup_js
+        assert f'let manifestVer = "{ver}";' in popup_js
+        assert f'extension_version: "{ver}"' in popup_js
 
     with open(CONTENT_JS_PATH, "r", encoding="utf-8") as f:
         content_js = f.read()
-        assert "v0.2.53" in content_js
-        assert 'extension_version: "0.2.53"' in content_js
+        assert f"v{ver}" in content_js
+        assert f'extension_version: "{ver}"' in content_js
 
     with open(SW_PATH, "r", encoding="utf-8") as f:
         sw = f.read()
-        assert "v0.2.53" in sw
-        assert 'extension_version = "0.2.53"' in sw
+        assert f"v{ver}" in sw
+        assert f'extension_version = "{ver}"' in sw
 
-    # Status route reports 0.2.53
+    # Status route reports aligned version
     res = client.get("/extension/api/status")
     assert res.status_code == 200
-    assert res.json()["version"] == "0.2.53"
+    assert res.json()["version"] == ver
 
     # Zip exists and is valid
-    zip_path = os.path.join(DIST_DIR, "technoreboot-avito-extension-0.2.53.zip")
+    zip_path = os.path.join(DIST_DIR, f"technoreboot-avito-extension-{ver}.zip")
     if not os.path.exists(zip_path):
         import sys
         sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "scripts")))
@@ -373,4 +374,4 @@ def test_test_j_extension_archive_and_version_synchronization():
         assert "popup.html" in namelist
         with zf.open("manifest.json") as mf:
             zip_manifest = json.load(mf)
-            assert zip_manifest["version"] == "0.2.53"
+            assert zip_manifest["version"] == ver
