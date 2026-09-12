@@ -42,8 +42,8 @@ def assert_unified_navbar_in_html(html: str, context: str = ""):
     assert "window.location.pathname" in html, f"Missing active navigation highlighter script in {context}"
 
 
-def test_admin_shell_index_unified_navbar():
-    resp = client.get("/")
+def test_admin_shell_index_unified_navbar(owner_headers):
+    resp = client.get("/", headers=owner_headers)
     assert resp.status_code == 200
     assert_unified_navbar_in_html(resp.text, "admin-shell index")
 

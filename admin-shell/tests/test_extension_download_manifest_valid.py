@@ -4,7 +4,9 @@ import zipfile
 import tempfile
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.abspath("scripts"))
+scripts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
+if scripts_dir not in sys.path:
+    sys.path.insert(0, scripts_dir)
 from validate_extension_package import validate_extension_directory
 from app.main import app
 

@@ -11,8 +11,11 @@ def create_product(sku, title, status="in_stock", brand="BrandX", storage="Ск�
     }
     r = client.post("/api/product-cards/import-json", json=payload)
     pid = r.json()["product_id"]
-    # set status via status endpoint
-    client.post(f"/api/products/{pid}/status", json={"status": status})
+    # set status via status endpoint following valid transitions: draft -> in_stock -> status
+    if status != "draft":
+        client.post(f"/api/products/{pid}/status", json={"status": "in_stock"})
+        if status != "in_stock":
+            client.post(f"/api/products/{pid}/status", json={"status": status})
     return pid
 
 def test_search_q():

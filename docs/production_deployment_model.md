@@ -113,3 +113,31 @@ In accordance with Stage 08D-R1R3 requirements:
 3. **Environment Independence:** Local development pairing state (`data/avito-module/...`) is completely isolated and independent from VDS production state (`/srv/technoreboot/data/avito-module/...`). Neither environment can overwrite or redeem codes from the other.
 4. **Code Normalization & Security:** 6-digit pairing codes are formatted with leading zeros (`%06d`), validated as exact strings, have a 10-minute TTL, and are strictly one-time-use. Issued tokens are SHA-256 hashed and authenticated on every extension request.
 5. **Dynamic Server Origin:** The Chrome Extension (v0.2.54+) supports dynamic server base URL configuration via popup UI and `chrome.storage.local`, allowing it to communicate directly with production VDS (`https://144.31.50.134/admin-api/avito-extension`) or local dev sandbox.
+
+---
+
+## 7. Business Data Direction & Local Parity Sync Architecture (Stage 08D-R1R4-SYNC)
+
+Stage 08D-R1R4-SYNC codifies the permanent architectural relationship between Local Dev and VDS:
+
+```text
+CODE ARROW: LOCAL DEV -> Git -> VDS (Code-Only Deployment via update_code_only.sh)
+DATA ARROW: VDS -> LOCAL DEV Replica (One-Way Sync via sync_vds_business_to_local.py)
+FORBIDDEN:  LOCAL DEV -> VDS (NEVER reverse the data arrow during normal operations)
+```
+
+### Operating Procedure: Feature / Update Cycle
+1. **Sync VDS Business Snapshot -> LOCAL:**
+   Run `python scripts/sync_vds_business_to_local.py` to pull fresh canonical data into the local test replica.
+2. **Develop & Test Code Locally:**
+   Build new features, adjust templates, add endpoints, and execute unit/integration test suites against the replicated dataset.
+3. **Commit & Push to Git:**
+   Commit code, tests, docs, and tooling to git and push to `origin/main`.
+4. **Automatic VDS Backup:**
+   Production deploy script automatically creates a pre-update safety backup of VDS state.
+5. **Code-Only Deploy to VDS:**
+   Execute `deploy/production/update_code_only.sh origin/main` on VDS. Business data, certificates, and secrets are completely untouched.
+6. **Verify VDS Invariants:**
+   Confirm all 6 containers are healthy and business counts match pre-deploy values.
+7. **Later Refresh Local Replica:**
+   Refresh local business data on demand using `scripts/sync_vds_business_to_local.py`.

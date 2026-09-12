@@ -30,18 +30,21 @@
 - **Role:** Permanent DEV / TEST Sandbox (`https://localhost:8443`).
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
 - **Restart Count:** 0 across all containers.
-- **Database Status:** 50 products, 52 sales, 66 repairs (SHA256: `a84b08e7...`).
-- **Data Sync:** Strictly isolated; local dirty data will never sync to VDS.
+- **Database Status:** 149 products, 0 sales, 0 repairs, 149 photos, 149 listings (100% parity with VDS).
+- **Data Sync:** Synchronized via `scripts/sync_vds_business_to_local.py` (VDS -> LOCAL).
+- **Safety Invariant:** Local data NEVER flows to VDS.
 
 ### Debian VDS (`144.31.50.134`)
 - **Role:** Canonical Real-User Test-Production (`https://144.31.50.134`).
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
+- **Current Git Commit:** `1c7792db7267bb3fd5e7b75b04a90edb73d37960`.
 - **Restart Count:** 0 across all containers.
-- **Business Data Status:** **CLEAN BASELINE (0 products, 0 sales, 0 repairs, 0 photos)**.
+- **Business Data Status:** **CANONICAL PRODUCTION (149 products, 0 sales, 0 repairs, 149 photos, 149 listings)**.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
-- **Pre-Reset Safety Backup:** `/srv/technoreboot/deploy/pre_clean_reset/TECHNOREBOOT_PRE_RESET_BACKUP_2026-09-12_081617.zip` (`4362991c...`).
-- **Clean Baseline Backup:** `/srv/technoreboot/data/backups/TECHNOREBOOT_CLEAN_IP_TEST_PRODUCTION_BASELINE_2026-09-12.zip` (`e6892f99...`).
+- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-12_103639.zip` / `TECHNOREBOOT_BACKUP_2026-09-12_103935.zip`.
 - **Code-Only Update Script:** Installed, tested, and active at `deploy/production/update_code_only.sh`.
+- **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles; dev-reset blocked even for OWNER on production.
+- **Avito Extension Version:** `0.2.56` (tightened host permissions, broad wildcard removed).
 
 ---
 
@@ -50,10 +53,11 @@
 ```text
 CURRENT_PRODUCTION_URL = https://144.31.50.134
 DOMAIN_NAME = deferred / not required
-LOCAL = DEV / TEST
-VDS = canonical real-user data
-FUTURE_DEPLOYS = code only
-LOCAL BUSINESS DATA MUST NEVER BE RESTORED TO VDS
+LOCAL = DEV / TEST SANDBOX (REPLICA)
+VDS = CANONICAL SOURCE OF TRUTH (REAL USER DATA)
+CODE FLOW = LOCAL -> Git -> VDS (Code-Only Deployment)
+DATA FLOW = VDS -> LOCAL (One-Way Parity Sync)
+REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 ```
 
 - Deployment updates are triggered via `deploy/production/update_code_only.sh`.

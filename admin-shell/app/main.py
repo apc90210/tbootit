@@ -80,8 +80,11 @@ async def dashboard(request: Request):
             
         try:
             params = dict(request.query_params)
+            if "limit" not in params:
+                params["limit"] = 1000
             products_resp = await client.get(f"{CORE_API_URL}/api/products/", params=params)
-            products = products_resp.json() if products_resp.status_code == 200 else []
+            prod_json = products_resp.json() if products_resp.status_code == 200 else []
+            products = prod_json.get("items", []) if isinstance(prod_json, dict) else prod_json
         except Exception:
             products = []
             
