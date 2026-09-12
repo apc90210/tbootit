@@ -33,40 +33,46 @@ with httpx.Client(cert=OWNER_CERT, verify=True, timeout=15.0, trust_env=False) a
     print(f"  [PASS] Production guard blocked dev-reset: HTTP 403 '{detail}'")
 
     # 3. Product Draft transition workflow on production VDS
-    print("\n[Step 3] Verifying product Draft transition workflow: GET /api/products/")
-    r_prods = client.get(f"{BASE_URL}/api/products/?limit=1")
-    assert r_prods.status_code == 200, f"Products fetch failed: {r_prods.status_code}"
-    items = r_prods.json().get("items", [])
-    if items:
-        p = items[0]
-        pid = p["id"]
-        orig_status = p.get("status", "in_stock")
-        print(f"  Selected Product ID {pid} (current status: '{orig_status}')")
+    print("\n[Step 3] Verifying product Draft transition workflow: PATCH /admin-api/products/1/status")
+    # Fetch product 1 details
+    r_det = client.get(f"{BASE_URL}/admin-api/products/1/details")
+    assert r_det.status_code == 200, f"Failed getting details: {r_det.status_code} {r_det.text}"
+    p_data = r_det.json()
+    orig_status = p_data.get("status", "in_stock")
+    print(f"  Product 1 current status: '{orig_status}'")
 
-        # Move to draft
-        print("  Moving product to 'draft'...")
-        r_to_draft = client.post(f"{BASE_URL}/api/products/{pid}/status", json={"status": "draft"})
-        assert r_to_draft.status_code == 200, f"Failed moving to draft: {r_to_draft.status_code} {r_to_draft.text}"
-        assert r_to_draft.json().get("status") == "draft"
-        print("  [PASS] Product successfully moved to 'draft'")
+    # Move product to draft
+    print("  Moving Product 1 to 'draft'...")
+    r_draft = client.patch(f"{BASE_URL}/admin-api/products/1/status", json={"status": "draft"})
+    assert r_draft.status_code == 200, f"Failed moving to draft: {r_draft.status_code} {r_draft.text}"
+    assert r_draft.json().get("status") == "draft"
+    print("  [PASS] Product 1 successfully transitioned to 'draft'")
 
-        # Restore back to original status
-        print(f"  Restoring product back to '{orig_status}'...")
-        r_restore = client.post(f"{BASE_URL}/api/products/{pid}/status", json={"status": orig_status})
-        assert r_restore.status_code == 200, f"Failed restoring status: {r_restore.status_code} {r_restore.text}"
-        assert r_restore.json().get("status") == orig_status
-        print(f"  [PASS] Product successfully restored to '{orig_status}'")
-    else:
-        print("  [SKIP] No products present to test status transition on VDS")
+    # Restore back to original status
+    print(f"  Restoring Product 1 back to '{orig_status}'...")
+    r_restore = client.patch(f"{BASE_URL}/admin-api/products/1/status", json={"status": orig_status})
+    assert r_restore.status_code == 200, f"Failed restoring: {r_restore.status_code} {r_restore.text}"
+    assert r_restore.json().get("status") == orig_status
+    print(f"  [PASS] Product 1 successfully restored to '{orig_status}'")
 
 # 4. Check business data counts on VDS
 print("\n[Step 4] Verifying business data counts on VDS...")
+py_cmd = (
+    "python3 -c \""
+    "import sqlite3; "
+    "conn = sqlite3.connect('/srv/technoreboot/data/db/technoreboot.db'); "
+    "cur = conn.cursor(); "
+    "p = cur.execute('SELECT COUNT(*) FROM products').fetchone()[0]; "
+    "s = cur.execute('SELECT COUNT(*) FROM sales').fetchone()[0]; "
+    "r = cur.execute('SELECT COUNT(*) FROM repair_orders').fetchone()[0]; "
+    "print(f'PRODUCTS={p} SALES={s} REPAIRS={r}')"
+    "\""
+)
 check_cmd = [
-    "ssh", "-i", r"C:\Users\Apc\.ssh\id_ed25519", "root@144.31.50.134",
-    "sqlite3 /srv/technoreboot/data/db/technoreboot.db \"SELECT 'PRODUCTS=' || count(*) FROM products; SELECT 'SALES=' || count(*) FROM sales; SELECT 'REPAIRS=' || count(*) FROM repairs;\""
+    "ssh", "-i", r"C:\Users\Apc\.ssh\id_ed25519", "root@144.31.50.134", py_cmd
 ]
 res = subprocess.run(check_cmd, capture_output=True, text=True, check=True)
-counts = res.stdout.strip().replace("\n", " ")
+counts = res.stdout.strip()
 print(f"  Live VDS Counts: {counts}")
 assert "PRODUCTS=149" in counts
 assert "SALES=0" in counts
