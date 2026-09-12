@@ -104,8 +104,48 @@
         <p id="resultMsg" class="msg" style="margin-top:10px;"></p>
     </div>
 
+    <!-- Post-Sale Deactivation Task Section -->
+    <div class="card" id="deactivationSection" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <h3 style="margin:0; font-size:14px;">Снятие с публикации</h3>
+            <span id="deactivationModeBadge" class="badge badge-warning" style="font-size:10px;">ТЕСТОВЫЙ РЕЖИМ</span>
+        </div>
+
+        <div style="margin-bottom:10px; font-size:12px; display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="dryRunCheckbox" checked>
+            <label for="dryRunCheckbox" style="cursor:pointer; font-weight:500;">Тестовый режим (без финального клика)</label>
+        </div>
+
+        <div id="activeTaskCard" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px; margin-bottom:8px;">
+            <div style="font-weight:600; font-size:12px; margin-bottom:4px;" id="taskHeader">Задача: снять объявление Avito</div>
+            <div style="font-size:11px; color:#64748b; margin-bottom:8px;" id="taskAvitoId">Avito ID: ...</div>
+
+            <div id="taskStepsList" style="font-size:11px; line-height:1.7; margin-bottom:10px;">
+                <div id="stepReceived" style="color:#94a3b8;">○ 1. Получена</div>
+                <div id="stepOpening" style="color:#94a3b8;">○ 2. Открываю объявление</div>
+                <div id="stepVerifying" style="color:#94a3b8;">○ 3. Проверяю ID</div>
+                <div id="stepFound" style="color:#94a3b8;">○ 4. Кнопка найдена</div>
+                <div id="stepExecuting" style="color:#94a3b8;">○ 5. Снятие с публикации</div>
+                <div id="stepConfirmed" style="color:#94a3b8;">○ 6. Подтверждение получено</div>
+            </div>
+
+            <div id="taskStatusBox" style="font-size:11px; padding:8px; border-radius:4px; background:#eff6ff; color:#1e40af; font-weight:500; margin-bottom:8px;">
+                Ожидание задачи...
+            </div>
+
+            <div style="display:flex; gap:6px;">
+                <button id="openTaskListingBtn" class="btn btn-secondary" style="flex:1; padding:4px 8px; font-size:11px; display:none;">↗ Открыть на Avito</button>
+                <button id="dismissTaskBtn" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;">✕ Скрыть</button>
+            </div>
+        </div>
+
+        <div id="noActiveTaskMsg" style="font-size:12px; color:#64748b; text-align:center; padding:8px 0;">
+            Нет активных задач снятия с публикации
+        </div>
+    </div>
+
     <div class="footer">
-        <small id="versionLabel">Техноребут Avito v0.2.57</small>
+        <small id="versionLabel">Техноребут Avito v0.2.58</small>
     </div>
 
     <script src="popup.js"></script>

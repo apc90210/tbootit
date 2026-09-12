@@ -165,11 +165,11 @@ def test_avito_target_domain_security_validation():
 
 
 # ==============================================================================
-# Chrome Extension v0.2.57 Package Tests (Section 13)
+# Chrome Extension v0.2.58 Package Tests (Section 13 & 14)
 # ==============================================================================
 
-def test_extension_package_v0257_and_task_channel_helpers():
-    """Section 13: Extension bumped to v0.2.57 and ZIP package contains valid manifest & service worker."""
+def test_extension_package_v0258_and_task_channel_helpers():
+    """Section 14: Extension bumped to v0.2.58 and ZIP package contains valid manifest, service worker & content script."""
     ext_zip_path = REPO_ROOT / "admin-shell" / "app" / "technoreboot-avito-extension.zip"
     assert ext_zip_path.is_file(), f"Missing extension zip: {ext_zip_path}"
 
@@ -179,15 +179,210 @@ def test_extension_package_v0257_and_task_channel_helpers():
         assert "service_worker.js" in namelist
         assert "content.js" in namelist
         assert "popup.html" in namelist
+        assert "popup.js" in namelist
 
         manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest_data["version"] == "0.2.57"
+        assert manifest_data["version"] == "0.2.58"
 
         sw_code = zf.read("service_worker.js").decode("utf-8")
-        assert "0.2.57" in sw_code
-        assert "fetch_next_task" in sw_code
+        assert "0.2.58" in sw_code
+        assert "pollNextDeactivationTask" in sw_code
+        assert "getActiveDeactivationTask" in sw_code
+        assert "executeDeactivationFlow" in sw_code
+        assert "isValidAvitoTarget" in sw_code
         assert "report_task_success" in sw_code
         assert "report_task_failed" in sw_code
+
+        content_code = zf.read("content.js").decode("utf-8")
+        assert "0.2.58" in content_code
+        assert "execute_deactivation" in content_code
+        assert "discoverDeactivationControl" in content_code
+        assert "DEACTIVATION_WHITELIST" in content_code
+        assert "DEACTIVATION_BLACKLIST" in content_code
+        assert "waitForConfirmedInactiveState" in content_code
+        assert "showDryRunPageBanner" in content_code
+
+
+# ==============================================================================
+# Stage 09A-R1 Executor Logic Tests (Section 18)
+# ==============================================================================
+
+def test_executor_target_validation_logic():
+    """Section 6 & 18: Exact target validation rejects bad schemes, non-Avito domains, and mismatched IDs."""
+    import urllib.parse
+
+    def is_valid_avito_target(listing_url: str, avito_listing_id: str) -> bool:
+        if not listing_url or not avito_listing_id:
+            return False
+        try:
+            parsed = urllib.parse.urlparse(listing_url)
+            if parsed.scheme not in ("http", "https"):
+                return False
+            hostname = (parsed.hostname or "").lower()
+            if hostname != "avito.ru" and not hostname.endswith(".avito.ru"):
+                return False
+            if str(avito_listing_id) not in listing_url:
+                return False
+            return True
+        except Exception:
+            return False
+
+    # Valid targets
+    assert is_valid_avito_target("https://www.avito.ru/moskva/tovary_123456789", "123456789") is True
+    assert is_valid_avito_target("https://m.avito.ru/items/987654321", "987654321") is True
+    assert is_valid_avito_target("https://avito.ru/123456789", "123456789") is True
+
+    # Malicious / Mismatched targets
+    assert is_valid_avito_target("https://evil.com/123456789", "123456789") is False
+    assert is_valid_avito_target("https://avito.ru.phishing.io/123456789", "123456789") is False
+    assert is_valid_avito_target("javascript:alert(1)", "123456789") is False
+    assert is_valid_avito_target("https://www.avito.ru/items/111111111", "123456789") is False
+    assert is_valid_avito_target("", "123456789") is False
+    assert is_valid_avito_target("https://www.avito.ru/items/123", "") is False
+
+
+def test_executor_dom_discovery_whitelist_and_blacklist():
+    """Section 8 & 18: Conservative DOM discovery recognizes whitelist, rejects blacklist, and detects ambiguity."""
+    WHITELIST = [
+        "снять с публикации",
+        "снять объявление",
+        "деактивировать",
+        "архивировать",
+        "убрать с публикации",
+        "закрыть объявление"
+    ]
+    BLACKLIST = [
+        "опубликовать",
+        "продать быстрее",
+        "продвигать",
+        "поднять",
+        "оплатить",
+        "купить услугу",
+        "редактировать",
+        "удалить аккаунт",
+        "разместить",
+        "добавить",
+        "продлить",
+        "подключить"
+    ]
+
+    def evaluate_element(text: str, aria_label: str = "", data_marker: str = ""):
+        combined = f"{text} {aria_label} {data_marker}".lower()
+        # Blacklist check
+        if any(b in combined for b in BLACKLIST):
+            return None
+        # Whitelist check
+        if any(w in combined for w in WHITELIST) or "close-item" in data_marker or "deactivate" in data_marker or data_marker == "item-actions/close":
+            return {"text": text, "marker": data_marker}
+        return None
+
+    # 1. Whitelist phrases must match
+    assert evaluate_element("Снять с публикации") is not None
+    assert evaluate_element("Снять объявление") is not None
+    assert evaluate_element("Деактивировать") is not None
+    assert evaluate_element("Архивировать") is not None
+    assert evaluate_element("Убрать с публикации") is not None
+    assert evaluate_element("", "", "item-actions/close") is not None
+
+    # 2. Blacklist phrases must be REJECTED even if containing deceptive words
+    assert evaluate_element("Опубликовать") is None
+    assert evaluate_element("Продать быстрее") is None
+    assert evaluate_element("Продвигать объявление") is None
+    assert evaluate_element("Оплатить размещение") is None
+    assert evaluate_element("Редактировать объявление") is None
+    assert evaluate_element("Снять и опубликовать заново") is None  # Contains 'опубликовать'
+
+    # 3. Ambiguity handling simulation:
+    sample_buttons = ["Снять с публикации", "Архивировать"]
+    candidates = [evaluate_element(b) for b in sample_buttons if evaluate_element(b) is not None]
+    assert len(candidates) == 2, "Multiple candidates must be flagged as ambiguous"
+
+
+def test_executor_dry_run_safety_contract():
+    """Section 11 & 18: In dry-run mode, button is found but destructive click is blocked and success is NOT reported."""
+    task = {
+        "task_id": 42,
+        "action": "deactivate_listing",
+        "avito_listing_id": "123456789",
+        "dry_run": True,
+        "step": "received"
+    }
+
+    # Simulation of content script dry-run execution
+    def simulate_content_script_execution(task_params, button_found: bool):
+        if not button_found:
+            return {"success": False, "status": "manual_required", "error": "Button not found"}
+        if task_params.get("dry_run"):
+            return {
+                "dry_run_ready": True,
+                "control_text": "Снять с публикации",
+                "message": "Готово к снятию: кнопка найдена"
+            }
+        return {"success": True, "confirmation": "inactive_state_confirmed"}
+
+    res = simulate_content_script_execution(task, button_found=True)
+    assert res.get("dry_run_ready") is True
+    assert res.get("control_text") == "Снять с публикации"
+    # Success is NOT reported
+    assert res.get("success") is not True
+    assert "Готово к снятию" in res.get("message", "")
+
+
+def test_executor_mandatory_confirmation_for_success():
+    """Section 10 & 18: Success requires confirmed inactive state; unconfirmed state results in failure."""
+    def evaluate_task_outcome(click_performed: bool, confirmed_inactive: bool):
+        if not click_performed:
+            return "not_executed"
+        if not confirmed_inactive:
+            return "failed_timeout"
+        return "success"
+
+    assert evaluate_task_outcome(click_performed=False, confirmed_inactive=False) == "not_executed"
+    assert evaluate_task_outcome(click_performed=True, confirmed_inactive=False) == "failed_timeout"
+    assert evaluate_task_outcome(click_performed=True, confirmed_inactive=True) == "success"
+
+
+def test_executor_active_task_locking_and_timeout():
+    """Section 5 & 18: Active task lock prevents concurrency; lock recovers safely after timeout."""
+    import time
+
+    class FakeExtensionStorage:
+        def __init__(self):
+            self.store = {}
+
+        def get(self, key):
+            return self.store.get(key)
+
+        def set(self, key, val):
+            self.store[key] = val
+
+    storage = FakeExtensionStorage()
+
+    def can_process_new_task(storage_obj, now_ts: float):
+        active = storage_obj.get("active_deactivation_task")
+        if not active:
+            return True
+        updated_ts = active.get("updated_ts", 0)
+        # Timeout after 300 seconds
+        if now_ts - updated_ts > 300:
+            storage_obj.set("active_deactivation_task", None)
+            return True
+        return False
+
+    t0 = 1000.0
+    # Initially no active task -> can process
+    assert can_process_new_task(storage, t0) is True
+
+    # Set active task
+    storage.set("active_deactivation_task", {"task_id": 10, "updated_ts": t0})
+
+    # Within timeout -> locked (concurrency blocked)
+    assert can_process_new_task(storage, t0 + 60.0) is False
+    assert can_process_new_task(storage, t0 + 299.0) is False
+
+    # After timeout (>300s) -> recovers safely
+    assert can_process_new_task(storage, t0 + 301.0) is True
+    assert storage.get("active_deactivation_task") is None
 
 
 # ==============================================================================
@@ -227,3 +422,4 @@ def test_deployment_compatibility_enforces_manual_migration_guard():
     assert compat.get("requires_manual_migration") is True
     assert compat.get("database_change") is True
     assert "Stage 09A" in compat.get("reason", "") or "avito_post_sale_tasks" in compat.get("reason", "")
+

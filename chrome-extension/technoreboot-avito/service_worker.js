@@ -1,6 +1,55 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.57)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.58)
 
 const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
+
+async function getDryRunMode() {
+    return new Promise(resolve => {
+        chrome.storage.local.get(["avito_deactivation_dry_run"], result => {
+            // Default to true for safety in local development
+            resolve(result.avito_deactivation_dry_run !== false);
+        });
+    });
+}
+
+async function setDryRunMode(enabled) {
+    return new Promise(resolve => {
+        chrome.storage.local.set({ avito_deactivation_dry_run: Boolean(enabled) }, () => {
+            resolve();
+        });
+    });
+}
+
+async function getActiveDeactivationTask() {
+    return new Promise(resolve => {
+        chrome.storage.local.get(["active_deactivation_task"], result => {
+            resolve(result.active_deactivation_task || null);
+        });
+    });
+}
+
+async function setActiveDeactivationTask(task) {
+    return new Promise(resolve => {
+        if (!task) {
+            chrome.storage.local.remove(["active_deactivation_task"], () => resolve());
+        } else {
+            chrome.storage.local.set({ active_deactivation_task: task }, () => resolve());
+        }
+    });
+}
+
+function isValidAvitoTarget(listingUrl, avitoListingId) {
+    if (!listingUrl || !avitoListingId) return false;
+    try {
+        const parsed = new URL(listingUrl);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+        const host = (parsed.hostname || "").toLowerCase();
+        if (host !== "avito.ru" && !host.endsWith(".avito.ru")) return false;
+        if (!listingUrl.includes(String(avitoListingId))) return false;
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 async function getServerUrl() {
     return new Promise(resolve => {
@@ -223,7 +272,7 @@ async function sendBulkImportPayload(payload) {
         if (!normalizedPayload.schema_version) {
             normalizedPayload.schema_version = 1;
         }
-        normalizedPayload.extension_version = "0.2.57";
+        normalizedPayload.extension_version = "0.2.58";
         if (!normalizedPayload.captured_at) {
             normalizedPayload.captured_at = new Date().toISOString();
         }
@@ -442,6 +491,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         reportTaskFailed(request.task_id, request.error, request.can_retry).then(sendResponse);
         return true;
     }
+    if (request.action === "get_active_task") {
+        getActiveDeactivationTask().then(task => sendResponse({ task: task }));
+        return true;
+    }
+    if (request.action === "get_dry_run_mode") {
+        getDryRunMode().then(isDryRun => sendResponse({ dry_run: isDryRun }));
+        return true;
+    }
+    if (request.action === "set_dry_run_mode") {
+        setDryRunMode(request.enabled).then(() => sendResponse({ success: true, dry_run: request.enabled }));
+        return true;
+    }
+    if (request.action === "clear_active_task") {
+        setActiveDeactivationTask(null).then(() => sendResponse({ success: true }));
+        return true;
+    }
+    if (request.action === "trigger_poll_tasks") {
+        pollNextDeactivationTask().then(() => sendResponse({ success: true }));
+        return true;
+    }
     return true;
 });
 
@@ -466,6 +535,25 @@ async function fetchNextPostSaleTask() {
         return { success: false, message: parsed.error, details: parsed.data };
     } catch (e) {
         return { success: false, message: `Ошибка связи: ${e.message}` };
+    }
+}
+
+async function notifyTaskStarted(taskId) {
+    const token = await getStoredToken();
+    if (!token) return { success: false, message: "Не привязано" };
+    try {
+        const bridgeUrl = await getServerUrl();
+        const res = await fetch(`${bridgeUrl}/tasks/${taskId}/started`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Extension-Token": token
+            }
+        });
+        const parsed = await parseJsonResponseSafely(res);
+        return { success: parsed.ok, data: parsed.data };
+    } catch (e) {
+        return { success: false, message: e.message };
     }
 }
 
@@ -508,6 +596,272 @@ async function reportTaskFailed(taskId, errorMsg, canRetry = true) {
         return { success: false, message: e.message };
     }
 }
+
+let isPollingActive = false;
+
+async function pollNextDeactivationTask() {
+    if (isPollingActive) return;
+    isPollingActive = true;
+    try {
+        const token = await getStoredToken();
+        if (!token) return; // Only poll when paired
+
+        // Active task lock check: ONE TASK AT A TIME
+        const activeTask = await getActiveDeactivationTask();
+        if (activeTask && activeTask.task_id) {
+            const updatedAt = activeTask.updated_at ? new Date(activeTask.updated_at).getTime() : 0;
+            const now = Date.now();
+            // Lock timeout after 5 minutes to recover safely from suspended/crashed worker
+            if (updatedAt && (now - updatedAt > 300000)) {
+                console.warn("[AvitoSW] Active task timed out after 5 minutes, clearing lock:", activeTask.task_id);
+                await reportTaskFailed(activeTask.task_id, "Extension task execution timed out (5 min)", false);
+                await setActiveDeactivationTask(null);
+            } else {
+                // Task is actively locked in progress
+                return;
+            }
+        }
+
+        const res = await fetchNextPostSaleTask();
+        if (!res || !res.success || !res.task) return;
+        const task = res.task;
+
+        // Strict target validation
+        if (task.action !== "deactivate_listing") {
+            console.warn("[AvitoSW] Unsupported task action:", task.action);
+            await reportTaskFailed(task.task_id, `Unsupported action: ${task.action}`, false);
+            return;
+        }
+
+        if (!isValidAvitoTarget(task.listing_url, task.avito_listing_id)) {
+            console.error("[AvitoSW] Target validation failed for task:", task);
+            await reportTaskFailed(task.task_id, `Security validation failed: invalid target URL or ID (${task.listing_url})`, false);
+            return;
+        }
+
+        // Notify server that task is started/processing
+        await notifyTaskStarted(task.task_id);
+
+        const isDryRun = await getDryRunMode();
+        const initialTaskState = {
+            task_id: task.task_id,
+            sale_id: task.sale_id,
+            product_id: task.product_id,
+            action: task.action,
+            avito_listing_id: String(task.avito_listing_id),
+            listing_url: task.listing_url,
+            step: "received",
+            status_message: `Задача #${task.task_id}: получена команда на снятие с публикации`,
+            tab_id: null,
+            dry_run: isDryRun,
+            updated_at: new Date().toISOString()
+        };
+        await setActiveDeactivationTask(initialTaskState);
+
+        // Execute deactivation navigation and DOM interaction
+        await executeDeactivationFlow(initialTaskState);
+    } catch (e) {
+        console.error("[AvitoSW] pollNextDeactivationTask error:", e);
+    } finally {
+        isPollingActive = false;
+    }
+}
+
+async function executeDeactivationFlow(task) {
+    try {
+        task.step = "opening_page";
+        task.status_message = `Открываю объявление Avito №${task.avito_listing_id}...`;
+        task.updated_at = new Date().toISOString();
+        await setActiveDeactivationTask(task);
+
+        // Find existing tab with this Avito ID or open a new tab
+        const allTabs = await new Promise(r => chrome.tabs.query({}, r));
+        let targetTab = allTabs.find(t => t.url && t.url.includes(task.avito_listing_id));
+
+        if (targetTab) {
+            await new Promise(r => chrome.tabs.update(targetTab.id, { active: true }, r));
+            task.tab_id = targetTab.id;
+        } else {
+            targetTab = await new Promise(r => chrome.tabs.create({ url: task.listing_url, active: true }, r));
+            task.tab_id = targetTab.id;
+        }
+
+        // Wait for page to fully load
+        const loaded = await waitForTabComplete(targetTab.id, 25000);
+        if (!loaded) {
+            task.step = "failed";
+            task.status_message = "Страница объявления Avito не загрузилась вовремя.";
+            task.updated_at = new Date().toISOString();
+            await setActiveDeactivationTask(task);
+            await reportTaskFailed(task.task_id, task.status_message, true);
+            return;
+        }
+
+        task.step = "verifying_id";
+        task.status_message = `Проверяю ID объявления №${task.avito_listing_id} на странице...`;
+        task.updated_at = new Date().toISOString();
+        await setActiveDeactivationTask(task);
+
+        // Send execution command to content script
+        const response = await sendTabMessageWithRetry(targetTab.id, {
+            action: "execute_deactivation",
+            task: task
+        }, 5);
+
+        if (!response) {
+            task.step = "failed";
+            task.status_message = "Content script не ответил на команду деактивации.";
+            task.updated_at = new Date().toISOString();
+            await setActiveDeactivationTask(task);
+            await reportTaskFailed(task.task_id, task.status_message, true);
+            return;
+        }
+
+        if (response.dry_run_ready) {
+            task.step = "dry_run_ready";
+            task.status_message = `Готово к снятию: кнопка найдена (${response.control_text || 'Снять с публикации'}). Финальное снятие не выполняется (ТЕСТОВЫЙ РЕЖИМ).`;
+            task.control_text = response.control_text;
+            task.updated_at = new Date().toISOString();
+            await setActiveDeactivationTask(task);
+            // CRITICAL: DO NOT call reportTaskSuccess! DO NOT click!
+            console.log("[AvitoSW] Dry-run complete: button found, destructive click blocked.");
+            return;
+        }
+
+        if (response.success && !task.dry_run) {
+            task.step = "confirmed";
+            task.status_message = `Подтверждение получено: объявление №${task.avito_listing_id} успешно деактивировано!`;
+            task.updated_at = new Date().toISOString();
+            await setActiveDeactivationTask(task);
+            await reportTaskSuccess(task.task_id, response.details || {});
+            console.log("[AvitoSW] Real deactivation confirmed and reported to server.");
+            // Clear lock after 15 seconds so next task can run
+            setTimeout(async () => {
+                await setActiveDeactivationTask(null);
+            }, 15000);
+            return;
+        }
+
+        if (response.status === "manual_required") {
+            task.step = "manual_required";
+            task.status_message = `Требуется ручное действие: ${response.error || 'Не удалось однозначно определить кнопку снятия'}`;
+            task.updated_at = new Date().toISOString();
+            await setActiveDeactivationTask(task);
+            await reportTaskFailed(task.task_id, task.status_message, false);
+            return;
+        }
+
+        // Generic failure
+        task.step = "failed";
+        task.status_message = response.error || "Ошибка выполнения деактивации.";
+        task.updated_at = new Date().toISOString();
+        await setActiveDeactivationTask(task);
+        await reportTaskFailed(task.task_id, task.status_message, true);
+    } catch (err) {
+        console.error("[AvitoSW] Execution flow error:", err);
+        task.step = "failed";
+        task.status_message = `Ошибка выполнения: ${err.message}`;
+        task.updated_at = new Date().toISOString();
+        await setActiveDeactivationTask(task);
+        await reportTaskFailed(task.task_id, err.message, true);
+    }
+}
+
+function waitForTabComplete(tabId, timeoutMs = 25000) {
+    return new Promise(resolve => {
+        let timer = null;
+        function checkTab() {
+            chrome.tabs.get(tabId, tab => {
+                if (chrome.runtime.lastError || !tab) {
+                    clearTimeout(timer);
+                    resolve(false);
+                } else if (tab.status === "complete") {
+                    clearTimeout(timer);
+                    setTimeout(() => resolve(true), 1200);
+                }
+            });
+        }
+        function listener(updatedTabId, changeInfo) {
+            if (updatedTabId === tabId && changeInfo.status === "complete") {
+                chrome.tabs.onUpdated.removeListener(listener);
+                clearTimeout(timer);
+                setTimeout(() => resolve(true), 1200);
+            }
+        }
+        chrome.tabs.onUpdated.addListener(listener);
+        timer = setTimeout(() => {
+            chrome.tabs.onUpdated.removeListener(listener);
+            resolve(false);
+        }, timeoutMs);
+        checkTab();
+    });
+}
+
+async function sendTabMessageWithRetry(tabId, message, maxRetries = 5) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const resp = await new Promise((resolve, reject) => {
+                chrome.tabs.sendMessage(tabId, message, res => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve(res);
+                    }
+                });
+            });
+            return resp;
+        } catch (e) {
+            if (attempt === maxRetries) {
+                // Try executing content script directly if not injected
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tabId },
+                        files: ["content.js"]
+                    });
+                    await new Promise(r => setTimeout(r, 600));
+                    return await new Promise((resolve, reject) => {
+                        chrome.tabs.sendMessage(tabId, message, res => {
+                            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                            else resolve(res);
+                        });
+                    });
+                } catch (injErr) {
+                    console.warn("[AvitoSW] Script injection fallback failed:", injErr);
+                }
+            }
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    }
+    return null;
+}
+
+// Alarms and timer setup
+try {
+    if (typeof chrome !== "undefined" && chrome.alarms) {
+        chrome.alarms.onAlarm.addListener(alarm => {
+            if (alarm.name === "avito_poll_tasks") {
+                pollNextDeactivationTask();
+            }
+        });
+
+        chrome.runtime.onInstalled.addListener(() => {
+            chrome.alarms.create("avito_poll_tasks", { periodInMinutes: 0.2 });
+            pollNextDeactivationTask();
+        });
+
+        chrome.runtime.onStartup.addListener(() => {
+            chrome.alarms.create("avito_poll_tasks", { periodInMinutes: 0.2 });
+            pollNextDeactivationTask();
+        });
+    }
+} catch (e) {
+    console.warn("[AvitoSW] Alarms setup warning:", e);
+}
+
+// Active interval polling while service worker is running
+try {
+    setInterval(pollNextDeactivationTask, 10000);
+} catch (e) {}
 
 
 

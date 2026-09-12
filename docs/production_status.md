@@ -109,7 +109,7 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 ---
 
-## 7. Avito Post-Sale Deactivation Status (Stage 09A LOCAL)
+## 7. Avito Post-Sale Deactivation & Real Extension Executor (Stage 09A LOCAL & Stage 09A-R1 LOCAL)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
@@ -120,9 +120,12 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Persistent Task Model** | **ACTIVE (`avito_post_sale_tasks`)** | Idempotent on `(sale_id, product_id, avito_listing_id, action)`. 7 discrete states. |
 | **Retry Limit & Fallback** | **ACTIVE (3 Attempts)** | Auto-transitions to `manual_required` upon reaching 3 failed attempts |
 | **Official API Capability** | `OFFICIAL_API_AVAILABLE = false` | Capability probe `can_deactivate_listing = false` (extension mode used) |
-| **Chrome Extension Version** | `0.2.57` | Added task channel helpers (`/tasks/next`, `/tasks/{id}/started`, `/tasks/{id}/success`, `/tasks/{id}/failed`) |
+| **Chrome Extension Version** | `0.2.58` | Full executor: polling, active-task locking, DOM discovery, modal handler, dry-run mode |
+| **Dry-Run Safety Mode** | **ACTIVE (Default ON)** | Discovers control, highlights, updates UI; blocks clicks and server success reporting |
+| **DOM Discovery Safety** | **ACTIVE** | Conservative whitelist & blacklist; rejects payment, publish, promotion, edit controls |
 | **Cleanup Queue UI** | **ACTIVE (`/avito/post-sale`)** | Filterable queue table with retry, queue, and cancel actions |
 | **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
+
 
 
 

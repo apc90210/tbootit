@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.57)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.58)
 
 let pageInitialData = null;
 
@@ -4313,7 +4313,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.57",
+                    extension_version: "0.2.58",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -4346,9 +4346,334 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
             });
         return true;
+    } else if (request.action === "execute_deactivation") {
+        executeDeactivationOnPage(request.task)
+            .then(res => sendResponse(res))
+            .catch(err => {
+                sendResponse({
+                    success: false,
+                    status: "failed",
+                    error: String(err)
+                });
+            });
+        return true;
     }
     return true;
 });
+
+// ==============================================================================
+// Avito Post-Sale Deactivation Executor (Stage 09A-R1 LOCAL)
+// ==============================================================================
+
+const DEACTIVATION_WHITELIST = [
+    "снять с публикации",
+    "снять объявление",
+    "деактивировать",
+    "архивировать",
+    "убрать с публикации",
+    "закрыть объявление"
+];
+
+const DEACTIVATION_BLACKLIST = [
+    "опубликовать",
+    "продать быстрее",
+    "продвигать",
+    "поднять",
+    "оплатить",
+    "купить услугу",
+    "редактировать",
+    "удалить аккаунт",
+    "разместить",
+    "добавить",
+    "продлить",
+    "подключить"
+];
+
+function discoverDeactivationControl() {
+    // Collect candidate button and link elements on page
+    const elements = Array.from(document.querySelectorAll('button, a, [role="button"], [data-marker*="close"], [data-marker*="archive"], [data-marker*="deactivate"]'));
+    const matches = [];
+
+    for (const el of elements) {
+        // Skip hidden elements
+        if (!el || (el.offsetParent === null && el.offsetWidth === 0 && el.offsetHeight === 0)) {
+            continue;
+        }
+
+        const text = (el.innerText || el.textContent || "").trim().toLowerCase();
+        const ariaLabel = (el.getAttribute("aria-label") || "").trim().toLowerCase();
+        const title = (el.getAttribute("title") || "").trim().toLowerCase();
+        const dataMarker = (el.getAttribute("data-marker") || "").trim().toLowerCase();
+        const combined = `${text} ${ariaLabel} ${title} ${dataMarker}`;
+
+        // Blacklist rejection: reject immediately if payment, promotion, publishing, or edit control
+        const hasBlacklisted = DEACTIVATION_BLACKLIST.some(b => combined.includes(b));
+        if (hasBlacklisted) {
+            continue;
+        }
+
+        // Whitelist match
+        const matchedPhrase = DEACTIVATION_WHITELIST.find(w => combined.includes(w));
+        const hasSpecificMarker = dataMarker.includes("close-item") || dataMarker.includes("deactivate") || dataMarker === "item-actions/close";
+
+        if (matchedPhrase || hasSpecificMarker) {
+            matches.push({
+                element: el,
+                text: el.innerText || el.getAttribute("aria-label") || matchedPhrase || "Снять с публикации",
+                dataMarker: dataMarker
+            });
+        }
+    }
+
+    if (matches.length === 0) return null;
+    if (matches.length > 1) {
+        // Filter nested matches (e.g. icon inside button)
+        const uniqueMatches = matches.filter((m, i) => !matches.some((other, j) => i !== j && other.element.contains(m.element)));
+        if (uniqueMatches.length === 1) {
+            return uniqueMatches[0];
+        }
+        return { ambiguous: true, count: matches.length };
+    }
+    return matches[0];
+}
+
+function checkListingAlreadyInactive() {
+    const pageText = (document.body ? document.body.innerText : "").toLowerCase();
+    const inactivePhrases = [
+        "объявление снято с публикации",
+        "снято с публикации",
+        "в архиве",
+        "архивировано",
+        "снято с продажи"
+    ];
+
+    for (const phrase of inactivePhrases) {
+        if (pageText.includes(phrase)) {
+            return { inactive: true, indicator: phrase };
+        }
+    }
+
+    // Check for republish/activate buttons
+    const republishBtn = document.querySelector('[data-marker*="republish"], [data-marker*="reactivate"]');
+    if (republishBtn) {
+        return { inactive: true, indicator: "кнопка повторной активации" };
+    }
+
+    return null;
+}
+
+async function handleDeactivationModalIfPresent() {
+    for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 400));
+        const modal = document.querySelector('[role="dialog"], [data-marker*="modal"], .modal, [data-marker*="popup"]');
+        if (modal) {
+            const modalText = (modal.innerText || "").toLowerCase();
+            // Reject payment/promotion modals
+            if (modalText.includes("оплатить") || modalText.includes("продвижение") || modalText.includes("купить")) {
+                console.warn("[AvitoContent] Modal is payment/promotion related, rejecting action.");
+                return;
+            }
+
+            // Safe reason selection
+            const radioReasons = Array.from(modal.querySelectorAll('input[type="radio"], [role="radio"], label'));
+            for (const radio of radioReasons) {
+                const rText = (radio.innerText || radio.textContent || "").toLowerCase();
+                if (rText.includes("продал на авито") || rText.includes("продал в другом") || rText.includes("снял с продажи") || rText.includes("другая причина")) {
+                    radio.click();
+                    await new Promise(r => setTimeout(r, 200));
+                    break;
+                }
+            }
+
+            // Find confirm button
+            const confirmBtn = Array.from(modal.querySelectorAll('button, [role="button"], a')).find(b => {
+                const bText = (b.innerText || b.textContent || "").trim().toLowerCase();
+                return bText === "снять" || bText === "снять с публикации" || bText === "да" || bText === "подтвердить" || bText === "продолжить";
+            });
+
+            if (confirmBtn) {
+                confirmBtn.click();
+                return;
+            }
+        }
+    }
+}
+
+async function waitForConfirmedInactiveState(timeoutMs = 15000) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+        const inactive = checkListingAlreadyInactive();
+        if (inactive) {
+            return { confirmed: true, type: inactive.indicator };
+        }
+        await new Promise(r => setTimeout(r, 600));
+    }
+    return null;
+}
+
+function showDryRunPageBanner(avitoId, controlText) {
+    let banner = document.getElementById("technoreboot-dryrun-banner");
+    if (!banner) {
+        banner = document.createElement("div");
+        banner.id = "technoreboot-dryrun-banner";
+        banner.style.position = "fixed";
+        banner.style.bottom = "24px";
+        banner.style.right = "24px";
+        banner.style.zIndex = "9999999";
+        banner.style.background = "#0f172a";
+        banner.style.color = "#f8fafc";
+        banner.style.border = "2px solid #eab308";
+        banner.style.borderRadius = "8px";
+        banner.style.padding = "14px 18px";
+        banner.style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
+        banner.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        banner.style.fontSize = "13px";
+        banner.style.lineHeight = "1.5";
+        banner.style.maxWidth = "360px";
+        document.body.appendChild(banner);
+    }
+    banner.innerHTML = `
+        <div style="font-weight:700; color:#facc15; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+            <span>⚠️ ТЕСТОВЫЙ РЕЖИМ (Dry-Run)</span>
+        </div>
+        <div>Готово к снятию: найдена кнопка «<strong>${controlText}</strong>».</div>
+        <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Финальный клик заблокирован. Объявление Avito №${avitoId} не изменено.</div>
+    `;
+}
+
+async function executeDeactivationOnPage(task) {
+    if (!task) {
+        return { success: false, status: "failed", error: "Отсутствуют параметры задачи." };
+    }
+
+    // 1. Exact Host Validation
+    const currentHost = (window.location.hostname || "").toLowerCase();
+    if (currentHost !== "avito.ru" && !currentHost.endsWith(".avito.ru")) {
+        return { success: false, status: "failed", error: `Недопустимый домен: ${currentHost}` };
+    }
+
+    // 2. Exact Avito ID Validation
+    const currentPageId = extractAvitoItemId(window.location.href);
+    if (!currentPageId) {
+        return { success: false, status: "manual_required", error: "Не удалось определить Avito ID на текущей странице." };
+    }
+    if (String(currentPageId) !== String(task.avito_listing_id)) {
+        return {
+            success: false,
+            status: "manual_required",
+            error: `Несоответствие ID: на странице обнаружен #${currentPageId}, ожидается #${task.avito_listing_id}`
+        };
+    }
+
+    // 3. Check if listing is ALREADY inactive/archived
+    const alreadyInactive = checkListingAlreadyInactive();
+    if (alreadyInactive) {
+        return {
+            success: true,
+            already_inactive: true,
+            dry_run_ready: Boolean(task.dry_run),
+            confirmation: "already_inactive",
+            control_text: alreadyInactive.indicator,
+            status_message: `Объявление уже снято с публикации (${alreadyInactive.indicator})`
+        };
+    }
+
+    // 4. Conservative DOM Discovery for Deactivation Controls
+    let candidate = discoverDeactivationControl();
+
+    // If not found, try opening actions menu if present (e.g. "...", "Действия", data-marker="item-actions/menu")
+    if (!candidate) {
+        const menuTrigger = document.querySelector('[data-marker="item-actions/menu"], [data-marker*="actions-menu"], button[aria-label*="действи"], [data-marker="item-view/more-actions"]');
+        if (menuTrigger) {
+            try {
+                menuTrigger.click();
+                await new Promise(r => setTimeout(r, 600));
+                candidate = discoverDeactivationControl();
+            } catch (e) {}
+        }
+    }
+
+    if (!candidate) {
+        // Re-check inactive state in case page state changed
+        const recheckInactive = checkListingAlreadyInactive();
+        if (recheckInactive) {
+            return {
+                success: true,
+                already_inactive: true,
+                dry_run_ready: Boolean(task.dry_run),
+                confirmation: "already_inactive",
+                control_text: recheckInactive.indicator,
+                status_message: `Объявление снято с публикации (${recheckInactive.indicator})`
+            };
+        }
+        return {
+            success: false,
+            status: "manual_required",
+            error: "Кнопка снятия с публикации не найдена в DOM на странице объявления."
+        };
+    }
+
+    if (candidate.ambiguous) {
+        return {
+            success: false,
+            status: "manual_required",
+            error: `Обнаружено несколько похожих кнопок снятия (${candidate.count}), требуется ручная проверка.`
+        };
+    }
+
+    const targetEl = candidate.element;
+    const controlText = candidate.text || "Снять с публикации";
+
+    // 5. Dry-Run Mode Safety Guard
+    if (task.dry_run) {
+        // Highlight element on page
+        try {
+            targetEl.style.outline = "3px dashed #eab308";
+            targetEl.style.outlineOffset = "3px";
+            targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (e) {}
+
+        // Add visual on-page notice
+        showDryRunPageBanner(task.avito_listing_id, controlText);
+
+        // DO NOT click! DO NOT report success!
+        return {
+            dry_run_ready: true,
+            control_text: controlText,
+            message: "Готово к снятию: кнопка найдена"
+        };
+    }
+
+    // 6. Armed Mode: Destructive execution with explicit approval
+    try {
+        targetEl.click();
+    } catch (clickErr) {
+        return { success: false, status: "failed", error: `Ошибка нажатия кнопки снятия: ${clickErr.message}` };
+    }
+
+    // Handle possible confirmation modal
+    await handleDeactivationModalIfPresent();
+
+    // 7. Mandatory Post-Action Inactive Confirmation
+    const confirmed = await waitForConfirmedInactiveState(15000);
+    if (confirmed) {
+        return {
+            success: true,
+            confirmation: "inactive_state_confirmed",
+            details: {
+                control_text: controlText,
+                avito_listing_id: task.avito_listing_id,
+                confirmation_type: confirmed.type
+            }
+        };
+    } else {
+        return {
+            success: false,
+            status: "failed",
+            error: "Таймаут: страница не подтвердила переход объявления в неактивное состояние после клика."
+        };
+    }
+}
 
 
 

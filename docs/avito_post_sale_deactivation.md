@@ -106,7 +106,41 @@ suggested  ──[ Seller clicks "Снять" ]──>  queued
 
 ---
 
-## 4. Chrome Extension Task Channel (v0.2.57)
+## 4. Chrome Extension Task Channel & Real Deactivation Executor (v0.2.58)
+
+### Extension Lifecycle & Modules
+- **Manifest:** Version `0.2.58`, permissions include `"alarms"` and `"storage"`.
+- **Background Service Worker (`service_worker.js`):**
+  - Polling loop via `chrome.alarms` (and fallback `setInterval`) calling `/tasks/next`.
+  - **Active Task Locking & Persistence:** Exactly one task executed at a time. The active task is stored in `chrome.storage.local` with timestamp. If a task exceeds 5 minutes (300 seconds), timeout recovery clears the stale lock.
+  - **Target Validation:** Verifies host is `avito.ru` or `*.avito.ru`, URL scheme is `http`/`https`, and `avito_listing_id` matches the URL path. Mismatches fail fast to `manual_required`.
+  - Coordinates tab navigation, waits for `status === "complete"`, and dispatches message `execute_deactivation` to the content script.
+  - Handles response events: `dry_run_ready`, `confirmed`, `manual_required`, and communicates status back to `/tasks/{id}/started`, `/tasks/{id}/success`, or `/tasks/{id}/failed`.
+- **Content Script (`content.js`):**
+  - Validates current host is `avito.ru` and page listing ID matches task target.
+  - **Conservative DOM Discovery:**
+    - Checks `DEACTIVATION_WHITELIST`: `["снять с публикации", "снять объявление", "деактивировать", "архивировать", "убрать с публикации"]`.
+    - Enforces `DEACTIVATION_BLACKLIST`: rejects buttons/links containing `оплатить`, `продвинуть`, `разместить`, `редактировать`, `поднять`, `турбо`, `x2`, `x5`, `x10`, `x20`, `активировать`, `купить`, `доставка`.
+    - Rejects ambiguous states: if multiple matching controls are found without an exact unambiguous match, fails fast to `manual_required`.
+  - **Inactive Check:** If the listing is already inactive (`объявление снято с публикации`, `в архиве`, or presence of `опубликовать снова`), reports confirmed inactive state without redundant clicks.
+  - **Modal Handling:** Detects Avito post-click confirmation modal and selects safe reason (`Товар продан на Авито` or `Снял с продажи`).
+  - **Mandatory Confirmation:** Success is reported **only** when DOM confirms inactive state (`waitForConfirmedInactiveState`).
+- **Dry-Run Safety Mode (`avito_deactivation_dry_run = true`):**
+  - Enabled by default to prevent accidental deactivations during testing and development.
+  - Finds and highlights the deactivation button with dashed yellow border (`outline: 3px dashed #eab308`).
+  - Displays non-destructive floating banner on page: `"Тестовый режим (Dry-Run): кнопка деактивации найдена, клик заблокирован"`.
+  - Updates popup status to `"Готово к снятию: кнопка найдена"`.
+  - **Safety Contract:** Never clicks destructive control and never reports success to server.
+- **Popup UX (`popup.html`, `popup.js`):**
+  - Card showing active post-sale task ID, target Avito ID, and dry-run toggle checkbox.
+  - Mode badge: `ТЕСТОВЫЙ РЕЖИМ (Dry-Run)` vs `РЕАЛЬНЫЙ РЕЖИМ (Armed)`.
+  - 6-step progress indicator:
+    1. Поиск задачи в очереди
+    2. Задача получена
+    3. Открытие страницы Avito
+    4. Анализ страницы
+    5. Выполнение деактивации (или Dry-Run проверка)
+    6. Подтверждение и завершение
 
 ### Bridge Endpoints (`avito-module`)
 - `GET /tasks/next`: Fetches oldest `queued` task, transitions to `processing`, increments `attempt_count`.
@@ -165,3 +199,4 @@ Adding table `avito_post_sale_tasks` constitutes a schema expansion:
    }
    ```
 4. VDS deployment is **BLOCKED** by Schema Guard until a dedicated manual migration stage is approved by the Owner.
+

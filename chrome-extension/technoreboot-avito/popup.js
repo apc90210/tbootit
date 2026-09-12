@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.57)
+// Technoreboot Avito Popup Script (v0.2.58)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -63,9 +63,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     const resultMsg = document.getElementById("resultMsg");
     const versionLabel = document.getElementById("versionLabel");
 
+    // Post-Sale Deactivation Elements (Stage 09A-R1)
+    const deactivationSection = document.getElementById("deactivationSection");
+    const deactivationModeBadge = document.getElementById("deactivationModeBadge");
+    const dryRunCheckbox = document.getElementById("dryRunCheckbox");
+    const activeTaskCard = document.getElementById("activeTaskCard");
+    const taskHeader = document.getElementById("taskHeader");
+    const taskAvitoId = document.getElementById("taskAvitoId");
+    const stepReceived = document.getElementById("stepReceived");
+    const stepOpening = document.getElementById("stepOpening");
+    const stepVerifying = document.getElementById("stepVerifying");
+    const stepFound = document.getElementById("stepFound");
+    const stepExecuting = document.getElementById("stepExecuting");
+    const stepConfirmed = document.getElementById("stepConfirmed");
+    const taskStatusBox = document.getElementById("taskStatusBox");
+    const openTaskListingBtn = document.getElementById("openTaskListingBtn");
+    const dismissTaskBtn = document.getElementById("dismissTaskBtn");
+    const noActiveTaskMsg = document.getElementById("noActiveTaskMsg");
+
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.57";
+        let manifestVer = "0.2.58";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -266,6 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 connBadge.textContent = "Подключен";
                 statusMsg.textContent = "Расширение подключено к Техноребут.";
                 hideAllCards();
+                if (deactivationSection) deactivationSection.style.display = "block";
                 if (serverUrlInput && !serverUrlInput.value && response.server_url) {
                     serverUrlInput.value = response.server_url;
                 }
@@ -282,8 +301,169 @@ document.addEventListener("DOMContentLoaded", async () => {
         fillSection.style.display = "none";
         bulkSection.style.display = "none";
         actionSection.style.display = "none";
+        if (deactivationSection) deactivationSection.style.display = "none";
         if (productLinkContainer) productLinkContainer.style.display = "none";
     }
+
+    // --- Post-Sale Deactivation UI Helpers ---
+    function updateModeBadge(isDryRun) {
+        if (!deactivationModeBadge) return;
+        if (isDryRun) {
+            deactivationModeBadge.className = "badge badge-warning";
+            deactivationModeBadge.textContent = "ТЕСТОВЫЙ РЕЖИМ (Dry-Run)";
+        } else {
+            deactivationModeBadge.className = "badge badge-online";
+            deactivationModeBadge.textContent = "РЕАЛЬНЫЙ РЕЖИМ (Armed)";
+        }
+    }
+
+    function updateActiveTaskUI(task) {
+        if (!activeTaskCard || !noActiveTaskMsg) return;
+        if (!task || !task.task_id) {
+            activeTaskCard.style.display = "none";
+            noActiveTaskMsg.style.display = "block";
+            return;
+        }
+        activeTaskCard.style.display = "block";
+        noActiveTaskMsg.style.display = "none";
+
+        if (taskHeader) taskHeader.textContent = `Задача #${task.task_id}: Снять с Avito`;
+        if (taskAvitoId) taskAvitoId.textContent = `Avito ID: ${task.avito_listing_id || '...'}`;
+
+        if (openTaskListingBtn) {
+            if (task.listing_url) {
+                openTaskListingBtn.style.display = "block";
+                openTaskListingBtn.onclick = () => {
+                    chrome.tabs.create({ url: task.listing_url });
+                };
+            } else {
+                openTaskListingBtn.style.display = "none";
+            }
+        }
+
+        const stepElements = [
+            { el: stepReceived, key: "received", label: "1. Получена" },
+            { el: stepOpening, key: "opening_page", label: "2. Открываю объявление" },
+            { el: stepVerifying, key: "verifying_id", label: "3. Проверяю ID" },
+            { el: stepFound, key: "control_found", label: "4. Кнопка найдена" },
+            { el: stepExecuting, key: "executing", label: "5. Снятие с публикации" },
+            { el: stepConfirmed, key: "confirmed", label: "6. Подтверждение получено" }
+        ];
+
+        const stepOrder = ["received", "opening_page", "verifying_id", "control_found", "executing", "confirmed"];
+        const currentIdx = stepOrder.indexOf(task.step);
+
+        stepElements.forEach((s, idx) => {
+            if (!s.el) return;
+            if (task.dry_run && task.step === "dry_run_ready") {
+                if (idx <= 3) {
+                    s.el.innerHTML = `✓ ${s.label}`;
+                    s.el.style.color = "#16a34a";
+                    s.el.style.fontWeight = "600";
+                } else if (idx === 4) {
+                    s.el.innerHTML = `⊘ 5. Снятие заблокировано (ТЕСТ)`;
+                    s.el.style.color = "#d97706";
+                    s.el.style.fontWeight = "600";
+                } else {
+                    s.el.innerHTML = `○ ${s.label}`;
+                    s.el.style.color = "#94a3b8";
+                    s.el.style.fontWeight = "normal";
+                }
+            } else if (task.step === "failed" || task.step === "manual_required") {
+                if (idx < currentIdx) {
+                    s.el.innerHTML = `✓ ${s.label}`;
+                    s.el.style.color = "#16a34a";
+                    s.el.style.fontWeight = "normal";
+                } else if (idx === currentIdx || (currentIdx === -1 && idx === 3)) {
+                    s.el.innerHTML = `✕ ${s.label} (${task.step})`;
+                    s.el.style.color = "#dc2626";
+                    s.el.style.fontWeight = "600";
+                } else {
+                    s.el.innerHTML = `○ ${s.label}`;
+                    s.el.style.color = "#94a3b8";
+                    s.el.style.fontWeight = "normal";
+                }
+            } else if (idx < currentIdx) {
+                s.el.innerHTML = `✓ ${s.label}`;
+                s.el.style.color = "#16a34a";
+                s.el.style.fontWeight = "normal";
+            } else if (idx === currentIdx) {
+                s.el.innerHTML = `▶ ${s.label}...`;
+                s.el.style.color = "#2563eb";
+                s.el.style.fontWeight = "600";
+            } else {
+                s.el.innerHTML = `○ ${s.label}`;
+                s.el.style.color = "#94a3b8";
+                s.el.style.fontWeight = "normal";
+            }
+        });
+
+        if (taskStatusBox) {
+            if (task.step === "dry_run_ready") {
+                taskStatusBox.style.background = "#fef3c7";
+                taskStatusBox.style.color = "#92400e";
+                taskStatusBox.innerHTML = `<strong>ТЕСТОВЫЙ РЕЖИМ:</strong> ${task.status_message || 'Готово к снятию: кнопка найдена. Финальное снятие не выполняется.'}`;
+            } else if (task.step === "confirmed" || task.step === "success") {
+                taskStatusBox.style.background = "#dcfce7";
+                taskStatusBox.style.color = "#166534";
+                taskStatusBox.textContent = task.status_message || "Снятие с публикации успешно подтверждено!";
+            } else if (task.step === "failed" || task.step === "manual_required") {
+                taskStatusBox.style.background = "#fee2e2";
+                taskStatusBox.style.color = "#991b1b";
+                taskStatusBox.textContent = task.status_message || "Ошибка деактивации.";
+            } else {
+                taskStatusBox.style.background = "#eff6ff";
+                taskStatusBox.style.color = "#1e40af";
+                taskStatusBox.textContent = task.status_message || "Выполняется задача...";
+            }
+        }
+    }
+
+    // Initialize Post-Sale Deactivation UI
+    if (dryRunCheckbox) {
+        chrome.runtime.sendMessage({ action: "get_dry_run_mode" }, res => {
+            const isDry = res ? res.dry_run !== false : true;
+            dryRunCheckbox.checked = isDry;
+            updateModeBadge(isDry);
+        });
+
+        dryRunCheckbox.addEventListener("change", () => {
+            const enabled = dryRunCheckbox.checked;
+            chrome.runtime.sendMessage({ action: "set_dry_run_mode", enabled: enabled }, () => {
+                updateModeBadge(enabled);
+            });
+        });
+    }
+
+    if (dismissTaskBtn) {
+        dismissTaskBtn.addEventListener("click", () => {
+            chrome.runtime.sendMessage({ action: "clear_active_task" }, () => {
+                updateActiveTaskUI(null);
+            });
+        });
+    }
+
+    // Fetch current active task immediately
+    chrome.runtime.sendMessage({ action: "get_active_task" }, res => {
+        updateActiveTaskUI(res ? res.task : null);
+    });
+
+    // Real-time storage listener
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+        chrome.storage.onChanged.addListener((changes, areaName) => {
+            if (areaName === "local") {
+                if (changes.active_deactivation_task) {
+                    updateActiveTaskUI(changes.active_deactivation_task.newValue);
+                }
+                if (changes.avito_deactivation_dry_run) {
+                    const isDry = changes.avito_deactivation_dry_run.newValue !== false;
+                    if (dryRunCheckbox) dryRunCheckbox.checked = isDry;
+                    updateModeBadge(isDry);
+                }
+            }
+        });
+    }
+
 
     // --- Pairing Handler ---
     pairBtn.addEventListener("click", () => {
