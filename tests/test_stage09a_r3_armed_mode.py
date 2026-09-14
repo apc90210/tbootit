@@ -36,50 +36,39 @@ def owner_headers():
         "x-auth-is-owner": "true"
     }
 
-def test_stage09a_r3_armed_contract_and_security(owner_headers):
-    """Verify Section 13 Armed mode requirements: approved task, domain blocking, auto-disarm."""
-    # 1. Armed API Endpoints via Admin-Shell Gateway
+def test_stage09a_r4_direct_real_contract_and_security(owner_headers):
+    """Verify Section 12 & 18 API cleanup and direct real execution mode requirements."""
+    # 1. Deprecated Arm API Endpoints via Admin-Shell Gateway return backward-compat direct_real mode
     disarm_resp = client.post("/admin-api/avito-extension/disarm", headers=owner_headers)
     assert disarm_resp.status_code == 200
-    assert disarm_resp.json()["armed_listing_id"] is None
-    assert disarm_resp.json()["mode"] == "dry_run"
+    assert disarm_resp.json()["mode"] == "direct_real"
+    assert disarm_resp.json()["deprecated"] is True
 
     # Status check
     status_resp = client.get("/admin-api/avito-extension/armed-status", headers=owner_headers)
     assert status_resp.status_code == 200
     assert status_resp.json()["armed"] is False
+    assert status_resp.json()["mode"] == "direct_real"
+    assert status_resp.json()["deprecated"] is True
 
     # Arm specifically for approved Avito ID 7353766377
     arm_resp = client.post("/admin-api/avito-extension/arm-task/7353766377", headers=owner_headers)
     assert arm_resp.status_code == 200
-    assert arm_resp.json()["armed_listing_id"] == "7353766377"
-
-    status_resp2 = client.get("/admin-api/avito-extension/armed-status", headers=owner_headers)
-    assert status_resp2.json()["armed"] is True
-    assert status_resp2.json()["armed_listing_id"] == "7353766377"
-
-    # Reset with disarm
-    disarm_resp2 = client.post("/admin-api/avito-extension/disarm", headers=owner_headers)
-    assert disarm_resp2.status_code == 200
-    assert disarm_resp2.json()["armed_listing_id"] is None
+    assert arm_resp.json()["mode"] == "direct_real"
+    assert arm_resp.json()["deprecated"] is True
 
 
-
-def test_stage09a_r3_extension_service_worker_contract():
-    """Verify Service Worker script enforces dry-run auto-restoration and dual action tolerance."""
+def test_stage09a_r4_extension_service_worker_contract():
+    """Verify Service Worker script enforces direct real execution and dual action tolerance."""
     sw_path = os.path.join(REPO_ROOT, "chrome-extension", "technoreboot-avito", "service_worker.js")
     with open(sw_path, "r", encoding="utf-8") as f:
         sw_code = f.read()
 
-    # Must contain armed listing helpers
-    assert "getArmedListingId" in sw_code
-    assert "setArmedListingId" in sw_code
-    assert "arm_specific_listing" in sw_code
-    assert "approved_for_real_execution" in sw_code
+    # Must be v0.2.60
+    assert "0.2.60" in sw_code
 
-    # Must contain auto-restoration of dry-run mode
-    assert "setDryRunMode(true)" in sw_code
-    assert "setArmedListingId(null)" in sw_code
+    # Direct real execution without dry-run gating
+    assert "dry_run: false" in sw_code
 
     # Must accept both actions
     assert '"deactivate_listing"' in sw_code
@@ -87,22 +76,23 @@ def test_stage09a_r3_extension_service_worker_contract():
     assert "Unsupported action:" in sw_code
 
 
-def test_stage09a_r3_extension_content_script_contract():
+def test_stage09a_r4_extension_content_script_contract():
     """Verify Content Script enforces external inactive confirmation and modal handling."""
     cs_path = os.path.join(REPO_ROOT, "chrome-extension", "technoreboot-avito", "content.js")
     with open(cs_path, "r", encoding="utf-8") as f:
         cs_code = f.read()
 
+    assert "0.2.60" in cs_code
     assert "extractAvitoItemId" in cs_code
     assert "handleDeactivationModalIfPresent" in cs_code
     assert "waitForConfirmedInactiveState" in cs_code
     assert "checkListingAlreadyInactive" in cs_code
     assert "продал на авито" in cs_code
     assert "inactive_state_confirmed" in cs_code
-    assert "showDryRunPageBanner" in cs_code
+    assert "DEACTIVATION_BLACKLIST" in cs_code
 
 
-def test_stage09a_r3_server_success_post_conditions():
+def test_stage09a_r4_server_post_conditions():
     """Verify server task, listing, and business state integrity in local SQLite DB."""
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()

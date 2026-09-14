@@ -109,25 +109,27 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 ---
 
-## 7. Avito Post-Sale Deactivation & Real E2E Proof (Stage 09A, 09A-R1, 09A-R2 & 09A-R3 LOCAL)
+## 7. Avito Post-Sale Deactivation & Simple Real Action (Stage 09A, R1, R2, R3 & R4 LOCAL)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
 | **Stage Scope** | **LOCAL ONLY** | Development and validation on `https://localhost:8443` (Zero VDS impact) |
-| **Sale Integration** | **ACTIVE** | Post-sale follow-up card and permanent `[ Снять с Avito ]` button on sale detail view |
+| **Simple Product Rule** | **ENFORCED** | `Нажал "Снять с Avito" -> система реально снимает объявление.` |
+| **Sale Integration** | **ACTIVE** | Permanent `[ Снять с Avito ]` button on sale detail view next to `[ Товарный чек ]` |
 | **Sale Non-Block Invariant** | **ENFORCED** | Sale commits before Avito follow-up; Avito failures never block or revert sales |
 | **Stock Non-Mutation** | **ENFORCED** | Physical inventory is never mutated by Avito task state changes |
 | **Persistent Task Model** | **ACTIVE (`avito_post_sale_tasks`)** | Idempotent on `(sale_id, product_id, avito_listing_id, action)`. 7 discrete states. |
 | **Action Contract Bridge** | **ACTIVE (Zero-DB-Migration)** | Bridge adapter maps DB business `'deactivate'` to extension transport `'deactivate_listing'` |
-| **Chrome Extension Version** | `0.2.59` | Tolerates both `'deactivate_listing'` and `'deactivate'`; rejects unknown actions; restores original tab |
-| **Targeted Arming & Auto-Disarm** | **ACTIVE (Stage 09A-R3)** | `POST /arm-task/{id}`, `POST /disarm`, auto-reverts to Dry-Run on success/failed |
-| **Real External Inactive Confirmation** | **VERIFIED (Stage 09A-R3)** | Validates external Avito inactive indicators before reporting task success |
+| **Chrome Extension Version** | `0.2.60` | Direct real deactivation; dry-run & armed complexity removed from normal seller workflow |
+| **Dry-Run & Armed Modes** | **REMOVED FROM NORMAL WORKFLOW** | Arming endpoints deprecated; popup simplified; seller click is direct authorization |
+| **Real External Inactive Confirmation** | **VERIFIED (Stage 09A-R4)** | Validates external Avito inactive indicators before reporting task success |
+| **Controlled Failure Path** | **VERIFIED (Stage 09A-R4)** | Mismatch/error -> honest `manual_required` with clear Russian message; retry available |
 | **Retry Limit & Fallback** | **ACTIVE (3 Attempts)** | Auto-transitions to `manual_required` upon reaching 3 failed attempts |
 | **Official API Capability** | `OFFICIAL_API_AVAILABLE = false` | Capability probe `can_deactivate_listing = false` (extension mode used) |
-| **Dry-Run Safety Mode** | **ACTIVE (Default ON)** | Discovers control, highlights, updates UI; blocks clicks and server success reporting unless armed |
 | **DOM Discovery Safety** | **ACTIVE** | Conservative whitelist & blacklist; checks actions menu and profile cards (`/profile/items`) |
 | **Cleanup Queue UI** | **ACTIVE (`/avito/post-sale`)** | Filterable queue table with retry, queue, and cancel actions |
 | **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
+
 
 
 

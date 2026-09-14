@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.59)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.60)
 
 let pageInitialData = null;
 
@@ -4313,7 +4313,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.59",
+                    extension_version: "0.2.60",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -4362,7 +4362,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==============================================================================
-// Avito Post-Sale Deactivation Executor (Stage 09A-R2 LOCAL)
+// Avito Post-Sale Deactivation Executor (Stage 09A-R4 LOCAL - Direct Real Mode)
 // ==============================================================================
 
 function extractAvitoItemId(url) {
@@ -4582,39 +4582,10 @@ async function waitForConfirmedInactiveState(timeoutMs = 20000) {
             return { confirmed: true, type: inactive.indicator };
         }
         await new Promise(r => setTimeout(r, 500));
-    }
     return null;
 }
 
-function showDryRunPageBanner(avitoId, controlText) {
-    let banner = document.getElementById("technoreboot-dryrun-banner");
-    if (!banner) {
-        banner = document.createElement("div");
-        banner.id = "technoreboot-dryrun-banner";
-        banner.style.position = "fixed";
-        banner.style.bottom = "24px";
-        banner.style.right = "24px";
-        banner.style.zIndex = "9999999";
-        banner.style.background = "#0f172a";
-        banner.style.color = "#f8fafc";
-        banner.style.border = "2px solid #eab308";
-        banner.style.borderRadius = "8px";
-        banner.style.padding = "14px 18px";
-        banner.style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
-        banner.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        banner.style.fontSize = "13px";
-        banner.style.lineHeight = "1.5";
-        banner.style.maxWidth = "360px";
-        document.body.appendChild(banner);
-    }
-    banner.innerHTML = `
-        <div style="font-weight:700; color:#facc15; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
-            <span>⚠️ ТЕСТОВЫЙ РЕЖИМ (Dry-Run)</span>
-        </div>
-        <div>Готово к снятию: найдена кнопка «<strong>${controlText}</strong>».</div>
-        <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Финальный клик заблокирован. Объявление Avito №${avitoId} не изменено.</div>
-    `;
-}
+// Deprecated banner removed in Stage 09A-R4
 
 async function executeDeactivationOnPage(task) {
     if (!task) {
@@ -4656,7 +4627,6 @@ async function executeDeactivationOnPage(task) {
         return {
             success: true,
             already_inactive: true,
-            dry_run_ready: Boolean(task.dry_run),
             confirmation: "already_inactive",
             control_text: alreadyInactive.indicator,
             status_message: `Объявление уже снято с публикации (${alreadyInactive.indicator})`
@@ -4709,7 +4679,6 @@ async function executeDeactivationOnPage(task) {
             return {
                 success: true,
                 already_inactive: true,
-                dry_run_ready: Boolean(task.dry_run),
                 confirmation: "already_inactive",
                 control_text: recheckInactive.indicator,
                 status_message: `Объявление снято с публикации (${recheckInactive.indicator})`
@@ -4744,27 +4713,7 @@ async function executeDeactivationOnPage(task) {
     const targetEl = candidate.element;
     const controlText = candidate.text || "Снять с публикации";
 
-    // 5. Dry-Run Mode Safety Guard
-    if (task.dry_run) {
-        // Highlight element on page
-        try {
-            targetEl.style.outline = "3px dashed #eab308";
-            targetEl.style.outlineOffset = "3px";
-            targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        } catch (e) {}
-
-        // Add visual on-page notice
-        showDryRunPageBanner(task.avito_listing_id, controlText);
-
-        // DO NOT click! DO NOT report success!
-        return {
-            dry_run_ready: true,
-            control_text: controlText,
-            message: "Готово к снятию: кнопка найдена"
-        };
-    }
-
-    // 6. Armed Mode: Destructive execution with explicit approval
+    // 5. Direct Real Execution: User clicking [ Снять с Avito ] explicitly authorizes deactivation
     try {
         targetEl.click();
     } catch (clickErr) {

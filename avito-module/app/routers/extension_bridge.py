@@ -18,14 +18,6 @@ router = APIRouter(prefix="/extension/api", tags=["chrome-extension"])
 PAIR_CODES_FILE = os.path.join(settings.AVITO_STORAGE_DIR, "extension_pair_codes.json")
 TOKENS_FILE = os.path.join(settings.AVITO_STORAGE_DIR, "extension_tokens.json")
 MY_LISTINGS_FILE = os.path.join(settings.AVITO_STORAGE_DIR, "extension_my_listings.json")
-ARMED_TASKS_FILE = os.path.join(settings.AVITO_STORAGE_DIR, "extension_armed_tasks.json")
-
-def _get_armed_listing_id() -> Optional[str]:
-    data = _load_json(ARMED_TASKS_FILE)
-    return data.get("armed_listing_id")
-
-def _set_armed_listing_id(listing_id: Optional[str]):
-    _save_json(ARMED_TASKS_FILE, {"armed_listing_id": str(listing_id).strip() if listing_id else None})
 
 def _load_json(file_path: str) -> Dict[str, Any]:
     if not os.path.exists(file_path):
@@ -75,7 +67,7 @@ EXTENSION_ACTION_DEACTIVATE_LISTING = "deactivate_listing"
 
 class MyListingsPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.59"
+    extension_version: str = "0.2.60"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "my_listings"
     listings_count: Optional[int] = 0
@@ -83,7 +75,7 @@ class MyListingsPayload(BaseModel):
 
 class BulkImportPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.59"
+    extension_version: str = "0.2.60"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "bulk_import"
     listings_count: Optional[int] = None
@@ -103,7 +95,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.2.59",
+        "version": "0.2.60",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
@@ -572,9 +564,8 @@ async def get_next_extension_task(token: str = Depends(verify_extension_token)):
             if action == BUSINESS_ACTION_DEACTIVATE:
                 task["action"] = EXTENSION_ACTION_DEACTIVATE_LISTING
 
-            # Targeted arming status (Stage 09A-R3)
-            armed_id = _get_armed_listing_id()
-            task["approved_for_real_execution"] = bool(armed_id and str(task.get("avito_listing_id", "")).strip() == armed_id)
+            # Direct real execution mode (Stage 09A-R4: seller click is authorization for real deactivation)
+            task["approved_for_real_execution"] = True
 
             return {"task": task}
         except Exception as e:
@@ -599,8 +590,6 @@ async def extension_task_success(
     payload: Optional[Dict[str, Any]] = Body(default=None),
     token: str = Depends(verify_extension_token)
 ):
-    # Auto-revert arming upon completion (Stage 09A-R3 Section 11)
-    _set_armed_listing_id(None)
     core_base = settings.CORE_API_BASE_URL.rstrip('/')
     url = f"{core_base}/api/avito/post-sale-tasks/{task_id}/success"
     async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
@@ -617,8 +606,6 @@ async def extension_task_failed(
     payload: Optional[Dict[str, Any]] = Body(default=None),
     token: str = Depends(verify_extension_token)
 ):
-    # Auto-revert arming upon completion (Stage 09A-R3 Section 11)
-    _set_armed_listing_id(None)
     core_base = settings.CORE_API_BASE_URL.rstrip('/')
     url = f"{core_base}/api/avito/post-sale-tasks/{task_id}/failed"
     async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
@@ -631,22 +618,19 @@ async def extension_task_failed(
 
 @router.post("/arm-task/{avito_listing_id}")
 async def arm_task_for_execution(avito_listing_id: str):
-    """Explicitly arm real execution for an authorized Avito listing ID (Stage 09A-R3)."""
+    """Deprecated in Stage 09A-R4: All queued seller deactivation tasks execute directly in real mode."""
     clean_id = str(avito_listing_id).strip()
-    _set_armed_listing_id(clean_id)
-    return {"success": True, "armed_listing_id": clean_id, "mode": "armed"}
+    return {"success": True, "armed_listing_id": clean_id, "mode": "direct_real", "deprecated": True}
 
 
 @router.post("/disarm")
 async def disarm_tasks():
-    """Reset to safe dry-run mode, clearing armed listing ID."""
-    _set_armed_listing_id(None)
-    return {"success": True, "armed_listing_id": None, "mode": "dry_run"}
+    """Deprecated in Stage 09A-R4: All queued seller deactivation tasks execute directly in real mode."""
+    return {"success": True, "armed_listing_id": None, "mode": "direct_real", "deprecated": True}
 
 
 @router.get("/armed-status")
 async def get_armed_status():
-    """Get current targeted arming state."""
-    armed_id = _get_armed_listing_id()
-    return {"armed": bool(armed_id), "armed_listing_id": armed_id}
+    """Deprecated in Stage 09A-R4: Direct real mode is always active."""
+    return {"armed": False, "armed_listing_id": None, "mode": "direct_real", "deprecated": True}
 

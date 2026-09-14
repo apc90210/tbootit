@@ -1,40 +1,22 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.59)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.60)
 
 const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
+// Deprecated in Stage 09A-R4: All seller-initiated deactivations execute directly in real mode.
 async function getDryRunMode() {
-    return new Promise(resolve => {
-        chrome.storage.local.get(["avito_deactivation_dry_run"], result => {
-            // Default to true for safety in local development
-            resolve(result.avito_deactivation_dry_run !== false);
-        });
-    });
+    return false;
 }
 
 async function setDryRunMode(enabled) {
-    return new Promise(resolve => {
-        chrome.storage.local.set({ avito_deactivation_dry_run: Boolean(enabled) }, () => {
-            resolve();
-        });
-    });
+    return Promise.resolve();
 }
 
 async function getArmedListingId() {
-    return new Promise(resolve => {
-        chrome.storage.local.get(["armed_avito_listing_id"], result => {
-            resolve(result.armed_avito_listing_id || null);
-        });
-    });
+    return null;
 }
 
 async function setArmedListingId(listingId) {
-    return new Promise(resolve => {
-        if (!listingId) {
-            chrome.storage.local.remove(["armed_avito_listing_id"], () => resolve());
-        } else {
-            chrome.storage.local.set({ armed_avito_listing_id: String(listingId).trim() }, () => resolve());
-        }
-    });
+    return Promise.resolve();
 }
 
 async function getActiveDeactivationTask() {
@@ -290,7 +272,7 @@ async function sendBulkImportPayload(payload) {
         if (!normalizedPayload.schema_version) {
             normalizedPayload.schema_version = 1;
         }
-        normalizedPayload.extension_version = "0.2.59";
+        normalizedPayload.extension_version = "0.2.60";
         if (!normalizedPayload.captured_at) {
             normalizedPayload.captured_at = new Date().toISOString();
         }
@@ -675,23 +657,7 @@ async function pollNextDeactivationTask() {
         // Notify server that task is started/processing
         await notifyTaskStarted(task.task_id);
 
-        const dryRunGlobal = await getDryRunMode();
-        const armedListingId = await getArmedListingId();
-
-        // Check if task is armed specifically or globally (Stage 09A-R3 Section 3)
-        let isArmed = false;
-        if (task.approved_for_real_execution === true) {
-            isArmed = true;
-        } else if (armedListingId && String(task.avito_listing_id).trim() === String(armedListingId).trim()) {
-            isArmed = true;
-        } else if (dryRunGlobal === false) {
-            if (!armedListingId || String(task.avito_listing_id).trim() === String(armedListingId).trim()) {
-                isArmed = true;
-            }
-        }
-
-        const taskDryRun = !isArmed;
-
+        // Stage 09A-R4: All seller-initiated deactivations execute directly in real mode
         const initialTaskState = {
             task_id: task.task_id,
             sale_id: task.sale_id,
@@ -700,16 +666,14 @@ async function pollNextDeactivationTask() {
             avito_listing_id: String(task.avito_listing_id),
             listing_url: task.listing_url,
             step: "received",
-            status_message: isArmed
-                ? `Задача #${task.task_id}: [РЕАЛЬНЫЙ РЕЖИМ] снятие с публикации №${task.avito_listing_id}`
-                : `Задача #${task.task_id}: получена команда на снятие с публикации (Dry-Run)`,
+            status_message: `Задача #${task.task_id}: снятие с публикации №${task.avito_listing_id}`,
             tab_id: null,
-            dry_run: taskDryRun,
+            dry_run: false,
             updated_at: new Date().toISOString()
         };
         await setActiveDeactivationTask(initialTaskState);
 
-        // Execute deactivation navigation and DOM interaction
+        // Execute direct real deactivation navigation and DOM interaction
         await executeDeactivationFlow(initialTaskState);
     } catch (e) {
         console.error("[AvitoSW] pollNextDeactivationTask error:", e);
@@ -752,6 +716,9 @@ async function executeDeactivationFlow(task) {
             task.updated_at = new Date().toISOString();
             await setActiveDeactivationTask(task);
             await reportTaskFailed(task.task_id, task.status_message, true);
+            setTimeout(async () => {
+                await setActiveDeactivationTask(null);
+            }, 3000);
             return;
         }
 
@@ -772,21 +739,13 @@ async function executeDeactivationFlow(task) {
             task.updated_at = new Date().toISOString();
             await setActiveDeactivationTask(task);
             await reportTaskFailed(task.task_id, task.status_message, true);
+            setTimeout(async () => {
+                await setActiveDeactivationTask(null);
+            }, 3000);
             return;
         }
 
-        if (response.dry_run_ready) {
-            task.step = "dry_run_ready";
-            task.status_message = `Готово к снятию: кнопка найдена (${response.control_text || 'Снять с публикации'}). Финальное снятие не выполняется (ТЕСТОВЫЙ РЕЖИМ).`;
-            task.control_text = response.control_text;
-            task.updated_at = new Date().toISOString();
-            await setActiveDeactivationTask(task);
-            // CRITICAL: DO NOT call reportTaskSuccess! DO NOT click!
-            console.log("[AvitoSW] Dry-run complete: button found, destructive click blocked.");
-            return;
-        }
-
-        if (response.success && !task.dry_run) {
+        if (response.success) {
             task.step = "confirmed";
             task.status_message = `Подтверждение получено: объявление №${task.avito_listing_id} успешно деактивировано!`;
             task.updated_at = new Date().toISOString();
@@ -806,14 +765,6 @@ async function executeDeactivationFlow(task) {
                 }, 2000);
             }
 
-            // CRITICAL SAFETY (Stage 09A-R3 Section 11):
-            // Restore Dry-Run mode to true and clear any armed listing ID
-            if (!task.dry_run) {
-                await setDryRunMode(true);
-                await setArmedListingId(null);
-                console.log("[AvitoSW] Real execution succeeded. Automatically restored Dry-Run mode to true.");
-            }
-
             // Clear lock after 3 seconds so next task can run
             setTimeout(async () => {
                 await setActiveDeactivationTask(null);
@@ -821,19 +772,15 @@ async function executeDeactivationFlow(task) {
             return;
         }
 
-        // Auto-revert arming on non-success paths as well
-        if (!task.dry_run) {
-            await setDryRunMode(true);
-            await setArmedListingId(null);
-            console.log("[AvitoSW] Real execution non-success. Automatically restored Dry-Run mode to true.");
-        }
-
         if (response.status === "manual_required") {
             task.step = "manual_required";
-            task.status_message = `Требуется ручное действие: ${response.error || 'Не удалось однозначно определить кнопку снятия'}`;
+            task.status_message = `Требуется ручное действие: ${response.error || 'Не удалось определить кнопку снятия'}`;
             task.updated_at = new Date().toISOString();
             await setActiveDeactivationTask(task);
             await reportTaskFailed(task.task_id, task.status_message, false);
+            setTimeout(async () => {
+                await setActiveDeactivationTask(null);
+            }, 3000);
             return;
         }
 
@@ -843,17 +790,19 @@ async function executeDeactivationFlow(task) {
         task.updated_at = new Date().toISOString();
         await setActiveDeactivationTask(task);
         await reportTaskFailed(task.task_id, task.status_message, true);
+        setTimeout(async () => {
+            await setActiveDeactivationTask(null);
+        }, 3000);
     } catch (err) {
         console.error("[AvitoSW] Execution flow error:", err);
-        if (!task.dry_run) {
-            await setDryRunMode(true);
-            await setArmedListingId(null);
-        }
         task.step = "failed";
         task.status_message = `Ошибка выполнения: ${err.message}`;
         task.updated_at = new Date().toISOString();
         await setActiveDeactivationTask(task);
         await reportTaskFailed(task.task_id, err.message, true);
+        setTimeout(async () => {
+            await setActiveDeactivationTask(null);
+        }, 3000);
     }
 }
 

@@ -264,4 +264,48 @@ A task is marked `success` only when Avito externally confirms the listing is no
 - **Business Data:** Sale #1 remains completed; Product #141 stock and status remain completely untouched.
 - **VDS Safety:** 100% strictly local development; zero operations or deployments to VDS `144.31.50.134`.
 
+---
+
+## 10. Stage 09A-R4: Simple Real Avito Deactivation (Zero Dry-Run / Zero Arming)
+
+### Simple Product Rule
+```text
+Нажал "Снять с Avito" -> система реально снимает объявление.
+```
+The explicit click on `[ Снять с Avito ]` by an authenticated seller on a completed sale is the definitive user authorization. No secondary "Armed" mode, no "Dry-Run" test toggle, and no technical switches are required or exposed in the seller workflow.
+
+### Architectural Simplifications
+1. **Zero Dry-Run in Normal Workflow:**
+   - All runtime Dry-Run gating has been removed from normal task execution.
+   - The test banner `⚠️ ТЕСТОВЫЙ РЕЖИМ (Dry-Run)` and final-click blocking are removed from `content.js`.
+   - The task executes directly and reports success once external inactive status is confirmed.
+2. **Zero Armed Mode in Normal Workflow:**
+   - Obsolete arming endpoints (`/arm-task`, `/disarm`, `/armed-status`) are deprecated and return safe direct-real stubs.
+   - Storage file `extension_armed_tasks.json` has been deleted.
+   - All queued seller tasks are automatically processed for direct real deactivation (`approved_for_real_execution = true`).
+3. **Simplified Extension Popup (v0.2.60):**
+   - Removed: Dry-Run checkbox, Dry-Run badge, Armed mode badge, arm button, disarm button, test-mode warnings.
+   - Preserved: Clean status showing connection, target Avito ID, and live task steps:
+     - `1. Получена`
+     - `2. Открываю объявление`
+     - `3. Проверяю ID`
+     - `4. Снимаю с публикации`
+     - `5. Подтверждаю результат`
+     - `✓ Снято с публикации на Avito` (или `Ошибка: ...` при сбое)
+4. **Safety Invariants Maintained:**
+   Safety is guaranteed by strict targeting invariants, not by a test-mode toggle:
+   - Exact Avito hostname validation (`avito.ru` / `*.avito.ru`).
+   - Exact Avito listing ID validation (URL + DOM `data-item-id`).
+   - Exact canonical URL relation.
+   - Conservative blacklist check: strictly blocks payment, promotion, publishing, or edit controls.
+   - Modal reason selection: safe selection (`Товар продан на Авито` or `Снял с продажи`).
+   - Mandatory external confirmation: success is reported only when the page confirms the listing is inactive (`waitForConfirmedInactiveState`).
+   - Ambiguous DOM states fail safely and honestly to `manual_required`.
+5. **Controlled Failure Path & Honest Error UX:**
+   - If deactivation fails (e.g. ID mismatch, unauthenticated session, unexpected modal), the task is honestly marked `manual_required` or `failed` with a clear Russian diagnostic error.
+   - Completed sales and physical stock are never modified or deleted.
+   - The sale detail page keeps `[ Повторить снятие ]` available for immediate retry.
+   - Duplicate tasks are strictly prevented on repeated clicks.
+
+
 

@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.59)
+// Technoreboot Avito Popup Script (v0.2.60)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.59";
+        let manifestVer = "0.2.60";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -305,18 +305,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (productLinkContainer) productLinkContainer.style.display = "none";
     }
 
-    // --- Post-Sale Deactivation UI Helpers ---
-    function updateModeBadge(isDryRun, armedListingId = null) {
-        if (!deactivationModeBadge) return;
-        if (isDryRun) {
-            deactivationModeBadge.className = "badge badge-warning";
-            deactivationModeBadge.textContent = "ТЕСТОВЫЙ РЕЖИМ (Dry-Run)";
-        } else {
-            deactivationModeBadge.className = "badge badge-danger";
-            deactivationModeBadge.textContent = armedListingId ? `⚠️ ВООРУЖЁН (№${armedListingId})` : "⚠️ РЕАЛЬНЫЙ РЕЖИМ (Armed)";
-        }
-    }
-
+    // --- Post-Sale Deactivation UI Helpers (Stage 09A-R4 Direct Real Mode) ---
     function updateActiveTaskUI(task) {
         if (!activeTaskCard || !noActiveTaskMsg) return;
         if (!task || !task.task_id) {
@@ -327,8 +316,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeTaskCard.style.display = "block";
         noActiveTaskMsg.style.display = "none";
 
-        if (taskHeader) taskHeader.textContent = `Задача #${task.task_id}: Снять с Avito`;
-        if (taskAvitoId) taskAvitoId.textContent = `Avito ID: ${task.avito_listing_id || '...'}`;
+        if (taskHeader) taskHeader.textContent = `Текущая задача:`;
+        if (taskAvitoId) taskAvitoId.textContent = `Avito №${task.avito_listing_id || '...'}`;
 
         if (openTaskListingBtn) {
             if (task.listing_url) {
@@ -345,37 +334,22 @@ document.addEventListener("DOMContentLoaded", async () => {
             { el: stepReceived, key: "received", label: "1. Получена" },
             { el: stepOpening, key: "opening_page", label: "2. Открываю объявление" },
             { el: stepVerifying, key: "verifying_id", label: "3. Проверяю ID" },
-            { el: stepFound, key: "control_found", label: "4. Кнопка найдена" },
-            { el: stepExecuting, key: "executing", label: "5. Снятие с публикации" },
-            { el: stepConfirmed, key: "confirmed", label: "6. Подтверждение получено" }
+            { el: stepExecuting, key: "executing", label: "4. Снимаю с публикации" },
+            { el: stepConfirmed, key: "confirmed", label: "5. Подтверждаю результат" }
         ];
 
-        const stepOrder = ["received", "opening_page", "verifying_id", "control_found", "executing", "confirmed"];
+        const stepOrder = ["received", "opening_page", "verifying_id", "executing", "confirmed"];
         const currentIdx = stepOrder.indexOf(task.step);
 
         stepElements.forEach((s, idx) => {
             if (!s.el) return;
-            if (task.dry_run && task.step === "dry_run_ready") {
-                if (idx <= 3) {
-                    s.el.innerHTML = `✓ ${s.label}`;
-                    s.el.style.color = "#16a34a";
-                    s.el.style.fontWeight = "600";
-                } else if (idx === 4) {
-                    s.el.innerHTML = `⊘ 5. Снятие заблокировано (ТЕСТ)`;
-                    s.el.style.color = "#d97706";
-                    s.el.style.fontWeight = "600";
-                } else {
-                    s.el.innerHTML = `○ ${s.label}`;
-                    s.el.style.color = "#94a3b8";
-                    s.el.style.fontWeight = "normal";
-                }
-            } else if (task.step === "failed" || task.step === "manual_required") {
+            if (task.step === "failed" || task.step === "manual_required") {
                 if (idx < currentIdx) {
                     s.el.innerHTML = `✓ ${s.label}`;
                     s.el.style.color = "#16a34a";
                     s.el.style.fontWeight = "normal";
                 } else if (idx === currentIdx || (currentIdx === -1 && idx === 3)) {
-                    s.el.innerHTML = `✕ ${s.label} (${task.step})`;
+                    s.el.innerHTML = `✕ ${s.label}`;
                     s.el.style.color = "#dc2626";
                     s.el.style.fontWeight = "600";
                 } else {
@@ -399,57 +373,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
 
         if (taskStatusBox) {
-            if (task.step === "dry_run_ready") {
-                taskStatusBox.style.background = "#fef3c7";
-                taskStatusBox.style.color = "#92400e";
-                taskStatusBox.innerHTML = `<strong>ТЕСТОВЫЙ РЕЖИМ:</strong> ${task.status_message || 'Готово к снятию: кнопка найдена. Финальное снятие не выполняется.'}`;
-            } else if (task.step === "confirmed" || task.step === "success") {
+            if (task.step === "confirmed" || task.step === "success") {
                 taskStatusBox.style.background = "#dcfce7";
                 taskStatusBox.style.color = "#166534";
-                taskStatusBox.textContent = task.status_message || "Снятие с публикации успешно подтверждено!";
+                taskStatusBox.textContent = "✓ Снято с публикации на Avito";
             } else if (task.step === "failed" || task.step === "manual_required") {
                 taskStatusBox.style.background = "#fee2e2";
                 taskStatusBox.style.color = "#991b1b";
-                taskStatusBox.textContent = task.status_message || "Ошибка деактивации.";
+                taskStatusBox.textContent = `Ошибка: ${task.status_message || 'Не удалось выполнить снятие'}`;
             } else {
                 taskStatusBox.style.background = "#eff6ff";
                 taskStatusBox.style.color = "#1e40af";
                 taskStatusBox.textContent = task.status_message || "Выполняется задача...";
             }
         }
-    }
-
-    // Initialize Post-Sale Deactivation UI
-    const armApproved7353766377Btn = document.getElementById("armApproved7353766377Btn");
-    if (armApproved7353766377Btn) {
-        armApproved7353766377Btn.addEventListener("click", () => {
-            chrome.runtime.sendMessage({ action: "arm_specific_listing", listing_id: "7353766377" }, res => {
-                if (dryRunCheckbox) dryRunCheckbox.checked = false;
-                updateModeBadge(false, "7353766377");
-                if (taskStatusBox) {
-                    taskStatusBox.textContent = "Вооружен для №7353766377. Запустите снятие или дождитесь авто-опроса...";
-                }
-            });
-        });
-    }
-
-    if (dryRunCheckbox) {
-        chrome.runtime.sendMessage({ action: "get_dry_run_mode" }, res => {
-            const isDry = res ? res.dry_run !== false : true;
-            dryRunCheckbox.checked = isDry;
-            chrome.runtime.sendMessage({ action: "get_armed_listing_id" }, armRes => {
-                updateModeBadge(isDry, armRes ? armRes.armed_listing_id : null);
-            });
-        });
-
-        dryRunCheckbox.addEventListener("change", () => {
-            const enabled = dryRunCheckbox.checked;
-            chrome.runtime.sendMessage({ action: "set_dry_run_mode", enabled: enabled }, () => {
-                chrome.runtime.sendMessage({ action: "get_armed_listing_id" }, armRes => {
-                    updateModeBadge(enabled, armRes ? armRes.armed_listing_id : null);
-                });
-            });
-        });
     }
 
     if (dismissTaskBtn) {
@@ -468,17 +405,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Real-time storage listener
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
         chrome.storage.onChanged.addListener((changes, areaName) => {
-            if (areaName === "local") {
-                if (changes.active_deactivation_task) {
-                    updateActiveTaskUI(changes.active_deactivation_task.newValue);
-                }
-                if (changes.avito_deactivation_dry_run || changes.armed_avito_listing_id) {
-                    chrome.storage.local.get(["avito_deactivation_dry_run", "armed_avito_listing_id"], s => {
-                        const isDry = s.avito_deactivation_dry_run !== false;
-                        if (dryRunCheckbox) dryRunCheckbox.checked = isDry;
-                        updateModeBadge(isDry, s.armed_avito_listing_id);
-                    });
-                }
+            if (areaName === "local" && changes.active_deactivation_task) {
+                updateActiveTaskUI(changes.active_deactivation_task.newValue);
             }
         });
     }
