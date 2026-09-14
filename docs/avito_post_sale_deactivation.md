@@ -200,3 +200,35 @@ Adding table `avito_post_sale_tasks` constitutes a schema expansion:
    ```
 4. VDS deployment is **BLOCKED** by Schema Guard until a dedicated manual migration stage is approved by the Owner.
 
+---
+
+## 8. Stage 09A-R2: Action Contract Alignment & Permanent Sale Detail UX
+
+### Action Contract Discrepancy & Resolution
+During real Owner testing with Avito ID `7353766377` (Sale #1), tasks failed with:
+`Status: manual_required, Attempts: 1 / 3, Error: Unsupported action: deactivate`
+
+- **Root Cause:** 
+  The Core business model and SQLite DB record `action = "deactivate"`.
+  The Chrome Extension v0.2.58 `service_worker.js` strictly required `task.action === "deactivate_listing"`.
+- **Resolution (Zero-DB-Migration):**
+  1. **Bridge Adapter Mapping:** `avito-module/app/routers/extension_bridge.py` defines `BUSINESS_ACTION_DEACTIVATE = "deactivate"` and `EXTENSION_ACTION_DEACTIVATE_LISTING = "deactivate_listing"`. When serializing tasks for the extension (`/admin-api/avito-extension/tasks/next`), the adapter maps `deactivate` to `deactivate_listing`.
+  2. **Extension Tolerance & Security Guard:** `chrome-extension/technoreboot-avito/service_worker.js` defines `SUPPORTED_DEACTIVATION_ACTIONS = ["deactivate_listing", "deactivate"]`. Both actions are accepted. Any unauthorized or unknown actions (e.g. `delete_account`, `publish_listing`, `pay_promotion`) are strictly rejected with `Unsupported action: ${task.action}`.
+  3. **Version Bump:** Extension bumped to `0.2.59` across `manifest.json`, `service_worker.js`, `content.js`, `popup.html`, `popup.js`, and `admin-shell`.
+
+### Permanent Sale Detail UX (Section 6A)
+- The sale detail view (`/sales/{sale_id}` or `/inventory/sales/{sale_id}`) now provides a permanent `[ Снять с Avito ]` action button next to `[ Товарный чек ]`.
+- Sellers can request deactivation at any time, even if dismissed immediately post-sale or if previous attempts failed.
+- In multi-item sales, an interactive dialog confirms deactivation of all linked active Avito listings.
+- Clear status banners provide immediate, honest feedback:
+  - `✓ Объявление уже снято с Avito`
+  - `ⓘ Задачи на снятие с Avito уже обрабатываются`
+  - `ⓘ Для этой продажи нет связанных объявлений Avito`
+  - `✓ Задачи на снятие с Avito поставлены в очередь`
+
+### Robust Browser Navigation & DOM Discovery (Section 6B)
+- **Canonical URL Navigation:** Extension navigates directly to `https://www.avito.ru/{avito_listing_id}` or the stored canonical item URL.
+- **Exact ID Verification:** `content.js` inspects `extractAvitoItemId(url)` and DOM `[data-item-id]` to verify that the active page matches the task's Avito ID. If IDs mismatch, execution aborts with `manual_required`.
+- **Action Menu & Profile Card Discovery:** If deactivation controls are hidden in a submenu ("...", "Действия") or within profile cards (`/profile/items`), `content.js` dynamically expands the menu to find the control.
+- **Tab Focus Preservation:** `service_worker.js` captures the `originalTabId` before opening the task tab. Upon completion in Armed mode, it restores focus to the seller's original working tab and closes the temporary Avito tab.
+

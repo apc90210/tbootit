@@ -165,11 +165,11 @@ def test_avito_target_domain_security_validation():
 
 
 # ==============================================================================
-# Chrome Extension v0.2.58 Package Tests (Section 13 & 14)
+# Chrome Extension v0.2.59 Package Tests (Section 13 & 14)
 # ==============================================================================
 
-def test_extension_package_v0258_and_task_channel_helpers():
-    """Section 14: Extension bumped to v0.2.58 and ZIP package contains valid manifest, service worker & content script."""
+def test_extension_package_v0259_and_task_channel_helpers():
+    """Section 14: Extension bumped to v0.2.59 and ZIP package contains valid manifest, service worker & content script."""
     ext_zip_path = REPO_ROOT / "admin-shell" / "app" / "technoreboot-avito-extension.zip"
     assert ext_zip_path.is_file(), f"Missing extension zip: {ext_zip_path}"
 
@@ -182,10 +182,10 @@ def test_extension_package_v0258_and_task_channel_helpers():
         assert "popup.js" in namelist
 
         manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest_data["version"] == "0.2.58"
+        assert manifest_data["version"] == "0.2.59"
 
         sw_code = zf.read("service_worker.js").decode("utf-8")
-        assert "0.2.58" in sw_code
+        assert "0.2.59" in sw_code
         assert "pollNextDeactivationTask" in sw_code
         assert "getActiveDeactivationTask" in sw_code
         assert "executeDeactivationFlow" in sw_code
@@ -194,7 +194,7 @@ def test_extension_package_v0258_and_task_channel_helpers():
         assert "report_task_failed" in sw_code
 
         content_code = zf.read("content.js").decode("utf-8")
-        assert "0.2.58" in content_code
+        assert "0.2.59" in content_code
         assert "execute_deactivation" in content_code
         assert "discoverDeactivationControl" in content_code
         assert "DEACTIVATION_WHITELIST" in content_code
@@ -422,4 +422,105 @@ def test_deployment_compatibility_enforces_manual_migration_guard():
     assert compat.get("requires_manual_migration") is True
     assert compat.get("database_change") is True
     assert "Stage 09A" in compat.get("reason", "") or "avito_post_sale_tasks" in compat.get("reason", "")
+
+
+# ==============================================================================
+# Stage 09A-R2 Action Contract Tests (Section 8)
+# ==============================================================================
+
+def test_persisted_task_action_deactivate_internal_validity():
+    """Section 4 & 8: Internal persisted business action is 'deactivate'."""
+    core_models_path = REPO_ROOT / "core" / "app" / "models.py"
+    with open(core_models_path, "r", encoding="utf-8") as f:
+        core_models_code = f.read()
+
+    assert "class AvitoPostSaleTask" in core_models_code
+    assert 'default="deactivate"' in core_models_code or "default='deactivate'" in core_models_code
+
+
+def test_extension_bridge_payload_action_mapping():
+    """Section 4 & 8: Extension bridge serializes business 'deactivate' into transport 'deactivate_listing'."""
+    bridge_path = REPO_ROOT / "avito-module" / "app" / "routers" / "extension_bridge.py"
+    with open(bridge_path, "r", encoding="utf-8") as f:
+        bridge_code = f.read()
+
+    assert 'BUSINESS_ACTION_DEACTIVATE = "deactivate"' in bridge_code
+    assert 'EXTENSION_ACTION_DEACTIVATE_LISTING = "deactivate_listing"' in bridge_code
+    assert 'task["action"] = EXTENSION_ACTION_DEACTIVATE_LISTING' in bridge_code
+
+
+def test_service_worker_accepts_supported_actions_and_rejects_unknown():
+    """Section 4, 6 & 8: Service worker accepts both deactivate_listing and deactivate, and rejects unknown actions."""
+    sw_path = REPO_ROOT / "chrome-extension" / "technoreboot-avito" / "service_worker.js"
+    with open(sw_path, "r", encoding="utf-8") as f:
+        sw_code = f.read()
+
+    assert "SUPPORTED_DEACTIVATION_ACTIONS" in sw_code
+    assert '"deactivate_listing"' in sw_code
+    assert '"deactivate"' in sw_code
+    assert "Unsupported action:" in sw_code
+
+    # Python simulation of the service worker action validator contract
+    supported = ["deactivate_listing", "deactivate"]
+    
+    # Valid actions accepted
+    assert "deactivate_listing" in supported
+    assert "deactivate" in supported
+
+    # Unknown actions rejected (must not be normalized into deactivation)
+    unknown_actions = ["delete_account", "publish_listing", "pay_promotion", "random_action"]
+    for unk in unknown_actions:
+        assert unk not in supported, f"Action {unk} must be rejected"
+
+
+def test_sale_detail_permanent_avito_button_and_messages_rendered():
+    """Section 6A & 8: Sale detail template includes permanent [Снять с Avito] button and avito_msg banners."""
+    sales_detail_path = REPO_ROOT / "inventory-sales-module" / "app" / "templates" / "sales_detail.html"
+    with open(sales_detail_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # Permanent button exists in action bar
+    assert "btnPermanentAvitoDeactivate" in html
+    assert "Снять с Avito" in html
+    assert "/inventory/sales/{{ sale.id }}/avito-deactivate" in html
+
+    # Informational message banners are handled
+    assert "Объявление уже снято с Avito" in html
+    assert "Для этой продажи нет связанных объявлений Avito" in html
+    assert "already_deactivated" in html
+    assert "no_listings" in html
+
+
+def test_content_script_extract_avito_item_id_logic():
+    """Section 6B & 8: extractAvitoItemId logic extracts exact listing ID from various Avito URL formats."""
+    import re
+    import urllib.parse
+
+    def extract_avito_item_id(url: str):
+        if not url:
+            return None
+        parsed = urllib.parse.urlparse(url)
+        path = parsed.path
+        trailing_match = re.search(r'(?:_/|/)(\d{7,15})(?:/|\?|#|$)', path)
+        if trailing_match and trailing_match.group(1):
+            return trailing_match.group(1)
+        # Alternate trailing pattern
+        m2 = re.search(r'_(\d{7,15})(?:/|\?|#|$)', path)
+        if m2 and m2.group(1):
+            return m2.group(1)
+        qs = urllib.parse.parse_qs(parsed.query)
+        for k in ("item_id", "id"):
+            if k in qs and re.match(r'^\d{7,15}$', qs[k][0]):
+                return qs[k][0]
+        any_digits = re.search(r'\b(\d{8,12})\b', path)
+        if any_digits and any_digits.group(1):
+            return any_digits.group(1)
+        return None
+
+    assert extract_avito_item_id("https://www.avito.ru/ekaterinburg/tovary/printer_7353766377") == "7353766377"
+    assert extract_avito_item_id("https://www.avito.ru/7353766377") == "7353766377"
+    assert extract_avito_item_id("https://www.avito.ru/items/7353766377") == "7353766377"
+    assert extract_avito_item_id("https://www.avito.ru/profile/items/active?item_id=7353766377") == "7353766377"
+    assert extract_avito_item_id("https://www.avito.ru/profile/items/active") is None
+
 

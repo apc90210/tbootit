@@ -36,6 +36,26 @@
         </div>
     {% endif %}
 
+    {% if avito_msg %}
+        {% if avito_msg == 'already_deactivated' %}
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #15803d; font-weight: 500;">
+            ✓ Объявление уже снято с Avito
+        </div>
+        {% elif avito_msg == 'no_listings' %}
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #475569; font-weight: 500;">
+            ⓘ Для этой продажи нет связанных объявлений Avito
+        </div>
+        {% elif avito_msg == 'already_in_progress' %}
+        <div style="background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #0369a1; font-weight: 500;">
+            ⏳ Задача на снятие с Avito уже находится в обработке или очереди.
+        </div>
+        {% elif avito_msg.startswith('queued_') %}
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #15803d; font-weight: 500;">
+            ✓ Задача на снятие с Avito успешно добавлена в очередь.
+        </div>
+        {% endif %}
+    {% endif %}
+
     {# Avito Post-Sale Follow-Up Block #}
     {% if avito_tasks and (st == 'completed' or st == 'reissued') %}
         {% set suggested_tasks = [] %}
@@ -275,10 +295,21 @@
     </div>
     {% endif %}
 
-    <div style="margin-top: 20px;">
-        <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn btn-primary" style="margin-right: 15px;">Товарный чек</a>
+    <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn btn-primary" style="margin-right: 5px;">Товарный чек</a>
+        
+        <form action="/inventory/sales/{{ sale.id }}/avito-deactivate" method="POST" style="display: inline; margin: 0;">
+            <button type="submit" id="btnPermanentAvitoDeactivate" class="btn" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer;"
+                {% if avito_tasks and avito_tasks|length > 1 %}
+                    onclick="return confirm('Снять все связанные объявления Avito ({{ avito_tasks|length }} шт.) по этой продаже?');"
+                {% endif %}
+            >
+                Снять с Avito
+            </button>
+        </form>
+
         <a href="/inventory/products" class="btn">Вернуться к товарам</a>
-        <a href="/inventory/sales" class="btn" style="margin-left: 10px;">Все продажи</a>
+        <a href="/inventory/sales" class="btn" style="margin-left: 5px;">Все продажи</a>
     </div>
 
     {% if st == 'completed' or st == 'reissued' %}

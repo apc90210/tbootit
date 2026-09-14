@@ -16,3 +16,5 @@ def test_proxy_location_rewrite_cases():
     assert rewrite_location_header("/inventory/products", "/inventory") == "/inventory/products"
     assert rewrite_location_header("/repairs/repairs", "/repairs") == "/repairs/repairs"
     assert rewrite_location_header("/avito/accounts", "/avito") == "/avito/accounts"
+    assert rewrite_location_header("/sales/1", "/sales") == "/sales/1"
+    assert rewrite_location_header("/reports/sales", "/reports/sales") == "/reports/sales"

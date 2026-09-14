@@ -109,22 +109,24 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 ---
 
-## 7. Avito Post-Sale Deactivation & Real Extension Executor (Stage 09A LOCAL & Stage 09A-R1 LOCAL)
+## 7. Avito Post-Sale Deactivation & Action Contract Fix (Stage 09A, 09A-R1 & 09A-R2 LOCAL)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
 | **Stage Scope** | **LOCAL ONLY** | Development and automated validation on `https://localhost:8443` |
-| **Sale Integration** | **ACTIVE** | Post-sale follow-up card on sales receipt (`[ Не сейчас ]` / `[ Снять с Avito ]`) |
+| **Sale Integration** | **ACTIVE** | Post-sale follow-up card and permanent `[ Снять с Avito ]` button on sale detail view |
 | **Sale Non-Block Invariant** | **ENFORCED** | Sale commits before Avito follow-up; Avito failures never block or revert sales |
 | **Stock Non-Mutation** | **ENFORCED** | Physical inventory is never mutated by Avito task state changes |
 | **Persistent Task Model** | **ACTIVE (`avito_post_sale_tasks`)** | Idempotent on `(sale_id, product_id, avito_listing_id, action)`. 7 discrete states. |
+| **Action Contract Bridge** | **ACTIVE (Zero-DB-Migration)** | Bridge adapter maps DB business `'deactivate'` to extension transport `'deactivate_listing'` |
+| **Chrome Extension Version** | `0.2.59` | Tolerates both `'deactivate_listing'` and `'deactivate'`; rejects unknown actions; restores original tab |
 | **Retry Limit & Fallback** | **ACTIVE (3 Attempts)** | Auto-transitions to `manual_required` upon reaching 3 failed attempts |
 | **Official API Capability** | `OFFICIAL_API_AVAILABLE = false` | Capability probe `can_deactivate_listing = false` (extension mode used) |
-| **Chrome Extension Version** | `0.2.58` | Full executor: polling, active-task locking, DOM discovery, modal handler, dry-run mode |
 | **Dry-Run Safety Mode** | **ACTIVE (Default ON)** | Discovers control, highlights, updates UI; blocks clicks and server success reporting |
-| **DOM Discovery Safety** | **ACTIVE** | Conservative whitelist & blacklist; rejects payment, publish, promotion, edit controls |
+| **DOM Discovery Safety** | **ACTIVE** | Conservative whitelist & blacklist; checks actions menu and profile cards (`/profile/items`) |
 | **Cleanup Queue UI** | **ACTIVE (`/avito/post-sale`)** | Filterable queue table with retry, queue, and cancel actions |
 | **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
+
 
 
 

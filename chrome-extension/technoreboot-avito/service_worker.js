@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.58)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.59)
 
 const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -272,7 +272,7 @@ async function sendBulkImportPayload(payload) {
         if (!normalizedPayload.schema_version) {
             normalizedPayload.schema_version = 1;
         }
-        normalizedPayload.extension_version = "0.2.58";
+        normalizedPayload.extension_version = "0.2.59";
         if (!normalizedPayload.captured_at) {
             normalizedPayload.captured_at = new Date().toISOString();
         }
@@ -627,7 +627,8 @@ async function pollNextDeactivationTask() {
         const task = res.task;
 
         // Strict target validation
-        if (task.action !== "deactivate_listing") {
+        const SUPPORTED_DEACTIVATION_ACTIONS = ["deactivate_listing", "deactivate"];
+        if (!SUPPORTED_DEACTIVATION_ACTIONS.includes(task.action)) {
             console.warn("[AvitoSW] Unsupported task action:", task.action);
             await reportTaskFailed(task.task_id, `Unsupported action: ${task.action}`, false);
             return;
@@ -673,6 +674,13 @@ async function executeDeactivationFlow(task) {
         task.status_message = `Открываю объявление Avito №${task.avito_listing_id}...`;
         task.updated_at = new Date().toISOString();
         await setActiveDeactivationTask(task);
+
+        // Track previously active tab to restore focus later
+        let originalTabId = null;
+        try {
+            const [currentActiveTab] = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+            originalTabId = currentActiveTab ? currentActiveTab.id : null;
+        } catch (_) {}
 
         // Find existing tab with this Avito ID or open a new tab
         const allTabs = await new Promise(r => chrome.tabs.query({}, r));
@@ -735,10 +743,23 @@ async function executeDeactivationFlow(task) {
             await setActiveDeactivationTask(task);
             await reportTaskSuccess(task.task_id, response.details || {});
             console.log("[AvitoSW] Real deactivation confirmed and reported to server.");
-            // Clear lock after 15 seconds so next task can run
+
+            // Restore focus to original tab and safely close temporary task tab after brief delay
+            if (originalTabId && targetTab && originalTabId !== targetTab.id) {
+                try {
+                    await new Promise(r => chrome.tabs.update(originalTabId, { active: true }, r));
+                } catch (_) {}
+            }
+            if (targetTab && targetTab.id) {
+                setTimeout(() => {
+                    chrome.tabs.remove(targetTab.id).catch(() => {});
+                }, 2000);
+            }
+
+            // Clear lock after 10 seconds so next task can run
             setTimeout(async () => {
                 await setActiveDeactivationTask(null);
-            }, 15000);
+            }, 10000);
             return;
         }
 

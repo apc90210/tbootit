@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.58)
+// Technoreboot Avito Popup Script (v0.2.59)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.58";
+        let manifestVer = "0.2.59";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();

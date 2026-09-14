@@ -62,9 +62,12 @@ class ListingPayload(BaseModel):
     page_type: str = "listing"
     listing: Dict[str, Any]
 
+BUSINESS_ACTION_DEACTIVATE = "deactivate"
+EXTENSION_ACTION_DEACTIVATE_LISTING = "deactivate_listing"
+
 class MyListingsPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.58"
+    extension_version: str = "0.2.59"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "my_listings"
     listings_count: Optional[int] = 0
@@ -72,7 +75,7 @@ class MyListingsPayload(BaseModel):
 
 class BulkImportPayload(BaseModel):
     schema_version: int = 1
-    extension_version: str = "0.2.58"
+    extension_version: str = "0.2.59"
     captured_at: Optional[str] = None
     page_type: Optional[str] = "bulk_import"
     listings_count: Optional[int] = None
@@ -92,7 +95,7 @@ async def get_extension_status(x_extension_token: Optional[str] = Header(None)):
 
     return {
         "online": True,
-        "version": "0.2.58",
+        "version": "0.2.59",
         "paired": paired,
         "token_valid": paired,
         "active_tokens_count": len(tokens)
@@ -555,6 +558,11 @@ async def get_next_extension_task(token: str = Depends(verify_extension_token)):
                     "can_retry": False
                 })
                 return {"task": None}
+
+            # Map action from internal business domain to extension transport domain
+            action = task.get("action", "")
+            if action == BUSINESS_ACTION_DEACTIVATE:
+                task["action"] = EXTENSION_ACTION_DEACTIVATE_LISTING
 
             return {"task": task}
         except Exception as e:

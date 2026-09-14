@@ -163,6 +163,8 @@ async def sale_detail(request: Request, sale_id: int):
 
     avito_dismissed = request.query_params.get("avito_dismissed") == "1"
 
+    avito_msg = request.query_params.get("avito_msg")
+
     return templates.TemplateResponse(
         request=request,
         name="sales_detail.html",
@@ -172,14 +174,34 @@ async def sale_detail(request: Request, sale_id: int):
             "sale_status_labels": SALE_STATUS_LABELS,
             "avito_tasks": avito_tasks,
             "avito_dismissed": avito_dismissed,
+            "avito_msg": avito_msg,
         },
     )
 
 @router.post("/sales/{sale_id}/avito-deactivate")
 async def sale_avito_deactivate_endpoint(request: Request, sale_id: int):
     """Queue post-sale Avito deactivation task(s)."""
-    await core_client.deactivate_sale_avito(sale_id)
-    return RedirectResponse(url=f"/sales/{sale_id}", status_code=303)
+    resp = await core_client.deactivate_sale_avito(sale_id)
+    msg = None
+    if resp and isinstance(resp, dict):
+        tasks = resp.get("tasks", [])
+        queued_count = resp.get("queued_count", 0)
+        if not tasks:
+            msg = "no_listings"
+        elif queued_count == 0:
+            if all(t.get("status") == "success" for t in tasks):
+                msg = "already_deactivated"
+            elif any(t.get("status") in ["queued", "processing"] for t in tasks):
+                msg = "already_in_progress"
+            else:
+                msg = "no_tasks_queued"
+        else:
+            msg = f"queued_{queued_count}"
+
+    url = f"/sales/{sale_id}"
+    if msg:
+        url += f"?avito_msg={msg}"
+    return RedirectResponse(url=url, status_code=303)
 
 @router.post("/sales/{sale_id}/avito-dismiss")
 async def sale_avito_dismiss_endpoint(request: Request, sale_id: int):

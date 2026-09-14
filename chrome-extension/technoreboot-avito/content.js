@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.58)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.59)
 
 let pageInitialData = null;
 
@@ -4313,7 +4313,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.58",
+                    extension_version: "0.2.59",
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -4362,12 +4362,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ==============================================================================
-// Avito Post-Sale Deactivation Executor (Stage 09A-R1 LOCAL)
+// Avito Post-Sale Deactivation Executor (Stage 09A-R2 LOCAL)
 // ==============================================================================
+
+function extractAvitoItemId(url) {
+    if (!url) return null;
+    try {
+        const u = new URL(url, window.location.origin);
+        const path = u.pathname;
+        const trailingMatch = path.match(/(?:_|\/)(\d{7,15})(?:\/|\?|#|$)/);
+        if (trailingMatch && trailingMatch[1]) {
+            return trailingMatch[1];
+        }
+        const qId = u.searchParams.get("item_id") || u.searchParams.get("id");
+        if (qId && /^\d{7,15}$/.test(qId)) {
+            return qId;
+        }
+        const anyDigits = path.match(/\b(\d{8,12})\b/);
+        if (anyDigits && anyDigits[1]) {
+            return anyDigits[1];
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
 
 const DEACTIVATION_WHITELIST = [
     "снять с публикации",
     "снять объявление",
+    "снять с продажи",
     "деактивировать",
     "архивировать",
     "убрать с публикации",
@@ -4389,9 +4413,10 @@ const DEACTIVATION_BLACKLIST = [
     "подключить"
 ];
 
-function discoverDeactivationControl() {
+function discoverDeactivationControl(targetAvitoId = null) {
     // Collect candidate button and link elements on page
-    const elements = Array.from(document.querySelectorAll('button, a, [role="button"], [data-marker*="close"], [data-marker*="archive"], [data-marker*="deactivate"]'));
+    const selector = 'button, a, [role="button"], [data-marker*="close"], [data-marker*="archive"], [data-marker*="deactivate"], [data-marker*="withdraw"], [data-marker*="unpublish"]';
+    const elements = Array.from(document.querySelectorAll(selector));
     const matches = [];
 
     for (const el of elements) {
@@ -4414,9 +4439,9 @@ function discoverDeactivationControl() {
 
         // Whitelist match
         const matchedPhrase = DEACTIVATION_WHITELIST.find(w => combined.includes(w));
-        const hasSpecificMarker = dataMarker.includes("close-item") || dataMarker.includes("deactivate") || dataMarker === "item-actions/close";
+        const hasSpecificMarker = dataMarker.includes("close-item") || dataMarker.includes("deactivate") || dataMarker === "item-actions/close" || dataMarker.includes("withdraw");
 
-        if (matchedPhrase || hasSpecificMarker) {
+        if (matchedPhrase || hasSpecificMarker || text === "снять") {
             matches.push({
                 element: el,
                 text: el.innerText || el.getAttribute("aria-label") || matchedPhrase || "Снять с публикации",
@@ -4553,7 +4578,17 @@ async function executeDeactivationOnPage(task) {
     }
 
     // 2. Exact Avito ID Validation
-    const currentPageId = extractAvitoItemId(window.location.href);
+    let currentPageId = extractAvitoItemId(window.location.href);
+    if (!currentPageId && task.avito_listing_id && window.location.href.includes(String(task.avito_listing_id))) {
+        currentPageId = String(task.avito_listing_id);
+    }
+    if (!currentPageId) {
+        const idEl = document.querySelector('[data-item-id], [data-marker*="item-id"]');
+        if (idEl) {
+            const m = (idEl.getAttribute("data-item-id") || idEl.innerText || "").match(/\d{7,15}/);
+            if (m) currentPageId = m[0];
+        }
+    }
     if (!currentPageId) {
         return { success: false, status: "manual_required", error: "Не удалось определить Avito ID на текущей странице." };
     }
@@ -4579,17 +4614,41 @@ async function executeDeactivationOnPage(task) {
     }
 
     // 4. Conservative DOM Discovery for Deactivation Controls
-    let candidate = discoverDeactivationControl();
+    let candidate = discoverDeactivationControl(task.avito_listing_id);
 
     // If not found, try opening actions menu if present (e.g. "...", "Действия", data-marker="item-actions/menu")
     if (!candidate) {
-        const menuTrigger = document.querySelector('[data-marker="item-actions/menu"], [data-marker*="actions-menu"], button[aria-label*="действи"], [data-marker="item-view/more-actions"]');
-        if (menuTrigger) {
+        const menuTriggers = Array.from(document.querySelectorAll('[data-marker="item-actions/menu"], [data-marker*="actions-menu"], button[aria-label*="действи"], button[aria-label*="ещё"], [data-marker="item-view/more-actions"], [data-marker*="more-button"]'));
+        for (const menuTrigger of menuTriggers) {
             try {
                 menuTrigger.click();
                 await new Promise(r => setTimeout(r, 600));
-                candidate = discoverDeactivationControl();
+                candidate = discoverDeactivationControl(task.avito_listing_id);
+                if (candidate) break;
             } catch (e) {}
+        }
+    }
+
+    // Check profile item card if on profile page
+    if (!candidate && window.location.pathname.includes("/profile/items")) {
+        const itemCard = document.querySelector(`[data-item-id="${task.avito_listing_id}"], [href*="${task.avito_listing_id}"]`)?.closest('[data-marker*="item"], tr, li');
+        if (itemCard) {
+            const cardBtn = Array.from(itemCard.querySelectorAll('button, a, [role="button"]')).find(b => {
+                const bText = (b.innerText || b.textContent || "").toLowerCase();
+                return DEACTIVATION_WHITELIST.some(w => bText.includes(w));
+            });
+            if (cardBtn) {
+                candidate = { element: cardBtn, text: cardBtn.innerText || "Снять с публикации" };
+            } else {
+                const cardMenu = itemCard.querySelector('[data-marker*="menu"], [data-marker*="actions"], button[aria-label*="действи"]');
+                if (cardMenu) {
+                    try {
+                        cardMenu.click();
+                        await new Promise(r => setTimeout(r, 600));
+                        candidate = discoverDeactivationControl(task.avito_listing_id);
+                    } catch (e) {}
+                }
+            }
         }
     }
 

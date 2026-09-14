@@ -601,7 +601,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.58"
+    version = "0.2.59"
     try:
         for manifest_candidate in [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")),
@@ -768,10 +768,12 @@ def rewrite_location_header(loc: str, prefix: str) -> str:
     path = re.sub(r'^https?://[^/]+', '', loc)
     if not path.startswith('/'):
         path = '/' + path
-    for p in ["/inventory", "/repairs", "/avito"]:
+    for p in ["/inventory", "/repairs", "/avito", "/sales", "/reports/sales"]:
         if path == p or path.startswith(p + "/"):
             return path
     prefix_clean = prefix.rstrip('/')
+    if path == prefix_clean or path.startswith(prefix_clean + '/'):
+        return path
     return f"{prefix_clean}{path}"
 
 async def _proxy_request(request: Request, target_base_url: str, path: str, prefix: str):
