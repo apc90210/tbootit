@@ -1,0 +1,62 @@
+{
+  "git_head": "46fbed130ca838c2e1aeaa4897f6cc68c86337b8",
+  "git_branch": "HEAD",
+  "git_status": "",
+  "compat": {
+    "version": 1,
+    "requires_manual_migration": false,
+    "database_change": false,
+    "reason": "Stage 09C PRODUCTION: avito_post_sale_tasks migration applied to live VDS DB. Schema guard passes. Code-only deploys are safe.",
+    "schema_contract_sha256": "ae36c0163d7dcd5fa4a4f8e977008566f84f1016b2aa3d686bd31228f43aa886",
+    "reviewed_at_commit": "e21dba6404f14314863213cb40ba945ea427a467"
+  },
+  "containers": [
+    "8335949b22d3 technoreboot-prod-admin-shell Up 10 seconds (healthy) production-admin-shell",
+    "a200d35a3453 technoreboot-prod-repairs Up 16 seconds (healthy) production-repairs-module",
+    "889aa85723d4 technoreboot-prod-inventory-sales Up 16 seconds (healthy) production-inventory-sales-module",
+    "ac7db9f1b9e7 technoreboot-prod-avito Up 39 minutes (healthy) b3938b9f934a",
+    "740021bf0a78 technoreboot-prod-core Up 39 minutes (healthy) d4bf017f5a2d",
+    "58c543b502b6 technoreboot-prod-gateway Up 2 days (healthy) nginx:alpine"
+  ],
+  "images": [
+    "production-admin-shell:latest 4ce60f65c8ae",
+    "production-inventory-sales-module:latest 186f1566a323",
+    "production-repairs-module:latest 4124c31bdcad",
+    "technoreboot-rollback/checkpoint_20260914_093238_e21dba64/admin-shell:latest b3feb5560eb3",
+    "technoreboot-sync-test-e022180-avito-module:latest ea239986d887",
+    "production-avito-module:latest d117e5dd2dc7",
+    "technoreboot-rollback/checkpoint_20260914_093238_e21dba64/avito:latest b3938b9f934a",
+    "technoreboot-sync-test-e022180-core:latest 881f9d2a3fde",
+    "technoreboot-sync-test-e022180-admin-shell:latest 55c7dd44ca69",
+    "technoreboot-rollback/checkpoint_20260914_093238_e21dba64/core:latest d4bf017f5a2d",
+    "production-core:latest eb959dddff9e",
+    "technoreboot-sync-test-e022180-inventory-sales-module:latest c615d5b04d5b",
+    "technoreboot-rollback/checkpoint_20260914_093238_e21dba64/inventory-sales:latest 0841224afe4c",
+    "technoreboot-rollback/checkpoint_20260914_085202_aa593781/admin-shell:latest 8e85f3a302a3",
+    "technoreboot-rollback/checkpoint_20260912_170414_e2805f1f/core:latest e7ddb53d6267",
+    "technoreboot-rollback/checkpoint_20260914_085202_aa593781/core:latest e7ddb53d6267",
+    "technoreboot-rollback/checkpoint_20260912_170414_e2805f1f/admin-shell:latest 390c5b2e88ab",
+    "technoreboot-sync-test-e022180-repairs-module:latest 2ad72c99e18f",
+    "nginx:alpine 72ba65eb42c1",
+    "technoreboot-rollback/checkpoint_20260912_170414_e2805f1f/gateway:latest 72ba65eb42c1",
+    "technoreboot-rollback/checkpoint_20260914_085202_aa593781/gateway:latest 72ba65eb42c1",
+    "technoreboot-rollback/checkpoint_20260914_093238_e21dba64/gateway:latest 72ba65eb42c1",
+    "alpine:latest 28bd5fe8b56d"
+  ],
+  "db_sha": "58ddb4186f6e19f4bc72840ee9728e71e384163e08024164f253af5fb065b9b7",
+  "quick_check": "ok",
+  "counts": {
+    "products": 149,
+    "sales": 0,
+    "product_photos": 149,
+    "product_external_listings": 149,
+    "repair_orders": 0,
+    "repairs": "TABLE_ABSENT",
+    "avito_post_sale_tasks": 0
+  },
+  "schema_sha": "eb6a9c173e51c7713e7fcc520597c22d40cae2068597f08e3bf8388c122c4254",
+  "storage_count": 149,
+  "auth_ca": "a9b4d288cddf74f6337848a833240efdfba412e3e55f37953a5a72533d009d8d",
+  "pdf_sha": "50ddeedeb4f93d2ea164ce57218a49cf6318ad2557a90c9266995dc8d0589b9e",
+  "pdf_size": "2470296"
+}

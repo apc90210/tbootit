@@ -1,0 +1,56 @@
+{
+  "checkpoint_id": "checkpoint_20260914_093238_e21dba64",
+  "created_at": "2026-09-14T09:33:00.962837+00:00",
+  "status": "COMPLETED",
+  "vds_ip": "144.31.50.134",
+  "previous_head": "e21dba6404f14314863213cb40ba945ea427a467",
+  "target_head": "46fbed130ca838c2e1aeaa4897f6cc68c86337b8",
+  "previous_schema_sha256": "204fbbe15a0ad230d0bc46d9a37228115574a4ad33b8724a63280be00e208c22",
+  "target_schema_sha256": "ae36c0163d7dcd5fa4a4f8e977008566f84f1016b2aa3d686bd31228f43aa886",
+  "business_backup_file": "TECHNOREBOOT_BACKUP_2026-09-14_093237.zip",
+  "business_backup_sha256": "625ee2dd86d408358d89c0cdea687b5f7609d5a51b253e6b490c87f1bea0ca8a",
+  "business_counts": {
+    "products": 149,
+    "sales": 0,
+    "repair_orders": 0,
+    "product_photos": 149,
+    "product_external_listings": 149
+  },
+  "storage_tree_sha256": "9bfe2827417e5dc8658afcdc8369aef83717f1a305279156b1507ecfc5a3ff1d",
+  "ca_sha256": "a9b4d288cddf74f6337848a833240efdfba412e3e55f37953a5a72533d009d8d",
+  "production_guard_verified": true,
+  "health_preflight": {
+    "probed_at": "2026-09-14T09:32:34.493711+00:00",
+    "vds_host": "root@144.31.50.134",
+    "local_free_mb": 93940,
+    "ssh_reachable": true,
+    "https_reachable": true,
+    "https_status_code": 403,
+    "sentinel": true,
+    "docker_ok": true,
+    "services": {
+      "core": "healthy",
+      "admin-shell": "healthy",
+      "inventory-sales": "healthy",
+      "repairs": "healthy",
+      "avito": "healthy",
+      "gateway": "healthy"
+    },
+    "db_readable": true,
+    "db_quick_check": "ok",
+    "products_count": 149,
+    "vds_free_mb": 9018,
+    "git_ok": true,
+    "git_head": "e21dba6404f14314863213cb40ba945ea427a467"
+  },
+  "rollback_allowed": true,
+  "rollback_reason": "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 \u043e\u0431\u0440\u0430\u0437\u044b \u043a\u043e\u043d\u0442\u0435\u0439\u043d\u0435\u0440\u043e\u0432 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b. \u0421\u0445\u0435\u043c\u0430 \u0411\u0414 \u0441\u043e\u0432\u043c\u0435\u0441\u0442\u0438\u043c\u0430.",
+  "previous_image_ids": {
+    "core": "sha256:d4bf017f5a2d734c03618ab36eec1c1201ec5ac1015de03b20f30fdf92c3acbd",
+    "admin-shell": "sha256:b3feb5560eb3aa03aba35e1e00ab43a3b2a5f7c4a44d90334c88f6030e13305c",
+    "inventory-sales": "sha256:0841224afe4c502dd6a2b7d69cd31a5bd7226124fd088cbbc6e5bcc423b18857",
+    "repairs": "sha256:44d608f400481152de2e4753ec4f92d08fe241bb5d94ea4621942eeba3deefa2",
+    "avito": "sha256:b3938b9f934abf52056490385936831178d64a706da73e47e59e634e13600291",
+    "gateway": "sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3"
+  }
+}

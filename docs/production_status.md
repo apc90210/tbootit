@@ -37,7 +37,7 @@
 ### Debian VDS (`144.31.50.134`)
 - **Role:** Canonical Real-User Test-Production (`https://144.31.50.134`).
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
-- **Current Git Commit:** `e21dba6404f14314863213cb40ba945ea427a467`.
+- **Current Git Commit:** `46fbed130ca838c2e1aeaa4897f6cc68c86337b8`.
 - **Restart Count:** 0 across all containers.
 - **Business Data Status:** **CANONICAL PRODUCTION (149 products, 0 sales, 0 repairs, 149 photos, 149 listings)**.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
@@ -177,9 +177,26 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Download Route** | `GET /help/user-manual.pdf` | Serves `application/pdf` with attachment header; accessible to both USER and OWNER |
 | **Help Overview Route** | `GET /help` | HTML overview with version details, chapter table of contents, and download button |
 | **Security Audit** | **ZERO SECRETS (PASS)** | Automated scan confirms no SSH keys, passwords, tokens, dev paths (`/srv/...`, `C:\tbootit\...`) |
-| **Automated Tests** | **ALL PASSED (0 FAILED)** | `tests/test_stage10a_user_manual_pdf.py` (6/6), `scripts/verify_user_manual_pdf.py` (all passed) |
-| **VDS Production Safety** | `VDS_DEPLOYED = false` | Strictly LOCAL. No VDS deployment or code mutation without Owner browser acceptance |
 | **Final Status** | `TECHNOREBOOT_STAGE10A_LOCAL_USER_MANUAL_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE** |
+
+---
+
+## 11. Production Deploy Latest Fix + User Manual (Stage 10B PRODUCTION)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **CANONICAL PRODUCTION VDS (`144.31.50.134`)** | Code-only deployment of manual Avito flow, extension v0.2.62, and User Manual PDF |
+| **Release Checkpoint** | `checkpoint_20260914_093238_e21dba64` | Retained with pre-update backup, previous image IDs, DB SHA-256 |
+| **Safety DB Backup** | `TECHNOREBOOT_BACKUP_2026-09-14_093237.zip` | SHA-256 `625ee2dd...`, quick_check = ok |
+| **Code Deployed** | **YES** | `update_code_only.sh origin/main` → `46fbed130c` (from `e21dba6404`) |
+| **All 6 Services Healthy** | **YES** | admin-shell, repairs, inventory-sales, avito, core, gateway — all healthy |
+| **User Manual PDF Deployed** | **YES** | Size 2,470,296 bytes, SHA-256 `50ddeedeb4f93d2ea164ce57218a49cf6318ad2557a90c9266995dc8d0589b9e` (exact match) |
+| **Download Endpoints Active** | **YES** | `/help/user-manual.pdf` (200 OK, attachment), `/help` (200 OK) |
+| **Top Navigation Links Active** | **YES (`📘 Инструкция`)** | Verified in live HTML responses from admin-shell, inventory-sales, repairs |
+| **Manual Avito Flow Active** | **YES** | Verified in live container templates (`Снять с Avito вручную`, `Не снимать`, `Я снял объявление`) |
+| **Business Data Preserved** | **YES** | 149 products, 0 sales, 149 photos, 149 listings, 149 storage files — identical pre/post |
+| **Schema Invariant** | **MATCH** | Live schema SHA unchanged (`eb6a9c17...`), Schema Guard verified SAFE |
+| **Final Status** | `TECHNOREBOOT_STAGE10B_PRODUCTION_DEPLOYMENT_SUCCESS` | **READY FOR OWNER BROWSER ACCEPTANCE** |
 
 
 
