@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.60)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.61)
 
 let pageInitialData = null;
 
@@ -4347,15 +4347,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
         return true;
     } else if (request.action === "execute_deactivation") {
-        executeDeactivationOnPage(request.task)
-            .then(res => sendResponse(res))
-            .catch(err => {
-                sendResponse({
-                    success: false,
-                    status: "failed",
-                    error: String(err)
-                });
-            });
+        sendResponse({
+            success: false,
+            status: "disabled",
+            error: "Automatic deactivation disabled in Stage 09A-R5 (Manual operator flow)"
+        });
         return true;
     }
     return true;

@@ -67,34 +67,30 @@
     </div>
 
     <div class="section">
-        <h2>Очередь снятия с Avito после продаж</h2>
+        <h2>Снятие объявлений с Avito после продаж</h2>
         <p style="color: #64748b; font-size: 0.95rem; margin-top: 4px;">
-            В этом разделе отображаются задачи на снятие объявлений с публикации после оформления продаж.
-            Действие «Не сейчас» в чеке сохраняет задачу в этой очереди для последующего выполнения.
+            В этом разделе отображаются товары с привязанными объявлениями Avito после оформления продаж.
+            Оператор открывает точное объявление на Avito и снимает его с публикации вручную.
         </p>
 
         <div class="filters">
             <a href="/avito/post-sale" class="{% if not selected_status %}active{% endif %}">Все ({{ total }})</a>
             <a href="/avito/post-sale?status=suggested" class="{% if selected_status == 'suggested' %}active{% endif %}">Ожидает решения</a>
-            <a href="/avito/post-sale?status=queued" class="{% if selected_status == 'queued' %}active{% endif %}">В очереди</a>
-            <a href="/avito/post-sale?status=processing" class="{% if selected_status == 'processing' %}active{% endif %}">В обработке</a>
-            <a href="/avito/post-sale?status=manual_required" class="{% if selected_status == 'manual_required' %}active{% endif %}">Требует внимания</a>
-            <a href="/avito/post-sale?status=failed" class="{% if selected_status == 'failed' %}active{% endif %}">Ошибки</a>
+            <a href="/avito/post-sale?status=manual_required" class="{% if selected_status == 'manual_required' %}active{% endif %}">Открыто для снятия</a>
             <a href="/avito/post-sale?status=success" class="{% if selected_status == 'success' %}active{% endif %}">Снято</a>
+            <a href="/avito/post-sale?status=canceled" class="{% if selected_status == 'canceled' %}active{% endif %}">Не снимать (отменено)</a>
         </div>
 
         {% if tasks %}
         <table>
             <thead>
                 <tr>
-                    <th style="width: 130px;">Дата</th>
+                    <th style="width: 140px;">Дата</th>
                     <th style="width: 90px;">Продажа</th>
                     <th>Товар</th>
-                    <th style="width: 140px;">Avito ID</th>
-                    <th style="width: 130px;">Статус</th>
-                    <th style="width: 80px;">Попытки</th>
-                    <th>Ошибка / Инфо</th>
-                    <th style="width: 160px;">Действие</th>
+                    <th style="width: 160px;">Avito ID</th>
+                    <th style="width: 160px;">Статус</th>
+                    <th style="width: 320px;">Действие</th>
                 </tr>
             </thead>
             <tbody>
@@ -116,8 +112,8 @@
                     </td>
                     <td>
                         {% if t.listing_url %}
-                            <a href="{{ t.listing_url }}" target="_blank" rel="noopener" style="color: #0284c7; text-decoration: underline;">
-                                №{{ t.avito_listing_id }}
+                            <a href="{{ t.listing_url }}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; font-weight: 600; text-decoration: underline;">
+                                №{{ t.avito_listing_id }} ↗
                             </a>
                         {% else %}
                             №{{ t.avito_listing_id }}
@@ -126,39 +122,38 @@
                     <td>
                         {% if t.status == 'suggested' %}
                             <span class="badge suggested">Ожидает решения</span>
-                        {% elif t.status == 'queued' %}
-                            <span class="badge queued">В очереди</span>
-                        {% elif t.status == 'processing' %}
-                            <span class="badge processing">В обработке</span>
-                        {% elif t.status == 'success' %}
-                            <span class="badge success">✓ Снято</span>
                         {% elif t.status == 'manual_required' %}
-                            <span class="badge manual_required">⚠ Ручная проверка</span>
-                        {% elif t.status == 'failed' %}
-                            <span class="badge failed">Ошибка</span>
+                            <span class="badge manual_required">⏳ Открыто для снятия</span>
+                        {% elif t.status == 'success' %}
+                            <span class="badge success">✓ Снято с публикации</span>
                         {% elif t.status == 'canceled' %}
-                            <span class="badge canceled">Отменено</span>
+                            <span class="badge canceled">Не снимать</span>
+                        {% elif t.status in ['queued', 'processing'] %}
+                            <span class="badge queued">Ожидает снятия</span>
+                        {% elif t.status == 'failed' %}
+                            <span class="badge failed">Требует внимания</span>
                         {% else %}
                             <span class="badge">{{ t.status }}</span>
                         {% endif %}
                     </td>
-                    <td style="text-align: center; font-size: 0.85rem;">
-                        {{ t.attempt_count }} / 3
-                    </td>
-                    <td style="font-size: 0.85rem; color: #b91c1c;">
-                        {{ t.last_error or '—' }}
-                    </td>
                     <td>
-                        {% if t.status == 'suggested' %}
-                            <button class="btn btn-primary" onclick="queueTask({{ t.id }})">Снять с Avito</button>
-                        {% elif t.status in ['failed', 'manual_required'] %}
-                            <button class="btn btn-warning" onclick="retryTask({{ t.id }})">Повторить</button>
-                            <button class="btn btn-danger" onclick="cancelTask({{ t.id }})" style="margin-left: 4px;">✕</button>
-                        {% elif t.status in ['queued', 'processing'] %}
-                            <button class="btn btn-danger" onclick="cancelTask({{ t.id }})">Отменить</button>
-                        {% else %}
-                            <span style="color: #94a3b8; font-size: 0.85rem;">—</span>
-                        {% endif %}
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                            {% if t.status != 'success' %}
+                                <a href="{{ t.listing_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="markTaskOpened({{ t.id }})">
+                                    ↗ Открыть объявление
+                                </a>
+                                {% if t.status != 'canceled' %}
+                                    <button class="btn" style="background: #f1f5f9; color: #475569;" onclick="dismissTask({{ t.id }})">
+                                        Не снимать
+                                    </button>
+                                {% endif %}
+                                <button class="btn" style="background: #15803d; color: #ffffff; border-color: #166534;" onclick="confirmTaskManual({{ t.id }})">
+                                    ✓ Я снял объявление
+                                </button>
+                            {% else %}
+                                <span style="color: #15803d; font-weight: 500; font-size: 0.88rem;">✓ Объявление снято вручную</span>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -172,40 +167,32 @@
     </div>
 
     <script>
-        async function queueTask(id) {
+        async function markTaskOpened(id) {
             try {
-                const res = await fetch(`/admin-api/avito/post-sale-tasks/${id}/queue`, {method: 'POST'});
+                await fetch(`/admin-api/avito/post-sale-tasks/${id}/mark-opened`, {method: 'POST'});
+            } catch (e) {}
+        }
+
+        async function confirmTaskManual(id) {
+            try {
+                const res = await fetch(`/admin-api/avito/post-sale-tasks/${id}/manual-confirm`, {method: 'POST'});
                 if (res.ok) {
                     window.location.reload();
                 } else {
-                    alert('Ошибка постановки задачи в очередь.');
+                    alert('Ошибка подтверждения ручного снятия.');
                 }
             } catch (e) {
                 alert('Сбой сети: ' + e.message);
             }
         }
 
-        async function retryTask(id) {
-            try {
-                const res = await fetch(`/admin-api/avito/post-sale-tasks/${id}/retry`, {method: 'POST'});
-                if (res.ok) {
-                    window.location.reload();
-                } else {
-                    alert('Ошибка повтора задачи.');
-                }
-            } catch (e) {
-                alert('Сбой сети: ' + e.message);
-            }
-        }
-
-        async function cancelTask(id) {
-            if (!confirm('Отменить задачу снятия объявления?')) return;
+        async function dismissTask(id) {
             try {
                 const res = await fetch(`/admin-api/avito/post-sale-tasks/${id}/cancel`, {method: 'POST'});
                 if (res.ok) {
                     window.location.reload();
                 } else {
-                    alert('Ошибка отмены задачи.');
+                    alert('Ошибка обновления статуса.');
                 }
             } catch (e) {
                 alert('Сбой сети: ' + e.message);

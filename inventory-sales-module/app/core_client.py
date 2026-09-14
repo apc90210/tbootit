@@ -234,6 +234,58 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def manual_confirm_sale_avito(self, sale_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/sales/{sale_id}/avito-manual-confirm",
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def mark_sale_manual_open(self, sale_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/sales/{sale_id}/avito-manual-open",
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def dismiss_sale_avito(self, sale_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/sales/{sale_id}/avito-dismiss",
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def mark_task_opened(self, task_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/avito/post-sale-tasks/{task_id}/mark-opened",
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
     async def get_organization_settings(self):
         from app.defaults import get_effective_settings
         async with httpx.AsyncClient(trust_env=False) as client:

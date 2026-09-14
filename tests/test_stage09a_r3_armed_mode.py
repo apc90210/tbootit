@@ -64,8 +64,8 @@ def test_stage09a_r4_extension_service_worker_contract():
     with open(sw_path, "r", encoding="utf-8") as f:
         sw_code = f.read()
 
-    # Must be v0.2.60
-    assert "0.2.60" in sw_code
+    # Must be v0.2.60 or v0.2.61
+    assert any(v in sw_code for v in ("0.2.60", "0.2.61"))
 
     # Direct real execution without dry-run gating
     assert "dry_run: false" in sw_code
@@ -82,7 +82,7 @@ def test_stage09a_r4_extension_content_script_contract():
     with open(cs_path, "r", encoding="utf-8") as f:
         cs_code = f.read()
 
-    assert "0.2.60" in cs_code
+    assert any(v in cs_code for v in ("0.2.60", "0.2.61"))
     assert "extractAvitoItemId" in cs_code
     assert "handleDeactivationModalIfPresent" in cs_code
     assert "waitForConfirmedInactiveState" in cs_code

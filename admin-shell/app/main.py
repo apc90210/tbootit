@@ -576,6 +576,18 @@ async def proxy_cancel_post_sale_task(task_id: int):
         resp = await client.post(f"{CORE_API_URL}/api/avito/post-sale-tasks/{task_id}/cancel")
         return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
 
+@app.post("/admin-api/avito/post-sale-tasks/{task_id}/manual-confirm")
+async def proxy_manual_confirm_post_sale_task(task_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{CORE_API_URL}/api/avito/post-sale-tasks/{task_id}/manual-confirm")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
+@app.post("/admin-api/avito/post-sale-tasks/{task_id}/mark-opened")
+async def proxy_mark_opened_post_sale_task(task_id: int):
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.post(f"{CORE_API_URL}/api/avito/post-sale-tasks/{task_id}/mark-opened")
+        return Response(content=resp.content, status_code=resp.status_code, media_type="application/json")
+
 # --- Extension Bridge Proxy Routes ---
 
 @app.get("/avito/extension", response_class=HTMLResponse)
@@ -601,7 +613,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.60"
+    version = "0.2.61"
     try:
         for manifest_candidate in [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")),

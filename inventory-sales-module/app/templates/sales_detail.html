@@ -45,127 +45,118 @@
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #475569; font-weight: 500;">
             ⓘ Для этой продажи нет связанных объявлений Avito
         </div>
-        {% elif avito_msg == 'already_in_progress' %}
-        <div style="background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #0369a1; font-weight: 500;">
-            ⏳ Задача на снятие с Avito уже находится в обработке или очереди.
+        {% elif avito_msg == 'manual_opened' %}
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #1e40af; font-weight: 500;">
+            ↗ Объявление Avito открыто в новой вкладке для ручного снятия. После завершения подтвердите действие кнопкой «Я снял объявление».
         </div>
-        {% elif avito_msg.startswith('queued_') %}
+        {% elif avito_msg == 'manual_confirmed' %}
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #15803d; font-weight: 500;">
-            ✓ Задача на снятие с Avito успешно добавлена в очередь.
+            ✓ Подтверждено: объявление снято с Avito оператором вручную.
+        </div>
+        {% elif avito_msg == 'dismissed' or avito_dismissed %}
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #475569; font-weight: 500;">
+            ⓘ Вы выбрали не снимать объявление. Оно осталось активным на Avito.
         </div>
         {% endif %}
     {% endif %}
 
-    {# Avito Post-Sale Follow-Up Block #}
+    {# Avito Post-Sale Follow-Up Block (Stage 09A-R5 Operator-Assisted Manual Flow) #}
     {% if avito_tasks and (st == 'completed' or st == 'reissued') %}
         {% set suggested_tasks = [] %}
-        {% set in_progress_tasks = [] %}
+        {% set manual_tasks = [] %}
         {% set success_tasks = [] %}
-        {% set manual_or_failed = [] %}
+        {% set canceled_tasks = [] %}
         {% for t in avito_tasks %}
             {% if t.status == 'suggested' %}
                 {% set _ = suggested_tasks.append(t) %}
-            {% elif t.status in ['queued', 'processing'] %}
-                {% set _ = in_progress_tasks.append(t) %}
+            {% elif t.status in ['manual_required', 'queued', 'processing', 'failed'] %}
+                {% set _ = manual_tasks.append(t) %}
             {% elif t.status == 'success' %}
                 {% set _ = success_tasks.append(t) %}
-            {% elif t.status in ['failed', 'manual_required'] %}
-                {% set _ = manual_or_failed.append(t) %}
+            {% elif t.status == 'canceled' %}
+                {% set _ = canceled_tasks.append(t) %}
             {% endif %}
         {% endfor %}
 
         {% if suggested_tasks and not avito_dismissed %}
-        <div style="background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 8px; padding: 18px 22px; margin-bottom: 20px;">
-            <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
-                <div>
-                    <h3 style="margin-top: 0; margin-bottom: 8px; color: #0369a1; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
-                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #0284c7;"></span>
-                        Снятие с Avito после продажи
-                    </h3>
-                    {% if suggested_tasks|length == 1 %}
-                        <p style="margin: 4px 0; color: #0f172a; font-size: 0.95rem;">
-                            <strong>Товар:</strong> {{ suggested_tasks[0].product_title }}
-                        </p>
-                        <p style="margin: 4px 0; color: #0f172a; font-size: 0.95rem;">
-                            <strong>Avito:</strong> Объявление №{{ suggested_tasks[0].avito_listing_id }} активно.
-                        </p>
-                        <p style="margin: 6px 0 0 0; color: #334155; font-size: 0.95rem;">
-                            Снять объявление с публикации на Avito?
-                        </p>
-                    {% else %}
-                        <p style="margin: 4px 0; color: #0f172a; font-size: 0.95rem;">
-                            <strong>Найдено активных объявлений Avito после продажи:</strong> {{ suggested_tasks|length }}
-                        </p>
-                        <ul style="margin: 6px 0; padding-left: 20px; color: #334155; font-size: 0.9rem;">
-                            {% for stask in suggested_tasks %}
-                                <li>{{ stask.product_title }} — Объявление №{{ stask.avito_listing_id }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+        {# Section 4: Large Clear Post-Sale Prompt #}
+        <div id="avito-post-sale-prompt" style="background: #ffffff; border: 2px solid #2563eb; border-radius: 10px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);">
+            <div style="font-size: 1.25rem; font-weight: 700; color: #1e3a8a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.4rem;">🛍️</span> Продажа оформлена
+            </div>
+            {% if suggested_tasks|length == 1 %}
+                <p style="margin: 6px 0; color: #1e293b; font-size: 1.05rem;">
+                    <strong>Товар:</strong> {{ suggested_tasks[0].product_title }}
+                </p>
+                <p style="margin: 6px 0; color: #475569; font-size: 1rem;">
+                    Объявление Avito №{{ suggested_tasks[0].avito_listing_id }} ещё активно.
+                </p>
+                <div style="margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <a href="{{ suggested_tasks[0].listing_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 12px 24px; border-radius: 6px; font-weight: 700; font-size: 1.05rem; text-decoration: none; cursor: pointer;" onclick="handleManualOpen('{{ sale.id }}', '{{ suggested_tasks[0].id }}')">
+                        ↗ Снять с Avito вручную
+                    </a>
                     <form action="/inventory/sales/{{ sale.id }}/avito-dismiss" method="POST" style="display: inline; margin: 0;">
-                        <button type="submit" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-weight: 500; cursor: pointer;">
-                            Не сейчас
-                        </button>
-                    </form>
-                    <form action="/inventory/sales/{{ sale.id }}/avito-deactivate" method="POST" style="display: inline; margin: 0;">
-                        <button type="submit" class="btn btn-primary" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                            {% if suggested_tasks|length == 1 %}
-                                Снять с Avito
-                            {% else %}
-                                Снять {{ suggested_tasks|length }} объявлений с Avito
-                            {% endif %}
+                        <button type="submit" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 12px 20px; border-radius: 6px; font-weight: 600; font-size: 1rem; cursor: pointer;">
+                            Не снимать
                         </button>
                     </form>
                 </div>
-            </div>
-        </div>
-        {% elif suggested_tasks and avito_dismissed %}
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.9rem; color: #64748b; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                ⓘ Действие по снятию объявлений с Avito отложено ({{ suggested_tasks|length }} в ожидании). 
-                Вы можете выполнить его позже в разделе <a href="/avito/post-sale" style="color: #0284c7; text-decoration: underline;">Avito → После продаж</a>.
-            </div>
-            <form action="/inventory/sales/{{ sale.id }}/avito-deactivate" method="POST" style="display: inline; margin: 0;">
-                <button type="submit" class="btn" style="background: #0284c7; color: #fff; padding: 4px 12px; font-size: 0.85rem; border-radius: 4px; border: none; cursor: pointer;">
-                    Снять сейчас
-                </button>
-            </form>
+            {% else %}
+                <p style="margin: 6px 0; color: #1e293b; font-size: 1.05rem;">
+                    <strong>Найдено активных объявлений Avito:</strong> {{ suggested_tasks|length }}
+                </p>
+                <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 10px;">
+                    {% for stask in suggested_tasks %}
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <strong style="color: #0f172a;">{{ stask.product_title }}</strong>
+                                <span style="color: #64748b; font-size: 0.9rem; margin-left: 8px;">(Объявление №{{ stask.avito_listing_id }})</span>
+                            </div>
+                            <a href="{{ stask.listing_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 8px 16px; border-radius: 4px; font-weight: 600; text-decoration: none;" onclick="handleManualOpen('{{ sale.id }}', '{{ stask.id }}')">
+                                ↗ Открыть объявление
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div style="margin-top: 14px;">
+                    <form action="/inventory/sales/{{ sale.id }}/avito-dismiss" method="POST" style="display: inline; margin: 0;">
+                        <button type="submit" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 18px; border-radius: 6px; font-weight: 500; cursor: pointer;">
+                            Не снимать
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
         </div>
         {% endif %}
 
-        {# Progress / Status indicators #}
-        {% if in_progress_tasks or success_tasks or manual_or_failed %}
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
-            <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 8px; color: #1e293b;">
-                Статус снятия объявлений с Avito:
+        {# Section 8 & 9: Manual removal in progress or awaiting confirmation #}
+        {% if manual_tasks %}
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+            <div style="font-weight: 600; font-size: 1rem; color: #92400e; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                <span>⏳</span> Объявление открыто для ручного снятия с Avito
             </div>
-            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                {% if success_tasks %}
-                    <span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 500;">
-                        ✓ Снято с Avito: {{ success_tasks|length }}
-                    </span>
-                {% endif %}
-                {% if in_progress_tasks %}
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 500;">
-                        ⏳ В обработке / очереди: {{ in_progress_tasks|length }}
-                    </span>
-                {% endif %}
-                {% if manual_or_failed %}
-                    <span style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 500;">
-                        ⚠ Требует ручной проверки / ошибки: {{ manual_or_failed|length }}
-                    </span>
-                    <form action="/inventory/sales/{{ sale.id }}/avito-deactivate" method="POST" style="display: inline; margin: 0;">
-                        <button type="submit" class="btn" style="background: #f59e0b; color: #fff; padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer;">
-                            Повторить
-                        </button>
-                    </form>
-                {% endif %}
-                <a href="/avito/post-sale" style="font-size: 0.85rem; color: #0284c7; text-decoration: underline; margin-left: 5px;">
-                    Очередь «После продаж» →
-                </a>
+            <p style="margin: 4px 0 12px 0; color: #78350f; font-size: 0.92rem;">
+                После того как вы сняли объявление с публикации на Avito, подтвердите действие:
+            </p>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <form action="/inventory/sales/{{ sale.id }}/avito-manual-confirm" method="POST" style="display: inline; margin: 0;">
+                    <button type="submit" class="btn" style="background: #15803d; color: #ffffff; border: 1px solid #166534; padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                        ✓ Я снял объявление
+                    </button>
+                </form>
+                {% for mt in manual_tasks %}
+                    <a href="{{ mt.listing_url }}" target="_blank" rel="noopener noreferrer" class="btn" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; padding: 7px 14px; border-radius: 6px; font-size: 0.88rem; text-decoration: none;">
+                        ↗ Открыть №{{ mt.avito_listing_id }} повторно
+                    </a>
+                {% endfor %}
             </div>
+        </div>
+        {% endif %}
+
+        {# Deactivated notice #}
+        {% if success_tasks and not manual_tasks and not suggested_tasks %}
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #15803d; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+            <span>✓</span> Объявление Avito снято с публикации (подтверждено оператором).
         </div>
         {% endif %}
     {% endif %}
@@ -298,19 +289,73 @@
     <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
         <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn btn-primary" style="margin-right: 5px;">Товарный чек</a>
         
-        <form action="/inventory/sales/{{ sale.id }}/avito-deactivate" method="POST" style="display: inline; margin: 0;">
-            <button type="submit" id="btnPermanentAvitoDeactivate" class="btn" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer;"
-                {% if avito_tasks and avito_tasks|length > 1 %}
-                    onclick="return confirm('Снять все связанные объявления Avito ({{ avito_tasks|length }} шт.) по этой продаже?');"
-                {% endif %}
-            >
-                Снять с Avito
+        {# Section 7: Permanent Manual Avito Button #}
+        {% if not has_linked_listings and (not avito_tasks or avito_tasks|length == 0) %}
+            <button type="button" id="btnPermanentAvitoDeactivate" class="btn" disabled style="background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 4px; font-size: 0.9rem; cursor: not-allowed;" title="Для этой продажи нет связанного объявления Avito">
+                Для этой продажи нет связанного объявления Avito
             </button>
-        </form>
+        {% elif all_archived or (avito_tasks and avito_tasks|length > 0 and avito_tasks|rejectattr('status', 'equalto', 'success')|list|length == 0) %}
+            <button type="button" id="btnPermanentAvitoDeactivate" class="btn" disabled style="background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: not-allowed;">
+                ✓ Объявление уже снято с Avito
+            </button>
+        {% else %}
+            {# Active linked listing(s) available #}
+            {% if avito_tasks and avito_tasks|length == 1 %}
+                <a href="{{ avito_tasks[0].listing_url }}" target="_blank" rel="noopener noreferrer" id="btnPermanentAvitoDeactivate" class="btn" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 8px 16px; border-radius: 4px; font-weight: 600; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="handleManualOpen('{{ sale.id }}', '{{ avito_tasks[0].id }}')">
+                    ↗ Снять с Avito вручную
+                </a>
+            {% elif avito_tasks and avito_tasks|length > 1 %}
+                <button type="button" id="btnPermanentAvitoDeactivate" class="btn" style="background: #0284c7; color: #ffffff; border: 1px solid #0369a1; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer;" onclick="document.getElementById('modalMultiAvito').style.display='flex'">
+                    ↗ Снять с Avito вручную ({{ avito_tasks|length }} шт.)
+                </button>
+            {% endif %}
+
+            {% if avito_tasks and avito_tasks|selectattr('status', 'equalto', 'manual_required')|list|length > 0 %}
+                <form action="/inventory/sales/{{ sale.id }}/avito-manual-confirm" method="POST" style="display: inline; margin: 0;">
+                    <button type="submit" class="btn" style="background: #15803d; color: #ffffff; border: 1px solid #166534; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                        ✓ Я снял объявление
+                    </button>
+                </form>
+            {% endif %}
+        {% endif %}
 
         <a href="/inventory/products" class="btn">Вернуться к товарам</a>
         <a href="/inventory/sales" class="btn" style="margin-left: 5px;">Все продажи</a>
     </div>
+
+    {% if avito_tasks and avito_tasks|length > 1 %}
+    <div id="modalMultiAvito" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: #fff; padding: 24px; border-radius: 8px; max-width: 550px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0; color:#0f172a;">Снять объявления с Avito вручную</h3>
+            <p style="color:#475569; font-size:0.95rem;">Откройте каждое объявление в браузере и снимите его с публикации на Avito:</p>
+            <div style="display:flex; flex-direction:column; gap:8px; margin: 16px 0;">
+                {% for t in avito_tasks %}
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 12px; border:1px solid #e2e8f0; border-radius:4px;">
+                    <div>
+                        <div style="font-weight:600;">{{ t.product_title }}</div>
+                        <div style="font-size:0.85rem; color:#64748b;">№{{ t.avito_listing_id }} — {% if t.status == 'success' %}<span style="color:#15803d;">Снято</span>{% elif t.status == 'manual_required' %}<span style="color:#b45309;">Открыто для снятия</span>{% else %}Активно{% endif %}</div>
+                    </div>
+                    <a href="{{ t.listing_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="padding:6px 12px; font-size:0.85rem; text-decoration:none;" onclick="handleManualOpen('{{ sale.id }}', '{{ t.id }}')">↗ Открыть</a>
+                </div>
+                {% endfor %}
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                <button type="button" class="btn" onclick="document.getElementById('modalMultiAvito').style.display='none'">Закрыть</button>
+                <form action="/inventory/sales/{{ sale.id }}/avito-manual-confirm" method="POST" style="display:inline; margin:0;">
+                    <button type="submit" class="btn" style="background:#15803d; color:#fff;">✓ Я снял все объявления</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        function handleManualOpen(saleId, taskId) {
+            try {
+                fetch('/inventory/sales/' + saleId + '/avito-manual-open', { method: 'POST' });
+            } catch (e) {}
+        }
+    </script>
 
     {% if st == 'completed' or st == 'reissued' %}
     <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">

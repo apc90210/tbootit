@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.60)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.61)
 
 const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -522,7 +522,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === "trigger_poll_tasks") {
-        pollNextDeactivationTask().then(() => sendResponse({ success: true }));
+        sendResponse({ success: true, disabled: true, message: "Automatic deactivation disabled in Stage 09A-R5" });
         return true;
     }
     return true;
@@ -614,11 +614,10 @@ async function reportTaskFailed(taskId, errorMsg, canRetry = true) {
 let isPollingActive = false;
 
 async function pollNextDeactivationTask() {
-    if (isPollingActive) return;
-    isPollingActive = true;
-    try {
-        const token = await getStoredToken();
-        if (!token) return; // Only poll when paired
+    // Stage 09A-R5 LOCAL: Automatic post-sale deactivation is disabled.
+    // Operator opens the listing in browser and removes it manually.
+    return;
+}
 
         // Active task lock check: ONE TASK AT A TIME
         const activeTask = await getActiveDeactivationTask();
@@ -874,33 +873,8 @@ async function sendTabMessageWithRetry(tabId, message, maxRetries = 5) {
     return null;
 }
 
-// Alarms and timer setup
-try {
-    if (typeof chrome !== "undefined" && chrome.alarms) {
-        chrome.alarms.onAlarm.addListener(alarm => {
-            if (alarm.name === "avito_poll_tasks") {
-                pollNextDeactivationTask();
-            }
-        });
-
-        chrome.runtime.onInstalled.addListener(() => {
-            chrome.alarms.create("avito_poll_tasks", { periodInMinutes: 0.2 });
-            pollNextDeactivationTask();
-        });
-
-        chrome.runtime.onStartup.addListener(() => {
-            chrome.alarms.create("avito_poll_tasks", { periodInMinutes: 0.2 });
-            pollNextDeactivationTask();
-        });
-    }
-} catch (e) {
-    console.warn("[AvitoSW] Alarms setup warning:", e);
-}
-
-// Active interval polling while service worker is running
-try {
-    setInterval(pollNextDeactivationTask, 10000);
-} catch (e) {}
+// Stage 09A-R5: Automatic post-sale deactivation polling and alarms disabled.
+// Normal seller workflow uses manual operator removal.
 
 
 

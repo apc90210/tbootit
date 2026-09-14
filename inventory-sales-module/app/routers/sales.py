@@ -154,15 +154,18 @@ async def sale_detail(request: Request, sale_id: int):
 
     # Fetch any Avito post-sale tasks for this sale
     avito_tasks = []
+    has_linked_listings = False
+    all_archived = False
     try:
         tasks_resp = await core_client.get_sale_avito_tasks(sale_id)
         if tasks_resp and isinstance(tasks_resp, dict):
             avito_tasks = tasks_resp.get("tasks", [])
+            has_linked_listings = tasks_resp.get("has_linked_listings", len(avito_tasks) > 0)
+            all_archived = tasks_resp.get("all_archived", False)
     except Exception:
         avito_tasks = []
 
     avito_dismissed = request.query_params.get("avito_dismissed") == "1"
-
     avito_msg = request.query_params.get("avito_msg")
 
     return templates.TemplateResponse(
@@ -173,6 +176,8 @@ async def sale_detail(request: Request, sale_id: int):
             "payment_methods": PAYMENT_METHODS,
             "sale_status_labels": SALE_STATUS_LABELS,
             "avito_tasks": avito_tasks,
+            "has_linked_listings": has_linked_listings,
+            "all_archived": all_archived,
             "avito_dismissed": avito_dismissed,
             "avito_msg": avito_msg,
         },
@@ -180,7 +185,7 @@ async def sale_detail(request: Request, sale_id: int):
 
 @router.post("/sales/{sale_id}/avito-deactivate")
 async def sale_avito_deactivate_endpoint(request: Request, sale_id: int):
-    """Queue post-sale Avito deactivation task(s)."""
+    """Queue or mark post-sale Avito deactivation task(s) for manual removal."""
     resp = await core_client.deactivate_sale_avito(sale_id)
     msg = None
     if resp and isinstance(resp, dict):
@@ -191,7 +196,7 @@ async def sale_avito_deactivate_endpoint(request: Request, sale_id: int):
         elif queued_count == 0:
             if all(t.get("status") == "success" for t in tasks):
                 msg = "already_deactivated"
-            elif any(t.get("status") in ["queued", "processing"] for t in tasks):
+            elif any(t.get("status") in ["queued", "processing", "manual_required"] for t in tasks):
                 msg = "already_in_progress"
             else:
                 msg = "no_tasks_queued"
@@ -203,9 +208,22 @@ async def sale_avito_deactivate_endpoint(request: Request, sale_id: int):
         url += f"?avito_msg={msg}"
     return RedirectResponse(url=url, status_code=303)
 
+@router.post("/sales/{sale_id}/avito-manual-open")
+async def sale_avito_manual_open_endpoint(request: Request, sale_id: int):
+    """Mark tasks as manual_required when operator opens listing for manual removal."""
+    await core_client.mark_sale_manual_open(sale_id)
+    return RedirectResponse(url=f"/sales/{sale_id}?avito_msg=manual_opened", status_code=303)
+
+@router.post("/sales/{sale_id}/avito-manual-confirm")
+async def sale_avito_manual_confirm_endpoint(request: Request, sale_id: int):
+    """Operator explicitly confirms: 'Я снял объявление'."""
+    await core_client.manual_confirm_sale_avito(sale_id)
+    return RedirectResponse(url=f"/sales/{sale_id}?avito_msg=manual_confirmed", status_code=303)
+
 @router.post("/sales/{sale_id}/avito-dismiss")
 async def sale_avito_dismiss_endpoint(request: Request, sale_id: int):
-    """Dismiss post-sale Avito prompt for current view ('Не сейчас'). Task remains in pending queue."""
+    """Operator chose 'Не снимать'. Transitions tasks to canceled, preserves listing status."""
+    await core_client.dismiss_sale_avito(sale_id)
     return RedirectResponse(url=f"/sales/{sale_id}?avito_dismissed=1", status_code=303)
 
 

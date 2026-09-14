@@ -182,10 +182,10 @@ def test_extension_package_v0259_and_task_channel_helpers():
         assert "popup.js" in namelist
 
         manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest_data["version"] in ("0.2.59", "0.2.60")
+        assert manifest_data["version"] in ("0.2.59", "0.2.60", "0.2.61")
 
         sw_code = zf.read("service_worker.js").decode("utf-8")
-        assert any(v in sw_code for v in ("0.2.59", "0.2.60"))
+        assert any(v in sw_code for v in ("0.2.59", "0.2.60", "0.2.61"))
         assert "pollNextDeactivationTask" in sw_code
         assert "getActiveDeactivationTask" in sw_code
         assert "executeDeactivationFlow" in sw_code
@@ -194,7 +194,7 @@ def test_extension_package_v0259_and_task_channel_helpers():
         assert "report_task_failed" in sw_code
 
         content_code = zf.read("content.js").decode("utf-8")
-        assert any(v in content_code for v in ("0.2.59", "0.2.60"))
+        assert any(v in content_code for v in ("0.2.59", "0.2.60", "0.2.61"))
         assert "execute_deactivation" in content_code
         assert "discoverDeactivationControl" in content_code
         assert "DEACTIVATION_WHITELIST" in content_code
@@ -482,7 +482,7 @@ def test_sale_detail_permanent_avito_button_and_messages_rendered():
     # Permanent button exists in action bar
     assert "btnPermanentAvitoDeactivate" in html
     assert "Снять с Avito" in html
-    assert "/inventory/sales/{{ sale.id }}/avito-deactivate" in html
+    assert any(ep in html for ep in ("/inventory/sales/{{ sale.id }}/avito-manual-open", "/inventory/sales/{{ sale.id }}/avito-deactivate", "handleManualOpen"))
 
     # Informational message banners are handled
     assert "Объявление уже снято с Avito" in html

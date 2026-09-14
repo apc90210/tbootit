@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
@@ -24,8 +25,23 @@ def log_audit(db: Session, entity_type: str, entity_id: int, action: str, old_va
     db.add(log)
 
 
+def _canonical_avito_url(listing_url: Optional[str], avito_listing_id: str) -> str:
+    canonical = f"https://www.avito.ru/{avito_listing_id}"
+    if listing_url:
+        try:
+            parsed = urllib.parse.urlparse(listing_url)
+            host = (parsed.netloc or "").lower()
+            if host in ["www.avito.ru", "avito.ru", "m.avito.ru"]:
+                if str(avito_listing_id) in parsed.path or str(avito_listing_id) in parsed.query:
+                    return listing_url
+        except Exception:
+            pass
+    return canonical
+
+
 def _enrich_task(task: models.AvitoPostSaleTask, db: Session) -> Dict[str, Any]:
     prod = db.query(models.Product).filter(models.Product.id == task.product_id).first()
+    canonical_url = _canonical_avito_url(task.listing_url, task.avito_listing_id)
     return {
         "id": task.id,
         "sale_id": task.sale_id,
@@ -34,7 +50,7 @@ def _enrich_task(task: models.AvitoPostSaleTask, db: Session) -> Dict[str, Any]:
         "product_sku": prod.sku if prod else None,
         "external_listing_id": task.external_listing_id,
         "avito_listing_id": task.avito_listing_id,
-        "listing_url": task.listing_url,
+        "listing_url": canonical_url,
         "status": task.status,
         "action": task.action,
         "requested_by": task.requested_by,
@@ -83,15 +99,16 @@ def get_sale_avito_tasks(sale_id: int, db: Session = Depends(get_db)):
             ).first()
 
             if not existing_task:
+                canonical_url = _canonical_avito_url(ext.external_url, str(ext.external_item_id))
                 new_task = models.AvitoPostSaleTask(
                     sale_id=sale_id,
                     product_id=item.product_id,
                     external_listing_id=ext.id,
                     avito_listing_id=str(ext.external_item_id),
-                    listing_url=ext.external_url or f"https://www.avito.ru/{ext.external_item_id}",
+                    listing_url=canonical_url,
                     status="suggested",
                     action="deactivate",
-                    execution_mode="extension",
+                    execution_mode="manual",
                     attempt_count=0
                 )
                 db.add(new_task)
@@ -111,10 +128,28 @@ def get_sale_avito_tasks(sale_id: int, db: Session = Depends(get_db)):
         if t.id not in existing_task_ids:
             tasks.append(_enrich_task(t, db))
 
+    # Inspect all external listings for products in this sale
+    product_ids = [item.product_id for item in items if item.product_id]
+    all_ext_listings = []
+    if product_ids:
+        all_ext_listings = db.query(models.ProductExternalListing).filter(
+            models.ProductExternalListing.product_id.in_(product_ids),
+            models.ProductExternalListing.marketplace == "avito"
+        ).all()
+
+    has_linked = len(all_ext_listings) > 0
+    all_archived = has_linked and all(
+        ext.remote_status in ["archived", "inactive", "closed"] for ext in all_ext_listings
+    )
+    if not all_archived and tasks and all(t["status"] == "success" for t in tasks):
+        all_archived = True
+
     return {
         "sale_id": sale_id,
         "count": len(tasks),
-        "tasks": tasks
+        "tasks": tasks,
+        "has_linked_listings": has_linked,
+        "all_archived": all_archived
     }
 
 
@@ -228,6 +263,137 @@ def cancel_task(task_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(task)
     return _enrich_task(task, db)
+
+
+@router.post("/api/avito/post-sale-tasks/{task_id}/manual-confirm")
+def manual_confirm_task(task_id: int, db: Session = Depends(get_db)):
+    """
+    Operator explicitly confirms: 'Я снял объявление'.
+    1. Task transitioned to 'success'
+    2. execution_mode set to 'manual'
+    3. ProductExternalListing.remote_status updated to 'archived'
+    4. Audit event written
+    """
+    task = db.query(models.AvitoPostSaleTask).filter(models.AvitoPostSaleTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    now = datetime.utcnow()
+    task.status = "success"
+    task.execution_mode = "manual"
+    task.finished_at = now
+    task.last_error = None
+    task.result_metadata = json.dumps({"confirmed_by": "operator_manual", "confirmed_at": now.isoformat()}, ensure_ascii=False)
+
+    ext = None
+    if task.external_listing_id:
+        ext = db.query(models.ProductExternalListing).filter(
+            models.ProductExternalListing.id == task.external_listing_id
+        ).first()
+    if not ext:
+        ext = db.query(models.ProductExternalListing).filter(
+            models.ProductExternalListing.marketplace == "avito",
+            models.ProductExternalListing.external_item_id == task.avito_listing_id
+        ).first()
+    if ext:
+        ext.remote_status = "archived"
+        ext.sync_state = "synced"
+        db.add(ext)
+
+    log_audit(
+        db,
+        entity_type="avito_post_sale_task",
+        entity_id=task.id,
+        action="avito_listing_deactivated_after_sale",
+        new_value={
+            "task_id": task.id,
+            "sale_id": task.sale_id,
+            "product_id": task.product_id,
+            "avito_listing_id": task.avito_listing_id,
+            "execution_mode": "manual",
+            "confirmation_method": "operator_click",
+            "timestamp": now.isoformat()
+        }
+    )
+
+    db.commit()
+    db.refresh(task)
+    return _enrich_task(task, db)
+
+
+@router.post("/api/avito/post-sale-tasks/{task_id}/mark-opened")
+def mark_task_opened(task_id: int, db: Session = Depends(get_db)):
+    """
+    Operator chose to open Avito for manual removal.
+    Transitions task to 'manual_required' without marking success.
+    """
+    task = db.query(models.AvitoPostSaleTask).filter(models.AvitoPostSaleTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status in ["suggested", "queued"]:
+        task.status = "manual_required"
+        task.execution_mode = "manual"
+        db.commit()
+        db.refresh(task)
+    return _enrich_task(task, db)
+
+
+@router.post("/api/sales/{sale_id}/avito-manual-confirm")
+def manual_confirm_sale_tasks(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Confirms manual deactivation for all tasks of a sale.
+    """
+    tasks = db.query(models.AvitoPostSaleTask).filter(
+        models.AvitoPostSaleTask.sale_id == sale_id
+    ).all()
+    confirmed = []
+    for t in tasks:
+        if t.status in ["suggested", "queued", "manual_required", "failed"]:
+            manual_confirm_task(t.id, db)
+            confirmed.append(t)
+    return {"sale_id": sale_id, "confirmed_count": len(confirmed)}
+
+
+@router.post("/api/sales/{sale_id}/avito-manual-open")
+def manual_open_sale_tasks(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Operator clicked [Снять с Avito вручную].
+    Transitions tasks for this sale to 'manual_required'.
+    Crucial: does NOT mark success!
+    """
+    tasks = db.query(models.AvitoPostSaleTask).filter(
+        models.AvitoPostSaleTask.sale_id == sale_id
+    ).all()
+    opened_count = 0
+    for t in tasks:
+        if t.status in ["suggested", "queued"]:
+            t.status = "manual_required"
+            t.execution_mode = "manual"
+            db.add(t)
+            opened_count += 1
+    db.commit()
+    return {"sale_id": sale_id, "opened_count": opened_count}
+
+
+@router.post("/api/sales/{sale_id}/avito-dismiss")
+def dismiss_sale_tasks(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Operator clicked 'Не снимать'.
+    Transitions suggested tasks to 'canceled'. Does NOT mutate listing!
+    """
+    tasks = db.query(models.AvitoPostSaleTask).filter(
+        models.AvitoPostSaleTask.sale_id == sale_id
+    ).all()
+    canceled_count = 0
+    for t in tasks:
+        if t.status in ["suggested", "queued"]:
+            t.status = "canceled"
+            db.add(t)
+            canceled_count += 1
+    db.commit()
+    return {"sale_id": sale_id, "canceled_count": canceled_count}
+
 
 
 @router.get("/api/avito/post-sale-tasks/next")

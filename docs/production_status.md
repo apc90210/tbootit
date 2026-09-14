@@ -109,25 +109,22 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 ---
 
-## 7. Avito Post-Sale Deactivation & Simple Real Action (Stage 09A, R1, R2, R3 & R4 LOCAL)
+## 7. Avito Post-Sale Deactivation & Operator-Assisted Manual Flow (Stage 09A-R5 LOCAL)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
 | **Stage Scope** | **LOCAL ONLY** | Development and validation on `https://localhost:8443` (Zero VDS impact) |
-| **Simple Product Rule** | **ENFORCED** | `Нажал "Снять с Avito" -> система реально снимает объявление.` |
-| **Sale Integration** | **ACTIVE** | Permanent `[ Снять с Avito ]` button on sale detail view next to `[ Товарный чек ]` |
-| **Sale Non-Block Invariant** | **ENFORCED** | Sale commits before Avito follow-up; Avito failures never block or revert sales |
-| **Stock Non-Mutation** | **ENFORCED** | Physical inventory is never mutated by Avito task state changes |
-| **Persistent Task Model** | **ACTIVE (`avito_post_sale_tasks`)** | Idempotent on `(sale_id, product_id, avito_listing_id, action)`. 7 discrete states. |
-| **Action Contract Bridge** | **ACTIVE (Zero-DB-Migration)** | Bridge adapter maps DB business `'deactivate'` to extension transport `'deactivate_listing'` |
-| **Chrome Extension Version** | `0.2.60` | Direct real deactivation; dry-run & armed complexity removed from normal seller workflow |
-| **Dry-Run & Armed Modes** | **REMOVED FROM NORMAL WORKFLOW** | Arming endpoints deprecated; popup simplified; seller click is direct authorization |
-| **Real External Inactive Confirmation** | **VERIFIED (Stage 09A-R4)** | Validates external Avito inactive indicators before reporting task success |
-| **Controlled Failure Path** | **VERIFIED (Stage 09A-R4)** | Mismatch/error -> honest `manual_required` with clear Russian message; retry available |
-| **Retry Limit & Fallback** | **ACTIVE (3 Attempts)** | Auto-transitions to `manual_required` upon reaching 3 failed attempts |
-| **Official API Capability** | `OFFICIAL_API_AVAILABLE = false` | Capability probe `can_deactivate_listing = false` (extension mode used) |
-| **DOM Discovery Safety** | **ACTIVE** | Conservative whitelist & blacklist; checks actions menu and profile cards (`/profile/items`) |
-| **Cleanup Queue UI** | **ACTIVE (`/avito/post-sale`)** | Filterable queue table with retry, queue, and cancel actions |
+| **Workflow Decision** | **MANUAL OPERATOR FLOW** | Automatic browser DOM clicking is disabled as unreliable; replaced by clear operator flow |
+| **Post-Sale Prompt** | **ACTIVE** | Large card after sale: `[ ↗ Снять с Avito вручную ]` and `[ Не снимать ]` |
+| **Manual Open Invariant** | **ENFORCED** | Opening listing sets task to `manual_required` (NEVER `success`). Original tab intact. |
+| **"Не снимать" Invariant** | **ENFORCED** | Dismisses prompt, transitions task to `canceled`, preserves active listing, sale completed. |
+| **Sale Detail Action Bar** | **ACTIVE** | Permanent button near `[ Товарный чек ]` with 3 honest states (no listing, already inactive, manual open) |
+| **Manual Confirmation** | **ACTIVE** | `[ ✓ Я снял объявление ]` button sets task to `success`, listing to `archived`, writes audit log |
+| **Post-Sale Queue UI** | **ACTIVE (`/avito/post-sale`)** | Operator-oriented table: Дата, Продажа, Товар, Avito ID, Статус, Действие |
+| **Chrome Extension Version** | `0.2.61` | Automatic background polling and DOM auto-clicker disabled; packages rebuilt |
+| **Stock & Sale Invariant** | **ENFORCED** | Completed sale and physical stock are NEVER mutated by Avito actions or cancellations |
+| **Automated Tests** | **158 PASSED (0 FAILED)** | Core (27), Admin-shell (28), Root (103) all passing cleanly |
+| **Live Proof** | **12/12 PASSED** | `scripts/verify_stage09a_r5_manual_flow.py` verified all flows end-to-end |
 | **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
 
 

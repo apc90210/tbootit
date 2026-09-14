@@ -307,5 +307,65 @@ The explicit click on `[ Снять с Avito ]` by an authenticated seller on a 
    - The sale detail page keeps `[ Повторить снятие ]` available for immediate retry.
    - Duplicate tasks are strictly prevented on repeated clicks.
 
+---
+
+## 11. Stage 09A-R5: Operator-Assisted Manual Avito Deactivation Flow
+
+### Owner Core Decision
+Automatic browser DOM deactivation is NOT sufficiently reliable across dynamic marketplace UI changes, captcha challenges, and modal layout variants. TechnoReboot MUST NOT attempt automatic DOM clicking in the normal seller workflow. Instead, the system implements an operator-assisted manual flow:
+1. When a sale is completed, the system identifies linked active Avito listings.
+2. The operator is presented with a clear prompt to open the exact listing manually.
+3. The operator performs the deactivation directly on Avito in a separate tab.
+4. The operator can optionally confirm removal in TechnoReboot.
+
+### Key Workflows & Invariants
+
+#### 1. Post-Sale Prompt (`#avito-post-sale-prompt`)
+Immediately following a sale containing an active linked Avito item:
+- **Card:** "Снять объявление с Avito?" showing product title and Avito ID.
+- **`[ ↗ Снять с Avito вручную ]`:**
+  - Opens the exact canonical Avito URL (`https://www.avito.ru/{id}` or valid full Avito URL) in a new browser tab (`target="_blank"`, `rel="noopener noreferrer"`).
+  - Crucial Invariant: Does NOT attempt automatic DOM clicking.
+  - Sets task status to `manual_required` (NEVER `success`).
+  - Original TechnoReboot sale tab remains intact and open.
+- **`[ Не снимать ]`:**
+  - Dismisses the post-sale prompt.
+  - Transitions the task to `canceled`.
+  - Invariant: Does NOT mutate listing status in `product_external_listings` (remains `active`).
+  - Invariant: Does NOT roll back, cancel, or modify the completed sale or physical inventory.
+
+#### 2. Permanent Action on Sale Detail (`/sales/{id}`)
+Adjacent to `[ Товарный чек ]`, a permanent action button displays the honest status:
+1. **No linked listing:** Button disabled with text `Для этой продажи нет связанного объявления Avito`.
+2. **Already inactive / archived:** Button disabled with text `✓ Объявление уже снято с Avito`.
+3. **Active linked listing:** Blue action button `[ ↗ Снять с Avito вручную ]`. For sales with >1 linked listing, shows `[ ↗ Снять с Avito вручную (N шт.) ]` which opens the multi-listing modal.
+
+#### 3. Optional Manual Confirmation (`[ ✓ Я снял объявление ]`)
+- Displayed when a listing has been opened for manual removal (status `manual_required`).
+- When clicked by the operator:
+  1. Task transitions to `status = success`, `execution_mode = manual`.
+  2. Linked listing in `product_external_listings` transitions to `remote_status = 'archived'`, `sync_state = 'synced'`.
+  3. Audit log entry written: `action = 'avito_listing_deactivated_after_sale'`, `confirmation_method = 'operator_click'`.
+  4. Physical inventory and completed sale remain completely untouched.
+
+#### 4. Operator Queue UI (`/avito/post-sale`)
+Provides an operator-friendly table with columns:
+- **Дата:** Creation timestamp.
+- **Продажа:** Clickable link to `#<sale_id>`.
+- **Товар:** Product title.
+- **Avito ID:** Direct canonical link to Avito listing.
+- **Статус:** Honest status badge (`В очереди`, `Открыто для снятия`, `Снято`, `Отменено`).
+- **Действие:** Context-appropriate action buttons:
+  - `[ ↗ Открыть объявление ]` (`target="_blank"`) -> marks `manual_required`.
+  - `[ Не снимать ]` -> marks `canceled`.
+  - `[ ✓ Я снял объявление ]` -> marks `success` and archives listing.
+
+#### 5. Chrome Extension v0.2.61
+- Automatic polling alarms (`chrome.alarms.create`) and interval timers are completely removed.
+- Task auto-clicker routines (`execute_deactivation`, `pollNextDeactivationTask`) are disabled/inerted.
+- The extension preserves active pairing and manual catalogue import features while ensuring zero background interference with manual operator workflows.
+- ZIP packages rebuilt: `dist/technoreboot-avito-extension-0.2.61.zip` and `admin-shell/app/technoreboot-avito-extension.zip`.
+
+
 
 
