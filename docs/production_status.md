@@ -161,6 +161,26 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Auto Code Rollback** | **NOT REQUIRED** | Deployment succeeded on first attempt |
 | **Final Status** | `TECHNOREBOOT_STAGE09C_PRODUCTION_DEPLOYMENT_SUCCESS` | **READY FOR OWNER BROWSER ACCEPTANCE** |
 
+---
+
+## 10. Local User Manual PDF & Admin Panel Download Link (Stage 10A LOCAL)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **LOCAL WORKSTATION ONLY** | User Manual PDF generation and permanent navigation download link integration |
+| **User Manual Source** | `docs/user_manual/TECHNOREBOOT_USER_MANUAL_RU.md` | Complete Russian manual covering 17 chapters, plain language, zero technical jargon |
+| **Generated PDF** | `admin-shell/app/static/docs/TECHNOREBOOT_USER_MANUAL_RU.pdf` | A4 format, 25 pages, 2,470,296 bytes, generated via Playwright Chromium |
+| **Clickable TOC** | **VERIFIED (17 JUMP LINKS)** | Page 2 contains 17 internal PDF GoTo links pointing to chapter anchors |
+| **PDF Outlines / Bookmarks** | **VERIFIED (19 ENTRIES)** | PyMuPDF injected outline hierarchy pointing to exact chapter pages |
+| **Screenshots Included** | **15 REAL UI SCREENSHOTS** | High-res cropped captures of Products, Extension v0.2.62, Sales, Repairs, Reports, Owner ops |
+| **Permanent Download Link** | **ACTIVE (`📘 Инструкция`)** | Integrated in unified navbar across inventory-sales, repairs, and all 12 admin-shell templates |
+| **Download Route** | `GET /help/user-manual.pdf` | Serves `application/pdf` with attachment header; accessible to both USER and OWNER |
+| **Help Overview Route** | `GET /help` | HTML overview with version details, chapter table of contents, and download button |
+| **Security Audit** | **ZERO SECRETS (PASS)** | Automated scan confirms no SSH keys, passwords, tokens, dev paths (`/srv/...`, `C:\tbootit\...`) |
+| **Automated Tests** | **ALL PASSED (0 FAILED)** | `tests/test_stage10a_user_manual_pdf.py` (6/6), `scripts/verify_user_manual_pdf.py` (all passed) |
+| **VDS Production Safety** | `VDS_DEPLOYED = false` | Strictly LOCAL. No VDS deployment or code mutation without Owner browser acceptance |
+| **Final Status** | `TECHNOREBOOT_STAGE10A_LOCAL_USER_MANUAL_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE** |
+
 
 
 

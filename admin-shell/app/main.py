@@ -651,6 +651,44 @@ async def download_extension_zip():
         headers={"Cache-Control": "no-store, no-cache, must-revalidate"}
     )
 
+@app.get("/help/user-manual.pdf")
+async def download_user_manual_pdf():
+    candidate_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "static", "docs", "TECHNOREBOOT_USER_MANUAL_RU.pdf")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "docs", "TECHNOREBOOT_USER_MANUAL_RU.pdf")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "user_manual", "TECHNOREBOOT_USER_MANUAL_RU.pdf")),
+        "/app/app/static/docs/TECHNOREBOOT_USER_MANUAL_RU.pdf",
+        "/app/static/docs/TECHNOREBOOT_USER_MANUAL_RU.pdf",
+        os.path.abspath("admin-shell/app/static/docs/TECHNOREBOOT_USER_MANUAL_RU.pdf"),
+        os.path.abspath("docs/user_manual/TECHNOREBOOT_USER_MANUAL_RU.pdf"),
+    ]
+    pdf_path = None
+    for p in candidate_paths:
+        if os.path.exists(p):
+            pdf_path = p
+            break
+    if not pdf_path or not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Файл руководства пользователя не найден.")
+    
+    return FileResponse(
+        pdf_path,
+        filename="TECHNOREBOOT_USER_MANUAL_RU.pdf",
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="TECHNOREBOOT_USER_MANUAL_RU.pdf"',
+            "Cache-Control": "no-store, no-cache, must-revalidate"
+        }
+    )
+
+@app.get("/help", response_class=HTMLResponse)
+async def help_page(request: Request):
+    return templates.TemplateResponse("help.html", {
+        "request": request,
+        "is_owner": _is_owner(request),
+        "manual_version": "1.0",
+        "manual_date": "14 сентября 2026 г.",
+    })
+
 @app.api_route("/admin-api/avito-extension/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_avito_extension_api(path: str, request: Request):
     target_url = f"{AVITO_MODULE_URL}/extension/api/{path}"

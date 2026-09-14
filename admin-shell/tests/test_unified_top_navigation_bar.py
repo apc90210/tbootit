@@ -26,6 +26,7 @@ EXPECTED_LINKS = [
     ("/repairs/repairs", "Ремонты"),
     ("/avito/extension", "Расширение Avito"),
     ("/inventory/settings/organization", "Настройки"),
+    ("/help/user-manual.pdf", "Инструкция"),
     ("/backups", "Резервные копии"),
     ("/certificates", "Доступ (mTLS)"),
 ]

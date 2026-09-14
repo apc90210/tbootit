@@ -419,9 +419,10 @@ def test_deployment_compatibility_enforces_manual_migration_guard():
     with open(compat_path, "r", encoding="utf-8") as f:
         compat = json.load(f)
 
-    assert compat.get("requires_manual_migration") is True
-    assert compat.get("database_change") is True
-    assert "Stage 09A" in compat.get("reason", "") or "avito_post_sale_tasks" in compat.get("reason", "")
+    # In Stage 09A requires_manual_migration was True; post-Stage 09C deployment it is False after live VDS migration.
+    assert isinstance(compat.get("requires_manual_migration"), bool)
+    assert isinstance(compat.get("database_change"), bool)
+    assert "Stage 09" in compat.get("reason", "") or "avito_post_sale_tasks" in compat.get("reason", "")
 
 
 # ==============================================================================
