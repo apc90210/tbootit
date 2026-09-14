@@ -1,6 +1,6 @@
 # Technoreboot Production Status
 
-**Status Date:** 2026-09-12  
+**Status Date:** 2026-09-14  
 **Operating Architecture:** Local (Permanent DEV Sandbox) + VDS (Canonical Production)  
 **Production Activation State:** **ACTIVE (IP-Only Canonical Test-Production)**  
 **Canonical Production URL:** `https://144.31.50.134`  
@@ -37,14 +37,15 @@
 ### Debian VDS (`144.31.50.134`)
 - **Role:** Canonical Real-User Test-Production (`https://144.31.50.134`).
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
-- **Current Git Commit:** `1c7792db7267bb3fd5e7b75b04a90edb73d37960`.
+- **Current Git Commit:** `e21dba6404f14314863213cb40ba945ea427a467`.
 - **Restart Count:** 0 across all containers.
 - **Business Data Status:** **CANONICAL PRODUCTION (149 products, 0 sales, 0 repairs, 149 photos, 149 listings)**.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
-- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-12_103639.zip` / `TECHNOREBOOT_BACKUP_2026-09-12_103935.zip`.
+- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-14_085201.zip` (release checkpoint), `TECHNOREBOOT_BACKUP_2026-09-14_085357.zip` (update_code_only.sh backup).
 - **Code-Only Update Script:** Installed, tested, and active at `deploy/production/update_code_only.sh`.
 - **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles; dev-reset blocked even for OWNER on production.
-- **Avito Extension Version:** `0.2.56` (tightened host permissions, broad wildcard removed).
+- **Avito Extension Version:** `0.2.62` (fixed SW init, immediate pairing input, one-click copy button).
+- **avito_post_sale_tasks Table:** **PRESENT** (Stage 09C migration applied, 0 rows).
 
 ---
 
@@ -71,7 +72,7 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
-| **Extension Version** | `0.2.54` | Aligned across manifest, popup, service worker, content script, and backend schemas |
+| **Extension Version** | `0.2.62` | Fixed service worker init, immediate pairing input UI, one-click copy button |
 | **Host Permissions** | `https://144.31.50.134/*`, `https://*/*` | Enables fetch communication with production VDS IP gateway |
 | **Server Base URL** | Dynamic / Configurable | Extension popup permits manual entry / auto-detection of server base URL |
 | **Pairing State Persistence** | Persistent Volume | Stored in `/srv/technoreboot/data/avito-module/extension_pair_codes.json` |
@@ -87,8 +88,8 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Owner Operations Page** | **ACTIVE (`/system/operations`)** | Web UI with real-time status, console logs, and confirmation modals |
 | **RBAC Enforcement** | **ACTIVE (OWNER ONLY)** | USER role returns 403 Forbidden on page and all action endpoints |
 | **Environment Guard** | **ACTIVE** | Local dev workstation enabled; VDS production hard-blocks all operations |
-| **Schema Guard Contract** | **ACTIVE (`ce11b10d...`)** | 23 tables, normalized types, 100% parity verified between code and VDS SQLite |
-| **Manual Migration Flag** | `requires_manual_migration=false` | Deployment compatibility tracked in `deploy/production/deployment_compatibility.json` |
+| **Schema Guard Contract** | **ACTIVE (`ae36c016...`)** | 24 tables, normalized types, 100% parity verified between code and VDS SQLite |
+| **Manual Migration Flag** | `requires_manual_migration=false` | Stage 09C migration applied; `deployment_compatibility.json` cleared; code-only deploys safe |
 | **Host Runner Daemon** | **RUNNING (`scripts/local_ops_runner.py`)** | Processes queued requests, enforces atomic locking, logs audit records |
 | **Automated Tests** | **54 PASSED (0 FAILED)** | Full coverage for RBAC, Environment Guard, Schema Guard, Direction Guard |
 
@@ -113,7 +114,7 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
-| **Stage Scope** | **LOCAL ONLY** | Development and validation on `https://localhost:8443` (Zero VDS impact) |
+| **Stage Scope** | **LOCAL + VDS PRODUCTION** | Deployed to production VDS in Stage 09C |
 | **Workflow Decision** | **MANUAL OPERATOR FLOW** | Automatic browser DOM clicking is disabled as unreliable; replaced by clear operator flow |
 | **Post-Sale Prompt** | **ACTIVE** | Large card after sale: `[ ↗ Снять с Avito вручную ]` and `[ Не снимать ]` |
 | **Manual Open Invariant** | **ENFORCED** | Opening listing sets task to `manual_required` (NEVER `success`). Original tab intact. |
@@ -125,7 +126,7 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Stock & Sale Invariant** | **ENFORCED** | Completed sale and physical stock are NEVER mutated by Avito actions or cancellations |
 | **Automated Tests** | **158 PASSED (0 FAILED)** | Core (27), Admin-shell (28), Root (103) all passing cleanly |
 | **Live Proof** | **12/12 PASSED** | `scripts/verify_stage09a_r5_manual_flow.py` verified all flows end-to-end |
-| **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
+| **Schema Guard Status** | `requires_manual_migration = false` | Migration applied in Stage 09C. Code-only deploys are safe. |
 
 ---
 
@@ -141,9 +142,24 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Isolated Test Cleanup** | **COMPLETED** | Test containers, network, worktree, and disposable DB copy removed cleanly |
 | **Final Status** | `TECHNOREBOOT_STAGE09B_VDS_ISOLATED_SYNC_TEST_PASSED_NO_PROD_DB_TOUCH` | Ready for separate production deployment stage upon Owner approval |
 
+---
 
+## 9. Production Schema Migration + Code Deploy (Stage 09C)
 
-
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Migration Applied** | **YES** | `avito_post_sale_tasks` table created on live VDS production DB |
+| **Migration Method** | `CREATE TABLE IF NOT EXISTS` + indexes | Idempotent, additive, zero existing row mutation |
+| **Schema Guard Post-Migration** | **PASS** | `db_schema_contract.py check-vds`: "VDS live database matches tracked contract: SAFE" |
+| **Code Deployed** | **YES** | `update_code_only.sh origin/main` → `e21dba6404` (from `aa593781b7`) |
+| **Extension Version** | `0.2.62` | ZIP SHA256 match confirmed: `c27a95bb...` |
+| **All 6 Services Healthy** | **YES** | core, admin-shell, inventory-sales, repairs, avito, gateway — all healthy |
+| **Business Data Preserved** | **YES** | 149 products, 0 sales, 149 photos, 149 listings — all counts identical pre/post |
+| **Release Checkpoint Retained** | **YES** | `checkpoint_20260914_085202_aa593781` with business backup, image IDs, DB SHA256 |
+| **deployment_compatibility.json** | `requires_manual_migration=false` | Future code-only deploys via admin shell UPDATE button are now safe |
+| **Smoke Tests** | **ALL PASSED** | Root, products, sales, extension, post-sale, repairs, manual flow buttons verified |
+| **Auto Code Rollback** | **NOT REQUIRED** | Deployment succeeded on first attempt |
+| **Final Status** | `TECHNOREBOOT_STAGE09C_PRODUCTION_DEPLOYMENT_SUCCESS` | **READY FOR OWNER BROWSER ACCEPTANCE** |
 
 
 

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "requires_manual_migration": true,
-  "database_change": true,
-  "reason": "Stage 09A LOCAL: Added avito_post_sale_tasks table for post-sale deactivation automation. VDS deployment deferred to future migration stage.",
+  "requires_manual_migration": false,
+  "database_change": false,
+  "reason": "Stage 09C PRODUCTION: avito_post_sale_tasks migration applied to live VDS DB. Schema guard passes. Code-only deploys are safe.",
   "schema_contract_sha256": "ae36c0163d7dcd5fa4a4f8e977008566f84f1016b2aa3d686bd31228f43aa886",
-  "reviewed_at_commit": "aa593781b7feef0ea732bcd6b2b761b79bf3ff87"
-}
+  "reviewed_at_commit": "e21dba6404f14314863213cb40ba945ea427a467"
+}
