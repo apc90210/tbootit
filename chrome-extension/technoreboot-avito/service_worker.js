@@ -19,6 +19,24 @@ async function setDryRunMode(enabled) {
     });
 }
 
+async function getArmedListingId() {
+    return new Promise(resolve => {
+        chrome.storage.local.get(["armed_avito_listing_id"], result => {
+            resolve(result.armed_avito_listing_id || null);
+        });
+    });
+}
+
+async function setArmedListingId(listingId) {
+    return new Promise(resolve => {
+        if (!listingId) {
+            chrome.storage.local.remove(["armed_avito_listing_id"], () => resolve());
+        } else {
+            chrome.storage.local.set({ armed_avito_listing_id: String(listingId).trim() }, () => resolve());
+        }
+    });
+}
+
 async function getActiveDeactivationTask() {
     return new Promise(resolve => {
         chrome.storage.local.get(["active_deactivation_task"], result => {
@@ -503,6 +521,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         setDryRunMode(request.enabled).then(() => sendResponse({ success: true, dry_run: request.enabled }));
         return true;
     }
+    if (request.action === "get_armed_listing_id") {
+        getArmedListingId().then(id => sendResponse({ armed_listing_id: id }));
+        return true;
+    }
+    if (request.action === "arm_specific_listing") {
+        const id = request.listing_id ? String(request.listing_id).trim() : null;
+        setArmedListingId(id).then(() => {
+            const isDry = !id;
+            setDryRunMode(isDry).then(() => {
+                sendResponse({ success: true, armed_listing_id: id, dry_run: isDry });
+            });
+        });
+        return true;
+    }
     if (request.action === "clear_active_task") {
         setActiveDeactivationTask(null).then(() => sendResponse({ success: true }));
         return true;
@@ -643,7 +675,23 @@ async function pollNextDeactivationTask() {
         // Notify server that task is started/processing
         await notifyTaskStarted(task.task_id);
 
-        const isDryRun = await getDryRunMode();
+        const dryRunGlobal = await getDryRunMode();
+        const armedListingId = await getArmedListingId();
+
+        // Check if task is armed specifically or globally (Stage 09A-R3 Section 3)
+        let isArmed = false;
+        if (task.approved_for_real_execution === true) {
+            isArmed = true;
+        } else if (armedListingId && String(task.avito_listing_id).trim() === String(armedListingId).trim()) {
+            isArmed = true;
+        } else if (dryRunGlobal === false) {
+            if (!armedListingId || String(task.avito_listing_id).trim() === String(armedListingId).trim()) {
+                isArmed = true;
+            }
+        }
+
+        const taskDryRun = !isArmed;
+
         const initialTaskState = {
             task_id: task.task_id,
             sale_id: task.sale_id,
@@ -652,9 +700,11 @@ async function pollNextDeactivationTask() {
             avito_listing_id: String(task.avito_listing_id),
             listing_url: task.listing_url,
             step: "received",
-            status_message: `Задача #${task.task_id}: получена команда на снятие с публикации`,
+            status_message: isArmed
+                ? `Задача #${task.task_id}: [РЕАЛЬНЫЙ РЕЖИМ] снятие с публикации №${task.avito_listing_id}`
+                : `Задача #${task.task_id}: получена команда на снятие с публикации (Dry-Run)`,
             tab_id: null,
-            dry_run: isDryRun,
+            dry_run: taskDryRun,
             updated_at: new Date().toISOString()
         };
         await setActiveDeactivationTask(initialTaskState);
@@ -756,11 +806,26 @@ async function executeDeactivationFlow(task) {
                 }, 2000);
             }
 
-            // Clear lock after 10 seconds so next task can run
+            // CRITICAL SAFETY (Stage 09A-R3 Section 11):
+            // Restore Dry-Run mode to true and clear any armed listing ID
+            if (!task.dry_run) {
+                await setDryRunMode(true);
+                await setArmedListingId(null);
+                console.log("[AvitoSW] Real execution succeeded. Automatically restored Dry-Run mode to true.");
+            }
+
+            // Clear lock after 3 seconds so next task can run
             setTimeout(async () => {
                 await setActiveDeactivationTask(null);
-            }, 10000);
+            }, 3000);
             return;
+        }
+
+        // Auto-revert arming on non-success paths as well
+        if (!task.dry_run) {
+            await setDryRunMode(true);
+            await setArmedListingId(null);
+            console.log("[AvitoSW] Real execution non-success. Automatically restored Dry-Run mode to true.");
         }
 
         if (response.status === "manual_required") {
@@ -780,6 +845,10 @@ async function executeDeactivationFlow(task) {
         await reportTaskFailed(task.task_id, task.status_message, true);
     } catch (err) {
         console.error("[AvitoSW] Execution flow error:", err);
+        if (!task.dry_run) {
+            await setDryRunMode(true);
+            await setArmedListingId(null);
+        }
         task.step = "failed";
         task.status_message = `Ошибка выполнения: ${err.message}`;
         task.updated_at = new Date().toISOString();

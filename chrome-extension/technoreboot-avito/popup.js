@@ -306,14 +306,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // --- Post-Sale Deactivation UI Helpers ---
-    function updateModeBadge(isDryRun) {
+    function updateModeBadge(isDryRun, armedListingId = null) {
         if (!deactivationModeBadge) return;
         if (isDryRun) {
             deactivationModeBadge.className = "badge badge-warning";
             deactivationModeBadge.textContent = "ТЕСТОВЫЙ РЕЖИМ (Dry-Run)";
         } else {
-            deactivationModeBadge.className = "badge badge-online";
-            deactivationModeBadge.textContent = "РЕАЛЬНЫЙ РЕЖИМ (Armed)";
+            deactivationModeBadge.className = "badge badge-danger";
+            deactivationModeBadge.textContent = armedListingId ? `⚠️ ВООРУЖЁН (№${armedListingId})` : "⚠️ РЕАЛЬНЫЙ РЕЖИМ (Armed)";
         }
     }
 
@@ -420,17 +420,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Initialize Post-Sale Deactivation UI
+    const armApproved7353766377Btn = document.getElementById("armApproved7353766377Btn");
+    if (armApproved7353766377Btn) {
+        armApproved7353766377Btn.addEventListener("click", () => {
+            chrome.runtime.sendMessage({ action: "arm_specific_listing", listing_id: "7353766377" }, res => {
+                if (dryRunCheckbox) dryRunCheckbox.checked = false;
+                updateModeBadge(false, "7353766377");
+                if (taskStatusBox) {
+                    taskStatusBox.textContent = "Вооружен для №7353766377. Запустите снятие или дождитесь авто-опроса...";
+                }
+            });
+        });
+    }
+
     if (dryRunCheckbox) {
         chrome.runtime.sendMessage({ action: "get_dry_run_mode" }, res => {
             const isDry = res ? res.dry_run !== false : true;
             dryRunCheckbox.checked = isDry;
-            updateModeBadge(isDry);
+            chrome.runtime.sendMessage({ action: "get_armed_listing_id" }, armRes => {
+                updateModeBadge(isDry, armRes ? armRes.armed_listing_id : null);
+            });
         });
 
         dryRunCheckbox.addEventListener("change", () => {
             const enabled = dryRunCheckbox.checked;
             chrome.runtime.sendMessage({ action: "set_dry_run_mode", enabled: enabled }, () => {
-                updateModeBadge(enabled);
+                chrome.runtime.sendMessage({ action: "get_armed_listing_id" }, armRes => {
+                    updateModeBadge(enabled, armRes ? armRes.armed_listing_id : null);
+                });
             });
         });
     }
@@ -455,10 +472,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (changes.active_deactivation_task) {
                     updateActiveTaskUI(changes.active_deactivation_task.newValue);
                 }
-                if (changes.avito_deactivation_dry_run) {
-                    const isDry = changes.avito_deactivation_dry_run.newValue !== false;
-                    if (dryRunCheckbox) dryRunCheckbox.checked = isDry;
-                    updateModeBadge(isDry);
+                if (changes.avito_deactivation_dry_run || changes.armed_avito_listing_id) {
+                    chrome.storage.local.get(["avito_deactivation_dry_run", "armed_avito_listing_id"], s => {
+                        const isDry = s.avito_deactivation_dry_run !== false;
+                        if (dryRunCheckbox) dryRunCheckbox.checked = isDry;
+                        updateModeBadge(isDry, s.armed_avito_listing_id);
+                    });
                 }
             }
         });

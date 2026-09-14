@@ -109,23 +109,26 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 
 ---
 
-## 7. Avito Post-Sale Deactivation & Action Contract Fix (Stage 09A, 09A-R1 & 09A-R2 LOCAL)
+## 7. Avito Post-Sale Deactivation & Real E2E Proof (Stage 09A, 09A-R1, 09A-R2 & 09A-R3 LOCAL)
 
 | Parameter | Current Status | Details |
 | :--- | :--- | :--- |
-| **Stage Scope** | **LOCAL ONLY** | Development and automated validation on `https://localhost:8443` |
+| **Stage Scope** | **LOCAL ONLY** | Development and validation on `https://localhost:8443` (Zero VDS impact) |
 | **Sale Integration** | **ACTIVE** | Post-sale follow-up card and permanent `[ Снять с Avito ]` button on sale detail view |
 | **Sale Non-Block Invariant** | **ENFORCED** | Sale commits before Avito follow-up; Avito failures never block or revert sales |
 | **Stock Non-Mutation** | **ENFORCED** | Physical inventory is never mutated by Avito task state changes |
 | **Persistent Task Model** | **ACTIVE (`avito_post_sale_tasks`)** | Idempotent on `(sale_id, product_id, avito_listing_id, action)`. 7 discrete states. |
 | **Action Contract Bridge** | **ACTIVE (Zero-DB-Migration)** | Bridge adapter maps DB business `'deactivate'` to extension transport `'deactivate_listing'` |
 | **Chrome Extension Version** | `0.2.59` | Tolerates both `'deactivate_listing'` and `'deactivate'`; rejects unknown actions; restores original tab |
+| **Targeted Arming & Auto-Disarm** | **ACTIVE (Stage 09A-R3)** | `POST /arm-task/{id}`, `POST /disarm`, auto-reverts to Dry-Run on success/failed |
+| **Real External Inactive Confirmation** | **VERIFIED (Stage 09A-R3)** | Validates external Avito inactive indicators before reporting task success |
 | **Retry Limit & Fallback** | **ACTIVE (3 Attempts)** | Auto-transitions to `manual_required` upon reaching 3 failed attempts |
 | **Official API Capability** | `OFFICIAL_API_AVAILABLE = false` | Capability probe `can_deactivate_listing = false` (extension mode used) |
-| **Dry-Run Safety Mode** | **ACTIVE (Default ON)** | Discovers control, highlights, updates UI; blocks clicks and server success reporting |
+| **Dry-Run Safety Mode** | **ACTIVE (Default ON)** | Discovers control, highlights, updates UI; blocks clicks and server success reporting unless armed |
 | **DOM Discovery Safety** | **ACTIVE** | Conservative whitelist & blacklist; checks actions menu and profile cards (`/profile/items`) |
 | **Cleanup Queue UI** | **ACTIVE (`/avito/post-sale`)** | Filterable queue table with retry, queue, and cancel actions |
 | **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
+
 
 
 

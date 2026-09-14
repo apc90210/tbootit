@@ -232,3 +232,36 @@ During real Owner testing with Avito ID `7353766377` (Sale #1), tasks failed wit
 - **Action Menu & Profile Card Discovery:** If deactivation controls are hidden in a submenu ("...", "Действия") or within profile cards (`/profile/items`), `content.js` dynamically expands the menu to find the control.
 - **Tab Focus Preservation:** `service_worker.js` captures the `originalTabId` before opening the task tab. Upon completion in Armed mode, it restores focus to the seller's original working tab and closes the temporary Avito tab.
 
+---
+
+## 9. Stage 09A-R3: Real Avito Deactivation E2E Proof (No Dry-Run)
+
+### Targeted Arming Architecture
+For explicit real execution without exposing unrelated tasks to destructive actions:
+1. **Targeted Backend Endpoints (`avito-module/app/routers/extension_bridge.py`):**
+   - `POST /arm-task/{avito_listing_id}`: Sets server-side armed listing ID in `extension_armed_tasks.json`.
+   - `POST /disarm`: Clears armed listing ID, immediately restoring safe Dry-Run mode.
+   - `GET /armed-status`: Returns `{"armed": bool, "armed_listing_id": string | null}`.
+2. **Task Payload Enrichment:**
+   - `/tasks/next` inspects the armed listing ID. If `task.avito_listing_id == armed_id`, it sets `approved_for_real_execution = true`.
+3. **Auto-Disarm Guarantee:**
+   - Both `/tasks/{task_id}/success` and `/tasks/{task_id}/failed` automatically clear the armed state (`_set_armed_listing_id(None)`).
+   - The Chrome extension service worker automatically resets its internal mode (`setDryRunMode(true)` and `setArmedListingId(null)`) on any terminal transition.
+4. **Extension Popup Controls:**
+   - Provides a dedicated `[ ⚠️ Вооружить для №7353766377 (Stage 09A-R3) ]` button with red badge warning `⚠️ ВООРУЖЁН (№7353766377)`.
+
+### Real External Inactive State Confirmation
+A task is marked `success` only when Avito externally confirms the listing is no longer active:
+- URL matches `/closed` or `/profile/items/closed`.
+- Page text confirms removal ("объявление снято с публикации", "снято с продажи", "в архиве", "закрыто", etc.).
+- Owner controls show republish/reactivate markers ("подать заново", "опубликовать заново").
+- Inactive polling checks up to 20 seconds with 500ms intervals before returning success.
+
+### Post-Conditions & Business Integrity
+- **Task:** `status = success`, `finished_at != null`, `last_error = null`, `execution_mode = extension`.
+- **Listing:** `remote_status = 'archived'`, `sync_state = 'synced'`.
+- **Audit Log:** Event `avito_listing_deactivated_after_sale` recorded with `task_id`, `sale_id`, `product_id`, `avito_listing_id`, `timestamp`.
+- **Business Data:** Sale #1 remains completed; Product #141 stock and status remain completely untouched.
+- **VDS Safety:** 100% strictly local development; zero operations or deployments to VDS `144.31.50.134`.
+
+

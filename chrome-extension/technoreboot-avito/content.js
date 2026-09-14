@@ -4415,8 +4415,22 @@ const DEACTIVATION_BLACKLIST = [
 
 function discoverDeactivationControl(targetAvitoId = null) {
     // Collect candidate button and link elements on page
-    const selector = 'button, a, [role="button"], [data-marker*="close"], [data-marker*="archive"], [data-marker*="deactivate"], [data-marker*="withdraw"], [data-marker*="unpublish"]';
+    const selector = 'button, a, [role="button"], [data-marker*="close"], [data-marker*="archive"], [data-marker*="deactivate"], [data-marker*="withdraw"], [data-marker*="unpublish"], [data-marker*="action"], div[class*="button"], span[class*="button"]';
     const elements = Array.from(document.querySelectorAll(selector));
+
+    // Also search text elements whose inner text contains deactivation keywords
+    const textElements = Array.from(document.querySelectorAll('span, div, p, label'));
+    for (const tel of textElements) {
+        if (tel.children.length > 3) continue;
+        const t = (tel.innerText || "").trim().toLowerCase();
+        if (DEACTIVATION_WHITELIST.some(w => t.includes(w)) || t === "снять") {
+            const clickable = tel.closest('button, a, [role="button"], div[data-marker], div[class*="button"]') || tel;
+            if (!elements.includes(clickable)) {
+                elements.push(clickable);
+            }
+        }
+    }
+
     const matches = [];
 
     for (const el of elements) {
@@ -4439,7 +4453,7 @@ function discoverDeactivationControl(targetAvitoId = null) {
 
         // Whitelist match
         const matchedPhrase = DEACTIVATION_WHITELIST.find(w => combined.includes(w));
-        const hasSpecificMarker = dataMarker.includes("close-item") || dataMarker.includes("deactivate") || dataMarker === "item-actions/close" || dataMarker.includes("withdraw");
+        const hasSpecificMarker = dataMarker.includes("close-item") || dataMarker.includes("deactivate") || dataMarker === "item-actions/close" || dataMarker.includes("withdraw") || dataMarker.includes("unpublish");
 
         if (matchedPhrase || hasSpecificMarker || text === "снять") {
             matches.push({
@@ -4463,13 +4477,27 @@ function discoverDeactivationControl(targetAvitoId = null) {
 }
 
 function checkListingAlreadyInactive() {
+    const currentUrl = (window.location.href || "").toLowerCase();
+    if (currentUrl.includes("/profile/items/closed") || currentUrl.includes("/items/closed") || currentUrl.includes("status=closed")) {
+        return { inactive: true, indicator: "страница закрытых объявлений" };
+    }
+
     const pageText = (document.body ? document.body.innerText : "").toLowerCase();
     const inactivePhrases = [
         "объявление снято с публикации",
         "снято с публикации",
+        "объявление снято",
+        "снято с продажи",
         "в архиве",
         "архивировано",
-        "снято с продажи"
+        "объявление закрыто",
+        "закрыто",
+        "объявление неактивно",
+        "неактивно",
+        "подать заново",
+        "разместить заново",
+        "опубликовать заново",
+        "активировать объявление"
     ];
 
     for (const phrase of inactivePhrases) {
@@ -4479,7 +4507,7 @@ function checkListingAlreadyInactive() {
     }
 
     // Check for republish/activate buttons
-    const republishBtn = document.querySelector('[data-marker*="republish"], [data-marker*="reactivate"]');
+    const republishBtn = document.querySelector('[data-marker*="republish"], [data-marker*="reactivate"], [data-marker*="activate"], [data-marker*="unarchive"]');
     if (republishBtn) {
         return { inactive: true, indicator: "кнопка повторной активации" };
     }
@@ -4488,7 +4516,7 @@ function checkListingAlreadyInactive() {
 }
 
 async function handleDeactivationModalIfPresent() {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
         await new Promise(r => setTimeout(r, 400));
         const modal = document.querySelector('[role="dialog"], [data-marker*="modal"], .modal, [data-marker*="popup"]');
         if (modal) {
@@ -4499,39 +4527,61 @@ async function handleDeactivationModalIfPresent() {
                 return;
             }
 
-            // Safe reason selection
-            const radioReasons = Array.from(modal.querySelectorAll('input[type="radio"], [role="radio"], label'));
-            for (const radio of radioReasons) {
-                const rText = (radio.innerText || radio.textContent || "").toLowerCase();
-                if (rText.includes("продал на авито") || rText.includes("продал в другом") || rText.includes("снял с продажи") || rText.includes("другая причина")) {
-                    radio.click();
-                    await new Promise(r => setTimeout(r, 200));
-                    break;
+            // Safe reason selection: radios, labels, buttons, list items, custom radio cards
+            const reasonElements = Array.from(modal.querySelectorAll('input[type="radio"], [role="radio"], label, [data-marker*="reason"], li, button, [role="option"]'));
+            for (const el of reasonElements) {
+                const rText = (el.innerText || el.textContent || el.getAttribute("aria-label") || "").toLowerCase();
+                const isMatch = rText.includes("продал на авито") || 
+                                rText.includes("продал в другом") || 
+                                rText.includes("снял с продажи") || 
+                                rText.includes("снято с продажи") || 
+                                rText.includes("другая причина") || 
+                                rText.includes("товар продан") || 
+                                rText.includes("продано");
+                if (isMatch) {
+                    try {
+                        el.click();
+                        await new Promise(r => setTimeout(r, 400));
+                        break;
+                    } catch (e) {}
                 }
             }
 
             // Find confirm button
-            const confirmBtn = Array.from(modal.querySelectorAll('button, [role="button"], a')).find(b => {
-                const bText = (b.innerText || b.textContent || "").trim().toLowerCase();
-                return bText === "снять" || bText === "снять с публикации" || bText === "да" || bText === "подтвердить" || bText === "продолжить";
+            const confirmBtn = Array.from(modal.querySelectorAll('button, [role="button"], a, input[type="submit"]')).find(b => {
+                const bText = (b.innerText || b.textContent || b.value || "").trim().toLowerCase();
+                const marker = (b.getAttribute("data-marker") || "").toLowerCase();
+                return bText === "снять" || 
+                       bText === "снять с публикации" || 
+                       bText === "да" || 
+                       bText === "да, снять" || 
+                       bText === "подтвердить" || 
+                       bText === "продолжить" || 
+                       bText === "закрыть" || 
+                       bText === "готово" || 
+                       marker.includes("confirm") || 
+                       marker.includes("close-confirm");
             });
 
             if (confirmBtn) {
-                confirmBtn.click();
-                return;
+                try {
+                    confirmBtn.click();
+                    await new Promise(r => setTimeout(r, 500));
+                    return;
+                } catch (e) {}
             }
         }
     }
 }
 
-async function waitForConfirmedInactiveState(timeoutMs = 15000) {
+async function waitForConfirmedInactiveState(timeoutMs = 20000) {
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
         const inactive = checkListingAlreadyInactive();
         if (inactive) {
             return { confirmed: true, type: inactive.indicator };
         }
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 500));
     }
     return null;
 }
@@ -4618,7 +4668,7 @@ async function executeDeactivationOnPage(task) {
 
     // If not found, try opening actions menu if present (e.g. "...", "Действия", data-marker="item-actions/menu")
     if (!candidate) {
-        const menuTriggers = Array.from(document.querySelectorAll('[data-marker="item-actions/menu"], [data-marker*="actions-menu"], button[aria-label*="действи"], button[aria-label*="ещё"], [data-marker="item-view/more-actions"], [data-marker*="more-button"]'));
+        const menuTriggers = Array.from(document.querySelectorAll('[data-marker="item-actions/menu"], [data-marker*="actions-menu"], button[aria-label*="действи"], button[aria-label*="ещё"], button[aria-label*="еще"], [data-marker="item-view/more-actions"], [data-marker*="more-button"], [data-marker*="item-view/actions"], [data-marker*="dots"], [data-marker*="seller-actions"], [data-marker*="manage-button"]'));
         for (const menuTrigger of menuTriggers) {
             try {
                 menuTrigger.click();
@@ -4665,10 +4715,21 @@ async function executeDeactivationOnPage(task) {
                 status_message: `Объявление снято с публикации (${recheckInactive.indicator})`
             };
         }
+
+        const hasLoginLink = Boolean(document.querySelector('a[href*="/profile/login"], a[data-marker*="login"], [data-marker*="header/login-button"]'));
+        const userMenu = document.querySelector('[data-marker*="header/user-menu"], [data-marker*="user-profile"], [data-marker*="user-name"]');
+        const authStatus = userMenu ? `авторизован как ${(userMenu.innerText || '').trim()}` : (hasLoginLink ? "не авторизован в Avito" : "профиль не определен");
+
+        const sampleButtons = Array.from(document.querySelectorAll('button, a[role="button"], [data-marker]'))
+            .filter(el => (el.offsetWidth > 0 || el.offsetHeight > 0) && el.innerText)
+            .map(el => (el.innerText || "").trim().replace(/\s+/g, ' '))
+            .filter(t => t.length > 0 && t.length < 40)
+            .slice(0, 8);
+
         return {
             success: false,
             status: "manual_required",
-            error: "Кнопка снятия с публикации не найдена в DOM на странице объявления."
+            error: `Кнопка снятия с публикации не найдена в DOM на странице объявления (${authStatus}). Кнопки на странице: [${sampleButtons.join(' | ')}]`
         };
     }
 
