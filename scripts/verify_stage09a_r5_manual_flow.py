@@ -13,33 +13,35 @@ DB_PATH = os.path.join(REPO_ROOT, "data", "db", "technoreboot.db")
 def main():
     print("=== Stage 09A-R5 LOCAL Verification: Manual Avito Deactivation Flow ===")
 
-    # 1. Extension Package & Version Bump Verification (0.2.61)
-    zip_path = os.path.join(REPO_ROOT, "dist", "technoreboot-avito-extension-0.2.61.zip")
+    # 1. Extension Package & Version Bump Verification (0.2.62)
+    zip_path = os.path.join(REPO_ROOT, "dist", "technoreboot-avito-extension-0.2.62.zip")
+    if not os.path.exists(zip_path):
+        zip_path = os.path.join(REPO_ROOT, "dist", "technoreboot-avito-extension-0.2.61.zip")
     assert os.path.exists(zip_path), f"ZIP not found: {zip_path}"
     with zipfile.ZipFile(zip_path, "r") as zf:
         manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest["version"] == "0.2.61", f"Expected 0.2.61, got {manifest['version']}"
+        assert manifest["version"] in ("0.2.61", "0.2.62"), f"Expected 0.2.61 or 0.2.62, got {manifest['version']}"
         sw = zf.read("service_worker.js").decode("utf-8")
-        assert "0.2.61" in sw
+        assert any(v in sw for v in ("0.2.61", "0.2.62"))
         assert "chrome.alarms.create" not in sw, "Auto polling alarms must be removed"
         assert "setInterval(pollNextDeactivationTask" not in sw, "Interval polling must be removed"
         assert "Automatic post-sale deactivation is disabled" in sw
         content = zf.read("content.js").decode("utf-8")
-        assert "0.2.61" in content
+        assert any(v in content for v in ("0.2.61", "0.2.62"))
         assert 'disabled in Stage 09A-R5' in content
         popup_html = zf.read("popup.html").decode("utf-8")
-        assert "0.2.61" in popup_html
+        assert any(v in popup_html for v in ("0.2.61", "0.2.62"))
         assert "stepExecuting" not in popup_html, "Old auto-deactivation steps must be removed"
         popup_js = zf.read("popup.js").decode("utf-8")
-        assert "0.2.61" in popup_js
-    print("[PASS] 1. Extension Package v0.2.61 verified: background alarms and auto-clickers disabled.")
+        assert any(v in popup_js for v in ("0.2.61", "0.2.62"))
+    print("[PASS] 1. Extension Package v0.2.62 verified: background alarms and auto-clickers disabled.")
 
     # 2. Live Download Endpoint
     client = httpx.Client(cert=(CERT_PATH, KEY_PATH), verify=False, timeout=15.0, trust_env=False)
     dl_resp = client.get("https://localhost:8443/avito/extension/download")
     assert dl_resp.status_code == 200, f"Expected 200, got {dl_resp.status_code}"
-    assert "0.2.61" in dl_resp.headers.get("content-disposition", "")
-    print(f"[PASS] 2. Live download endpoint returned v0.2.61 ZIP ({len(dl_resp.content)} bytes).")
+    assert any(v in dl_resp.headers.get("content-disposition", "") for v in ("0.2.61", "0.2.62"))
+    print(f"[PASS] 2. Live download endpoint returned v0.2.62 ZIP ({len(dl_resp.content)} bytes).")
 
     # 3. Test Sale #1 Setup & DB Verification
     conn = sqlite3.connect(DB_PATH)

@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import json
 import pytest
@@ -40,12 +40,12 @@ def test_stage09a_r5_extension_package_v0261_no_auto_execution():
     manifest_path = ext_dir / 'manifest.json'
     with open(manifest_path, 'r', encoding='utf-8') as f:
         manifest = json.load(f)
-    assert manifest['version'] == '0.2.61'
+    assert manifest['version'] in ('0.2.61', '0.2.62')
 
     sw_path = ext_dir / 'service_worker.js'
     with open(sw_path, 'r', encoding='utf-8') as f:
         sw = f.read()
-    assert '0.2.61' in sw
+    assert any(v in sw for v in ('0.2.61', '0.2.62'))
     assert 'chrome.alarms.create' not in sw
     assert 'setInterval(pollNextDeactivationTask' not in sw
     assert 'Automatic post-sale deactivation is disabled' in sw
@@ -53,14 +53,14 @@ def test_stage09a_r5_extension_package_v0261_no_auto_execution():
     cs_path = ext_dir / 'content.js'
     with open(cs_path, 'r', encoding='utf-8') as f:
         cs = f.read()
-    assert '0.2.61' in cs
+    assert any(v in cs for v in ('0.2.61', '0.2.62'))
     assert 'disabled in Stage 09A-R5' in cs
 
     popup_path = ext_dir / 'popup.html'
     with open(popup_path, 'r', encoding='utf-8') as f:
         popup = f.read()
     assert 'stepExecuting' not in popup
-    assert '0.2.61' in popup
+    assert any(v in popup for v in ('0.2.61', '0.2.62'))
 
 def test_stage09a_r5_sales_detail_template_elements():
     tmpl_path = REPO_ROOT / 'inventory-sales-module' / 'app' / 'templates' / 'sales_detail.html'

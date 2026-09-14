@@ -1,4 +1,4 @@
-// Technoreboot Avito Popup Script (v0.2.61)
+// Technoreboot Avito Popup Script (v0.2.62)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.61";
+        let manifestVer = "0.2.62";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -239,58 +239,109 @@ document.addEventListener("DOMContentLoaded", async () => {
         chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
             if (tabs && tabs.length > 0 && tabs[0].url) {
                 const tabUrl = tabs[0].url;
-                if (!serverUrlInput.value || serverUrlInput.value.includes("localhost")) {
-                    if (tabUrl.includes("144.31.50.134")) {
-                        serverUrlInput.value = "https://144.31.50.134/admin-api/avito-extension";
-                        persistServerUrl(false);
-                        checkStatus();
+                try {
+                    const parsed = new URL(tabUrl);
+                    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+                        // Detect if active tab is TechnoReboot admin / web app
+                        if (
+                            tabUrl.includes("144.31.50.134") ||
+                            tabUrl.includes("localhost:8443") ||
+                            tabUrl.includes("127.0.0.1:8443") ||
+                            tabUrl.includes("localhost:8011") ||
+                            tabUrl.includes("127.0.0.1:8011") ||
+                            tabUrl.includes("localhost:8000") ||
+                            tabUrl.includes("/avito/extension") ||
+                            tabUrl.includes("/inventory") ||
+                            tabUrl.includes("/sales") ||
+                            tabUrl.includes("/admin-api")
+                        ) {
+                            const detected = `${parsed.protocol}//${parsed.host}/admin-api/avito-extension`;
+                            if (!serverUrlInput.value || serverUrlInput.value !== detected) {
+                                serverUrlInput.value = detected;
+                                persistServerUrl(false);
+                                checkStatus();
+                            }
+                        }
                     }
-                }
+                } catch (e) {}
             }
         });
     }
 
     // --- Status Check ---
     function checkStatus() {
-        chrome.runtime.sendMessage({ action: "get_status" }, response => {
-            if (!response || !response.online) {
+        // Fallback timer: if check takes more than 2 seconds, reveal pairSection so user is NEVER blocked
+        const fallbackTimer = setTimeout(() => {
+            if (!isPaired) {
                 isServerOnline = false;
-                isPaired = false;
                 connBadge.className = "badge badge-offline";
                 connBadge.textContent = "Offline";
-                statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу контейнеров).";
-                hideAllCards();
-                // Show pairing section so user can set server URL
-                pairSection.style.display = "block";
-                if (serverUrlInput && !serverUrlInput.value && response && response.server_url) {
-                    serverUrlInput.value = response.server_url;
-                }
-            } else if (!response.paired) {
-                isServerOnline = true;
-                isPaired = false;
-                connBadge.className = "badge badge-offline";
-                connBadge.textContent = "Не привязан";
-                statusMsg.textContent = "Сервер Техноребут в сети. Введите код для привязки.";
-                hideAllCards();
-                pairSection.style.display = "block";
-                if (serverUrlInput && !serverUrlInput.value && response.server_url) {
-                    serverUrlInput.value = response.server_url;
-                }
-                inspectActiveTab();
-            } else {
-                isServerOnline = true;
-                isPaired = true;
-                connBadge.className = "badge badge-online";
-                connBadge.textContent = "Подключен";
-                statusMsg.textContent = "Расширение подключено к Техноребут.";
-                hideAllCards();
-                if (deactivationSection) deactivationSection.style.display = "block";
-                if (serverUrlInput && !serverUrlInput.value && response.server_url) {
-                    serverUrlInput.value = response.server_url;
-                }
-                inspectActiveTab();
+                statusMsg.textContent = "Проверка соединения заняла слишком много времени. Введите код или проверьте адрес ниже.";
+                if (pairSection) pairSection.style.display = "block";
             }
-        });
+        }, 2000);
+
+        try {
+            chrome.runtime.sendMessage({ action: "get_status" }, response => {
+                clearTimeout(fallbackTimer);
+                if (chrome.runtime.lastError || !response) {
+                    isServerOnline = false;
+                    isPaired = false;
+                    connBadge.className = "badge badge-offline";
+                    connBadge.textContent = "Offline";
+                    statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу сервера или адрес ниже).";
+                    hideAllCards();
+                    pairSection.style.display = "block";
+                    return;
+                }
+
+                if (!response.online) {
+                    isServerOnline = false;
+                    isPaired = false;
+                    connBadge.className = "badge badge-offline";
+                    connBadge.textContent = "Offline";
+                    statusMsg.textContent = response.error
+                        ? `Сервер недоступен: ${response.error}`
+                        : "Сервер Техноребут недоступен (проверьте работу сервера или адрес ниже).";
+                    hideAllCards();
+                    pairSection.style.display = "block";
+                    if (serverUrlInput && !serverUrlInput.value && response.server_url) {
+                        serverUrlInput.value = response.server_url;
+                    }
+                } else if (!response.paired) {
+                    isServerOnline = true;
+                    isPaired = false;
+                    connBadge.className = "badge badge-offline";
+                    connBadge.textContent = "Не привязан";
+                    statusMsg.textContent = "Сервер в сети. Введите 6-значный код подключения:";
+                    hideAllCards();
+                    pairSection.style.display = "block";
+                    if (serverUrlInput && !serverUrlInput.value && response.server_url) {
+                        serverUrlInput.value = response.server_url;
+                    }
+                    inspectActiveTab();
+                } else {
+                    isServerOnline = true;
+                    isPaired = true;
+                    connBadge.className = "badge badge-online";
+                    connBadge.textContent = "Подключен";
+                    statusMsg.textContent = "Расширение подключено к Техноребут.";
+                    hideAllCards();
+                    if (serverUrlInput && !serverUrlInput.value && response.server_url) {
+                        serverUrlInput.value = response.server_url;
+                    }
+                    inspectActiveTab();
+                }
+            });
+        } catch (e) {
+            clearTimeout(fallbackTimer);
+            isServerOnline = false;
+            isPaired = false;
+            connBadge.className = "badge badge-offline";
+            connBadge.textContent = "Offline";
+            statusMsg.textContent = "Ошибка расширения при проверке подключения.";
+            pairSection.style.display = "block";
+        }
     }
 
     checkStatus();
@@ -436,7 +487,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         chrome.runtime.sendMessage({ action: "pair", code: cleanCode, server_url: serverUrl }, res => {
             pairBtn.disabled = false;
-            if (res && res.success) {
+            if (chrome.runtime.lastError || !res) {
+                pairMsg.className = "msg msg-error";
+                pairMsg.textContent = (chrome.runtime.lastError && chrome.runtime.lastError.message) || "Ошибка связи с сервером при привязке.";
+                return;
+            }
+            if (res.success) {
                 isPaired = true;
                 connBadge.className = "badge badge-online";
                 connBadge.textContent = "Подключен";
@@ -446,10 +502,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                 inspectActiveTab();
             } else {
                 pairMsg.className = "msg msg-error";
-                pairMsg.textContent = (res && res.message) || "Ошибка привязки кода.";
+                pairMsg.textContent = res.message || "Ошибка привязки кода.";
             }
         });
     });
+
+    if (pairCodeInput) {
+        pairCodeInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                pairBtn.click();
+            }
+        });
+    }
 
     function sendMessageToTabWithAutoInject(tabId, message, callback) {
         chrome.tabs.sendMessage(tabId, message, response => {

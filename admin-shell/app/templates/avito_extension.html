@@ -107,7 +107,7 @@
         </p>
         <p>Привязанных расширений: <strong>{{ extension_status.active_tokens_count or 0 }}</strong></p>
         
-        <a href="/avito/extension/download" class="btn btn-primary btn-lg">Скачать расширение (ZIP, v0.2.61)</a>
+        <a href="/avito/extension/download" class="btn btn-primary btn-lg">Скачать расширение (ZIP, v0.2.62)</a>
     </div>
 
     <!-- Last Ingest Card -->
@@ -138,9 +138,15 @@
         <p>Сгенерируйте 6-значный одноразовый код и введите его в окне расширения в Chrome:</p>
         <button id="genCodeBtn" class="btn" onclick="generateCode()">Создать новый код подключения</button>
         
-        <div id="codeContainer" style="display:none; margin-top: 15px;">
-            <p>Код подключения (действителен 10 минут):</p>
-            <div id="codeDisplay" class="code-display">------</div>
+        <div id="codeContainer" style="display:none; margin-top: 18px; padding: 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e3a8a;">Код подключения (действителен 10 минут):</p>
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                <div id="codeDisplay" class="code-display" style="margin: 0; font-size: 2.2em; letter-spacing: 6px; font-family: monospace; cursor: pointer; user-select: all;" title="Нажмите, чтобы скопировать" onclick="copyPairCode()">------</div>
+                <button id="copyCodeBtn" onclick="copyPairCode()" class="btn btn-success" style="padding: 10px 20px; font-size: 1.05rem; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;">
+                    📋 Скопировать
+                </button>
+            </div>
+            <p id="copyCodeMsg" style="color: #15803d; font-size: 0.9rem; margin: 8px 0 0 0; font-weight: 600; display: none;">✓ Код скопирован в буфер обмена!</p>
         </div>
 
         <div id="serverUrlContainer" style="margin-top: 15px; padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
@@ -189,6 +195,54 @@
             }
         }
 
+        function copyPairCode() {
+            var codeEl = document.getElementById('codeDisplay');
+            var copyBtn = document.getElementById('copyCodeBtn');
+            var copyMsg = document.getElementById('copyCodeMsg');
+            if (codeEl) {
+                var codeText = codeEl.textContent.trim();
+                if (codeText && codeText !== '------') {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(codeText).then(function() {
+                            showCopySuccess();
+                        }).catch(function() {
+                            fallbackCopy(codeEl);
+                        });
+                    } else {
+                        fallbackCopy(codeEl);
+                    }
+                }
+            }
+
+            function showCopySuccess() {
+                if (copyBtn) {
+                    var orig = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '✓ Скопировано!';
+                    copyBtn.style.background = '#15803d';
+                    setTimeout(function() {
+                        copyBtn.innerHTML = '📋 Скопировать';
+                        copyBtn.style.background = '';
+                    }, 2500);
+                }
+                if (copyMsg) {
+                    copyMsg.style.display = 'block';
+                    setTimeout(function() { copyMsg.style.display = 'none'; }, 3000);
+                }
+            }
+
+            function fallbackCopy(el) {
+                var range = document.createRange();
+                range.selectNodeContents(el);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                try {
+                    document.execCommand('copy');
+                    showCopySuccess();
+                } catch (e) {}
+            }
+        }
+
         async function generateCode() {
             const btn = document.getElementById('genCodeBtn');
             const errDiv = document.getElementById('codeError');
@@ -224,6 +278,7 @@
                 if (res.ok && data && data.pair_code) {
                     document.getElementById('codeDisplay').textContent = data.pair_code;
                     if (container) container.style.display = 'block';
+                    copyPairCode();
                 } else {
                     let msg = 'Не удалось создать код подключения: сервер вернул ошибку ' + res.status + '.';
                     if (data && (data.detail || data.message)) {

@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.61)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.62)
 
 const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
 
@@ -158,12 +158,21 @@ async function parseJsonResponseSafely(res) {
 }
 
 async function checkBridgeStatus() {
+    let bridgeUrl = DEFAULT_BRIDGE_BASE_URL;
     try {
-        const bridgeUrl = await getServerUrl();
+        bridgeUrl = await getServerUrl();
         const token = await getStoredToken();
-        const res = await fetch(`${bridgeUrl}/status`, {
-            headers: token ? { "X-Extension-Token": token } : {}
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        let res;
+        try {
+            res = await fetch(`${bridgeUrl}/status`, {
+                headers: token ? { "X-Extension-Token": token } : {},
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         const parsed = await parseJsonResponseSafely(res);
         if (parsed.ok) {
             const data = parsed.data;
@@ -176,14 +185,17 @@ async function checkBridgeStatus() {
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.1.9",
+                version: data.version || "0.2.62",
                 server_url: bridgeUrl
             };
         }
         return { online: false, error: parsed.error, server_url: bridgeUrl };
     } catch (e) {
-        const bridgeUrl = await getServerUrl();
-        return { online: false, error: e.message, server_url: bridgeUrl };
+        return {
+            online: false,
+            error: e.name === "AbortError" ? "Таймаут подключения (3.5с)" : e.message,
+            server_url: bridgeUrl
+        };
     }
 }
 
@@ -616,9 +628,14 @@ let isPollingActive = false;
 async function pollNextDeactivationTask() {
     // Stage 09A-R5 LOCAL: Automatic post-sale deactivation is disabled.
     // Operator opens the listing in browser and removes it manually.
-    return;
-}
+    if (true) {
+        return;
+    }
 
+    if (isPollingActive) return;
+    isPollingActive = true;
+
+    try {
         // Active task lock check: ONE TASK AT A TIME
         const activeTask = await getActiveDeactivationTask();
         if (activeTask && activeTask.task_id) {
@@ -661,21 +678,19 @@ async function pollNextDeactivationTask() {
             task_id: task.task_id,
             sale_id: task.sale_id,
             product_id: task.product_id,
-            action: task.action,
-            avito_listing_id: String(task.avito_listing_id),
+            avito_listing_id: task.avito_listing_id,
             listing_url: task.listing_url,
-            step: "received",
-            status_message: `Задача #${task.task_id}: снятие с публикации №${task.avito_listing_id}`,
-            tab_id: null,
+            action: task.action,
             dry_run: false,
+            step: "opened_tab",
+            status_message: `Запуск снятия с публикации (ID ${task.avito_listing_id})...`,
             updated_at: new Date().toISOString()
         };
         await setActiveDeactivationTask(initialTaskState);
 
-        // Execute direct real deactivation navigation and DOM interaction
         await executeDeactivationFlow(initialTaskState);
     } catch (e) {
-        console.error("[AvitoSW] pollNextDeactivationTask error:", e);
+        console.error("[AvitoSW] Polling cycle error:", e);
     } finally {
         isPollingActive = false;
     }
@@ -683,8 +698,8 @@ async function pollNextDeactivationTask() {
 
 async function executeDeactivationFlow(task) {
     try {
-        task.step = "opening_page";
-        task.status_message = `Открываю объявление Avito №${task.avito_listing_id}...`;
+        task.step = "opening_tab";
+        task.status_message = `Открываю объявление ${task.avito_listing_id}...`;
         task.updated_at = new Date().toISOString();
         await setActiveDeactivationTask(task);
 

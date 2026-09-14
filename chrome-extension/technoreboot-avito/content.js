@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.61)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.62)
 
 let pageInitialData = null;
 

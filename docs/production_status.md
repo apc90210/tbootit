@@ -121,7 +121,7 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Sale Detail Action Bar** | **ACTIVE** | Permanent button near `[ Товарный чек ]` with 3 honest states (no listing, already inactive, manual open) |
 | **Manual Confirmation** | **ACTIVE** | `[ ✓ Я снял объявление ]` button sets task to `success`, listing to `archived`, writes audit log |
 | **Post-Sale Queue UI** | **ACTIVE (`/avito/post-sale`)** | Operator-oriented table: Дата, Продажа, Товар, Avito ID, Статус, Действие |
-| **Chrome Extension Version** | `0.2.61` | Automatic background polling and DOM auto-clicker disabled; packages rebuilt |
+| **Chrome Extension Version** | `0.2.62` | Fixed SW syntax error, immediate pairing code input UI, copy pair code button |
 | **Stock & Sale Invariant** | **ENFORCED** | Completed sale and physical stock are NEVER mutated by Avito actions or cancellations |
 | **Automated Tests** | **158 PASSED (0 FAILED)** | Core (27), Admin-shell (28), Root (103) all passing cleanly |
 | **Live Proof** | **12/12 PASSED** | `scripts/verify_stage09a_r5_manual_flow.py` verified all flows end-to-end |
