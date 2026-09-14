@@ -127,6 +127,21 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Live Proof** | **12/12 PASSED** | `scripts/verify_stage09a_r5_manual_flow.py` verified all flows end-to-end |
 | **Schema Guard Status** | `requires_manual_migration = true` | `database_change = true`, VDS deployment blocked until Owner approval |
 
+---
+
+## 8. VDS Isolated Shell Sync Test (Stage 09B — Zero Production DB Touch)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **VDS ISOLATED TEST ONLY** | Release tested in isolated namespace (`technoreboot-sync-test-e022180`) on loopback port `127.0.0.1:18443` |
+| **VDS Host Compatibility** | **VERIFIED (PASS)** | All 6 candidate images built and ran healthy on VDS host; UI, extension v0.2.62, copy button, and endpoints verified |
+| **Live Production Runtime** | **100% UNTOUCHED** | All 6 live production containers retained original IDs and images (`Up 39h/40h/2d`), public `https://144.31.50.134` returned 200 |
+| **Live Production DB** | **100% UNTOUCHED** | SHA256 before (`da6e2808...`) == SHA256 after (`da6e2808...`), schema hash unchanged, zero writes |
+| **Live Media & Auth** | **100% UNTOUCHED** | Storage count (149) and auth files completely intact and unmodified |
+| **Isolated Test Cleanup** | **COMPLETED** | Test containers, network, worktree, and disposable DB copy removed cleanly |
+| **Final Status** | `TECHNOREBOOT_STAGE09B_VDS_ISOLATED_SYNC_TEST_PASSED_NO_PROD_DB_TOUCH` | Ready for separate production deployment stage upon Owner approval |
+
+
 
 
 
