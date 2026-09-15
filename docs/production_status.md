@@ -1,6 +1,6 @@
 # Technoreboot Production Status
 
-**Status Date:** 2026-09-14  
+**Status Date:** 2026-09-15  
 **Operating Architecture:** Local (Permanent DEV Sandbox) + VDS (Canonical Production)  
 **Production Activation State:** **ACTIVE (IP-Only Canonical Test-Production)**  
 **Canonical Production URL:** `https://144.31.50.134`  
@@ -15,6 +15,7 @@
 | **VDS Public IPv4** | `144.31.50.134` | `144.31.50.134` | MATCH |
 | **VDS Hostname** | `atanov821.serv.host` | Deferred | DEFERRED |
 | **Canonical URL** | `https://144.31.50.134` | `https://144.31.50.134` | **ACTIVE** |
+| **Russia Domestic Reachability** | ICMP, PLPMTUD & TCP MSS clamped | Reachable w/o VPN | **ACTIVE (FIXED)** |
 | **Public Server TLS** | Let's Encrypt IP SAN Certificate | Let's Encrypt IP SAN | **ACTIVE (TRUSTED)** |
 | **TLS Issuer** | Let's Encrypt (`C=US, O=Let's Encrypt, CN=YE2`) | Let's Encrypt | MATCH |
 | **TLS SAN** | `IP Address:144.31.50.134` | `144.31.50.134` | MATCH |
@@ -30,22 +31,22 @@
 - **Role:** Permanent DEV / TEST Sandbox (`https://localhost:8443`).
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
 - **Restart Count:** 0 across all containers.
-- **Database Status:** 149 products, 0 sales, 0 repairs, 149 photos, 149 listings (100% parity with VDS).
+- **Database Status:** Local replica.
 - **Data Sync:** Synchronized via `scripts/sync_vds_business_to_local.py` (VDS -> LOCAL).
 - **Safety Invariant:** Local data NEVER flows to VDS.
 
 ### Debian VDS (`144.31.50.134`)
 - **Role:** Canonical Real-User Test-Production (`https://144.31.50.134`).
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
-- **Current Git Commit:** `46fbed130ca838c2e1aeaa4897f6cc68c86337b8`.
+- **Current Git Commit:** `37768cb20dc7eca4a9539ce83ab9ba5b379c1232`.
 - **Restart Count:** 0 across all containers.
-- **Business Data Status:** **CANONICAL PRODUCTION (149 products, 0 sales, 0 repairs, 149 photos, 149 listings)**.
+- **Business Data Status:** **CANONICAL PRODUCTION (162 products, 3 sales, 1 repair order, 158 photos, 158 listings)**.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
-- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-14_085201.zip` (release checkpoint), `TECHNOREBOOT_BACKUP_2026-09-14_085357.zip` (update_code_only.sh backup).
+- **Pre-Update Safety Backup:** Verified.
 - **Code-Only Update Script:** Installed, tested, and active at `deploy/production/update_code_only.sh`.
 - **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles; dev-reset blocked even for OWNER on production.
-- **Avito Extension Version:** `0.2.62` (fixed SW init, immediate pairing input, one-click copy button).
-- **avito_post_sale_tasks Table:** **PRESENT** (Stage 09C migration applied, 0 rows).
+- **Avito Extension Version:** `0.2.62` (fixed SW init, immediate pairing input, syntax error resolved).
+- **avito_post_sale_tasks Table:** **PRESENT** (Stage 09C migration applied).
 
 ---
 
