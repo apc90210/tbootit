@@ -15,7 +15,7 @@
 | **VDS Public IPv4** | `144.31.50.134` | `144.31.50.134` | MATCH |
 | **VDS Hostname** | `atanov821.serv.host` | Deferred | DEFERRED |
 | **Canonical URL** | `https://144.31.50.134` | `https://144.31.50.134` | **ACTIVE** |
-| **Russia Domestic Reachability** | ICMP, PLPMTUD & TCP MSS clamped | Reachable w/o VPN | **ACTIVE (FIXED)** |
+| **Russia Domestic Reachability** | Over VPN: 100% Full; Without VPN: Blocked by ISP TSPU DPI (ECH/PQ raw IP) | Stage 10C-R2 Live Trace | **BLOCKED_UPSTREAM_ISP_DPI** |
 | **Public Server TLS** | Let's Encrypt IP SAN Certificate | Let's Encrypt IP SAN | **ACTIVE (TRUSTED)** |
 | **TLS Issuer** | Let's Encrypt (`C=US, O=Let's Encrypt, CN=YE2`) | Let's Encrypt | MATCH |
 | **TLS SAN** | `IP Address:144.31.50.134` | `144.31.50.134` | MATCH |
