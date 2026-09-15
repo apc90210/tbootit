@@ -65,7 +65,27 @@ def validate_extension_directory(ext_dir: str):
     if invalid_pngs:
         raise ValueError(f"Invalid PNG files in extension package: {invalid_pngs}")
 
-    print(f"[OK] Extension package at {ext_dir} is valid! ({len(referenced_files)} referenced files verified)")
+    # 5. JavaScript Syntax Validation
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            for rel_path, category in referenced_files:
+                if rel_path.lower().endswith(".js"):
+                    full_path = os.path.join(ext_dir, rel_path)
+                    with open(full_path, "r", encoding="utf-8") as jf:
+                        code = jf.read()
+                    try:
+                        page.evaluate("code => new Function(code)", code)
+                    except Exception as e:
+                        browser.close()
+                        raise ValueError(f"JavaScript syntax error in {rel_path}: {e}")
+            browser.close()
+    except ImportError:
+        pass
+
+    print(f"[OK] Extension package at {ext_dir} is valid! ({len(referenced_files)} referenced files verified, JS syntax OK)")
     return True
 
 def validate_extension_zip(zip_path: str):

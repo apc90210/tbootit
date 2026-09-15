@@ -2,6 +2,16 @@
 
 let pageInitialData = null;
 
+function getExtensionVersion() {
+    try {
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest) {
+            const m = chrome.runtime.getManifest();
+            if (m && m.version) return m.version;
+        }
+    } catch (e) {}
+    return "0.2.62";
+}
+
 // Listen for direct initial data captured from main world
 if (typeof document !== 'undefined') {
     document.addEventListener('TechnorebootInitialData', function(e) {
@@ -1876,7 +1886,7 @@ function extractListingData(extraPhotos = []) {
 
         const resultPayload = {
             schema_version: 1,
-            extension_version: "0.2.57",
+            extension_version: getExtensionVersion(),
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -1907,7 +1917,7 @@ function extractListingData(extraPhotos = []) {
         console.error("Technoreboot extractListingData fallback error:", err);
         return {
             schema_version: 1,
-            extension_version: "0.2.57",
+            extension_version: getExtensionVersion(),
             captured_at: new Date().toISOString(),
             page_type: "listing",
             listing: {
@@ -2552,7 +2562,7 @@ function extractMyListingsData() {
 
         return {
             schema_version: 1,
-            extension_version: "0.2.57",
+            extension_version: getExtensionVersion(),
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: items.length,
@@ -2562,7 +2572,7 @@ function extractMyListingsData() {
     } catch (e) {
         return {
             schema_version: 1,
-            extension_version: "0.2.57",
+            extension_version: getExtensionVersion(),
             captured_at: new Date().toISOString(),
             page_type: "my_listings",
             listings_count: 0,
@@ -4313,7 +4323,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
-                    extension_version: "0.2.60",
+                    extension_version: getExtensionVersion(),
                     page_type: "listing",
                     listing: {
                         external_item_id: "item",
@@ -4578,6 +4588,7 @@ async function waitForConfirmedInactiveState(timeoutMs = 20000) {
             return { confirmed: true, type: inactive.indicator };
         }
         await new Promise(r => setTimeout(r, 500));
+    }
     return null;
 }
 
