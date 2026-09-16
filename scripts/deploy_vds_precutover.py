@@ -24,7 +24,7 @@ USER_CRT_PATH = PROJECT_ROOT / "data" / "auth" / "certificates" / "5419163337bd.
 USER_KEY_PATH = PROJECT_ROOT / "data" / "auth" / "certificates" / "5419163337bd.key"
 TEMP_SERVER_CRT = Path(r"C:\Users\Apc\AppData\Local\Temp\vds_server.crt")
 
-VDS_HOST = "144.31.50.134"
+VDS_HOST = "144.31.15.88"
 SSH_PORT = 22
 SSH_USER = "root"
 SSH_KEY_PATH = r"C:\Users\Apc\.ssh\id_ed25519"

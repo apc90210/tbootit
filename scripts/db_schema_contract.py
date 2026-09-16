@@ -347,7 +347,7 @@ def main():
     
     vds_p = subparsers.add_parser("check-vds", help="Check live VDS database schema against contract")
     vds_p.add_argument("--key", default="C:/Users/Apc/.ssh/id_ed25519", help="SSH private key path")
-    vds_p.add_argument("--vds", default="root@144.31.50.134", help="VDS host")
+    vds_p.add_argument("--vds", default="root@144.31.15.88", help="VDS host")
     vds_p.add_argument("--contract", default=str(DEFAULT_CONTRACT_PATH), help="Contract path")
     
     args = parser.parse_args()

@@ -1,10 +1,12 @@
 # Technoreboot Production Status
 
-**Status Date:** 2026-09-15  
+**Status Date:** 2026-09-16  
 **Operating Architecture:** Local (Permanent DEV Sandbox) + VDS (Canonical Production)  
-**Production Activation State:** **ACTIVE (IP-Only Canonical Test-Production)**  
-**Canonical Production URL:** `https://144.31.50.134`  
+**Production Activation State:** **ACTIVE (Canonical Production: 144.31.15.88)**  
+**Canonical Production URL:** `https://144.31.15.88`  
 **Domain Status:** Deferred / Not Required  
+**PRIMARY_PRODUCTION_VDS:** `144.31.15.88`  
+**LEGACY_VDS:** `144.31.50.134` (OLD_VDS_STATUS=legacy-retained, OLD_VDS_ROUTINE_SUPPORT=false)  
 
 ---
 
@@ -12,13 +14,13 @@
 
 | Parameter | Current Value | Required / Target Value | Status |
 | :--- | :--- | :--- | :--- |
-| **VDS Public IPv4** | `144.31.50.134` | `144.31.50.134` | MATCH |
-| **VDS Hostname** | `atanov821.serv.host` (Unregistered NXDOMAIN) | User domain required for public SNI | **PROVIDER_HOSTNAME_UNSUITABLE** |
-| **Canonical URL** | `https://144.31.50.134` | `https://144.31.50.134` | **ACTIVE** |
-| **Russia Domestic Reachability** | Over VPN: 100% Full; Without VPN: Blocked by ISP TSPU DPI (ECH/PQ raw IP) | Stage 10C-R2 Live Trace | **BLOCKED_UPSTREAM_ISP_DPI** |
+| **VDS Public IPv4** | `144.31.15.88` | `144.31.15.88` | **MATCH (PRIMARY)** |
+| **VDS Hostname** | `atanov822.serv.host` | `atanov822.serv.host` | MATCH |
+| **Canonical URL** | `https://144.31.15.88` | `https://144.31.15.88` | **ACTIVE** |
+| **Legacy VDS IPv4** | `144.31.50.134` | `legacy-retained` | **RETIRED (NO ROUTINE SUPPORT)** |
 | **Public Server TLS** | Let's Encrypt IP SAN Certificate | Let's Encrypt IP SAN | **ACTIVE (TRUSTED)** |
 | **TLS Issuer** | Let's Encrypt (`C=US, O=Let's Encrypt, CN=YE2`) | Let's Encrypt | MATCH |
-| **TLS SAN** | `IP Address:144.31.50.134` | `144.31.50.134` | MATCH |
+| **TLS SAN** | `IP Address:144.31.15.88` | `144.31.15.88` | MATCH |
 | **TLS Profile** | Short-lived profile | Short-lived | MATCH |
 | **ACME Renewal Service** | Systemd `certbot.timer` + reload hook | Active & enabled | **ACTIVE** |
 | **mTLS Client CA** | `a9b4d288cddf74f6337848a833240efdfba412e3e55f37953a5a72533d009d8d` | Persistent | PRESERVED |
@@ -32,34 +34,46 @@
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
 - **Restart Count:** 0 across all containers.
 - **Database Status:** Local replica.
-- **Data Sync:** Synchronized via `scripts/sync_vds_business_to_local.py` (VDS -> LOCAL).
+- **Data Sync:** Synchronized from `144.31.15.88` via `scripts/sync_vds_business_to_local.py` (VDS -> LOCAL).
 - **Safety Invariant:** Local data NEVER flows to VDS.
 
-### Debian VDS (`144.31.50.134`)
-- **Role:** Canonical Real-User Test-Production (`https://144.31.50.134`).
+### Debian VDS (`144.31.15.88`) — PRIMARY PRODUCTION
+- **Role:** Canonical Primary Production (`https://144.31.15.88`).
+- **Provider Hostname:** `atanov822.serv.host`.
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
 - **Current Git Commit:** `37768cb20dc7eca4a9539ce83ab9ba5b379c1232`.
 - **Restart Count:** 0 across all containers.
-- **Business Data Status:** **CANONICAL PRODUCTION (162 products, 3 sales, 1 repair order, 158 photos, 158 listings)**.
+- **Business Data Status:** **CANONICAL PRODUCTION (225 products, 6 sales, 1 repair order, 221 photos, 221 listings, 4 avito post-sale tasks)**.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
 - **Pre-Update Safety Backup:** Verified.
 - **Code-Only Update Script:** Installed, tested, and active at `deploy/production/update_code_only.sh`.
 - **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles; dev-reset blocked even for OWNER on production.
-- **Avito Extension Version:** `0.2.62` (fixed SW init, immediate pairing input, syntax error resolved).
-- **avito_post_sale_tasks Table:** **PRESENT** (Stage 09C migration applied).
+- **Avito Extension Version:** `0.2.62`.
+- **avito_post_sale_tasks Table:** **PRESENT**.
+
+### Legacy Debian VDS (`144.31.50.134`) — RETIRED
+- **Role:** Legacy-retained (`OLD_VDS_STATUS=legacy-retained`).
+- **Routine Support:** None (`OLD_VDS_ROUTINE_SUPPORT=false`).
+- **Policy:** Preserved untouched for history/rollback; not deployed to, not verified routinely.
 
 ---
 
 ## 3. Deployment & Update Model
 
 ```text
-CURRENT_PRODUCTION_URL = https://144.31.50.134
-DOMAIN_NAME = deferred / not required
-LOCAL = DEV / TEST SANDBOX (REPLICA)
-VDS = CANONICAL SOURCE OF TRUTH (REAL USER DATA)
-CODE FLOW = LOCAL -> Git -> VDS (Code-Only Deployment)
-DATA FLOW = VDS -> LOCAL (One-Way Parity Sync)
-REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
+PRIMARY_PRODUCTION_VDS = 144.31.15.88
+CURRENT_PRODUCTION_URL = https://144.31.15.88
+LEGACY_VDS = 144.31.50.134
+OLD_VDS_STATUS = legacy-retained
+OLD_VDS_ROUTINE_SUPPORT = false
+
+WORKFLOW:
+1. Production source of truth for business data: 144.31.15.88
+2. Development: LOCAL C:\tbootit
+3. Business-data refresh: VDS 144.31.15.88 -> LOCAL only
+4. New work: LOCAL implementation -> automated tests -> Owner browser acceptance
+5. Deployment: separate production deployment stage -> 144.31.15.88
+6. Never: LOCAL business DB/media -> VDS
 ```
 
 - Deployment updates are triggered via `deploy/production/update_code_only.sh`.
@@ -218,3 +232,24 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Avito Safety** | **ENFORCED** | Auto-deactivation disabled (manual only); no duplicate external worker |
 | **Packet Capture Armed** | **YES (`target-capture.service`)** | Logging all port 80/443 traffic to `/tmp/stage10d_target_test.pcap` for non-VPN testing |
 | **Final Status** | `TECHNOREBOOT_STAGE10D_NEW_VDS_CLONE_READY_ARMED_FOR_OWNER_TEST` | **READY FOR OWNER NON-VPN BROWSER TEST** |
+
+---
+
+## 13. Promote New VDS as Canonical Production & Sync to LOCAL (Stage 10D-R1)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Canonical Production VDS** | `144.31.15.88` | Promoted to sole primary production source of truth |
+| **Legacy Server (`144.31.50.134`)** | `legacy-retained` | Retired from active service; routine support disabled |
+| **Fresh VDS Backup** | `TECHNOREBOOT_BACKUP_2026-09-16_215207.zip` | SHA-256 `64ab2ad1...`, quick_check = ok, 351 archive members |
+| **Local Safety Backup** | `pre_sync_20260916_220128.zip` | SHA-256 `a6f341a8...`, stored in `.local-recovery/` |
+| **VDS -> LOCAL Data Sync** | **100% PARITY MATCH** | Products (225), Sales (6), Repairs (1), Photos (221), Listings (221), Tasks (4), Storage (221) |
+| **DB Schema Parity** | **MATCH (`3fdb6cbed...`)** | SQLite `PRAGMA quick_check: ok`, schema contract verified SAFE |
+| **Local PKI / Secrets** | **UNTOUCHED (100% SECURE)** | Local TLS certs, client auth keys, dev .env, and secrets completely preserved |
+| **Local Stack Health** | **ALL 6 SERVICES HEALTHY** | core, admin-shell, inventory-sales, repairs, avito, gateway — all Up & functional |
+| **Local Smoke Verification** | **8/8 PASSED (HTTP 200)** | `/`, `/inventory/products`, `/sales`, `/repairs`, `/avito/extension`, `/avito/post-sale`, `/help`, `/help/user-manual.pdf` |
+| **Automated Test Suite** | **164 PASSED (0 FAILED)** | Core (27), Admin-shell (28), Root integration suite (109) — 100% pass |
+| **Active Target Updated** | `144.31.15.88` | Active tooling (`sync_vds_business_to_local.py`, `verify_ip_https_mtls.py`, `db_schema_contract.py`, extension manifest) updated to `144.31.15.88` |
+| **Historical Records** | **PRESERVED UNCHANGED** | All historical stage logs, audit reports, and forensic data retain original IPs |
+| **Final Status** | `TECHNOREBOOT_STAGE10D_R1_NEW_VDS_CANONICAL_LOCAL_SYNC_COMPLETE` | **CANONICAL PRODUCTION PROMOTED & LOCAL SYNC VERIFIED** |
+

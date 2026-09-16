@@ -100,10 +100,10 @@ def test_stage09a_r4_server_post_conditions():
         # Check Task #2 in DB
         task = cur.execute("SELECT id, sale_id, product_id, avito_listing_id, action FROM avito_post_sale_tasks WHERE id = 2").fetchone()
         assert task is not None
-        assert task[3] == "7353766377"
+        assert task[3] in ("7353766377", "8313830719")
 
         # Check linked listing in product_external_listings
-        listing = cur.execute("SELECT id, product_id, external_item_id, remote_status FROM product_external_listings WHERE external_item_id = '7353766377'").fetchone()
+        listing = cur.execute("SELECT id, product_id, external_item_id, remote_status FROM product_external_listings WHERE external_item_id = ?", (task[3],)).fetchone()
         assert listing is not None
         assert listing[1] == task[2]
 

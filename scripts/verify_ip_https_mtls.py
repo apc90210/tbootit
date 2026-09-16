@@ -2,8 +2,8 @@ import ssl
 import httpx
 from pathlib import Path
 
-BASE_URL = "https://144.31.50.134"
-HTTP_URL = "http://144.31.50.134"
+BASE_URL = "https://144.31.15.88"
+HTTP_URL = "http://144.31.15.88"
 
 AUTH_DIR = Path(r"C:\tbootit\data\auth\certificates")
 OWNER_CERT = (str(AUTH_DIR / "owner.crt"), str(AUTH_DIR / "owner.key"))

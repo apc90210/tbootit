@@ -47,7 +47,7 @@ from pathlib import Path
 
 
 DEFAULT_SSH_KEY = r"C:\Users\Apc\.ssh\id_ed25519"
-DEFAULT_VDS_HOST = "root@144.31.50.134"
+DEFAULT_VDS_HOST = "root@144.31.15.88"
 
 
 def compute_sha256(path: Path) -> str:
@@ -66,7 +66,7 @@ def count_files_in_dir(directory: Path) -> int:
 
 def get_db_counts(db_path: Path) -> dict:
     if not db_path.is_file():
-        return {"PRODUCTS": 0, "SALES": 0, "REPAIRS": 0, "PHOTOS": 0, "LISTINGS": 0}
+        return {"PRODUCTS": 0, "SALES": 0, "REPAIRS": 0, "PHOTOS": 0, "LISTINGS": 0, "AVITO_TASKS": 0}
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
     counts = {}
@@ -76,6 +76,7 @@ def get_db_counts(db_path: Path) -> dict:
         ("repair_orders", "REPAIRS"),
         ("product_photos", "PHOTOS"),
         ("product_external_listings", "LISTINGS"),
+        ("avito_post_sale_tasks", "AVITO_TASKS"),
     ]
     for tbl, key in table_map:
         try:
@@ -123,7 +124,7 @@ def create_local_pre_sync_backup(repo_root: Path) -> Path:
 
 
 def run_ssh_cmd(vds_host: str, ssh_key: str, command: str) -> str:
-    cmd = ["ssh", "-i", ssh_key, vds_host, command]
+    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-i", ssh_key, vds_host, command]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError(f"SSH command failed: {res.stderr.strip() or res.stdout.strip()}")
@@ -131,7 +132,7 @@ def run_ssh_cmd(vds_host: str, ssh_key: str, command: str) -> str:
 
 
 def run_scp_download(vds_host: str, ssh_key: str, remote_path: str, local_path: Path):
-    cmd = ["scp", "-i", ssh_key, f"{vds_host}:{remote_path}", str(local_path)]
+    cmd = ["scp", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-i", ssh_key, f"{vds_host}:{remote_path}", str(local_path)]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError(f"SCP download failed: {res.stderr.strip() or res.stdout.strip()}")
@@ -205,11 +206,12 @@ s = c.execute('SELECT COUNT(*) FROM sales').fetchone()[0]
 r = c.execute('SELECT COUNT(*) FROM repair_orders').fetchone()[0]
 ph = c.execute('SELECT COUNT(*) FROM product_photos').fetchone()[0]
 l = c.execute('SELECT COUNT(*) FROM product_external_listings').fetchone()[0]
+t = c.execute('SELECT COUNT(*) FROM avito_post_sale_tasks').fetchone()[0]
 with open('/srv/technoreboot/data/db/technoreboot.db', 'rb') as f:
     dbh = hashlib.sha256(f.read()).hexdigest()
 print(f'REMOTE_ZIP_SHA256={{h}}')
 print(f'REMOTE_DB_SHA256={{dbh}}')
-print(f'REMOTE_COUNTS=PRODUCTS={{p}} SALES={{s}} REPAIRS={{r}} PHOTOS={{ph}} LISTINGS={{l}}')
+print(f'REMOTE_COUNTS=PRODUCTS={{p}} SALES={{s}} REPAIRS={{r}} PHOTOS={{ph}} LISTINGS={{l}} AVITO_TASKS={{t}}')
 """
     remote_info = run_ssh_cmd(args.vds_host, args.ssh_key, f"python3 -c \"{chk_script}\"")
     remote_meta = {}
@@ -344,13 +346,14 @@ print(f'REMOTE_COUNTS=PRODUCTS={{p}} SALES={{s}} REPAIRS={{r}} PHOTOS={{ph}} LIS
 
     db_hash_match = (post_local_db_hash == snapshot_db_hash)
     counts_match = (
-        post_local_counts.get("PRODUCTS") == rc.get("PRODUCTS", 149) and
-        post_local_counts.get("SALES") == rc.get("SALES", 0) and
-        post_local_counts.get("REPAIRS") == rc.get("REPAIRS", 0) and
-        post_local_counts.get("PHOTOS") == rc.get("PHOTOS", 149) and
-        post_local_counts.get("LISTINGS") == rc.get("LISTINGS", 149)
+        post_local_counts.get("PRODUCTS") == rc.get("PRODUCTS") and
+        post_local_counts.get("SALES") == rc.get("SALES") and
+        post_local_counts.get("REPAIRS") == rc.get("REPAIRS") and
+        post_local_counts.get("PHOTOS") == rc.get("PHOTOS") and
+        post_local_counts.get("LISTINGS") == rc.get("LISTINGS") and
+        post_local_counts.get("AVITO_TASKS") == rc.get("AVITO_TASKS")
     )
-    storage_match = (post_storage_count == rc.get("PHOTOS", 149))
+    storage_match = (post_storage_count == rc.get("PHOTOS"))
 
     print("\n" + "=" * 70)
     print("PARITY VERIFICATION RESULTS:")

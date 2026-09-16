@@ -244,6 +244,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (parsed.protocol === "http:" || parsed.protocol === "https:") {
                         // Detect if active tab is TechnoReboot admin / web app
                         if (
+                            tabUrl.includes("144.31.15.88") ||
                             tabUrl.includes("144.31.50.134") ||
                             tabUrl.includes("localhost:8443") ||
                             tabUrl.includes("127.0.0.1:8443") ||

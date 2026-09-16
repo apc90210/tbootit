@@ -25,7 +25,7 @@ By explicit decision of the Project Owner, the previous "final cutover means sto
 
 ### Debian VDS (Canonical Real-User Production)
 - **Role:** Canonical test-production and real-user operating environment.
-- **Hostname / IP:** `atanov821.serv.host` / `144.31.50.134`.
+- **Hostname / IP:** `atanov822.serv.host` / `144.31.15.88` (PRIMARY / CANONICAL PRODUCTION; legacy server `144.31.50.134` retired/legacy-retained).
 - **Data State:** Canonical business data begins clean (0 products, 0 sales, 0 repairs, 0 photos) and accumulates real user transactions.
 - **Authority:** VDS business data is the **single source of truth**.
 - **Persistence Rule:** VDS business data and media **MUST persist** across all future code deployments, container rebuilds, and configuration updates.
@@ -112,7 +112,7 @@ In accordance with Stage 08D-R1R3 requirements:
 2. **Persistence Across Rebuilds & Deploys:** The directory `/srv/technoreboot/data/avito-module` is mounted as a persistent host volume into the `avito-module` container (`/app/data`). Pairing codes and issued tokens survive container recreations, rebuilds, and code-only deployments.
 3. **Environment Independence:** Local development pairing state (`data/avito-module/...`) is completely isolated and independent from VDS production state (`/srv/technoreboot/data/avito-module/...`). Neither environment can overwrite or redeem codes from the other.
 4. **Code Normalization & Security:** 6-digit pairing codes are formatted with leading zeros (`%06d`), validated as exact strings, have a 10-minute TTL, and are strictly one-time-use. Issued tokens are SHA-256 hashed and authenticated on every extension request.
-5. **Dynamic Server Origin:** The Chrome Extension (v0.2.54+) supports dynamic server base URL configuration via popup UI and `chrome.storage.local`, allowing it to communicate directly with production VDS (`https://144.31.50.134/admin-api/avito-extension`) or local dev sandbox.
+5. **Dynamic Server Origin:** The Chrome Extension (v0.2.54+) supports dynamic server base URL configuration via popup UI and `chrome.storage.local`, allowing it to communicate directly with production VDS (`https://144.31.15.88/admin-api/avito-extension`) or local dev sandbox.
 
 ---
 

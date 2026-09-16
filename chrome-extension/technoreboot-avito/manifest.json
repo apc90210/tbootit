@@ -55,7 +55,8 @@
     "http://127.0.0.1:8020/*",
     "https://localhost:8443/*",
     "https://127.0.0.1:8443/*",
-    "https://144.31.50.134/*"
+    "https://144.31.50.134/*",
+    "https://144.31.15.88/*"
   ],
   "optional_host_permissions": [
     "https://*/*",
