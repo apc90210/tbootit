@@ -199,6 +199,22 @@ REVERSE SYNC = STRICTLY FORBIDDEN (LOCAL DATA NEVER FLOWS TO VDS)
 | **Schema Invariant** | **MATCH** | Live schema SHA unchanged (`eb6a9c17...`), Schema Guard verified SAFE |
 | **Final Status** | `TECHNOREBOOT_STAGE10B_PRODUCTION_DEPLOYMENT_SUCCESS` | **READY FOR OWNER BROWSER ACCEPTANCE** |
 
+---
 
+## 12. Parallel Clone to New Debian 13 VDS (Stage 10D PRODUCTION)
 
-
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **PARALLEL FULL CLONE TO NEW VDS (`144.31.15.88`)** | Testing non-VPN connectivity on alternative IP prefix without touching source |
+| **Source Server** | `144.31.50.134` (Authoritative Production) | Remained 100% online, unmutated, 6 services healthy, authoritative status retained |
+| **Target Server** | `144.31.15.88` (Parallel Test Clone) | Debian 13 trixie, Xeon E5-2667 v2, 1.9 GB RAM, 18 GB disk free, MTU 1500 |
+| **Public Server TLS** | **Let's Encrypt IP SAN (`144.31.15.88`)** | Successfully issued via Certbot 5.8.0 standalone shortlived profile; auto-renewal enabled |
+| **Client mTLS Verification** | **ACTIVE & ENFORCED** | Uses identical TechnoReboot Client CA (`a9b4d288...`); requests without cert return 403 |
+| **HTTP 80 Redirect** | **ACTIVE (301 -> HTTPS)** | Verified redirection to `https://144.31.15.88/` |
+| **Business Data Invariants** | **100% PARITY MATCH** | 220 products, 6 sales, 1 repair, 216 photos, 216 listings, 4 tasks, 216 storage files |
+| **DB Schema Parity** | **MATCH (`3fdb6cbed...`)** | SQLite `PRAGMA quick_check: ok`, identical schema SHA |
+| **All 6 Services Healthy** | **YES** | core, inventory-sales, repairs, avito, admin-shell, gateway — all Up & healthy |
+| **Internal Ports Secured** | **YES** | Zero internal ports exposed on host; only 80 and 443 open on gateway |
+| **Avito Safety** | **ENFORCED** | Auto-deactivation disabled (manual only); no duplicate external worker |
+| **Packet Capture Armed** | **YES (`target-capture.service`)** | Logging all port 80/443 traffic to `/tmp/stage10d_target_test.pcap` for non-VPN testing |
+| **Final Status** | `TECHNOREBOOT_STAGE10D_NEW_VDS_CLONE_READY_ARMED_FOR_OWNER_TEST` | **READY FOR OWNER NON-VPN BROWSER TEST** |
