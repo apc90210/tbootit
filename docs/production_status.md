@@ -1,6 +1,6 @@
 # Technoreboot Production Status
 
-**Status Date:** 2026-09-16  
+**Status Date:** 2026-09-17  
 **Operating Architecture:** Local (Permanent DEV Sandbox) + VDS (Canonical Production)  
 **Production Activation State:** **ACTIVE (Canonical Production: 144.31.15.88)**  
 **Canonical Production URL:** `https://144.31.15.88`  
@@ -41,12 +41,14 @@
 - **Role:** Canonical Primary Production (`https://144.31.15.88`).
 - **Provider Hostname:** `atanov822.serv.host`.
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
-- **Current Git Commit:** `37768cb20dc7eca4a9539ce83ab9ba5b379c1232`.
+- **Current Git Commit:** `ce7dec766445f4083ed81205023fb934d375bced` (Stage 11C).
 - **Restart Count:** 0 across all containers.
-- **Business Data Status:** **CANONICAL PRODUCTION (225 products, 6 sales, 1 repair order, 221 photos, 221 listings, 4 avito post-sale tasks)**.
+- **Business Data Status:** **CANONICAL PRODUCTION (239 products, 7 sales, 1 repair order, 235 photos, 235 listings, 5 avito post-sale tasks)**.
+- **Stage 11A/11B Features Deployed:** Sales corrections with audit revisions, canonical repair issue payment finalization, warranty receipt.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
-- **Pre-Update Safety Backup:** Verified.
-- **Code-Only Update Script:** Installed, tested, and active at `deploy/production/update_code_only.sh`.
+- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-17_072006.zip` verified.
+- **Release Checkpoint:** `checkpoint_20260917_072006_37768cb2`.
+- **Schema Guard:** Contract `3b8d35d76ae6343f105925aa7c725c7ebc4b8613ed5f015bec61a27f491484dc` (SAFE).
 - **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles; dev-reset blocked even for OWNER on production.
 - **Avito Extension Version:** `0.2.62`.
 - **avito_post_sale_tasks Table:** **PRESENT**.
