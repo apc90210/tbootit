@@ -836,6 +836,10 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
 
     headers = dict(request.headers)
     headers.pop("host", None)
+    headers.pop("x-client-role", None)
+    headers.pop("x-auth-role", None)
+    headers.pop("x-role", None)
+    headers.pop("x-auth-is-owner", None)
     headers["x-forwarded-host"] = request.headers.get("host", "localhost:8011")
     headers["x-forwarded-port"] = "8011"
     headers["x-forwarded-proto"] = request.url.scheme or "http"

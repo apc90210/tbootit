@@ -653,21 +653,44 @@ def _hard_delete_sale(db: Session, db_sale: models.Sale) -> int:
     for rev in revisions:
         db.delete(rev)
 
-    # 5. Decouple linked repair orders
-    repairs = db.query(models.RepairOrder).filter(models.RepairOrder.sale_id == sale_id).all()
-    for rep in repairs:
+    # 5. Decouple linked repair orders and reset status to 'ready' if previously 'issued' (Invariant C)
+    linked_repairs = set()
+    for rep in db.query(models.RepairOrder).filter(models.RepairOrder.sale_id == sale_id).all():
+        linked_repairs.add(rep)
+
+    if db_sale.source_type == "repair" and db_sale.source_id:
+        rep_by_source = db.query(models.RepairOrder).filter(models.RepairOrder.id == db_sale.source_id).first()
+        if rep_by_source:
+            linked_repairs.add(rep_by_source)
+
+    for rep in linked_repairs:
+        old_status = rep.status
         rep.sale_id = None
         rep.final_amount = None
         rep.payment_method = None
         rep.warranty_days = None
-
-    if db_sale.source_type == "repair" and db_sale.source_id:
-        rep_by_source = db.query(models.RepairOrder).filter(models.RepairOrder.id == db_sale.source_id).first()
-        if rep_by_source and rep_by_source.sale_id == sale_id:
-            rep_by_source.sale_id = None
-            rep_by_source.final_amount = None
-            rep_by_source.payment_method = None
-            rep_by_source.warranty_days = None
+        if old_status == "issued":
+            rep.status = "ready"
+            rep.issued_at = None
+            rep.closed_at = None
+            hist = models.RepairStatusHistory(
+                repair_id=rep.id,
+                old_status=old_status,
+                new_status="ready",
+                comment=f"Связанная продажа №{sale_id} безвозвратно удалена владельцем. Ремонт возвращён в статус «Готов».",
+                changed_by="owner",
+                changed_at=datetime.utcnow()
+            )
+            db.add(hist)
+            log_audit(
+                db,
+                "repair_order",
+                rep.id,
+                "repair.linked_sale_deleted_reset_ready",
+                old_value={"status": old_status, "sale_id": sale_id},
+                new_value={"status": "ready", "sale_id": None},
+                comment=f"Reset repair #{rep.number} to ready because linked sale #{sale_id} was permanently deleted by owner."
+            )
 
     # 6. Decouple other sales referencing this sale
     related_sales = db.query(models.Sale).filter(
@@ -693,13 +716,15 @@ def _hard_delete_sale(db: Session, db_sale: models.Sale) -> int:
     for it in items:
         db.delete(it)
 
-    # 8. Log audit before deletion
+    # 8. Log audit before deletion (Section 7)
     log_audit(
         db,
         "sale",
         sale_id,
-        "hard_delete",
-        old_value={"total_amount": db_sale.total_amount, "status": db_sale.status, "comment": db_sale.comment}
+        "permanent_delete",
+        old_value={"id": sale_id, "total_amount": db_sale.total_amount, "status": db_sale.status, "comment": db_sale.comment},
+        new_value=None,
+        comment=f"Permanent delete by owner. Stock restored: {db_sale.status not in ['canceled', 'cancelled']}."
     )
 
     # 9. Delete sale

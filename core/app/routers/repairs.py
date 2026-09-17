@@ -640,13 +640,15 @@ def _hard_delete_repair(db: Session, db_repair: models.RepairOrder) -> int:
         s.source_type = None
         s.source_id = None
 
-    # 3. Log audit
+    # 3. Log audit before deletion (Section 7)
     log_audit(
         db,
         "repair_order",
         repair_id,
-        "hard_delete",
-        old_value={"number": db_repair.number, "status": db_repair.status, "customer_name": db_repair.customer_name}
+        "permanent_delete",
+        old_value={"id": repair_id, "number": db_repair.number, "status": db_repair.status, "customer_name": db_repair.customer_name},
+        new_value=None,
+        comment=f"Permanent delete by owner. Deleted history count: {len(histories)}"
     )
 
     # 4. Delete repair order
@@ -656,13 +658,47 @@ def _hard_delete_repair(db: Session, db_repair: models.RepairOrder) -> int:
 
 @router.post("/bulk-delete", response_model=schemas.BulkDeleteResponse)
 def bulk_delete_repairs(req: schemas.RepairBulkDeleteRequest, db: Session = Depends(get_db)):
-    deleted = []
+    if not req.repair_ids:
+        raise HTTPException(status_code=400, detail="Не выбрано ни одного наряда на ремонт")
+
+    # Pass 1: Validate all repairs and check for active linked sales (Invariants D & E)
+    repairs_to_delete = []
+    blocked_messages = []
     for r_id in req.repair_ids:
         db_repair = db.query(models.RepairOrder).filter(models.RepairOrder.id == r_id).first()
-        if db_repair:
-            _hard_delete_repair(db, db_repair)
-            deleted.append(r_id)
+        if not db_repair:
+            continue
+        # Find any linked sale
+        linked_sale_id = db_repair.sale_id
+        if not linked_sale_id:
+            s = db.query(models.Sale).filter(models.Sale.source_type == "repair", models.Sale.source_id == r_id).first()
+            if s:
+                linked_sale_id = s.id
+
+        if linked_sale_id:
+            active_sale = db.query(models.Sale).filter(models.Sale.id == linked_sale_id).first()
+            if active_sale and active_sale.status not in ["canceled", "cancelled"]:
+                blocked_messages.append(f"Ремонт {db_repair.number}: сначала удалите связанную продажу №{linked_sale_id}")
+            elif active_sale:
+                active_sale.source_type = None
+                active_sale.source_id = None
+                db_repair.sale_id = None
+
+        repairs_to_delete.append(db_repair)
+
+    if blocked_messages:
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(blocked_messages)
+        )
+
+    # Pass 2: Atomic deletion
+    deleted = []
+    for db_repair in repairs_to_delete:
+        _hard_delete_repair(db, db_repair)
+        deleted.append(db_repair.id)
     db.commit()
+
     return {
         "status": "ok",
         "deleted_count": len(deleted),
@@ -675,6 +711,25 @@ def delete_repair(repair_id: int, db: Session = Depends(get_db)):
     db_repair = db.query(models.RepairOrder).filter(models.RepairOrder.id == repair_id).first()
     if not db_repair:
         raise HTTPException(status_code=404, detail="Ремонтный заказ не найден")
+
+    linked_sale_id = db_repair.sale_id
+    if not linked_sale_id:
+        s = db.query(models.Sale).filter(models.Sale.source_type == "repair", models.Sale.source_id == repair_id).first()
+        if s:
+            linked_sale_id = s.id
+
+    if linked_sale_id:
+        active_sale = db.query(models.Sale).filter(models.Sale.id == linked_sale_id).first()
+        if active_sale and active_sale.status not in ["canceled", "cancelled"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Невозможно удалить ремонт {db_repair.number}: сначала удалите связанную продажу №{linked_sale_id}"
+            )
+        elif active_sale:
+            active_sale.source_type = None
+            active_sale.source_id = None
+            db_repair.sale_id = None
+
     _hard_delete_repair(db, db_repair)
     db.commit()
     return {

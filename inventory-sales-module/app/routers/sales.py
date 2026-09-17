@@ -15,11 +15,7 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 def is_owner_request(request: Request) -> bool:
     """Check if the request originates from an authenticated OWNER certificate."""
-    if request.headers.get("x-auth-is-owner") == "1":
-        return True
-    if request.headers.get("x-client-role") == "owner":
-        return True
-    return False
+    return request.headers.get("x-auth-is-owner") == "1"
 
 
 @router.get("/sales", response_class=HTMLResponse)

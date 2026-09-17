@@ -469,7 +469,12 @@ class CoreClient:
                 )
                 if response.status_code == 200:
                     return response.json()
-                return {"error": True, "status_code": response.status_code, "detail": response.text}
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
             except Exception as e:
                 return {"error": True, "details": str(e)}
 

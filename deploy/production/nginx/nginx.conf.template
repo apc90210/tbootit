@@ -76,6 +76,7 @@ http {
             proxy_set_header X-Client-Cert-Verify $ssl_client_verify;
             proxy_set_header X-Auth-Subject $auth_subject;
             proxy_set_header X-Auth-Is-Owner $auth_is_owner;
+            proxy_set_header X-Client-Role "";
         }
     }
 }
