@@ -52,7 +52,7 @@
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             {% if repair.sale_id or repair.linked_sale_id %}
-            <a href="/sales/sales/{{ repair.sale_id or repair.linked_sale_id }}" target="_blank" class="btn btn-primary" style="font-size: 0.92rem;">
+            <a href="/sales/{{ repair.sale_id or repair.linked_sale_id }}" target="_blank" class="btn btn-primary" style="font-size: 0.92rem;">
                 🛒 Связанная продажа №{{ repair.sale_id or repair.linked_sale_id }}
             </a>
             {% endif %}
@@ -119,7 +119,7 @@
             <p><strong>Способ оплаты:</strong> {{ repair.payment_method or '—' }}</p>
             <p><strong>Гарантийный срок:</strong> {{ repair.warranty_days or 0 }} дней</p>
             {% if repair.sale_id or repair.linked_sale_id %}
-            <p><strong>Связанный чек продажи:</strong> <a href="/sales/sales/{{ repair.sale_id or repair.linked_sale_id }}" target="_blank">Продажа №{{ repair.sale_id or repair.linked_sale_id }}</a></p>
+            <p><strong>Связанный чек продажи:</strong> <a href="/sales/{{ repair.sale_id or repair.linked_sale_id }}" target="_blank">Продажа №{{ repair.sale_id or repair.linked_sale_id }}</a></p>
             {% endif %}
             {% endif %}
 

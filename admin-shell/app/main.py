@@ -951,16 +951,30 @@ async def redirect_products_list_shortcut():
 
 
 @app.api_route("/sales", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/sales/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route("/sales/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_sales(request: Request, path: str = ""):
-    subpath = f"sales/{path}".rstrip('/') if path else "sales"
+    path_clean = path.strip('/')
+    if not path_clean:
+        subpath = "sales"
+    elif path_clean == "sales" or path_clean.startswith("sales/"):
+        subpath = path_clean
+    else:
+        subpath = f"sales/{path_clean}"
     return await _proxy_request(request, INVENTORY_MODULE_URL, subpath, "/sales")
 
 
 @app.api_route("/reports/sales", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/reports/sales/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route("/reports/sales/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_reports_sales(request: Request, path: str = ""):
-    subpath = f"reports/sales/{path}".rstrip('/') if path else "reports/sales"
+    path_clean = path.strip('/')
+    if not path_clean:
+        subpath = "reports/sales"
+    elif path_clean == "reports/sales" or path_clean.startswith("reports/sales/"):
+        subpath = path_clean
+    else:
+        subpath = f"reports/sales/{path_clean}"
     return await _proxy_request(request, INVENTORY_MODULE_URL, subpath, "/reports/sales")
 
 
