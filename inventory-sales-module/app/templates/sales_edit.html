@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование продажи #{{ sale.id }}{% endblock %}
+
+{% block content %}
+    <div style="margin-bottom: 20px;">
+        <a href="/inventory/sales/{{ sale.id }}" class="btn" style="background: #6c757d; color: #fff;">← Назад к продаже</a>
+    </div>
+
+    <h2>Редактирование продажи #{{ sale.id }}</h2>
+
+    <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; color: #856404;">
+        <strong>Внимание:</strong> Корректировка продажи не удаляет историю. Будет создана новая ревизия с фиксацией автора, времени и всех изменений. Остатки товаров на складе будут автоматически пересчитаны.
+    </div>
+
+    <div style="background: #fff; padding: 24px; border: 1px solid #ddd; border-radius: 6px; max-width: 900px;">
+        <form id="editSaleForm" action="/inventory/sales/{{ sale.id }}/edit" method="POST">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Способ оплаты *</label>
+                    <select name="payment_method" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                        {% for pm_key, pm_label in payment_methods.items() %}
+                            <option value="{{ pm_key }}" {% if sale.payment_method == pm_key %}selected{% endif %}>{{ pm_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 6px;">Кто вносит изменения *</label>
+                    <input type="text" name="changed_by" value="Администратор" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 6px;">Причина / комментарий к корректировке</label>
+                <input type="text" name="comment" placeholder="Например: Замена брака / Скидка / Ошибка оператора" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+            </div>
+
+            <h3 style="margin-top: 25px; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">Состав продажи (позиции в чеке)</h3>
+
+            <table id="itemsTable" style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 10px; text-align: left;">Товар / Наименование</th>
+                        <th style="padding: 10px; text-align: center; width: 100px;">ID товара</th>
+                        <th style="padding: 10px; text-align: right; width: 130px;">Цена (₽)</th>
+                        <th style="padding: 10px; text-align: center; width: 100px;">Кол-во</th>
+                        <th style="padding: 10px; text-align: right; width: 130px;">Сумма (₽)</th>
+                        <th style="padding: 10px; text-align: center; width: 80px;">Удалить</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsTableBody">
+                    {% for item in sale.get('items', []) %}
+                    <tr class="item-row" data-idx="{{ loop.index }}" style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px;">
+                            <input type="text" name="item_title_{{ loop.index }}" value="{{ item.title }}" required style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                        </td>
+                        <td style="padding: 8px; text-align: center;">
+                            <input type="text" name="item_product_id_{{ loop.index }}" value="{{ item.product_id if item.product_id is not none else '' }}" style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px;" placeholder="—">
+                        </td>
+                        <td style="padding: 8px; text-align: right;">
+                            <input type="number" step="0.01" min="0" name="item_price_{{ loop.index }}" value="{{ item.price }}" required class="price-input" style="width: 110px; padding: 6px; text-align: right; border: 1px solid #ccc; border-radius: 4px;">
+                        </td>
+                        <td style="padding: 8px; text-align: center;">
+                            <input type="number" min="1" step="1" name="item_quantity_{{ loop.index }}" value="{{ item.quantity }}" required class="qty-input" style="width: 70px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+                        </td>
+                        <td style="padding: 8px; text-align: right; font-weight: bold;" class="row-total">
+                            {{ item.price * item.quantity }} ₽
+                        </td>
+                        <td style="padding: 8px; text-align: center;">
+                            <button type="button" class="btn-remove-row" style="background: #dc3545; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.9rem;">✕</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Add Item Section -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+                <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px;">Добавить товар со склада:</div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="number" id="newProductIdInput" placeholder="ID товара со склада" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; width: 180px;">
+                    <button type="button" id="btnLookupProduct" class="btn" style="background: #0284c7; color: #fff; padding: 8px 16px; border-radius: 4px; cursor: pointer;">+ Найти и добавить</button>
+                    <button type="button" id="btnAddCustomRow" class="btn" style="background: #64748b; color: #fff; padding: 8px 16px; border-radius: 4px; cursor: pointer;">+ Добавить произвольную строку</button>
+                </div>
+                <div id="lookupStatus" style="font-size: 0.9rem; margin-top: 6px; min-height: 20px;"></div>
+            </div>
+
+            <!-- Total Amount Summary -->
+            <div style="background: #f1f5f9; padding: 16px 20px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <span style="font-size: 1.1rem; font-weight: 600; color: #334155;">Итоговая стоимость после изменений:</span>
+                <span id="displayTotalAmount" style="font-size: 1.4rem; font-weight: 700; color: #0f172a;">{{ sale.total_amount }} ₽</span>
+            </div>
+
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button type="submit" class="btn btn-success" style="background: #16a34a; color: #fff; padding: 10px 24px; font-weight: 600; font-size: 1rem; border: none; border-radius: 4px; cursor: pointer;" onclick="return confirm('Подтверждаете сохранение изменений в продаже?');">
+                    ✓ Сохранить изменения
+                </button>
+                <a href="/inventory/sales/{{ sale.id }}" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 4px; text-decoration: none;">
+                    Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let rowCounter = {{ sale.get('items', [])|length + 10 }};
+
+        function recalculateTotals() {
+            let total = 0;
+            const rows = document.querySelectorAll('#itemsTableBody tr.item-row');
+            rows.forEach(row => {
+                const priceInput = row.querySelector('.price-input');
+                const qtyInput = row.querySelector('.qty-input');
+                const rowTotalCell = row.querySelector('.row-total');
+                const p = parseFloat(priceInput.value) || 0;
+                const q = parseInt(qtyInput.value) || 0;
+                const rTotal = p * q;
+                total += rTotal;
+                if (rowTotalCell) {
+                    rowTotalCell.textContent = rTotal.toFixed(2).replace(/\.00$/, '') + ' ₽';
+                }
+            });
+            document.getElementById('displayTotalAmount').textContent = total.toFixed(2).replace(/\.00$/, '') + ' ₽';
+        }
+
+        function attachRowListeners(row) {
+            const priceInput = row.querySelector('.price-input');
+            const qtyInput = row.querySelector('.qty-input');
+            const removeBtn = row.querySelector('.btn-remove-row');
+
+            if (priceInput) priceInput.addEventListener('input', recalculateTotals);
+            if (qtyInput) qtyInput.addEventListener('input', recalculateTotals);
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function() {
+                    const allRows = document.querySelectorAll('#itemsTableBody tr.item-row');
+                    if (allRows.length <= 1) {
+                        alert('В продаже должен остаться хотя бы один товар.');
+                        return;
+                    }
+                    row.remove();
+                    recalculateTotals();
+                });
+            }
+        }
+
+        // Initialize listeners for existing rows
+        document.querySelectorAll('#itemsTableBody tr.item-row').forEach(attachRowListeners);
+
+        // Add custom row
+        document.getElementById('btnAddCustomRow').addEventListener('click', function() {
+            rowCounter++;
+            const tbody = document.getElementById('itemsTableBody');
+            const tr = document.createElement('tr');
+            tr.className = 'item-row';
+            tr.dataset.idx = rowCounter;
+            tr.style.borderBottom = '1px solid #eee';
+            tr.innerHTML = `
+                <td style="padding: 8px;">
+                    <input type="text" name="item_title_${rowCounter}" value="Новая позиция" required style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                </td>
+                <td style="padding: 8px; text-align: center;">
+                    <input type="text" name="item_product_id_${rowCounter}" value="" style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px;" placeholder="—">
+                </td>
+                <td style="padding: 8px; text-align: right;">
+                    <input type="number" step="0.01" min="0" name="item_price_${rowCounter}" value="0" required class="price-input" style="width: 110px; padding: 6px; text-align: right; border: 1px solid #ccc; border-radius: 4px;">
+                </td>
+                <td style="padding: 8px; text-align: center;">
+                    <input type="number" min="1" step="1" name="item_quantity_${rowCounter}" value="1" required class="qty-input" style="width: 70px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+                </td>
+                <td style="padding: 8px; text-align: right; font-weight: bold;" class="row-total">0 ₽</td>
+                <td style="padding: 8px; text-align: center;">
+                    <button type="button" class="btn-remove-row" style="background: #dc3545; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.9rem;">✕</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            attachRowListeners(tr);
+            recalculateTotals();
+        });
+
+        // Lookup product from Core and add row
+        document.getElementById('btnLookupProduct').addEventListener('click', async function() {
+            const input = document.getElementById('newProductIdInput');
+            const statusDiv = document.getElementById('lookupStatus');
+            const pid = parseInt(input.value.trim());
+            if (!pid) {
+                statusDiv.style.color = '#dc2626';
+                statusDiv.textContent = 'Укажите корректный ID товара.';
+                return;
+            }
+
+            statusDiv.style.color = '#0284c7';
+            statusDiv.textContent = 'Поиск товара #' + pid + '...';
+
+            try {
+                const resp = await fetch('/inventory/sales/api/product/' + pid);
+                if (!resp.ok) {
+                    statusDiv.style.color = '#dc2626';
+                    statusDiv.textContent = 'Товар #' + pid + ' не найден.';
+                    return;
+                }
+                const prod = await resp.json();
+                if (prod.error) {
+                    statusDiv.style.color = '#dc2626';
+                    statusDiv.textContent = 'Товар #' + pid + ' не найден.';
+                    return;
+                }
+
+                if (prod.status !== 'in_stock' && prod.status !== 'reserved') {
+                    statusDiv.style.color = '#dc2626';
+                    statusDiv.textContent = 'Товар #' + pid + ' находится в статусе "' + (prod.status || '') + '", продажа невозможна.';
+                    return;
+                }
+
+                if ((prod.quantity || 0) < 1) {
+                    statusDiv.style.color = '#dc2626';
+                    statusDiv.textContent = 'Товара #' + pid + ' нет в наличии (остаток 0).';
+                    return;
+                }
+
+                rowCounter++;
+                const tbody = document.getElementById('itemsTableBody');
+                const tr = document.createElement('tr');
+                tr.className = 'item-row';
+                tr.dataset.idx = rowCounter;
+                tr.style.borderBottom = '1px solid #eee';
+                const pPrice = prod.sale_price || 0;
+                tr.innerHTML = `
+                    <td style="padding: 8px;">
+                        <input type="text" name="item_title_${rowCounter}" value="${prod.title || 'Товар #' + pid}" required style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    </td>
+                    <td style="padding: 8px; text-align: center;">
+                        <input type="text" name="item_product_id_${rowCounter}" value="${prod.id}" readonly style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; background: #f8fafc;">
+                    </td>
+                    <td style="padding: 8px; text-align: right;">
+                        <input type="number" step="0.01" min="0" name="item_price_${rowCounter}" value="${pPrice}" required class="price-input" style="width: 110px; padding: 6px; text-align: right; border: 1px solid #ccc; border-radius: 4px;">
+                    </td>
+                    <td style="padding: 8px; text-align: center;">
+                        <input type="number" min="1" max="${prod.quantity || 1}" step="1" name="item_quantity_${rowCounter}" value="1" required class="qty-input" style="width: 70px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+                    </td>
+                    <td style="padding: 8px; text-align: right; font-weight: bold;" class="row-total">${pPrice} ₽</td>
+                    <td style="padding: 8px; text-align: center;">
+                        <button type="button" class="btn-remove-row" style="background: #dc3545; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.9rem;">✕</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+                attachRowListeners(tr);
+                recalculateTotals();
+
+                statusDiv.style.color = '#16a34a';
+                statusDiv.textContent = '✓ Добавлен товар: ' + (prod.title || '#' + pid) + ' (остаток: ' + prod.quantity + ' шт.)';
+                input.value = '';
+            } catch (err) {
+                statusDiv.style.color = '#dc2626';
+                statusDiv.textContent = 'Ошибка сети при поиске товара.';
+            }
+        });
+
+        recalculateTotals();
+    </script>
+{% endblock %}

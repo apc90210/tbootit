@@ -260,6 +260,35 @@ def migrate_db():
         except Exception as e:
             print(f"Index creation error on ix_product_ext_listings_market_item: {e}")
 
+        # Stage 11A sale revisions migration
+        res_sales = conn.execute(text("PRAGMA table_info(sales);")).fetchall()
+        sales_columns = [row[1] for row in res_sales]
+        if "revision_count" not in sales_columns:
+            try:
+                conn.execute(text("ALTER TABLE sales ADD COLUMN revision_count INTEGER NOT NULL DEFAULT 0;"))
+            except Exception as e:
+                print(f"Migration error on sales.revision_count: {e}")
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sale_revisions (
+                id INTEGER PRIMARY KEY,
+                sale_id INTEGER NOT NULL,
+                revision_no INTEGER NOT NULL,
+                changed_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                changed_by VARCHAR,
+                comment TEXT,
+                before_snapshot TEXT NOT NULL,
+                after_snapshot TEXT NOT NULL,
+                structured_diff TEXT NOT NULL,
+                FOREIGN KEY(sale_id) REFERENCES sales (id)
+            );
+        """))
+        try:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_revisions_id ON sale_revisions (id);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_revisions_sale_id ON sale_revisions (sale_id);"))
+        except Exception as e:
+            print(f"Index creation error on sale_revisions: {e}")
+
     try:
         from app.services.repair_migration import run_repair_additive_migration
         db_file = settings.database_url.replace("sqlite:///", "")

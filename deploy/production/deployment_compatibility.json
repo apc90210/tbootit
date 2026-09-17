@@ -2,7 +2,7 @@
   "version": 1,
   "requires_manual_migration": false,
   "database_change": false,
-  "reason": "Stage 09C PRODUCTION: avito_post_sale_tasks migration applied to live VDS DB. Schema guard passes. Code-only deploys are safe.",
-  "schema_contract_sha256": "ae36c0163d7dcd5fa4a4f8e977008566f84f1016b2aa3d686bd31228f43aa886",
+  "reason": "Stage 09C PRODUCTION avito_post_sale_tasks baseline verified. Stage 11A LOCAL: sale_revisions table and revision_count column added. Stage 11B LOCAL: final_amount, payment_method, warranty_days, sale_id added to repair_orders.",
+  "schema_contract_sha256": "f912b92d934c7e5b56b1c4492f1a61f5a54276d295e05823ac1ba1e4d9153745",
   "reviewed_at_commit": "e21dba6404f14314863213cb40ba945ea427a467"
 }

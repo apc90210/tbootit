@@ -2517,6 +2517,13 @@
         },
         {
           "default": null,
+          "name": "final_amount",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "FLOAT"
+        },
+        {
+          "default": null,
           "name": "id",
           "nullable": false,
           "primary_key": 1,
@@ -2553,6 +2560,13 @@
         {
           "default": null,
           "name": "parts_description",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "payment_method",
           "nullable": true,
           "primary_key": 0,
           "type": "TEXT"
@@ -2601,6 +2615,13 @@
         },
         {
           "default": null,
+          "name": "sale_id",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
           "name": "serial_number",
           "nullable": true,
           "primary_key": 0,
@@ -2622,6 +2643,13 @@
         },
         {
           "default": null,
+          "name": "warranty_days",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
           "name": "work_description",
           "nullable": true,
           "primary_key": 0,
@@ -2633,6 +2661,11 @@
           "from_column": "customer_id",
           "to_column": "id",
           "to_table": "customers"
+        },
+        {
+          "from_column": "sale_id",
+          "to_column": "id",
+          "to_table": "sales"
         }
       ],
       "indexes": [
@@ -2649,6 +2682,13 @@
           ],
           "name": "ix_repair_orders_number",
           "unique": true
+        },
+        {
+          "columns": [
+            "sale_id"
+          ],
+          "name": "ix_repair_orders_sale_id",
+          "unique": false
         },
         {
           "columns": [
@@ -2816,6 +2856,96 @@
         }
       ]
     },
+    "sale_revisions": {
+      "columns": [
+        {
+          "default": null,
+          "name": "after_snapshot",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "before_snapshot",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": "CURRENT_TIMESTAMP",
+          "name": "changed_at",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "DATETIME"
+        },
+        {
+          "default": null,
+          "name": "changed_by",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "comment",
+          "nullable": true,
+          "primary_key": 0,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "id",
+          "nullable": false,
+          "primary_key": 1,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "revision_no",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "sale_id",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "structured_diff",
+          "nullable": false,
+          "primary_key": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from_column": "sale_id",
+          "to_column": "id",
+          "to_table": "sales"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "id"
+          ],
+          "name": "ix_sale_revisions_id",
+          "unique": false
+        },
+        {
+          "columns": [
+            "sale_id"
+          ],
+          "name": "ix_sale_revisions_sale_id",
+          "unique": false
+        }
+      ]
+    },
     "sales": {
       "columns": [
         {
@@ -2892,6 +3022,13 @@
           "default": null,
           "name": "replaced_by_sale_id",
           "nullable": true,
+          "primary_key": 0,
+          "type": "INTEGER"
+        },
+        {
+          "default": "'0'",
+          "name": "revision_count",
+          "nullable": false,
           "primary_key": 0,
           "type": "INTEGER"
         },

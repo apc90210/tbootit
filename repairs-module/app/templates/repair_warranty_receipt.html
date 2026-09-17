@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Квитанция на ремонт / гарантийный талон № {{ receipt.repair_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            color: #111;
+        }
+        .receipt-container {
+            background: #fff;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .org-header {
+            text-align: center;
+            font-size: 1.05rem;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .org-header strong {
+            font-size: 1.3rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .title-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+        .title-header h1 {
+            margin: 0 0 5px 0;
+            font-size: 1.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .meta-table, .info-table, .works-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 18px;
+        }
+        .meta-table td {
+            padding: 4px 6px;
+            font-size: 0.95rem;
+        }
+        .section-heading {
+            font-size: 1.05rem;
+            font-weight: bold;
+            margin: 15px 0 8px 0;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 3px;
+        }
+        .info-table td, .info-table th, .works-table td, .works-table th {
+            border: 1px solid #000;
+            padding: 8px 10px;
+            font-size: 0.95rem;
+            text-align: left;
+        }
+        .info-table th, .works-table th {
+            background-color: #f7f7f7;
+            font-weight: bold;
+        }
+        .works-table td.amount, .works-table th.amount {
+            text-align: right;
+            white-space: nowrap;
+        }
+        .total-box {
+            margin: 15px 0;
+            padding: 12px 15px;
+            background: #fbfbfb;
+            border: 1px solid #000;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .warranty-box {
+            border: 1px solid #000;
+            padding: 12px 15px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            background: #fff;
+        }
+        .warranty-box strong {
+            font-size: 1rem;
+        }
+        .signatures {
+            margin-top: 35px;
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+        }
+        .signatures .sig-col {
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        .signatures .line {
+            border-bottom: 1px solid #000;
+            margin-top: 35px;
+            margin-bottom: 5px;
+        }
+        .signatures .caption {
+            font-size: 0.8rem;
+            color: #555;
+            text-align: center;
+        }
+        .actions {
+            text-align: center;
+            margin-top: 25px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 22px;
+            background: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            margin: 0 5px;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        @media print {
+            body {
+                background: #fff;
+                padding: 0;
+            }
+            .receipt-container {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                width: 100%;
+                max-width: 100%;
+            }
+            .actions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="receipt-container">
+    <!-- Header -->
+    <div class="org-header">
+        <strong>{{ receipt.organization.name or 'Сервисный центр ТехноРебут' }}</strong>
+        {% if receipt.organization.address %}<div>Адрес: {{ receipt.organization.address }}</div>{% endif %}
+        {% if receipt.organization.phone %}<div>Телефон: {{ receipt.organization.phone }}</div>{% endif %}
+        {% if receipt.organization.inn %}<div>ИНН / ОГРН: {{ receipt.organization.inn }}</div>{% endif %}
+    </div>
+
+    <!-- Title -->
+    <div class="title-header">
+        <h1>Квитанция на ремонт / гарантийный талон</h1>
+        <div style="font-size: 1.15rem; font-weight: bold;">№ {{ receipt.repair_number }}</div>
+    </div>
+
+    <!-- Meta Info -->
+    <table class="meta-table">
+        <tr>
+            <td style="width: 50%;"><strong>Дата приёма:</strong> {{ receipt.accepted_at[:10] if receipt.accepted_at else '—' }}</td>
+            <td style="width: 50%;"><strong>Дата выдачи:</strong> {{ receipt.issued_at[:10] if receipt.issued_at else '—' }}</td>
+        </tr>
+        <tr>
+            <td><strong>Клиент:</strong> {{ receipt.customer_name }}</td>
+            <td><strong>Телефон:</strong> {{ receipt.customer_phone }}</td>
+        </tr>
+        {% if receipt.sale_id %}
+        <tr>
+            <td colspan="2"><strong>Связанный расчётный документ:</strong> Продажа №{{ receipt.sale_id }}</td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <!-- Device Details -->
+    <div class="section-heading">Сведения об устройстве</div>
+    <table class="info-table">
+        <tr>
+            <th style="width: 30%;">Тип устройства</th>
+            <td>{{ receipt.device_type }}</td>
+        </tr>
+        <tr>
+            <th>Бренд / Модель</th>
+            <td>{{ receipt.brand or '' }} {{ receipt.model or '' }}</td>
+        </tr>
+        <tr>
+            <th>Серийный номер / IMEI</th>
+            <td><code>{{ receipt.serial_number or 'Не указан' }}</code></td>
+        </tr>
+        <tr>
+            <th>Заявленная неисправность</th>
+            <td>{{ receipt.reported_issue or '—' }}</td>
+        </tr>
+        {% if receipt.diagnosis_text and receipt.diagnosis_text != '—' %}
+        <tr>
+            <th>Результат диагностики</th>
+            <td>{{ receipt.diagnosis_text }}</td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <!-- Works & Payment -->
+    <div class="section-heading">Выполненные работы и стоимость</div>
+    <table class="works-table">
+        <thead>
+            <tr>
+                <th style="width: 60px; text-align: center;">№</th>
+                <th>Наименование услуги / выполненных работ</th>
+                <th style="width: 80px; text-align: center;">Кол-во</th>
+                <th class="amount" style="width: 140px;">Сумма</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="text-align: center;">1</td>
+                <td>
+                    <strong>{{ receipt.work_description }}</strong>
+                    {% if receipt.planned_works_text %}
+                    <div style="font-size: 0.85rem; color: #555; margin-top: 3px;">{{ receipt.planned_works_text }}</div>
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">1</td>
+                <td class="amount">{{ "%.2f"|format(receipt.final_amount) }} ₽</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Financial Total -->
+    <div class="total-box">
+        <div>
+            <strong>Способ оплаты:</strong> {{ receipt.payment_method_label }}
+        </div>
+        <div>
+            <strong>ИТОГО К ОПЛАТЕ:</strong> <span style="font-size: 1.3rem; font-weight: bold;">{{ "%.2f"|format(receipt.final_amount) }} ₽</span>
+        </div>
+    </div>
+
+    <!-- Warranty Conditions -->
+    <div class="warranty-box">
+        <div style="margin-bottom: 6px;">
+            <strong>Гарантийные обязательства:</strong>
+            <span style="font-size: 1.05rem; font-weight: bold; color: #004085;">
+                {{ receipt.warranty_label }}
+            </span>
+        </div>
+        <p style="margin: 4px 0;">1. Гарантия распространяется исключительно на выполненные работы и заменённые детали.</p>
+        <p style="margin: 4px 0;">2. Гарантия аннулируется при наличии следов механических повреждений, ударов, деформаций, попадания жидкости, воздействия высоких температур или неквалифицированного стороннего вмешательства.</p>
+        <p style="margin: 4px 0;">3. Настоящий талон является подтверждением выполнения работ и приёма оборудования заказчиком в исправном техническом состоянии.</p>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signatures">
+        <div class="sig-col">
+            <p><strong>Работу принял Заказчик:</strong></p>
+            <p style="font-size: 0.85rem; color: #444;">Претензий по качеству выполненных работ, комплектности и внешнему виду устройства не имею.</p>
+            <div class="line"></div>
+            <div class="caption">(подпись Заказчика / расшифровка)</div>
+        </div>
+        <div class="sig-col">
+            <p><strong>Устройство выдал:</strong></p>
+            <p style="font-size: 0.85rem; color: #444;">Сервисный инженер / Администратор</p>
+            <div class="line"></div>
+            <div class="caption">(подпись / штамп сервисного центра)</div>
+        </div>
+    </div>
+
+    <!-- Action buttons (screen only) -->
+    <div class="actions">
+        <button onclick="window.print()" class="btn">🖨️ Распечатать квитанцию</button>
+        <button onclick="window.close()" class="btn btn-secondary">Закрыть</button>
+    </div>
+</div>
+
+</body>
+</html>

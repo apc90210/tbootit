@@ -4,7 +4,7 @@ from app import models
 def test_repair_sale_stock_isolation(client, db_session):
     """
     Test 100% stock isolation:
-    - Creating a repair sale does NOT decrease product.quantity
+    - Creating a repair sale upon issue does NOT decrease product.quantity
     - Creating a repair sale does NOT create a dummy Product
     - Creating a repair sale does NOT generate stock movements
     """
@@ -12,7 +12,7 @@ def test_repair_sale_stock_isolation(client, db_session):
     prod_count_before = db_session.query(models.Product).count()
     movement_count_before = db_session.query(models.StockMovement).count()
 
-    # Create repair and set ready
+    # Create repair and set ready, then issued
     rep = models.RepairOrder(
         number="R-STOCK-ISO",
         status="diagnostics",
@@ -27,9 +27,20 @@ def test_repair_sale_stock_isolation(client, db_session):
     db_session.add(rep)
     db_session.commit()
 
-    res = client.post(
+    client.post(
         f"/api/repairs/{rep.id}/status",
         json={"status": "ready", "comment": "Готов", "estimated_repair_amount": 5000}
+    )
+
+    res = client.post(
+        f"/api/repairs/{rep.id}/status",
+        json={
+            "status": "issued",
+            "final_amount": 5000.0,
+            "payment_method": "transfer",
+            "warranty_days": 60,
+            "comment": "Выдан"
+        }
     )
     assert res.status_code == 200
 

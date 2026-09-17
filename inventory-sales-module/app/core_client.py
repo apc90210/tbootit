@@ -210,6 +210,29 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def correct_sale(self, sale_id: int, payload: dict):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/sales/{sale_id}/correct", json=payload, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                err = response.text
+                try: err = response.json().get("detail", err)
+                except: pass
+                return {"error": True, "status_code": response.status_code, "detail": err}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def get_sale_revisions(self, sale_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/sales/{sale_id}/revisions", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code, "items": []}
+            except Exception as e:
+                return {"error": True, "details": str(e), "items": []}
+
     async def get_sale_avito_tasks(self, sale_id: int):
         async with httpx.AsyncClient(trust_env=False) as client:
             try:

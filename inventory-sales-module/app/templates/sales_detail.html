@@ -7,11 +7,25 @@
 
     {% if st == 'completed' %}
         <div style="background: #e8f5e9; padding: 20px; border: 1px solid #a5d6a7; border-radius: 5px; margin-bottom: 20px; text-align: center;">
-            <h2 style="color: #2e7d32; margin-top: 0; margin-bottom: 0;">✓ Продажа оформлена (Действующая)</h2>
+            <h2 style="color: #2e7d32; margin-top: 0; margin-bottom: 0;">
+                ✓ Продажа оформлена (Действующая)
+                {% if sale.revision_count and sale.revision_count > 0 %}
+                    <span style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 4px 10px; border-radius: 4px; font-size: 0.95rem; font-weight: 600; margin-left: 10px; vertical-align: middle;">
+                        ✎ Изменена (ревизия №{{ sale.revision_count }})
+                    </span>
+                {% endif %}
+            </h2>
         </div>
     {% elif st == 'reissued' %}
         <div style="background: #e3f2fd; padding: 20px; border: 1px solid #90caf9; border-radius: 5px; margin-bottom: 20px; text-align: center;">
-            <h2 style="color: #1565c0; margin-top: 0; margin-bottom: 5px;">✓ Повторно оформленная продажа</h2>
+            <h2 style="color: #1565c0; margin-top: 0; margin-bottom: 5px;">
+                ✓ Повторно оформленная продажа
+                {% if sale.revision_count and sale.revision_count > 0 %}
+                    <span style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 4px 10px; border-radius: 4px; font-size: 0.95rem; font-weight: 600; margin-left: 10px; vertical-align: middle;">
+                        ✎ Изменена (ревизия №{{ sale.revision_count }})
+                    </span>
+                {% endif %}
+            </h2>
             {% if sale.source_sale_id or sale.original_sale_id %}
                 <p style="margin: 0; color: #1976d2;">
                     Создана на основе отменённой продажи 
@@ -187,6 +201,23 @@
                 <th style="width: 200px;">Номер продажи</th>
                 <td>#{{ sale.id }}</td>
             </tr>
+            {% if sale.source_type == 'repair' and sale.source_id %}
+            <tr style="background: #f0fdfa;">
+                <th>Источник</th>
+                <td>
+                    <span style="background: #0d9488; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-right: 6px;">
+                        Ремонтный заказ
+                    </span>
+                    <a href="/repairs/repairs/{{ sale.source_id }}" target="_blank" style="font-weight: bold; color: #0f766e; text-decoration: underline;">
+                        Ремонт №{{ sale.source_id }}
+                    </a>
+                    &nbsp;
+                    <a href="/repairs/repairs/{{ sale.source_id }}/receipt" target="_blank" class="btn" style="background: #0d9488; color: #fff; padding: 3px 8px; font-size: 0.8rem; margin-left: 8px;">
+                        📄 Квитанция на ремонт / гарантийный талон
+                    </a>
+                </td>
+            </tr>
+            {% endif %}
             <tr>
                 <th>Дата/время продажи</th>
                 <td>{{ sale.created_at or '—' }}</td>
@@ -288,6 +319,16 @@
 
     <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
         <a href="/inventory/sales/{{ sale.id }}/receipt" class="btn btn-primary" style="margin-right: 5px;">Товарный чек</a>
+        {% if sale.source_type == 'repair' and sale.source_id %}
+            <a href="/repairs/repairs/{{ sale.source_id }}/receipt" target="_blank" class="btn btn-success" style="margin-right: 5px; font-weight: bold;">
+                📄 Квитанция на ремонт / гарантийный талон
+            </a>
+        {% endif %}
+        {% if st == 'completed' or st == 'reissued' %}
+            <a href="/inventory/sales/{{ sale.id }}/edit" class="btn" style="background: #eab308; color: #000; font-weight: 600; border: 1px solid #ca8a04; margin-right: 5px;">
+                ✎ Изменить продажу
+            </a>
+        {% endif %}
         
         {# Section 7: Permanent Manual Avito Button #}
         {% if not has_linked_listings and (not avito_tasks or avito_tasks|length == 0) %}
@@ -356,6 +397,44 @@
             } catch (e) {}
         }
     </script>
+
+    {% if revisions and revisions|length > 0 %}
+    <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">
+    <div style="background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 22px; max-width: 800px;">
+        <h3 style="margin-top: 0; margin-bottom: 16px; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">📜</span> История изменений ({{ revisions|length }})
+        </h3>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+            {% for rev in revisions|reverse %}
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                    <div style="font-weight: 700; color: #1e293b;">
+                        Ревизия №{{ rev.revision_no }}
+                        <span style="color: #64748b; font-weight: normal; margin-left: 8px; font-size: 0.9rem;">— {{ rev.changed_at }}</span>
+                    </div>
+                    <div style="font-size: 0.85rem; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 4px;">
+                        Автор: {{ rev.changed_by or 'Администратор' }}
+                    </div>
+                </div>
+                {% if rev.human_bullets and rev.human_bullets|length > 0 %}
+                    <ul style="margin: 6px 0; padding-left: 20px; color: #334155; font-size: 0.95rem; line-height: 1.6;">
+                        {% for bullet in rev.human_bullets %}
+                            <li>{{ bullet|replace('• ', '') }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="margin: 4px 0; color: #64748b; font-size: 0.9rem;">Параметры скорректированы</p>
+                {% endif %}
+                {% if rev.comment %}
+                    <div style="margin-top: 8px; font-size: 0.9rem; color: #475569; background: #fff; padding: 6px 10px; border-radius: 4px; border-left: 3px solid #0284c7;">
+                        <strong>Причина / комментарий:</strong> {{ rev.comment }}
+                    </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     {% if st == 'completed' or st == 'reissued' %}
     <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">

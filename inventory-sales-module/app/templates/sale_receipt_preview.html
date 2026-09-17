@@ -142,6 +142,11 @@
                 </div>
             {% endif %}
             <h1>Товарный чек № {{ sale.id }} от {{ sale.created_at[:10] if sale.created_at else '—' }}</h1>
+            {% if sale.revision_count and sale.revision_count > 0 %}
+                <div style="font-size: 0.85rem; color: #555; margin-top: 4px; font-style: italic;">
+                    Продажа скорректирована — ревизия №{{ sale.revision_count }}
+                </div>
+            {% endif %}
         </div>
 
         <table class="items">

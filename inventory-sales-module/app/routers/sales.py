@@ -1,10 +1,11 @@
 from typing import Optional
 from fastapi import APIRouter, Request, Query, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
 from app.schemas import SELLABLE_STATUSES, PAYMENT_METHODS, STATUS_LABELS, SALE_STATUS_LABELS
 import os
+import json
 
 router = APIRouter()
 
@@ -168,6 +169,22 @@ async def sale_detail(request: Request, sale_id: int):
     avito_dismissed = request.query_params.get("avito_dismissed") == "1"
     avito_msg = request.query_params.get("avito_msg")
 
+    # Fetch revision history
+    revisions = []
+    try:
+        rev_resp = await core_client.get_sale_revisions(sale_id)
+        if rev_resp and isinstance(rev_resp, dict):
+            raw_revs = rev_resp.get("items", [])
+            for r in raw_revs:
+                try:
+                    s_diff = json.loads(r.get("structured_diff", "{}"))
+                    r["human_bullets"] = s_diff.get("human_bullets", [])
+                except Exception:
+                    r["human_bullets"] = []
+                revisions.append(r)
+    except Exception:
+        revisions = []
+
     return templates.TemplateResponse(
         request=request,
         name="sales_detail.html",
@@ -180,6 +197,7 @@ async def sale_detail(request: Request, sale_id: int):
             "all_archived": all_archived,
             "avito_dismissed": avito_dismissed,
             "avito_msg": avito_msg,
+            "revisions": revisions,
         },
     )
 
@@ -367,3 +385,88 @@ async def reissue_sale_endpoint(request: Request, sale_id: int):
         )
         
     return RedirectResponse(url=f"/sales/{res.get('id')}", status_code=303)
+
+
+@router.get("/sales/{sale_id}/edit", response_class=HTMLResponse)
+async def edit_sale_form(request: Request, sale_id: int):
+    sale = await core_client.get_sale(sale_id)
+    if sale and isinstance(sale, dict) and "error" in sale:
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={"message": "Продажа не найдена"}
+        )
+    if sale.get("status") in ["canceled", "cancelled", "superseded"]:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": f"Продажа №{sale_id} не может быть изменена (статус: {sale.get('status')})"}
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="sales_edit.html",
+        context={
+            "sale": sale,
+            "payment_methods": PAYMENT_METHODS,
+        }
+    )
+
+
+@router.post("/sales/{sale_id}/edit")
+async def edit_sale_endpoint(request: Request, sale_id: int):
+    form_data = await request.form()
+    payment_method = form_data.get("payment_method", "cash")
+    comment = str(form_data.get("comment", "")).strip() or None
+    changed_by = str(form_data.get("changed_by", "Администратор")).strip() or "Администратор"
+
+    items = []
+    for key, value in form_data.items():
+        if key.startswith("item_product_id_"):
+            idx = key.split("_")[-1]
+            try:
+                raw_val = str(value).strip()
+                prod_id = int(raw_val) if raw_val and raw_val != "None" else None
+                price = float(form_data.get(f"item_price_{idx}", 0))
+                qty = int(form_data.get(f"item_quantity_{idx}", 1))
+                title = str(form_data.get(f"item_title_{idx}", "")).strip()
+                if qty > 0 and (prod_id is not None or title):
+                    items.append({
+                        "product_id": prod_id,
+                        "title": title or (f"Товар #{prod_id}" if prod_id else "Позиция"),
+                        "price": price,
+                        "quantity": qty
+                    })
+            except (ValueError, TypeError):
+                pass
+
+    if not items:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": "В продаже должен остаться хотя бы один товар"}
+        )
+
+    payload = {
+        "payment_method": payment_method,
+        "comment": comment,
+        "changed_by": changed_by,
+        "items": items
+    }
+
+    res = await core_client.correct_sale(sale_id, payload)
+    if res and isinstance(res, dict) and "error" in res:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"message": res.get("detail", "Ошибка корректировки продажи")}
+        )
+
+    return RedirectResponse(url=f"/sales/{sale_id}", status_code=303)
+
+
+@router.get("/sales/api/product/{product_id}")
+async def get_product_json(product_id: int):
+    prod = await core_client.get_product(product_id)
+    if not prod or (isinstance(prod, dict) and "error" in prod):
+        return JSONResponse(status_code=404, content={"error": True, "message": "Товар не найден"})
+    return JSONResponse(content=prod)
+

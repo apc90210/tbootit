@@ -94,14 +94,38 @@ class CoreClient:
         status: str,
         comment: Optional[str] = None,
         changed_by: Optional[str] = None,
-        estimated_repair_amount: Optional[int] = None
+        estimated_repair_amount: Optional[int] = None,
+        final_amount: Optional[float] = None,
+        payment_method: Optional[str] = None,
+        warranty_days: Optional[int] = None
     ):
         async with httpx.AsyncClient(trust_env=False) as client:
             try:
                 payload = {"status": status, "comment": comment, "changed_by": changed_by}
                 if estimated_repair_amount is not None:
                     payload["estimated_repair_amount"] = estimated_repair_amount
+                if final_amount is not None:
+                    payload["final_amount"] = final_amount
+                if payment_method is not None:
+                    payload["payment_method"] = payment_method
+                if warranty_days is not None:
+                    payload["warranty_days"] = warranty_days
                 response = await client.post(f"{self.base_url}/api/repairs/{repair_id}/status", json=payload, timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def get_repair_receipt_data(self, repair_id: int):
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/repairs/{repair_id}/receipt-data", timeout=10.0)
                 if response.status_code == 200:
                     return response.json()
                 detail = ""

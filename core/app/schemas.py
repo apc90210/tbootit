@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -196,7 +196,7 @@ class RepairOrder(RepairOrderBase):
 # Sale Schemas
 class SaleItemBase(BaseModel):
     product_id: Optional[int] = None
-    title: str
+    title: Optional[str] = None
     price: float
     quantity: int
 
@@ -239,6 +239,7 @@ class Sale(SaleBase):
     superseded_by_sale_id: Optional[int] = None
     reissued_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    revision_count: int = 0
     items: List[SaleItem] = []
     class Config:
         from_attributes = True
@@ -247,6 +248,36 @@ class SaleReissue(BaseModel):
     reason: str
     payment_method: Optional[str] = "cash"
     items: List[SaleItemCreate]
+
+class SaleRevision(BaseModel):
+    id: int
+    sale_id: int
+    revision_no: int
+    changed_at: Optional[datetime] = None
+    changed_by: Optional[str] = None
+    comment: Optional[str] = None
+    before_snapshot: str
+    after_snapshot: str
+    structured_diff: str
+    class Config:
+        from_attributes = True
+
+class SaleCorrect(BaseModel):
+    payment_method: Optional[str] = None
+    comment: Optional[str] = None
+    reason: Optional[str] = None
+    changed_by: Optional[str] = "Администратор"
+    items: List[SaleItemCreate]
+
+    @model_validator(mode="after")
+    def populate_comment(self):
+        if not self.comment and self.reason:
+            self.comment = self.reason
+        return self
+
+class SaleRevisionListResponse(BaseModel):
+    items: List[SaleRevision]
+    total: int
 
 class SaleListResponse(BaseModel):
     items: List[Sale]
@@ -704,6 +735,9 @@ class RepairOrderStatusUpdate(BaseModel):
     comment: Optional[str] = None
     changed_by: Optional[str] = None
     estimated_repair_amount: Optional[int] = None
+    final_amount: Optional[float] = None
+    payment_method: Optional[str] = None
+    warranty_days: Optional[int] = None
 
     @field_validator("estimated_repair_amount", mode="before")
     def validate_estimated_repair_amount_opt(cls, v):
@@ -735,6 +769,34 @@ class RepairOrderStatusUpdate(BaseModel):
                 raise ValueError("Предполагаемая стоимость ремонта должна быть целым числом")
         return v
 
+    @field_validator("final_amount", mode="before")
+    def validate_final_amount(cls, v):
+        if v is not None:
+            try:
+                val = float(v)
+                if val < 0:
+                    raise ValueError("Окончательная стоимость ремонта не может быть отрицательной")
+                return val
+            except ValueError as e:
+                if "отрицательной" in str(e):
+                    raise
+                raise ValueError("Окончательная стоимость ремонта должна быть числом")
+        return v
+
+    @field_validator("warranty_days", mode="before")
+    def validate_warranty_days(cls, v):
+        if v is not None:
+            try:
+                val = int(v)
+                if val < 0:
+                    raise ValueError("Срок гарантии не может быть отрицательным")
+                return val
+            except (ValueError, TypeError) as e:
+                if "отрицательным" in str(e):
+                    raise
+                raise ValueError("Срок гарантии должен быть целым неотрицательным числом")
+        return v
+
 class RepairOrder(RepairOrderBase):
     id: int
     number: str
@@ -747,7 +809,42 @@ class RepairOrder(RepairOrderBase):
     closed_at: Optional[datetime] = None
     issued_at: Optional[datetime] = None
     canceled_at: Optional[datetime] = None
+    final_amount: Optional[float] = None
+    payment_method: Optional[str] = None
+    warranty_days: Optional[int] = None
+    sale_id: Optional[int] = None
+    linked_sale_id: Optional[int] = None
     history: List[RepairStatusHistorySchema] = []
+
+    class Config:
+        from_attributes = True
+
+class RepairReceiptResponse(BaseModel):
+    repair_id: int
+    repair_number: str
+    status: str
+    status_label: Optional[str] = None
+    accepted_at: Optional[datetime] = None
+    issued_at: Optional[datetime] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    device_type: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    reported_issue: Optional[str] = None
+    diagnosis_text: Optional[str] = None
+    planned_works_text: Optional[str] = None
+    work_description: Optional[str] = None
+    final_amount: float
+    payment_method: Optional[str] = None
+    payment_method_label: Optional[str] = None
+    warranty_days: int
+    warranty_label: str
+    warranty_until: Optional[str] = None
+    sale_id: Optional[int] = None
+    organization: dict = {}
 
     class Config:
         from_attributes = True

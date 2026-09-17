@@ -378,6 +378,13 @@ class RepairOrder(Base):
     parts_description = Column(Text, nullable=True)
     price = Column(Float, nullable=True)
 
+    # Stage11B Repair Issue & Linked Sale fields
+    final_amount = Column(Float, nullable=True)
+    payment_method = Column(String, nullable=True)
+    warranty_days = Column(Integer, nullable=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True, index=True)
+
+    sale = relationship("Sale", foreign_keys=[sale_id], backref="repair_order_entry")
     history = relationship("RepairStatusHistory", back_populates="repair", order_by="RepairStatusHistory.changed_at.asc()")
 
 from sqlalchemy import event
@@ -433,9 +440,25 @@ class Sale(Base):
     superseded_by_sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
     reissued_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revision_count = Column(Integer, default=0, nullable=False, server_default="0")
     
     items = relationship("SaleItem", back_populates="sale")
     avito_post_sale_tasks = relationship("AvitoPostSaleTask", back_populates="sale")
+    revisions = relationship("SaleRevision", back_populates="sale", order_by="SaleRevision.revision_no.asc()")
+
+class SaleRevision(Base):
+    __tablename__ = "sale_revisions"
+    id = Column(Integer, primary_key=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False, index=True)
+    revision_no = Column(Integer, nullable=False)
+    changed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    changed_by = Column(String, nullable=True)
+    comment = Column(Text, nullable=True)
+    before_snapshot = Column(Text, nullable=False)
+    after_snapshot = Column(Text, nullable=False)
+    structured_diff = Column(Text, nullable=False)
+
+    sale = relationship("Sale", back_populates="revisions")
 
 class SaleItem(Base):
     __tablename__ = "sale_items"

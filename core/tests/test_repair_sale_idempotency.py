@@ -3,10 +3,11 @@ from app import models
 
 def test_repair_sale_idempotency_and_cancellation(client, db_session):
     """
-    Test idempotency of repair-sale creation:
-    - Multiple transitions to ready do NOT create duplicate sales.
-    - Updated amount is saved to existing sale.
-    - Transition to canceled updates linked sale status to 'canceled'.
+    Test idempotency of repair-sale creation on issue:
+    - Moving to ready creates NO sale.
+    - Multiple transitions/retries to issued do NOT create duplicate sales.
+    - Exactly one sale exists.
+    - Backward casual transition from issued is rejected.
     """
     rep = models.RepairOrder(
         number="R-IDEMPOTENT-001",
@@ -22,10 +23,24 @@ def test_repair_sale_idempotency_and_cancellation(client, db_session):
     db_session.add(rep)
     db_session.commit()
 
-    # 1. First transition to ready (amount = 3000)
+    # 1. Transition to ready (no sale created)
+    res_ready = client.post(
+        f"/api/repairs/{rep.id}/status",
+        json={"status": "ready", "comment": "Готов", "estimated_repair_amount": 3000}
+    )
+    assert res_ready.status_code == 200
+    assert db_session.query(models.Sale).filter(models.Sale.source_type == "repair", models.Sale.source_id == rep.id).count() == 0
+
+    # 2. First transition to issued
     res1 = client.post(
         f"/api/repairs/{rep.id}/status",
-        json={"status": "ready", "comment": "Готов 1", "estimated_repair_amount": 3000}
+        json={
+            "status": "issued",
+            "final_amount": 3000.0,
+            "payment_method": "card",
+            "warranty_days": 30,
+            "comment": "Выдан"
+        }
     )
     assert res1.status_code == 200
 
@@ -35,33 +50,28 @@ def test_repair_sale_idempotency_and_cancellation(client, db_session):
     ).count()
     assert sales_count_1 == 1
 
-    # 2. Transition to in_repair and then ready again with updated amount 3500
-    client.post(f"/api/repairs/{rep.id}/status", json={"status": "in_repair", "comment": "Допработа"})
+    # 3. Retry/double-submit to issued
     res2 = client.post(
         f"/api/repairs/{rep.id}/status",
-        json={"status": "ready", "comment": "Готов 2", "estimated_repair_amount": 3500}
+        json={
+            "status": "issued",
+            "final_amount": 3000.0,
+            "payment_method": "card",
+            "warranty_days": 30,
+            "comment": "Повторный вызов"
+        }
     )
     assert res2.status_code == 200
 
-    sales_2 = db_session.query(models.Sale).filter(
+    sales_count_2 = db_session.query(models.Sale).filter(
         models.Sale.source_type == "repair",
         models.Sale.source_id == rep.id
-    ).all()
-    assert len(sales_2) == 1
-    assert sales_2[0].total_amount == 3500.0
+    ).count()
+    assert sales_count_2 == 1, "Idempotency: double submit must NOT create duplicate sale"
 
-    # 3. Transition to in_repair and then canceled
-    client.post(f"/api/repairs/{rep.id}/status", json={"status": "in_repair", "comment": "Возврат на доработку"})
-    res3 = client.post(
+    # 4. Backward casual transition from issued is blocked
+    res_back = client.post(
         f"/api/repairs/{rep.id}/status",
-        json={"status": "canceled", "comment": "Клиент передумал", "changed_by": "Менеджер"}
+        json={"status": "ready", "comment": "Откат назад"}
     )
-    assert res3.status_code == 200
-
-    db_session.expire_all()
-    sale_after_cancel = db_session.query(models.Sale).filter(
-        models.Sale.source_type == "repair",
-        models.Sale.source_id == rep.id
-    ).first()
-    assert sale_after_cancel.status == "canceled"
-    assert sale_after_cancel.cancelled_at is not None
+    assert res_back.status_code == 409

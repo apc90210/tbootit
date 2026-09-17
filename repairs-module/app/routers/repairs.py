@@ -376,7 +376,10 @@ async def update_repair_status_submit(
     status_value: str = Form(..., alias="status"),
     comment: Optional[str] = Form(None),
     changed_by: Optional[str] = Form(None),
-    estimated_repair_amount_raw: Optional[str] = Form(None, alias="estimated_repair_amount")
+    estimated_repair_amount_raw: Optional[str] = Form(None, alias="estimated_repair_amount"),
+    final_amount_raw: Optional[str] = Form(None, alias="final_amount"),
+    payment_method: Optional[str] = Form(None),
+    warranty_days_raw: Optional[str] = Form(None, alias="warranty_days")
 ):
     parsed_amount: Optional[int] = None
     if estimated_repair_amount_raw is not None and estimated_repair_amount_raw.strip() != "":
@@ -406,12 +409,74 @@ async def update_repair_status_submit(
                 error_msg="Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
             )
 
+    parsed_final_amount: Optional[float] = None
+    parsed_warranty_days: Optional[int] = None
+    pm: Optional[str] = None
+
+    if status_value == "issued":
+        # Final amount validation
+        if final_amount_raw is not None and final_amount_raw.strip() != "":
+            try:
+                val = float(final_amount_raw)
+                if val < 0:
+                    return await repair_detail(
+                        request, repair_id, error_msg="Окончательная стоимость ремонта не может быть отрицательной"
+                    )
+                parsed_final_amount = val
+            except ValueError:
+                return await repair_detail(
+                    request, repair_id, error_msg="Окончательная стоимость ремонта должна быть числом"
+                )
+        elif estimated_repair_amount_raw is not None and estimated_repair_amount_raw.strip() != "":
+            try:
+                val = float(estimated_repair_amount_raw)
+                if val < 0:
+                    return await repair_detail(request, repair_id, error_msg="Стоимость ремонта не может быть отрицательной")
+                parsed_final_amount = val
+            except ValueError:
+                return await repair_detail(request, repair_id, error_msg="Стоимость ремонта должна быть числом")
+        elif isinstance(repair_data, dict) and (repair_data.get("estimated_repair_amount") is not None or repair_data.get("price") is not None):
+            val = repair_data.get("estimated_repair_amount") if repair_data.get("estimated_repair_amount") is not None else repair_data.get("price")
+            parsed_final_amount = float(val)
+        else:
+            return await repair_detail(
+                request, repair_id, error_msg="Для выдачи ремонта необходимо указать окончательную стоимость ремонта"
+            )
+
+        # Payment method validation
+        if not payment_method or not payment_method.strip():
+            return await repair_detail(
+                request, repair_id, error_msg="Для выдачи ремонта выберите способ оплаты"
+            )
+        pm = payment_method.strip()
+
+        # Warranty validation
+        if warranty_days_raw is not None and warranty_days_raw.strip() != "":
+            try:
+                wd = int(warranty_days_raw)
+                if wd < 0:
+                    return await repair_detail(
+                        request, repair_id, error_msg="Срок гарантии не может быть отрицательным"
+                    )
+                parsed_warranty_days = wd
+            except ValueError:
+                return await repair_detail(
+                    request, repair_id, error_msg="Срок гарантии должен быть целым числом дней (0 = без гарантии)"
+                )
+        else:
+            return await repair_detail(
+                request, repair_id, error_msg="Для выдачи ремонта укажите срок гарантии (0 = без гарантии)"
+            )
+
     res = await core_client.update_repair_status(
         repair_id=repair_id,
         status=status_value,
         comment=comment,
         changed_by=changed_by,
-        estimated_repair_amount=parsed_amount
+        estimated_repair_amount=parsed_amount,
+        final_amount=parsed_final_amount,
+        payment_method=pm,
+        warranty_days=parsed_warranty_days
     )
 
     if isinstance(res, dict) and res.get("error"):
@@ -419,8 +484,16 @@ async def update_repair_status_submit(
         return await repair_detail(request, repair_id, error_msg=err_detail)
 
     status_label = res.get("status_label") or status_value
+    success_msg = f"Статус успешно изменён на «{status_label}»"
+    if status_value == "issued":
+        sale_id = res.get("sale_id") or res.get("linked_sale_id")
+        if sale_id:
+            success_msg = f"Ремонт выдан клиенту. Оформлена продажа №{sale_id}."
+        else:
+            success_msg = "Ремонт выдан клиенту. Оплата успешно принята."
+
     return RedirectResponse(
-        url=f"/repairs/{repair_id}?msg=Статус+успешно+изменён+на+«{status_label}»",
+        url=f"/repairs/{repair_id}?msg={success_msg}",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
@@ -449,5 +522,22 @@ async def print_repair_order(request: Request, repair_id: int):
         request=request, name="repair_print_order.html", context={
             "repair": data,
             "org": org_settings
+        }
+    )
+
+@router.get("/repairs/{repair_id}/receipt", response_class=HTMLResponse)
+@router.get("/{repair_id}/receipt", response_class=HTMLResponse)
+async def print_repair_warranty_receipt(request: Request, repair_id: int):
+    data = await core_client.get_repair_receipt_data(repair_id)
+    if isinstance(data, dict) and data.get("error"):
+        return templates.TemplateResponse(
+            request=request, name="error.html", context={
+                "message": data.get("detail") or "Данные для квитанции не найдены"
+            }
+        )
+
+    return templates.TemplateResponse(
+        request=request, name="repair_warranty_receipt.html", context={
+            "receipt": data
         }
     )

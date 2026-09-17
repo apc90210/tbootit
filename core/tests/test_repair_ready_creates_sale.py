@@ -1,19 +1,15 @@
 import pytest
 from app import models
 
-def test_repair_ready_creates_sale_and_audit(client, db_session):
+def test_repair_ready_does_not_create_sale_issued_creates_sale(client, db_session):
     """
-    Test that transitioning a repair to status='ready' creates a linked Sale record.
-    Verifies:
-    - Sale created with total_amount = repair.estimated_repair_amount (e.g. 2800)
-    - source_type = 'repair'
-    - source_id = repair.id
-    - Description contains repair number and issue
-    - Audit log event repair.sale_created is generated
+    Stage 11B Canonical Rule: Готов != продажа.
+    - Transitioning to 'ready' marks repair finished, but creates NO Sale.
+    - Transitioning from 'ready' to 'issued' with payment and warranty creates exactly one linked Sale.
     """
     # 1. Create a repair in diagnostics
     rep = models.RepairOrder(
-        number="R-STAGE05C-001",
+        number="R-STAGE11B-001",
         status="diagnostics",
         customer_name="Тест Продажи",
         customer_phone="+79998887766",
@@ -34,9 +30,35 @@ def test_repair_ready_creates_sale_and_audit(client, db_session):
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "ready"
-    assert body["estimated_repair_amount"] == 2800
 
-    # 3. Verify linked Sale in DB
+    # 3. Verify NO Sale in DB on ready
+    sale_on_ready = db_session.query(models.Sale).filter(
+        models.Sale.source_type == "repair",
+        models.Sale.source_id == rep.id
+    ).first()
+    assert sale_on_ready is None, "Готов != продажа: Ready must NOT create a sale"
+
+    # 4. Transition to issued with payment details
+    res_issue = client.post(
+        f"/api/repairs/{rep.id}/status",
+        json={
+            "status": "issued",
+            "final_amount": 2800.0,
+            "payment_method": "cash",
+            "warranty_days": 30,
+            "changed_by": "Администратор",
+            "comment": "Выдан клиенту"
+        }
+    )
+    assert res_issue.status_code == 200
+    issue_body = res_issue.json()
+    assert issue_body["status"] == "issued"
+    assert issue_body["final_amount"] == 2800.0
+    assert issue_body["payment_method"] == "cash"
+    assert issue_body["warranty_days"] == 30
+    assert issue_body["sale_id"] is not None
+
+    # 5. Verify linked Sale in DB
     sale = db_session.query(models.Sale).filter(
         models.Sale.source_type == "repair",
         models.Sale.source_id == rep.id
@@ -44,31 +66,25 @@ def test_repair_ready_creates_sale_and_audit(client, db_session):
     assert sale is not None
     assert sale.total_amount == 2800.0
     assert sale.status == "completed"
-    assert "R-STAGE05C-001" in sale.comment
+    assert sale.payment_method == "cash"
+    assert sale.warranty_days == 30
+    assert "R-STAGE11B-001" in sale.comment
     assert "Lenovo" in sale.comment
-    assert "IdeaPad 3" in sale.comment
-    assert "Не включается" in sale.comment
 
-    # 4. Verify line item created
+    # 6. Verify line item created
     items = db_session.query(models.SaleItem).filter(models.SaleItem.sale_id == sale.id).all()
     assert len(items) == 1
     assert items[0].product_id is None
     assert items[0].price == 2800.0
     assert items[0].quantity == 1
 
-    # 5. Verify audit log entry
-    audit = db_session.query(models.AuditLog).filter(
-        models.AuditLog.action == "repair.sale_created",
-        models.AuditLog.entity_id == rep.id
-    ).first()
-    assert audit is not None
 
-def test_free_repair_ready_creates_zero_amount_sale(client, db_session):
+def test_free_repair_issued_creates_zero_amount_sale(client, db_session):
     """
-    Test that a free repair (estimated_repair_amount=0) creates a linked sale with total_amount=0.
+    Test that a free repair issued with final_amount=0 creates a linked sale with total_amount=0.
     """
     rep = models.RepairOrder(
-        number="R-STAGE05C-FREE",
+        number="R-STAGE11B-FREE",
         status="diagnostics",
         customer_name="Бесплатный Ремонт",
         customer_phone="+79998887766",
@@ -81,11 +97,26 @@ def test_free_repair_ready_creates_zero_amount_sale(client, db_session):
     db_session.add(rep)
     db_session.commit()
 
-    res = client.post(
+    # Move to ready
+    res_ready = client.post(
         f"/api/repairs/{rep.id}/status",
         json={"status": "ready", "comment": "Без оплаты", "estimated_repair_amount": 0}
     )
-    assert res.status_code == 200
+    assert res_ready.status_code == 200
+    assert db_session.query(models.Sale).filter(models.Sale.source_type == "repair", models.Sale.source_id == rep.id).first() is None
+
+    # Move to issued
+    res_issue = client.post(
+        f"/api/repairs/{rep.id}/status",
+        json={
+            "status": "issued",
+            "final_amount": 0.0,
+            "payment_method": "cash",
+            "warranty_days": 0,
+            "comment": "Бесплатная выдача"
+        }
+    )
+    assert res_issue.status_code == 200
 
     sale = db_session.query(models.Sale).filter(
         models.Sale.source_type == "repair",

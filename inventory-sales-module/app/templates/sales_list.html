@@ -36,6 +36,11 @@
                         {% if sale.source_type == 'repair' %}
                             <span style="background: #17a2b8; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 4px;">Ремонт</span>
                         {% endif %}
+                        {% if sale.revision_count and sale.revision_count > 0 %}
+                            <span title="Продажа была скорректирована (ревизий: {{ sale.revision_count }})" style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-left: 4px; display: inline-block;">
+                                ✎ Изменена{% if sale.revision_count > 1 %} ×{{ sale.revision_count }}{% endif %}
+                            </span>
+                        {% endif %}
                     </td>
                     <td>{{ sale.created_at or '—' }}</td>
                     <td>

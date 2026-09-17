@@ -9,14 +9,22 @@
             {% if repair.status not in ['issued', 'canceled'] %}
             <a href="/repairs/repairs/{{ repair.id }}/edit" class="btn btn-primary">Редактировать</a>
             {% endif %}
+            {% if repair.status == 'issued' %}
+            <a href="/repairs/repairs/{{ repair.id }}/receipt" target="_blank" class="btn btn-success" style="margin-left: 5px; font-weight: bold;">📄 Квитанция / гарантия</a>
+            {% endif %}
             <a href="/repairs/repairs/{{ repair.id }}/print" target="_blank" class="btn btn-info" style="margin-left: 5px;">🖨️ Печать наряд-заказа</a>
             <a href="/repairs/repairs" class="btn btn-secondary" style="margin-left: 5px;">К списку ремонтов</a>
         </div>
     </div>
 
     {% if msg %}
-    <div style="background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
-        ✓ {{ msg }}
+    <div style="background: #d4edda; color: #155724; padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>✓ {{ msg }}</div>
+        {% if repair.status == 'issued' %}
+        <div>
+            <a href="/repairs/repairs/{{ repair.id }}/receipt" target="_blank" class="btn btn-success" style="font-size: 0.9rem; padding: 6px 14px;">🖨️ Распечатать квитанцию / гарантию</a>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -26,6 +34,32 @@
         {% if "стоимость ремонта" in error_msg or repair.estimated_repair_amount is none %}
         <a href="/repairs/repairs/{{ repair.id }}/edit" class="btn btn-warning" style="font-weight: bold; text-decoration: none; padding: 6px 12px;">Указать стоимость ремонта</a>
         {% endif %}
+    </div>
+    {% endif %}
+
+    {% if repair.status == 'issued' %}
+    <!-- Issued Banner -->
+    <div style="background: #e8f4fd; color: #0c5460; padding: 16px 20px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #bee5eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <div style="font-size: 1.15rem; font-weight: bold; margin-bottom: 4px; color: #004085;">
+                ✓ Ремонт успешно выдан клиенту
+            </div>
+            <div style="font-size: 0.95rem;">
+                Окончательная оплата: <strong>{{ "%.2f"|format(repair.final_amount or repair.price or 0) }} ₽</strong>
+                {% if repair.payment_method %} &nbsp;|&nbsp; Способ: <strong>{{ repair.payment_method }}</strong>{% endif %}
+                &nbsp;|&nbsp; Гарантия: <strong>{{ repair.warranty_days or 0 }} дн.</strong>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            {% if repair.sale_id or repair.linked_sale_id %}
+            <a href="/sales/sales/{{ repair.sale_id or repair.linked_sale_id }}" target="_blank" class="btn btn-primary" style="font-size: 0.92rem;">
+                🛒 Связанная продажа №{{ repair.sale_id or repair.linked_sale_id }}
+            </a>
+            {% endif %}
+            <a href="/repairs/repairs/{{ repair.id }}/receipt" target="_blank" class="btn btn-success" style="font-size: 0.92rem; font-weight: bold;">
+                📄 Печать квитанции / гарантии
+            </a>
+        </div>
     </div>
     {% endif %}
 
@@ -79,6 +113,16 @@
             {% if repair.estimated_repair_amount is not none %}<strong>{{ repair.estimated_repair_amount }} ₽</strong>{% else %}<span style="color: #888;">Не указано</span>{% endif %}
             </p>
 
+            {% if repair.status == 'issued' %}
+            <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px; color: #0056b3;">Финансовые итоги и выдача</h3>
+            <p><strong>Окончательная стоимость:</strong> <strong>{{ "%.2f"|format(repair.final_amount or repair.price or 0) }} ₽</strong></p>
+            <p><strong>Способ оплаты:</strong> {{ repair.payment_method or '—' }}</p>
+            <p><strong>Гарантийный срок:</strong> {{ repair.warranty_days or 0 }} дней</p>
+            {% if repair.sale_id or repair.linked_sale_id %}
+            <p><strong>Связанный чек продажи:</strong> <a href="/sales/sales/{{ repair.sale_id or repair.linked_sale_id }}" target="_blank">Продажа №{{ repair.sale_id or repair.linked_sale_id }}</a></p>
+            {% endif %}
+            {% endif %}
+
             <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px;">Клиент</h3>
             <p><strong>ФИО:</strong> {{ repair.customer_name }}</p>
             <p><strong>Телефон:</strong> <code>{{ repair.customer_phone }}</code></p>
@@ -89,13 +133,25 @@
         <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 20px;">
             <!-- Status Update Action Box -->
             <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 4px;">
-                <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Изменить статус</h3>
+                <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Управление статусом</h3>
                 
+                {% if repair.status == 'ready' %}
+                <div style="margin-bottom: 18px; padding: 12px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px;">
+                    <div style="font-weight: bold; color: #2e7d32; margin-bottom: 6px;">Ремонт готов к выдаче</div>
+                    <div style="font-size: 0.88rem; color: #555; margin-bottom: 10px;">
+                        Оборудование ожидает клиента. При выдаче подтвердите окончательную сумму, способ оплаты и срок гарантии.
+                    </div>
+                    <button type="button" onclick="openIssueModal()" class="btn btn-success" style="width: 100%; font-weight: bold; padding: 10px;">
+                        🚀 Выдать клиенту и принять оплату
+                    </button>
+                </div>
+                {% endif %}
+
                 {% if allowed_statuses %}
-                <form method="POST" action="/repairs/repairs/{{ repair.id }}/status">
+                <form id="statusForm" method="POST" action="/repairs/repairs/{{ repair.id }}/status" onsubmit="return handleStatusSubmit(event)">
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; font-weight: bold; margin-bottom: 5px;">Новый статус:</label>
-                        <select name="status" required style="width: 100%; padding: 8px; box-sizing: border-box;">
+                        <select id="statusSelect" name="status" required style="width: 100%; padding: 8px; box-sizing: border-box;" onchange="handleStatusChange(this.value)">
                             {% for st in allowed_statuses %}
                             <option value="{{ st.value }}">{{ st.label }}</option>
                             {% endfor %}
@@ -119,8 +175,16 @@
                         <input type="text" name="changed_by" value="{{ repair.assigned_to or '' }}" placeholder="ФИО..." style="width: 100%; padding: 8px; box-sizing: border-box;">
                     </div>
 
-                    <button type="submit" class="btn btn-success" style="width: 100%; font-weight: bold;">Сохранить новый статус</button>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; font-weight: bold;">Сохранить статус</button>
                 </form>
+                {% elif repair.status == 'issued' %}
+                <div style="padding: 12px; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.9rem; color: #475569;">
+                    <p style="margin: 0 0 8px 0; font-weight: bold; color: #1e293b;">🔒 Финальный статус: Выдан</p>
+                    <p style="margin: 0 0 10px 0;">Заказ закрыт и зафиксирован в продаже №{{ repair.sale_id or repair.linked_sale_id }}. Случайный откат статуса заблокирован во избежание расхождений в бухгалтерском учёте.</p>
+                    <a href="/repairs/repairs/{{ repair.id }}/receipt" target="_blank" class="btn btn-success" style="display: block; text-align: center; text-decoration: none; font-weight: bold;">
+                        🖨️ Квитанция / гарантийный талон
+                    </a>
+                </div>
                 {% else %}
                 <p style="color: #666; font-style: italic;">Переход из статуса «{{ repair.status_label or repair.status }}» не предусмотрен (финальный статус).</p>
                 {% endif %}
@@ -149,24 +213,24 @@
     <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 4px; margin-top: 20px;">
         <h3>История статусов</h3>
         {% if repair.history %}
-        <table style="margin-top: 10px;">
+        <table style="margin-top: 10px; width: 100%; border-collapse: collapse;">
             <thead>
-                <tr>
-                    <th>Дата / Время</th>
-                    <th>Предыдущий статус</th>
-                    <th>Новый статус</th>
-                    <th>Комментарий</th>
-                    <th>Кто изменил</th>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 8px; text-align: left;">Дата / Время</th>
+                    <th style="padding: 8px; text-align: left;">Предыдущий статус</th>
+                    <th style="padding: 8px; text-align: left;">Новый статус</th>
+                    <th style="padding: 8px; text-align: left;">Комментарий</th>
+                    <th style="padding: 8px; text-align: left;">Кто изменил</th>
                 </tr>
             </thead>
             <tbody>
                 {% for hist in repair.history %}
-                <tr>
-                    <td>{{ hist.changed_at[:19] if hist.changed_at else '—' }}</td>
-                    <td>{{ hist.old_status or '—' }}</td>
-                    <td><strong>{{ hist.new_status }}</strong></td>
-                    <td>{{ hist.comment or '—' }}</td>
-                    <td>{{ hist.changed_by or '—' }}</td>
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">{{ hist.changed_at[:19] if hist.changed_at else '—' }}</td>
+                    <td style="padding: 8px;">{{ hist.old_status or '—' }}</td>
+                    <td style="padding: 8px;"><strong>{{ hist.new_status }}</strong></td>
+                    <td style="padding: 8px;">{{ hist.comment or '—' }}</td>
+                    <td style="padding: 8px;">{{ hist.changed_by or '—' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -175,4 +239,105 @@
         <p style="color: #666;">Записи в истории отсутствуют.</p>
         {% endif %}
     </div>
+
+    <!-- Issue Completion Modal -->
+    <div id="issueModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 9999; justify-content: center; align-items: center;">
+        <div style="background: #fff; border-radius: 8px; width: 520px; max-width: 92%; padding: 25px; box-shadow: 0 5px 25px rgba(0,0,0,0.25); position: relative;">
+            <h3 style="margin-top: 0; margin-bottom: 6px; font-size: 1.25rem;">Выдача устройства и оплата</h3>
+            <p style="margin-top: 0; margin-bottom: 18px; color: #666; font-size: 0.9rem;">
+                Ремонт <strong>{{ repair.number }}</strong> ({{ repair.device_type }} {{ repair.brand or '' }} {{ repair.model or '' }})
+            </p>
+
+            <form method="POST" action="/repairs/repairs/{{ repair.id }}/status">
+                <input type="hidden" name="status" value="issued">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Окончательная стоимость ремонта, ₽ <span style="color: red;">*</span>
+                    </label>
+                    <input type="number" step="any" min="0" name="final_amount" id="modalFinalAmount" required
+                           value="{{ repair.final_amount or repair.estimated_repair_amount or repair.price or 0 }}"
+                           style="width: 100%; padding: 9px; box-sizing: border-box; font-size: 1.05rem; font-weight: bold;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Способ оплаты <span style="color: red;">*</span>
+                    </label>
+                    <select name="payment_method" required style="width: 100%; padding: 9px; box-sizing: border-box; font-size: 0.95rem;">
+                        <option value="cash">Наличные</option>
+                        <option value="card">Банковская карта (безнал)</option>
+                        <option value="transfer">Перевод на карту / счёт</option>
+                        <option value="sbp">Система быстрых платежей (СБП)</option>
+                        <option value="other">Другое</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">
+                        Срок гарантии (дней) <span style="color: red;">*</span>
+                    </label>
+                    <input type="number" min="0" step="1" name="warranty_days" required value="30"
+                           placeholder="30 (0 = без гарантии)"
+                           style="width: 100%; padding: 9px; box-sizing: border-box;">
+                    <div style="font-size: 0.8rem; color: #777; margin-top: 3px;">Укажите 0, если ремонт выдаётся без гарантийных обязательств.</div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Мастер / Администратор:</label>
+                    <input type="text" name="changed_by" value="{{ repair.assigned_to or '' }}" placeholder="ФИО сотрудника..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Комментарий к выдаче:</label>
+                    <textarea name="comment" rows="2" placeholder="Заметка о выдаче клиенту..." style="width: 100%; padding: 8px; box-sizing: border-box;"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" onclick="closeIssueModal()" class="btn btn-secondary" style="padding: 9px 18px; font-weight: 500;">
+                        Отмена
+                    </button>
+                    <button type="submit" class="btn btn-success" style="padding: 9px 22px; font-weight: bold;">
+                        Подтвердить выдачу и оплату
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function openIssueModal() {
+        var modal = document.getElementById('issueModal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    function closeIssueModal() {
+        var modal = document.getElementById('issueModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        var sel = document.getElementById('statusSelect');
+        if (sel && sel.value === 'issued') {
+            sel.value = sel.options[0].value;
+        }
+    }
+
+    function handleStatusChange(newVal) {
+        if (newVal === 'issued') {
+            openIssueModal();
+        }
+    }
+
+    function handleStatusSubmit(e) {
+        var sel = document.getElementById('statusSelect');
+        if (sel && sel.value === 'issued') {
+            e.preventDefault();
+            openIssueModal();
+            return false;
+        }
+        return true;
+    }
+    </script>
 {% endblock %}
