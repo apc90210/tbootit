@@ -41,15 +41,24 @@
 - **Role:** Canonical Primary Production (`https://144.31.15.88`).
 - **Provider Hostname:** `atanov822.serv.host`.
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
-- **Current Git Commit:** `ce7dec766445f4083ed81205023fb934d375bced` (Stage 11C).
+- **Current Git Commit:** `ac115b08721f04dcaba3809015025f576e32ea7b` (Stage 11D-R1).
 - **Restart Count:** 0 across all containers.
-- **Business Data Status:** **CANONICAL PRODUCTION (239 products, 7 sales, 1 repair order, 235 photos, 235 listings, 5 avito post-sale tasks)**.
-- **Stage 11A/11B Features Deployed:** Sales corrections with audit revisions, canonical repair issue payment finalization, warranty receipt.
+- **Business Data Status:** **CANONICAL PRODUCTION (241 products, 4 sales, 1 repair order, 237 photos, 237 listings, 3 avito post-sale tasks)**.
+- **Stage 11A/11B/11D-R1 Features Deployed:**
+  - Sales corrections with immutable revision history.
+  - Canonical repair issue payment finalization, warranty receipt (`/sales/{id}` canonical link).
+  - Ready status accessible from all active repair stages with price field.
+  - OWNER-only permanent bulk delete for Sales & Repairs with full relational invariants.
+  - Anti-spoofing gateway & reverse-proxy header sanitization for `X-Auth-Is-Owner`.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
-- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-17_072006.zip` verified.
-- **Release Checkpoint:** `checkpoint_20260917_072006_37768cb2`.
+- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-17_110805.zip` verified (`061b139bed42b56c228500a58cdc3352aa41a6b0dcc46551e778e9640de9e713`).
+- **Running Image IDs:**
+  - `core`: `sha256:237ff077b400f85bb8e9ed20f9e4b0c71a828d49c2111d96f0503379e710a5da`
+  - `admin-shell`: `sha256:0bcc827b6307d599bf296291974632cc68736e5c6394bdbad723d4e1d863ac2d`
+  - `inventory-sales`: `sha256:e7a8fdcea8e39f2cb26df3b47ad742630c29630a7f35b98fb97cdc25fceacbaa`
+  - `repairs`: `sha256:f91c41abe2820a5b70f166340d31e65a8a7889be731a37416233a41c394e3c3a`
 - **Schema Guard:** Contract `3b8d35d76ae6343f105925aa7c725c7ebc4b8613ed5f015bec61a27f491484dc` (SAFE).
-- **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles; dev-reset blocked even for OWNER on production.
+- **RBAC & Security Status:** USER restricted from dev-reset, seed, backups, certificates, avito profiles, and bulk-delete; dev-reset blocked even for OWNER on production; spoofed `X-Auth-Is-Owner: 1` returns 403.
 - **Avito Extension Version:** `0.2.62`.
 - **avito_post_sale_tasks Table:** **PRESENT**.
 
