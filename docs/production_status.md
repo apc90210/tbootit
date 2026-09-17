@@ -41,17 +41,23 @@
 - **Role:** Canonical Primary Production (`https://144.31.15.88`).
 - **Provider Hostname:** `atanov822.serv.host`.
 - **Stack Status:** **RUNNING** (all 6 services Up and healthy).
-- **Current Git Commit:** `ac115b08721f04dcaba3809015025f576e32ea7b` (Stage 11D-R1).
+- **Current Git Commit:** Stage 11D-R2 (`024c453592680addaa5f064380cbecc886700a6b`).
 - **Restart Count:** 0 across all containers.
-- **Business Data Status:** **CANONICAL PRODUCTION (241 products, 4 sales, 1 repair order, 237 photos, 237 listings, 3 avito post-sale tasks)**.
-- **Stage 11A/11B/11D-R1 Features Deployed:**
+- **Business Data Status:** **CANONICAL PRODUCTION (241 products, 4 sales, 1 repair order, 237 photos, 237 listings, 4 avito post-sale tasks)**.
+- **Stage 11A/11B/11D-R1/11D-R2 Features Deployed & Audited:**
   - Sales corrections with immutable revision history.
   - Canonical repair issue payment finalization, warranty receipt (`/sales/{id}` canonical link).
   - Ready status accessible from all active repair stages with price field.
   - OWNER-only permanent bulk delete for Sales & Repairs with full relational invariants.
   - Anti-spoofing gateway & reverse-proxy header sanitization for `X-Auth-Is-Owner`.
+  - Forensic integrity audit (Stage 11D-R2): repair #1 and status history restored from pre-incident backup after test mutation; compensating audit event #1746 recorded; data integrity 100% verified.
 - **Production Data Guard:** Installed and active at `/srv/technoreboot/data/.technoreboot_production_data`.
-- **Pre-Update Safety Backup:** `TECHNOREBOOT_BACKUP_2026-09-17_110805.zip` verified (`061b139bed42b56c228500a58cdc3352aa41a6b0dcc46551e778e9640de9e713`).
+- **Incident Forensic Status:**
+  - `REAL_BUSINESS_RECORDS_MUTATED_DURING_STAGE11D_R1`: true
+  - `INCIDENT_RESTORED_AND_VERIFIED`: true
+  - `PRE_INCIDENT_BACKUP`: `TECHNOREBOOT_BACKUP_2026-09-17_110805.zip` (`061b139bed42b56c228500a58cdc3352aa41a6b0dcc46551e778e9640de9e713`)
+  - `POST_INCIDENT_BACKUP`: `TECHNOREBOOT_BACKUP_2026-09-17_113124.zip` (`832c9a108d8666a8a926c5e004c5efa586f22c40c1406a50bc9a6dddc7844768`)
+  - `COMPENSATING_AUDIT_LOG_ID`: 1746 (`production_test_restore`)
 - **Running Image IDs:**
   - `core`: `sha256:237ff077b400f85bb8e9ed20f9e4b0c71a828d49c2111d96f0503379e710a5da`
   - `admin-shell`: `sha256:0bcc827b6307d599bf296291974632cc68736e5c6394bdbad723d4e1d863ac2d`
