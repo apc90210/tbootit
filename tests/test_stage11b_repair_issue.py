@@ -464,3 +464,18 @@ def test_15_existing_production_synced_repair_data_remains_readable():
         assert "id" in first_rep
         assert "number" in first_rep
         assert "status" in first_rep
+
+
+def test_16_ready_status_accessible_from_any_repair_stage():
+    """Requirement: Ready ('Готов') status can be selected from any active repair stage."""
+    stages_to_test = ["waiting_customer", "waiting_parts", "diagnostics", "received", "in_repair"]
+
+    for stage in stages_to_test:
+        rep_id = _create_test_repair(status=stage, estimated_repair_amount=2500)
+        res = client.post(
+            f"/api/repairs/{rep_id}/status",
+            json={"status": "ready", "comment": f"Готов из стадии {stage}"}
+        )
+        assert res.status_code == 200, f"Failed to transition to ready from {stage}: {res.text}"
+        assert res.json()["status"] == "ready"
+

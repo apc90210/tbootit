@@ -31,7 +31,7 @@ def test_repair_status_transition_matrix(client):
     assert res3.json()["status"] == "ready"
 
     # Valid transition: ready -> issued
-    res4 = client.post(f"/api/repairs/{r_id}/status", json={"status": "issued"})
+    res4 = client.post(f"/api/repairs/{r_id}/status", json={"status": "issued", "payment_method": "cash", "warranty_days": 30})
     assert res4.status_code == 200
     data_issued = res4.json()
     assert data_issued["status"] == "issued"

@@ -212,13 +212,13 @@ async def repair_detail(request: Request, repair_id: int, msg: Optional[str] = N
     # Determine allowed next statuses for status transition UI
     cur_status = data.get("status")
     VALID_TRANSITIONS = {
-        "received": ["diagnostics", "canceled"],
+        "received": ["diagnostics", "in_repair", "ready", "canceled"],
         "diagnostics": ["waiting_customer", "waiting_parts", "in_repair", "ready", "unrepairable", "canceled"],
-        "waiting_customer": ["diagnostics", "waiting_parts", "in_repair", "unrepairable", "canceled"],
-        "waiting_parts": ["waiting_customer", "in_repair", "unrepairable", "canceled"],
+        "waiting_customer": ["diagnostics", "waiting_parts", "in_repair", "ready", "unrepairable", "canceled"],
+        "waiting_parts": ["waiting_customer", "in_repair", "ready", "unrepairable", "canceled"],
         "in_repair": ["waiting_customer", "waiting_parts", "ready", "unrepairable", "canceled"],
         "ready": ["in_repair", "issued"],
-        "unrepairable": ["issued", "canceled"],
+        "unrepairable": ["diagnostics", "in_repair", "ready", "issued", "canceled"],
         "issued": [],
         "canceled": []
     }
@@ -400,13 +400,18 @@ async def update_repair_status_submit(
             )
 
     repair_data = await core_client.get_repair(repair_id)
-    if isinstance(repair_data, dict) and repair_data.get("status") == "diagnostics" and status_value != "diagnostics":
+    if ((repair_data.get("status") == "diagnostics" and status_value != "diagnostics") or status_value == "ready"):
         effective_amount = parsed_amount if parsed_amount is not None else repair_data.get("estimated_repair_amount")
         if effective_amount is None:
+            detail_msg = (
+                "Для перевода в статус «Готов» укажите стоимость ремонта. Можно указать 0 ₽."
+                if status_value == "ready"
+                else "Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
+            )
             return await repair_detail(
                 request,
                 repair_id,
-                error_msg="Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
+                error_msg=detail_msg
             )
 
     parsed_final_amount: Optional[float] = None

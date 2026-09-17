@@ -12,13 +12,13 @@ from app.routers.customers import log_audit
 router = APIRouter()
 
 VALID_TRANSITIONS = {
-    "received": ["diagnostics", "canceled"],
+    "received": ["diagnostics", "in_repair", "ready", "canceled"],
     "diagnostics": ["waiting_customer", "waiting_parts", "in_repair", "ready", "unrepairable", "canceled"],
-    "waiting_customer": ["diagnostics", "waiting_parts", "in_repair", "unrepairable", "canceled"],
-    "waiting_parts": ["waiting_customer", "in_repair", "unrepairable", "canceled"],
+    "waiting_customer": ["diagnostics", "waiting_parts", "in_repair", "ready", "unrepairable", "canceled"],
+    "waiting_parts": ["waiting_customer", "in_repair", "ready", "unrepairable", "canceled"],
     "in_repair": ["waiting_customer", "waiting_parts", "ready", "unrepairable", "canceled"],
     "ready": ["in_repair", "issued"],
-    "unrepairable": ["issued", "canceled"],
+    "unrepairable": ["diagnostics", "in_repair", "ready", "issued", "canceled"],
     "issued": [],
     "canceled": []
 }
@@ -333,11 +333,16 @@ def update_repair_status(repair_id: int, status_in: schemas.RepairOrderStatusUpd
         else db_repair.estimated_repair_amount
     )
 
-    if current_status == "diagnostics" and new_status != "diagnostics":
+    if (current_status == "diagnostics" and new_status != "diagnostics") or new_status == "ready":
         if effective_amount is None:
+            detail_msg = (
+                "Для перевода в статус «Готов» укажите стоимость ремонта. Можно указать 0 ₽."
+                if new_status == "ready"
+                else "Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
+            )
             raise HTTPException(
                 status_code=400,
-                detail="Для выхода из статуса «Диагностика» укажите стоимость ремонта. Можно указать 0 ₽."
+                detail=detail_msg
             )
 
     old_amount = db_repair.estimated_repair_amount
