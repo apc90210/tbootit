@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.62)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.64)
 
 let pageInitialData = null;
 
@@ -9,7 +9,7 @@ function getExtensionVersion() {
             if (m && m.version) return m.version;
         }
     } catch (e) {}
-    return "0.2.62";
+    return "0.2.64";
 }
 
 // Listen for direct initial data captured from main world
@@ -176,22 +176,37 @@ function getCanonicalAvitoImageIdentity(url) {
     if (!url || typeof url !== 'string') return '';
 
     const pathOnly = url.split('?')[0];
-    let cleanPath = pathOnly.replace(/^https?:\/\/[^\/]+\//i, '');
-    cleanPath = cleanPath.replace(/^(?:image\/\d+\/|\d+x\d+\/)+/i, '');
-    const filename = cleanPath.split('/').pop() || cleanPath;
+    let clean = pathOnly.replace(/^https?:\/\/[^\/]+\//i, '');
+    clean = clean.replace(/^(?:image\/\d+\/|\d+x\d+\/)+/i, '');
+    const filename = clean.split('/').pop() || clean;
+
+    // 1. If numeric filename before extension (e.g. 9876543210.jpg)
+    const noExt = filename.replace(/\.(?:jpg|jpeg|webp|png|avif)$/i, '');
+    if (/^\d{6,}$/.test(noExt)) {
+        return `avito_photo_${noExt}`;
+    }
+
+    // 2. Strip leading index prefix e.g. "1." from "1.sePk6..."
     const token = filename.replace(/^\d+\./, '');
 
-    // Match [prefix][letter]a[digit] — both new (ba4, ra3) and old (La6) formats
-    const laMatch = token.match(/^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[a-zA-Z]a\d/i);
+    // 3. Match [prefix][alphanumeric]a[digit] with non-greedy prefix
+    const laMatch = token.match(/^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[A-Za-z0-9]a\d/i);
     if (laMatch && laMatch[1]) {
         return `avito_photo_${laMatch[1]}`;
     }
 
-    const tokenNoExt = token.replace(/\.(?:jpg|jpeg|webp|png)$/i, '');
-    if (tokenNoExt && tokenNoExt.length >= 3) {
-        return `avito_photo_${tokenNoExt}`;
+    // 4. Dot-separated hash e.g. "hash.second_hash"
+    const parts = token.split('.');
+    if (parts.length >= 2 && parts[0].length >= 6) {
+        return `avito_photo_${parts[0].slice(0, 16)}`;
     }
-    return tokenNoExt || token || filename || pathOnly;
+
+    const cleanName = noExt.replace(/[^A-Za-z0-9_-]/g, '');
+    if (cleanName.length >= 3) {
+        return `avito_photo_${cleanName.slice(0, 16)}`;
+    }
+
+    return filename || pathOnly;
 }
 
 function extractAvitoResolutionVersion(url) {
@@ -202,7 +217,7 @@ function extractAvitoResolutionVersion(url) {
     const filename = cleanPath.split('/').pop() || cleanPath;
     const token = filename.replace(/^\d+\./, '');
 
-    const m = token.match(/[a-zA-Z]a(\d)/);
+    const m = token.match(/[A-Za-z0-9]a(\d)/);
     if (m) return parseInt(m[1], 10);
     return 0;
 }
@@ -813,8 +828,13 @@ function extractPhotosFromEmbeddedState() {
 }
 
 function findGalleryRootElement() {
+    // Primary gallery root - Section 4 strict authority
+    const primary = document.querySelector('[data-marker="item-view/gallery"]');
+    if (primary) {
+        return { root: primary, selector: '[data-marker="item-view/gallery"]' };
+    }
+
     const candidateSelectors = [
-        '[data-marker="item-view/gallery"]',
         '[data-marker="image-frame/image-wrapper"]',
         '[data-marker="image-frame"]',
         'ul[data-marker="gallery/list"]',
@@ -840,9 +860,15 @@ const GALLERY_SELECTORS = [
 
 function isInsideExcluded(el) {
     if (!el || !el.closest) return false;
-    // Never exclude elements inside gallery or item view main container
-    if (el.closest('[data-marker*="gallery"]') || el.closest('[data-marker*="image-frame"]') || el.closest('[data-marker*="item-view/gallery"]') || el.closest('[data-marker="item-view/main"]')) {
-        return false;
+    // Never exclude genuine gallery items
+    if (el.closest('[data-marker*="gallery"]') || el.closest('[data-marker*="image-frame"]') || el.closest('[data-marker*="item-view/gallery"]')) {
+        if (!el.closest('[data-marker*="sticky"], [data-marker*="history"]')) {
+            return false;
+        }
+    }
+    // Disallow sticky, history, and review preview items explicitly
+    if (el.closest('[data-marker*="sticky"], [data-marker*="history"], [data-marker^="review"], [data-marker*="/review"], [data-marker*="-review"], [data-marker*="_review"]')) {
+        return true;
     }
     return !!(el.closest('[data-marker*="seller"], [data-marker*="user-info"], [data-marker*="profile"], .seller-info-avatar, [data-marker*="recommend"], [data-marker*="similar"], [data-marker*="items-carousel"], [data-marker*="seller-items"], .similar-items, .recommendations-root, .serp-item, header, footer, nav, aside'));
 }
@@ -867,28 +893,20 @@ function extractPhotosFromDom() {
     }
 
     const { root: galleryRoot } = findGalleryRootElement();
+    const scope = galleryRoot || document.querySelector('[data-marker="item-view/gallery"]') || document.querySelector('[data-marker="image-frame"]');
+    if (!scope) {
+        return rawCandidates;
+    }
 
-    // 1. Extract from thumbnail list across document (excluding recommendations and seller items)
+    // 1. Extract from thumbnail list strictly inside gallery root (excluding foreign widgets and sticky previews)
     const thumbSelectors = [
         'ul[data-marker="gallery/list"] li',
         'ul[data-marker="gallery/list"] > *',
-        '[data-marker="gallery/list"] [data-marker*="image"]',
         '[data-marker="gallery/preview-item"]',
-        '[data-marker*="preview"]',
-        '[data-marker="item-view/gallery"] ul li',
-        '[data-marker="gallery"] ul li',
-        'div[class*="gallery-list"] > *',
-        'div[class*="style-gallery-list"] li',
-        'ul[class*="gallery-list"] li',
         '[data-marker="image-frame/preview"]'
     ].join(', ');
 
-    const allThumbEls = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
-        if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
-            return false;
-        }
-        return true;
-    });
+    const allThumbEls = Array.from(scope.querySelectorAll(thumbSelectors)).filter(el => !isInsideExcluded(el));
     const thumbEls = allThumbEls.filter(el => !allThumbEls.some(other => other !== el && other.contains(el)));
 
     thumbEls.forEach(thumb => {
@@ -899,6 +917,7 @@ function extractPhotosFromDom() {
                 const candidates = parseSrcsetCandidates(srcset);
                 candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `thumb_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
             }
+            if (thumb.currentSrc) addCandidate(thumb.currentSrc, "gallery_current_src", "thumb_current_src");
             if (thumb.src) addCandidate(thumb.src, "gallery_img_src", "thumb_src");
             if (thumb.dataset && thumb.dataset.src) addCandidate(thumb.dataset.src, "gallery_img_src", "thumb_data_src");
         }
@@ -908,6 +927,7 @@ function extractPhotosFromDom() {
                 const candidates = parseSrcsetCandidates(srcset);
                 candidates.forEach(c => addCandidate(c.url, "gallery_srcset", `thumb_${c.descriptor || 'srcset'}`, c.srcsetW, c.descriptor));
             }
+            if (el.currentSrc) addCandidate(el.currentSrc, "gallery_current_src", "thumb_current_src");
             if (el.src) addCandidate(el.src, "gallery_img_src", "thumb_src");
             if (el.dataset && el.dataset.src) addCandidate(el.dataset.src, "gallery_img_src", "thumb_data_src");
         });
@@ -929,11 +949,10 @@ function extractPhotosFromDom() {
         });
     });
 
-    // 2. Extract from main display frame
-    const mainFrame = document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                      document.querySelector('[data-marker="image-frame"]') ||
-                      (galleryRoot ? (galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') || galleryRoot.querySelector('[data-marker="image-frame"]')) : null) ||
-                      galleryRoot;
+    // 2. Extract from main display frame inside gallery root
+    const mainFrame = scope.querySelector('[data-marker="image-frame/image-wrapper"]') ||
+                      scope.querySelector('[data-marker="image-frame"]') ||
+                      (scope.getAttribute && scope.getAttribute('data-marker') === 'image-frame' ? scope : null);
 
     if (mainFrame) {
         if (mainFrame.tagName === 'IMG') {
@@ -983,53 +1002,63 @@ function extractGallerySlotsFromInitialData(currentItemId) {
 }
 
 function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
-    // 1. Search for gallery counter in document
-    const counterSelectors = [
-        '[data-marker="gallery/counter"]',
-        '[data-marker="image-frame/counter"]',
-        '[data-marker="image-viewer/counter"]',
-        '[class*="image-frame-counter"]',
-        '[class*="gallery-counter"]',
-        '[class*="counter"]',
-        '[aria-label*="из"]'
-    ];
-    for (const sel of counterSelectors) {
-        try {
-            const els = document.querySelectorAll(sel);
-            for (const el of els) {
-                const text = el.textContent || el.getAttribute('aria-label') || '';
-                const m = text.match(/(\d+)\s*(?:из|\/)\s*(\d+)/i);
-                if (m && m[2]) {
-                    const total = parseInt(m[2], 10);
-                    if (total > 0 && total < 100) return total;
-                }
-            }
-        } catch(e) {}
+    const scope = galleryRoot || document.querySelector('[data-marker="item-view/gallery"]') || document.querySelector('[data-marker="image-frame"]');
+
+    // 1. Primary: Search for gallery counter within gallery root
+    const counterScopes = [];
+    if (scope) counterScopes.push(scope);
+    const frameCounter = document.querySelector('[data-marker="image-frame/counter"], [data-marker="gallery/counter"]');
+    if (frameCounter && !counterScopes.some(s => s.contains && s.contains(frameCounter))) {
+        counterScopes.push(frameCounter);
     }
 
-    // 2. Search for thumbnail list in document, excluding recommendations/seller
+    const counterSelectors = [
+        '[data-marker*="counter"]',
+        '[class*="image-frame-counter"]',
+        '[class*="gallery-counter"]',
+        '[aria-label*="из"]',
+        '[aria-label*="/"]',
+        '[aria-label*="of"]'
+    ];
+
+    for (const cScope of counterScopes) {
+        for (const sel of counterSelectors) {
+            try {
+                const els = cScope.querySelectorAll ? cScope.querySelectorAll(sel) : (cScope.matches && cScope.matches(sel) ? [cScope] : []);
+                for (const el of els) {
+                    if (isInsideExcluded(el)) continue;
+                    const text = el.textContent || el.getAttribute('aria-label') || '';
+                    const m = text.match(/(\d+)\s*(?:из|\/|of)\s*(\d+)/i);
+                    if (m && m[2]) {
+                        const total = parseInt(m[2], 10);
+                        if (total > 0 && total < 100) return total;
+                    }
+                }
+            } catch(e) {}
+        }
+    }
+
+    // 2. Secondary: Count unique logical gallery thumbnail items strictly inside gallery root
     try {
-        const thumbSelectors = [
-            'ul[data-marker="gallery/list"] li',
-            'ul[data-marker="gallery/list"] > *',
-            '[data-marker="gallery/list"] [data-marker*="image"]',
-            '[data-marker="gallery/preview-item"]',
-            '[data-marker*="preview"]',
-            '[data-marker="item-view/gallery"] ul li',
-            '[data-marker="gallery"] ul li',
-            'div[class*="gallery-list"] > *',
-            'div[class*="style-gallery-list"] li',
-            'ul[class*="gallery-list"] li',
-            '[data-marker="image-frame/preview"]'
-        ].join(', ');
-        const thumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
-            if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
-                return false;
+        const thumbContainer = scope ? (scope.querySelector('ul[data-marker="gallery/list"]') || scope.querySelector('[data-marker="gallery/list"]')) : null;
+        if (thumbContainer) {
+            const thumbItems = Array.from(thumbContainer.children || []).filter(el => !isInsideExcluded(el));
+            const uniqueThumbs = new Set();
+            for (const item of thumbItems) {
+                const img = item.querySelector('img, source');
+                const src = img ? (img.currentSrc || img.src || img.getAttribute('data-src') || (img.srcset ? img.srcset.split(',')[0].split(' ')[0] : '')) : '';
+                const valid = validateListingImageUrl(src);
+                if (valid) {
+                    const id = getCanonicalAvitoImageIdentity(valid);
+                    if (id) uniqueThumbs.add(id);
+                }
             }
-            return true;
-        });
-        if (thumbs && thumbs.length > 0) {
-            return thumbs.length;
+            if (uniqueThumbs.size > 0) {
+                return uniqueThumbs.size;
+            }
+            if (thumbItems.length > 0) {
+                return thumbItems.length;
+            }
         }
     } catch(e) {}
 
@@ -1130,6 +1159,10 @@ function extractAllPhotos(jsonLd, walkedSlots = []) {
         }
 
         for (const key of groupOrder) {
+            if (expectedPhotoCount > 0 && chosenSlots.length >= expectedPhotoCount) {
+                foreignImagesRejectedCount += groupsMap.get(key).length;
+                continue;
+            }
             const cands = groupsMap.get(key);
             cands.sort((a, b) => (b.score || 0) - (a.score || 0));
             if (cands.length > 1) duplicatesRejectedCount += (cands.length - 1);
@@ -1144,6 +1177,12 @@ function extractAllPhotos(jsonLd, walkedSlots = []) {
                 identity: key
             });
         }
+    }
+
+    // Strict exact-N enforcement across all layers
+    if (expectedPhotoCount > 0 && chosenSlots.length > expectedPhotoCount) {
+        foreignImagesRejectedCount += (chosenSlots.length - expectedPhotoCount);
+        chosenSlots = chosenSlots.slice(0, expectedPhotoCount);
     }
 
     // Ultimate fallback if still zero
@@ -1612,141 +1651,179 @@ function collectActiveSlideCandidates(container) {
 
 async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
     const { root: galleryRoot } = findGalleryRootElement();
-    const activeFrame = document.querySelector('[data-marker="image-frame/image-wrapper"]') ||
-                        document.querySelector('[data-marker="image-frame"]') ||
-                        (galleryRoot ? (galleryRoot.querySelector('[data-marker="image-frame/image-wrapper"]') || galleryRoot.querySelector('[data-marker="image-frame"]')) : null) ||
-                        galleryRoot;
+    const scope = galleryRoot || document.querySelector('[data-marker="item-view/gallery"]') || document.querySelector('[data-marker="image-frame"]');
+    
+    // Active hero image frame
+    const activeFrame = scope ? (scope.querySelector('[data-marker="image-frame/image-wrapper"]') || scope.querySelector('[data-marker="image-frame"]')) : (document.querySelector('[data-marker="image-frame/image-wrapper"]') || document.querySelector('[data-marker="image-frame"]'));
+
+    // Determine target N
+    const targetN = determineExpectedPhotoCount(scope, expectedCount);
 
     const slots = [];
     const seenIdentities = new Set();
+    let traversalTimeouts = 0;
 
-    function getSlideIdentifier(cands) {
-        if (!cands || cands.length === 0) return null;
-        for (const c of cands) {
-            const id = getCanonicalAvitoImageIdentity(c.url);
-            if (id) return id;
+    // --- PHASE 1: EXACT SLOT DISCOVERY ---
+    // 1. Locate thumbnail elements strictly inside galleryRoot / scope
+    const thumbContainer = scope ? (scope.querySelector('ul[data-marker="gallery/list"]') || scope.querySelector('[data-marker="gallery/list"]')) : null;
+    const thumbEls = thumbContainer ? Array.from(thumbContainer.children || []).filter(el => !isInsideExcluded(el)) : [];
+
+    for (let i = 0; i < thumbEls.length; i++) {
+        if (targetN > 0 && slots.length >= targetN) break;
+
+        const thumb = thumbEls[i];
+        const thumbCands = collectActiveSlideCandidates(thumb);
+        if (thumbCands.length === 0) continue;
+
+        let slotId = null;
+        for (const c of thumbCands) {
+            const cid = getCanonicalAvitoImageIdentity(c.url);
+            if (cid) {
+                slotId = cid;
+                break;
+            }
         }
-        return cands[0].url;
+        if (!slotId) slotId = thumbCands[0].url;
+
+        if (!seenIdentities.has(slotId)) {
+            seenIdentities.add(slotId);
+            slots.push({
+                index: slots.length,
+                canonicalId: slotId,
+                thumbnailUrl: thumbCands[0].url,
+                bestKnownUrl: thumbCands[0].url,
+                hqUrl: null,
+                source: "thumbnail",
+                candidates: thumbCands,
+                thumbEl: thumb
+            });
+        }
     }
 
-    // Find all thumbnail elements across document (excluding recommendations and seller items)
-    const thumbSelectors = [
-        'ul[data-marker="gallery/list"] li',
-        'ul[data-marker="gallery/list"] > *',
-        '[data-marker="gallery/list"] [data-marker*="image"]',
-        '[data-marker="gallery/preview-item"]',
-        '[data-marker*="preview"]',
-        '[data-marker="item-view/gallery"] ul li',
-        '[data-marker="gallery"] ul li',
-        'div[class*="gallery-list"] > *',
-        'div[class*="style-gallery-list"] li',
-        'ul[class*="gallery-list"] li',
-        '[data-marker="image-frame/preview"]'
-    ].join(', ');
-
-    const allThumbs = Array.from(document.querySelectorAll(thumbSelectors)).filter(el => {
-        if (el.closest && (el.closest('[data-marker*="seller"]') || el.closest('[data-marker*="recommend"]') || el.closest('[data-marker*="similar"]'))) {
-            return false;
-        }
-        return true;
-    });
-
-    // Deduplicate: remove elements whose ancestor is already in allThumbs
-    const thumbs = allThumbs.filter(el => !allThumbs.some(other => other !== el && other.contains(el)));
-
-    if (thumbs.length > 1) {
-        // Thumbnail-directed traversal
-        const targetCount = expectedCount > 0 ? Math.min(expectedCount, thumbs.length) : thumbs.length;
-        for (let i = 0; i < targetCount; i++) {
-            const thumb = thumbs[i];
-
-            try {
-                if (typeof thumb.scrollIntoView === 'function') {
-                    thumb.scrollIntoView({ block: 'nearest', inline: 'center' });
+    // Single-photo ad fallback: no thumbnail list, inspect activeFrame directly
+    if (slots.length === 0 && activeFrame) {
+        const heroCands = collectActiveSlideCandidates(activeFrame);
+        if (heroCands.length > 0) {
+            let heroId = null;
+            for (const c of heroCands) {
+                const cid = getCanonicalAvitoImageIdentity(c.url);
+                if (cid) {
+                    heroId = cid;
+                    break;
                 }
-                const clickTarget = thumb.querySelector('button, img, [role="button"]') || (thumb.tagName !== 'A' ? thumb : null);
-                if (clickTarget) {
-                    clickTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
-                    clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
-                    clickTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
-                    clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                    clickTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
-                    clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-                    clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                    if (typeof clickTarget.click === 'function' && clickTarget.tagName !== 'A') {
-                        clickTarget.click();
+            }
+            if (!heroId) heroId = heroCands[0].url;
+            slots.push({
+                index: 0,
+                canonicalId: heroId,
+                thumbnailUrl: heroCands[0].url,
+                bestKnownUrl: heroCands[0].url,
+                hqUrl: heroCands[0].url,
+                source: "hero_active",
+                candidates: heroCands,
+                thumbEl: null
+            });
+            seenIdentities.add(heroId);
+        }
+    }
+
+    // --- PHASE 2: HQ ACQUISITION PER EXACT SLOT ---
+    // Check if hero image already matches slot 0 on page load
+    if (slots.length > 0 && activeFrame) {
+        const initialHeroCands = collectActiveSlideCandidates(activeFrame);
+        if (initialHeroCands.length > 0) {
+            let initialHeroId = null;
+            for (const c of initialHeroCands) {
+                const cid = getCanonicalAvitoImageIdentity(c.url);
+                if (cid) {
+                    initialHeroId = cid;
+                    break;
+                }
+            }
+            if (initialHeroId && initialHeroId === slots[0].canonicalId) {
+                slots[0].hqUrl = initialHeroCands[0].url;
+                slots[0].bestKnownUrl = initialHeroCands[0].url;
+                slots[0].source = "hero_active";
+                const seenUrls = new Set(initialHeroCands.map(c => c.url));
+                slots[0].candidates = [...initialHeroCands, ...slots[0].candidates.filter(c => !seenUrls.has(c.url))];
+            }
+        }
+    }
+
+    // Sequential thumbnail activation with identity-first wait (Sections 9 & 10)
+    for (let i = 0; i < slots.length; i++) {
+        if (slots[i].hqUrl) {
+            // Already high quality (e.g. slot 0 from active hero)
+            continue;
+        }
+
+        const thumb = slots[i].thumbEl;
+        if (!thumb) continue;
+
+        try {
+            if (typeof thumb.scrollIntoView === 'function') {
+                thumb.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+            const clickTarget = thumb.querySelector('button, img, [role="button"]') || (thumb.tagName !== 'A' ? thumb : null);
+            if (clickTarget) {
+                clickTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                if (typeof clickTarget.click === 'function' && clickTarget.tagName !== 'A') {
+                    clickTarget.click();
+                }
+            }
+        } catch (e) {}
+
+        // Identity-first bounded wait: poll active hero for matching canonicalId (timeout: 1200ms, step: 30ms)
+        const startTime = Date.now();
+        let matched = false;
+        while (Date.now() - startTime < 1200) {
+            await new Promise(r => setTimeout(r, 30));
+            const currentHeroCands = collectActiveSlideCandidates(activeFrame);
+            if (currentHeroCands.length > 0) {
+                let currentId = null;
+                for (const c of currentHeroCands) {
+                    const cid = getCanonicalAvitoImageIdentity(c.url);
+                    if (cid) {
+                        currentId = cid;
+                        break;
                     }
                 }
-            } catch(e) {}
-
-            await new Promise(r => setTimeout(r, 140));
-
-            const mainCands = collectActiveSlideCandidates(activeFrame);
-            const thumbCands = collectActiveSlideCandidates(thumb);
-
-            // Merge candidates for this slot: HD candidates from main frame + preview candidates from thumbnail
-            const slotCands = [...mainCands];
-            const seenUrlsInSlot = new Set(slotCands.map(c => c.url));
-            for (const tc of thumbCands) {
-                if (!seenUrlsInSlot.has(tc.url)) {
-                    seenUrlsInSlot.add(tc.url);
-                    slotCands.push(tc);
+                if (currentId && currentId === slots[i].canonicalId) {
+                    // Identity matched! Active hero now displays slot i in HQ!
+                    slots[i].hqUrl = currentHeroCands[0].url;
+                    slots[i].bestKnownUrl = currentHeroCands[0].url;
+                    slots[i].source = "active_gallery_traversal";
+                    const seenUrls = new Set(currentHeroCands.map(c => c.url));
+                    slots[i].candidates = [...currentHeroCands, ...slots[i].candidates.filter(c => !seenUrls.has(c.url))];
+                    matched = true;
+                    break;
                 }
             }
-
-            slotCands.sort((a, b) => (b.score || 0) - (a.score || 0));
-            const slotId = getSlideIdentifier(slotCands) || (`slot_${i}`);
-
-            slots.push({
-                slot_index: i,
-                source: "active_gallery_traversal",
-                candidates: slotCands,
-                candidate_count: slotCands.length,
-                selected_url: slotCands.length > 0 ? slotCands[0].url : "",
-                selected_resolution: slotCands.length > 0 ? (slotCands[0].descriptor || "default") : "default",
-                score: slotCands.length > 0 ? slotCands[0].score : 0,
-                identity: slotId
-            });
-            seenIdentities.add(slotId);
         }
 
-        // Restore first thumbnail at end
-        try {
-            const firstTarget = thumbs[0].querySelector('button, img, [role="button"]') || (thumbs[0].tagName !== 'A' ? thumbs[0] : null);
-            if (firstTarget && typeof firstTarget.click === 'function' && firstTarget.tagName !== 'A') {
-                firstTarget.click();
-            }
-        } catch(e) {}
-
-        return slots;
-
-    } else {
-        // Next-button driven traversal
-        let initialCands = collectActiveSlideCandidates(activeFrame);
-        let initialId = getSlideIdentifier(initialCands);
-        if (initialCands.length > 0 && initialId) {
-            seenIdentities.add(initialId);
-            slots.push({
-                slot_index: 0,
-                source: "active_gallery_traversal",
-                candidates: initialCands,
-                candidate_count: initialCands.length,
-                selected_url: initialCands[0].url,
-                selected_resolution: initialCands[0].descriptor || "default",
-                score: initialCands[0].score,
-                identity: initialId
-            });
+        if (!matched) {
+            // Bounded timeout: fallback to best known thumbnail URL to guarantee exact N
+            traversalTimeouts++;
         }
+    }
 
-        const nextBtn = document.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
-        const maxSteps = expectedCount > 0 ? expectedCount + 2 : 15;
+    // --- VIRTUALIZED / LONG GALLERIES (Section 11) ---
+    if (targetN > 0 && slots.length < targetN && activeFrame) {
+        const nextBtn = (scope || document).querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
+        const maxSteps = targetN + 2;
         let consecutiveNoChange = 0;
-        const firstObservedId = initialId;
+        const firstObservedId = slots.length > 0 ? slots[0].canonicalId : null;
 
         for (let step = 0; step < maxSteps; step++) {
-            if (expectedCount > 0 && slots.length >= expectedCount) break;
+            if (slots.length >= targetN) break;
 
-            const prevId = initialId;
+            const prevId = slots[slots.length - 1].canonicalId;
             if (nextBtn) {
                 try {
                     nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -1754,14 +1831,20 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
                 } catch (e) {}
             }
 
-            // Poll for slide change up to 350ms
+            // Poll for slide change up to 400ms
             let newCands = [];
             let newId = null;
-            const startTime = Date.now();
-            while (Date.now() - startTime < 350) {
-                await new Promise(r => setTimeout(r, 40));
+            const pollStart = Date.now();
+            while (Date.now() - pollStart < 400) {
+                await new Promise(r => setTimeout(r, 30));
                 newCands = collectActiveSlideCandidates(activeFrame);
-                newId = getSlideIdentifier(newCands);
+                for (const c of newCands) {
+                    const cid = getCanonicalAvitoImageIdentity(c.url);
+                    if (cid) {
+                        newId = cid;
+                        break;
+                    }
+                }
                 if (newId && newId !== prevId) break;
             }
 
@@ -1770,31 +1853,51 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
                 if (consecutiveNoChange >= 3) break;
                 continue;
             }
-
             consecutiveNoChange = 0;
 
-            // Wrap detection: returned to first photo
             if (firstObservedId && newId === firstObservedId && slots.length > 1) {
+                // Cycle complete
                 break;
             }
 
-            if (newId && !seenIdentities.has(newId)) {
+            if (!seenIdentities.has(newId)) {
                 seenIdentities.add(newId);
                 slots.push({
-                    slot_index: slots.length,
+                    index: slots.length,
+                    canonicalId: newId,
+                    thumbnailUrl: newCands[0].url,
+                    bestKnownUrl: newCands[0].url,
+                    hqUrl: newCands[0].url,
                     source: "active_gallery_traversal",
                     candidates: newCands,
-                    candidate_count: newCands.length,
-                    selected_url: newCands[0].url,
-                    selected_resolution: newCands[0].descriptor || "default",
-                    score: newCands[0].score,
-                    identity: newId
+                    thumbEl: null
                 });
-                initialId = newId;
             }
         }
-        return slots;
     }
+
+    // --- RESTORE PAGE STATE (Section 12) ---
+    try {
+        if (slots.length > 1 && slots[0].thumbEl) {
+            const firstTarget = slots[0].thumbEl.querySelector('button, img, [role="button"]') || (slots[0].thumbEl.tagName !== 'A' ? slots[0].thumbEl : null);
+            if (firstTarget && typeof firstTarget.click === 'function' && firstTarget.tagName !== 'A') {
+                firstTarget.click();
+            }
+        }
+    } catch (e) {}
+
+    // Map to normalized slot format
+    return slots.map((s, idx) => ({
+        slot_index: idx,
+        source: s.source || "active_gallery_traversal",
+        candidates: s.candidates,
+        candidate_count: s.candidates.length,
+        selected_url: s.hqUrl || s.bestKnownUrl || s.thumbnailUrl,
+        selected_resolution: (s.candidates[0] && s.candidates[0].descriptor) || "default",
+        score: (s.candidates[0] && s.candidates[0].score) || 0,
+        identity: s.canonicalId,
+        hq_available: !!s.hqUrl
+    }));
 }
 
 function extractListingData(extraPhotos = []) {

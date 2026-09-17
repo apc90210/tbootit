@@ -182,10 +182,10 @@ def test_extension_package_v0259_and_task_channel_helpers():
         assert "popup.js" in namelist
 
         manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
-        assert manifest_data["version"] in ("0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63")
+        assert manifest_data["version"] in ("0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64")
 
         sw_code = zf.read("service_worker.js").decode("utf-8")
-        assert any(v in sw_code for v in ("0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63"))
+        assert any(v in sw_code for v in ("0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64"))
         assert "pollNextDeactivationTask" in sw_code
         assert "getActiveDeactivationTask" in sw_code
         assert "executeDeactivationFlow" in sw_code
@@ -194,7 +194,7 @@ def test_extension_package_v0259_and_task_channel_helpers():
         assert "report_task_failed" in sw_code
 
         content_code = zf.read("content.js").decode("utf-8")
-        assert any(v in content_code for v in ("0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63"))
+        assert any(v in content_code for v in ("0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64"))
         assert "execute_deactivation" in content_code
         assert "discoverDeactivationControl" in content_code
         assert "DEACTIVATION_WHITELIST" in content_code

@@ -307,4 +307,39 @@ WORKFLOW:
 | **Legacy VDS** | **UNTOUCHED (`144.31.50.134`)** | Retired VDS not accessed or modified |
 | **Final Status** | `TECHNOREBOOT_STAGE12B_PRODUCTION_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE ON PRODUCTION** |
 
+---
+
+## 16. Avito Photo Import Pipeline Diagnostic (Stage 13A DIAGNOSTIC)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **DIAGNOSTIC ONLY** | Root-cause forensic audit of photo extraction pipeline across extension, service worker, avito-module, and core |
+| **Document-Wide Preview Over-Collection** | **IDENTIFIED** | `extractPhotosFromDom()` executed un-scoped queries with greedy `[data-marker*="preview"]`, matching sticky previews, history carousels, and review attachments (reproduced 4 photos -> 9 candidates) |
+| **Dead Exclusion Code** | **IDENTIFIED** | `isInsideExcluded` was defined but never called on DOM extraction paths |
+| **Core Dual-Append Bug** | **IDENTIFIED** | `core/app/routers/integrations.py` appended both `best_high` and `best_low` to `effective_photos`, duplicating photos in SQLite |
+| **Single Hero HQ Finding** | **IDENTIFIED** | Avito only loads HQ ($1280\times960$) for currently active hero image; inactive slides remain $140\times105$ until thumbnail is clicked |
+| **Canonical Identity V2** | **DESIGNED & TESTED** | `getCanonicalAvitoImageIdentityV2` verified on 10 variants of 4 real photos -> 4 logical keys, 0 collisions |
+| **Final Status** | `TECHNOREBOOT_STAGE13A_DIAGNOSTIC_COMPLETE` | Diagnostic completed, zero production mutation, ready for Stage 13B implementation |
+
+---
+
+## 17. Avito Extension Exact-N Gallery Import + HQ Activation (Stage 13B LOCAL)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **LOCAL DEV FIRST (`https://localhost:8443`)** | Elimination of document-wide scans, exact-N gallery slots, per-photo HQ activation, server single-append |
+| **Extension Version** | **v0.2.64** | Bumped from v0.2.63 across manifest, content.js, popup, service worker, admin-shell templates |
+| **ZIP Checksum (SHA-256)** | `ecbce1f3cc66e40ee45a8eecc783065c939ee2d6f9c340b16c7d3947793debdc` | Verified 100% byte-for-byte identical across `dist/` and `admin-shell/app/` |
+| **Scoped Gallery Root** | **ENFORCED** | Authoritative gallery root `[data-marker="item-view/gallery"]`; all thumbnail queries strictly scoped |
+| **Foreign Marker Exclusion** | **ACTIVE** | `isInsideExcluded` protects genuine gallery items and excludes sticky, history, review, seller markers |
+| **Authoritative Photo Count $N$** | **ENFORCED** | Parses counter text `[data-marker*="counter"]` (`1 из 4`, `1 / 4`); candidate slots strictly bounded to $N$ |
+| **Canonical Identity V2** | **ACTIVE** | Regex `[A-Za-z0-9]a\d`, numeric filename preservation (`9876543210`), shard & query string stripped |
+| **Per-Photo HQ Activation** | **ACTIVE** | Sequentially activates thumbnails; condition-based wait polls hero identity up to 1200ms (30ms interval); parses `srcset` for max width |
+| **Client Download Contract** | **1 DOWNLOAD PER SLOT** | Downloads `hqUrl` if available and valid image; falls back to `thumbnailUrl` for same slot on failure |
+| **Core Server Dual-Append Fix** | **RESOLVED** | Exactly 1 `ProductPhoto` persisted per logical identity; ranks candidates by resolution + base64 content |
+| **Automated Tests** | **343 PASSED (0 FAILED)** | Targeted suite (164 tests) + Extension suite (158 tests) + DB Schema Guard (SAFE, 0 diffs) |
+| **Section 19 Fixture Simulation** | **PASSED (4 of 4)** | 4 real photos + 5 foreign widgets -> exactly 4 slots extracted, 0 foreign images, slot 0 1280w HQ |
+| **Production Target** | **UNTOUCHED (NO DEPLOY)** | Canonical VDS `144.31.15.88` untouched; legacy VDS `144.31.50.134` untouched; DB unchanged |
+| **Final Status** | `TECHNOREBOOT_STAGE13B_LOCAL_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE ON LOCAL** |
+
 

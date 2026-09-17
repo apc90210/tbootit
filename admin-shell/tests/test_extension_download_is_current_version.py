@@ -7,5 +7,5 @@ def test_extension_download_is_current_version():
     """Verify /avito/extension/download returns versioned filename and Cache-Control headers."""
     res = client.get("/avito/extension/download")
     assert res.status_code == 200
-    assert any(v in res.headers.get("content-disposition", "") for v in ("0.2.53", "0.2.54", "0.2.55", "0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63"))
+    assert any(v in res.headers.get("content-disposition", "") for v in ("0.2.53", "0.2.54", "0.2.55", "0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64"))
     assert "no-store" in res.headers.get("cache-control", "")

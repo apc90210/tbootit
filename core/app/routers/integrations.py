@@ -306,36 +306,41 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
         clean_path = _re.sub(r"^(?:image/\d+/|\d+x\d+/)+", "", clean_path, flags=_re.IGNORECASE)
         filename = clean_path.split("/")[-1]
         token = _re.sub(r"^\d+\.", "", filename)
-        m = _re.search(r"[a-zA-Z]a(\d)", token)
+        m = _re.search(r"[A-Za-z0-9]a(\d)", token)
         if m:
             return int(m.group(1))
         return 0
 
     def _get_avito_canonical_identity(url):
-        """Extract canonical Avito photo identity from source_url."""
+        """Extract canonical Avito photo identity from source_url (V2)."""
         if not url:
             return None
         path_only = url.split("?")[0]
         clean_path = _re.sub(r"^https?://[^/]+/", "", path_only, flags=_re.IGNORECASE)
         clean_path = _re.sub(r"^(?:image/\d+/|\d+x\d+/)+", "", clean_path, flags=_re.IGNORECASE)
         filename = clean_path.split("/")[-1]
+
+        # If numeric filename before extension (e.g. 9876543210.jpg)
+        no_ext = _re.sub(r"\.(?:jpg|jpeg|webp|png|avif)$", "", filename, flags=_re.IGNORECASE)
+        if _re.match(r"^\d{6,}$", no_ext):
+            return "avito_photo_" + no_ext
+
+        # Strip leading index prefix e.g. "1." from "1.sePk6..."
         token = _re.sub(r"^\d+\.", "", filename)
 
-        la_match = _re.search(r"^([A-Za-z0-9_-]+?)[a-zA-Z]a\d", token, _re.IGNORECASE)
-        if la_match and la_match.group(1) and len(la_match.group(1)) >= 2:
-            return "avito_photo_" + la_match.group(1)
+        # Match [prefix][alphanumeric]a[digit] with non-greedy prefix
+        ver_match = _re.search(r"^([A-Za-z0-9_-]{2,}?[A-Za-z0-9_-])[A-Za-z0-9]a\d", token, _re.IGNORECASE)
+        if ver_match and ver_match.group(1):
+            return "avito_photo_" + ver_match.group(1)
 
-        token_no_ext = _re.sub(r"\.(?:jpg|jpeg|webp|png)$", "", token, flags=_re.IGNORECASE)
-        if _re.match(r"^\d{6,}$", token_no_ext):
-            return "avito_photo_" + token_no_ext
+        # Dot-separated hash e.g. "hash.second_hash"
+        parts = token.split(".")
+        if len(parts) >= 2 and len(parts[0]) >= 6:
+            return f"avito_photo_{parts[0][:16]}"
 
-        parts = token_no_ext.split(".")
-        if len(parts) >= 2:
-            return f"avito_photo_{parts[0]}_{parts[1][:16]}"
-
-        clean_name = _re.sub(r"[^A-Za-z0-9_-]", "", token_no_ext)
-        if len(clean_name) >= 2:
-            return "avito_photo_" + clean_name
+        clean_name = _re.sub(r"[^A-Za-z0-9_-]", "", no_ext)
+        if len(clean_name) >= 3:
+            return f"avito_photo_{clean_name[:16]}"
 
         if "img.avito.st" in url.lower():
             return path_only
@@ -358,21 +363,23 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
             except Exception:
                 pass
 
-        base_area = w * h if (w > 0 and h > 0) else 0
+        base_area = 0
+        if w > 0 and h > 0:
+            base_area = w * h
 
-        v = _extract_avito_resolution_version(url)
-        la_bonus = v * 10
-        if v > 0 and base_area == 0:
-            if v >= 4:
-                base_area = 1280 * 960  # 1,228,800
-            elif v == 3:
-                base_area = 640 * 480   # 307,200
-            elif v == 2:
-                base_area = 208 * 156   # 32,448
-            elif v == 1:
-                base_area = 140 * 105   # 14,700
+        version = _extract_avito_resolution_version(url)
+        la_bonus = version * 10
+        if version > 0 and base_area == 0:
+            if version >= 4:
+                base_area = 1280 * 960
+            elif version == 3:
+                base_area = 640 * 480
+            elif version == 2:
+                base_area = 208 * 156
+            elif version == 1:
+                base_area = 140 * 105
 
-        if base_area == 0 and "img.avito.st/image/1/" in url.lower():
+        if base_area == 0 and ".img.avito.st/image/1/" in url:
             base_area = 1280 * 960
 
         if base_area > 0:
@@ -438,19 +445,18 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 unkeyed_incoming.append(item_photo)
 
         effective_photos = []
-        HIGH_RES_THRESHOLD = 300000
 
+        # STAGE 13B: Exactly one ProductPhoto per logical Avito photo key (no double-append!)
         for ckey in key_sequence:
             candidates = grouped_incoming[ckey]
-            high_res = [c for c in candidates if _get_avito_quality_score(c.url) >= HIGH_RES_THRESHOLD]
-            low_res = [c for c in candidates if _get_avito_quality_score(c.url) < HIGH_RES_THRESHOLD]
+            def _candidate_rank(p):
+                score = _get_avito_quality_score(p.url)
+                if p.content_base64:
+                    score += 1000  # Bonus if base64 binary is already downloaded
+                return score
 
-            if high_res:
-                best_high = max(high_res, key=lambda p: _get_avito_quality_score(p.url))
-                effective_photos.append(best_high)
-            if low_res:
-                best_low = max(low_res, key=lambda p: _get_avito_quality_score(p.url))
-                effective_photos.append(best_low)
+            best_photo = max(candidates, key=_candidate_rank)
+            effective_photos.append(best_photo)
 
         effective_photos.extend(unkeyed_incoming)
 
