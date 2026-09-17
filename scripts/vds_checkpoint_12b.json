@@ -1,0 +1,40 @@
+{
+  "checkpoint_id": "checkpoint_20260917_121040_9316ada2",
+  "created_at": "2026-09-17T09:10:41.310002+00:00",
+  "status": "COMPLETED",
+  "vds_ip": "144.31.15.88",
+  "previous_head": "9316ada2e43f9ae5811fc36f5e2cb295fafba25f",
+  "target_head": "9bb8f121ed2e3398724d2391cf520e984773ad42",
+  "business_backup_file": "TECHNOREBOOT_BACKUP_2026-09-17_121040.zip",
+  "business_backup_sha256": "c867b8e4639646621ad773b58d5c26b187d99f9dac5c89733ea4fb15adcbc887",
+  "business_counts": {
+    "products": 241,
+    "sales": 5,
+    "repair_orders": 1,
+    "product_photos": 237,
+    "product_external_listings": 237,
+    "avito_post_sale_tasks": 5,
+    "storage_files": 237
+  },
+  "health_preflight": {
+    "probed_at": "2026-09-17T09:10:41.310002+00:00",
+    "vds_host": "root@144.31.15.88",
+    "ssh_reachable": true,
+    "https_reachable": true,
+    "services": {
+      "core": "healthy",
+      "admin-shell": "healthy",
+      "inventory-sales": "healthy",
+      "repairs": "healthy",
+      "avito": "healthy",
+      "gateway": "healthy"
+    },
+    "db_readable": true,
+    "db_quick_check": "ok",
+    "git_head": "9316ada2e43f9ae5811fc36f5e2cb295fafba25f"
+  },
+  "previous_image_ids": {
+    "admin-shell": "sha256:2d0bd386cea49a88ecf3faf2422a7841beebdee3f546af36afe8148f99fbe2e9",
+    "avito": "sha256:f1fa0916bc2d2db5b39aa2fda0d2802a12132b94079065d94649bdef5988bfa8"
+  }
+}

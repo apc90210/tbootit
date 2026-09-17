@@ -287,3 +287,24 @@ WORKFLOW:
 | **Production Target** | **UNTOUCHED (0 changes)** | VDS `144.31.15.88` untouched; DB unchanged; ready for Owner LOCAL acceptance |
 | **Final Status** | `TECHNOREBOOT_STAGE12A_LOCAL_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE ON LOCAL** |
 
+---
+
+## 15. Extension Connection Switching Production Deployment (Stage 12B PRODUCTION)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **CANONICAL PRODUCTION VDS (`144.31.15.88`)** | Deployment of accepted Stage 12A extension v0.2.63 and server endpoints |
+| **Production Git Commit** | `9bb8f121ed2e3398724d2391cf520e984773ad42` | Exact match with local accepted main HEAD |
+| **Safety Backup** | `TECHNOREBOOT_BACKUP_2026-09-17_121040.zip` | SHA256: `c867b8e4...`, verified quick_check = ok |
+| **Safety Checkpoint** | `checkpoint_20260917_121040_9316ada2` | Saved to `scripts/vds_checkpoint_12b.json` |
+| **Rebuilt Services** | **admin-shell, avito-module** | Only affected services rebuilt; core, repairs, inventory, gateway untouched |
+| **Runtime Health** | **ALL 6 SERVICES HEALTHY** | admin-shell, avito-module, core, inventory-sales, repairs, gateway — all Up & healthy |
+| **Deployed Extension Package** | **v0.2.63 (MATCH)** | Download SHA256: `bbaf780f75647c598c0725ad2de30239f865ea311ca529d405978960d1a16f9b` |
+| **Pairing Revoke Endpoints** | **ACTIVE & VERIFIED** | `/extension/api/pairing/revoke` and `/pairing/unpair` verified with isolated disposable token |
+| **Business Data Invariants** | **100% PRESERVED** | Products (241), Sales (5), Repairs (1), Photos (237), Listings (237), Tasks (5), Storage (237) |
+| **DB Quick & FK Check** | **PASS (`ok`, 0 violations)** | SQLite `PRAGMA quick_check = ok`, `PRAGMA foreign_key_check = 0` |
+| **mTLS Security** | **ENFORCED (403 without cert)** | All protected routes require Owner/User certificate; external download works over mTLS |
+| **Legacy VDS** | **UNTOUCHED (`144.31.50.134`)** | Retired VDS not accessed or modified |
+| **Final Status** | `TECHNOREBOOT_STAGE12B_PRODUCTION_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE ON PRODUCTION** |
+
+
