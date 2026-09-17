@@ -13,6 +13,15 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
+def is_owner_request(request: Request) -> bool:
+    """Check if the request originates from an authenticated OWNER certificate."""
+    if request.headers.get("x-auth-is-owner") == "1":
+        return True
+    if request.headers.get("x-client-role") == "owner":
+        return True
+    return False
+
+
 @router.get("/sales", response_class=HTMLResponse)
 async def sales_list(
     request: Request,
@@ -44,8 +53,50 @@ async def sales_list(
             "selected_status": status or "",
             "payment_methods": PAYMENT_METHODS,
             "sale_status_labels": SALE_STATUS_LABELS,
+            "is_owner": is_owner_request(request),
         },
     )
+
+
+@router.post("/sales/bulk-delete")
+async def bulk_delete_sales_endpoint(request: Request):
+    if not is_owner_request(request):
+        return JSONResponse(
+            status_code=403,
+            content={"error": True, "detail": "Доступ запрещён: функция безвозвратного удаления доступна только владельцу (сертификат owner)"}
+        )
+
+    sale_ids = []
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            data = await request.json()
+            sale_ids = data.get("sale_ids", [])
+        else:
+            form = await request.form()
+            raw_ids = form.getlist("selected_ids") or form.getlist("sale_ids")
+            if not raw_ids and form.get("sale_ids"):
+                raw_ids = str(form.get("sale_ids")).split(",")
+            sale_ids = [int(x) for x in raw_ids if str(x).strip().isdigit()]
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": True, "detail": f"Ошибка разбора ID продаж: {e}"})
+
+    if not sale_ids:
+        return JSONResponse(status_code=400, content={"error": True, "detail": "Не выбрано ни одной продажи для удаления"})
+
+    res = await core_client.bulk_delete_sales(sale_ids)
+    if res and isinstance(res, dict) and res.get("error"):
+        return JSONResponse(
+            status_code=res.get("status_code", 500),
+            content={"error": True, "detail": res.get("detail", "Ошибка удаления в Core API")}
+        )
+
+    return JSONResponse(content={
+        "success": True,
+        "deleted_count": res.get("deleted_count", len(sale_ids)),
+        "deleted_ids": res.get("deleted_ids", sale_ids)
+    })
+
 
 
 

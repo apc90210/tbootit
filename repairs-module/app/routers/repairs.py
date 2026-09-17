@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 from fastapi import APIRouter, Request, Query, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
 
@@ -9,6 +9,15 @@ router = APIRouter(redirect_slashes=False)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+def is_owner_request(request: Request) -> bool:
+    """Check if the request originates from an authenticated OWNER certificate."""
+    if request.headers.get("x-auth-is-owner") == "1":
+        return True
+    if request.headers.get("x-client-role") == "owner":
+        return True
+    return False
+
 
 @router.get("/", response_class=HTMLResponse)
 @router.get("/repairs", response_class=HTMLResponse)
@@ -51,6 +60,7 @@ async def list_repairs(
             }
         )
 
+
     statuses_list = options.get("statuses", []) if isinstance(options, dict) else []
     priorities_list = options.get("priorities", []) if isinstance(options, dict) else []
     device_types_list = options.get("device_types", []) if isinstance(options, dict) else []
@@ -77,12 +87,56 @@ async def list_repairs(
             "sort": sort or "",
             "page": page,
             "page_size": page_size,
-            "msg": msg or ""
+            "msg": msg or "",
+            "is_owner": is_owner_request(request),
         }
     )
 
+
+@router.post("/repairs/bulk-delete")
+@router.post("/repairs/repairs/bulk-delete")
+async def bulk_delete_repairs_endpoint(request: Request):
+    if not is_owner_request(request):
+        return JSONResponse(
+            status_code=403,
+            content={"error": True, "detail": "Доступ запрещён: функция безвозвратного удаления доступна только владельцу (сертификат owner)"}
+        )
+
+    repair_ids = []
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            data = await request.json()
+            repair_ids = data.get("repair_ids", [])
+        else:
+            form = await request.form()
+            raw_ids = form.getlist("selected_ids") or form.getlist("repair_ids")
+            if not raw_ids and form.get("repair_ids"):
+                raw_ids = str(form.get("repair_ids")).split(",")
+            repair_ids = [int(x) for x in raw_ids if str(x).strip().isdigit()]
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": True, "detail": f"Ошибка разбора ID ремонтов: {e}"})
+
+    if not repair_ids:
+        return JSONResponse(status_code=400, content={"error": True, "detail": "Не выбрано ни одного ремонта для удаления"})
+
+    res = await core_client.bulk_delete_repairs(repair_ids)
+    if res and isinstance(res, dict) and res.get("error"):
+        return JSONResponse(
+            status_code=res.get("status_code", 500),
+            content={"error": True, "detail": res.get("detail", "Ошибка удаления в Core API")}
+        )
+
+    return JSONResponse(content={
+        "success": True,
+        "deleted_count": res.get("deleted_count", len(repair_ids)),
+        "deleted_ids": res.get("deleted_ids", repair_ids)
+    })
+
+
 DEFAULT_COMPLETENESS = "Ноутбук, зарядка, чехол..."
 DEFAULT_APPEARANCE = "Потёртости, царпины..."
+
 
 @router.get("/repairs/new", response_class=HTMLResponse)
 async def new_repair_form(request: Request, error_msg: Optional[str] = None):

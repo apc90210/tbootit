@@ -1023,3 +1023,17 @@ class AvitoPostSaleTaskListResponse(BaseModel):
     limit: int
     offset: int
 
+
+class SaleBulkDeleteRequest(BaseModel):
+    sale_ids: List[int]
+
+
+class RepairBulkDeleteRequest(BaseModel):
+    repair_ids: List[int]
+
+
+class BulkDeleteResponse(BaseModel):
+    status: str = "ok"
+    deleted_count: int
+    deleted_ids: List[int]
+

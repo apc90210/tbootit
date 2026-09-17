@@ -65,10 +65,31 @@
     </div>
 
     {% if items %}
+        {% if is_owner %}
+        <div id="ownerBulkBar" style="display: none; margin-bottom: 15px; padding: 12px 16px; background: #fef2f2; border: 1px solid #f87171; border-radius: 6px; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; color: #991b1b; font-weight: 600; font-size: 0.95rem;">
+                <span>🔒 Режим владельца (owner): выбрано ремонтов: <strong id="selectedRepairsCount">0</strong></span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" id="deleteBulkRepairsBtn" class="btn" style="background: #dc2626; color: #fff; font-weight: bold; border: none; padding: 7px 16px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="confirmBulkDeleteRepairs()">
+                    🗑️ Безвозвратно удалить (<span id="deleteBtnCount">0</span>)
+                </button>
+                <button type="button" class="btn" style="background: #fff; color: #374151; border: 1px solid #d1d5db; padding: 7px 12px; border-radius: 4px; cursor: pointer;" onclick="clearRepairSelection()">
+                    Снять выбор
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         <p>Найдено заказов: <strong>{{ total }}</strong></p>
         <table>
             <thead>
                 <tr>
+                    {% if is_owner %}
+                    <th style="width: 38px; text-align: center;">
+                        <input type="checkbox" id="selectAllRepairsCheckbox" title="Выбрать все ремонты" style="cursor: pointer; width: 18px; height: 18px;" onchange="toggleSelectAllRepairs(this.checked)">
+                    </th>
+                    {% endif %}
                     <th>Номер</th>
                     <th>Дата приёма</th>
                     <th>Клиент</th>
@@ -84,6 +105,11 @@
             <tbody>
                 {% for item in items %}
                 <tr>
+                    {% if is_owner %}
+                    <td style="text-align: center; vertical-align: middle;">
+                        <input type="checkbox" class="repair-select-box" value="{{ item.id }}" style="cursor: pointer; width: 18px; height: 18px;" onchange="onRepairCheckboxChange()">
+                    </td>
+                    {% endif %}
                     <td><strong>{{ item.number }}</strong></td>
                     <td>{{ item.accepted_at[:16] if item.accepted_at else '—' }}</td>
                     <td>{{ item.customer_name }}</td>
@@ -131,4 +157,99 @@
             {% endif %}
         </div>
     {% endif %}
+
+    {% if is_owner %}
+    <script>
+        function getSelectedRepairIds() {
+            var boxes = document.querySelectorAll('.repair-select-box:checked');
+            var ids = [];
+            boxes.forEach(function(b) { ids.push(parseInt(b.value)); });
+            return ids;
+        }
+
+        function onRepairCheckboxChange() {
+            var ids = getSelectedRepairIds();
+            var count = ids.length;
+            var bar = document.getElementById('ownerBulkBar');
+            var countEl = document.getElementById('selectedRepairsCount');
+            var btnCountEl = document.getElementById('deleteBtnCount');
+            var allBoxes = document.querySelectorAll('.repair-select-box');
+            var selectAllBox = document.getElementById('selectAllRepairsCheckbox');
+
+            if (countEl) countEl.innerText = count;
+            if (btnCountEl) btnCountEl.innerText = count;
+            if (bar) bar.style.display = count > 0 ? 'flex' : 'none';
+            if (selectAllBox && allBoxes.length > 0) {
+                selectAllBox.checked = (count === allBoxes.length);
+            }
+        }
+
+        function toggleSelectAllRepairs(checked) {
+            var boxes = document.querySelectorAll('.repair-select-box');
+            boxes.forEach(function(b) { b.checked = checked; });
+            onRepairCheckboxChange();
+        }
+
+        function clearRepairSelection() {
+            var boxes = document.querySelectorAll('.repair-select-box');
+            boxes.forEach(function(b) { b.checked = false; });
+            var selectAllBox = document.getElementById('selectAllRepairsCheckbox');
+            if (selectAllBox) selectAllBox.checked = false;
+            onRepairCheckboxChange();
+        }
+
+        async function confirmBulkDeleteRepairs() {
+            var ids = getSelectedRepairIds();
+            if (!ids || ids.length === 0) {
+                alert('Не выбрано ни одного ремонта');
+                return;
+            }
+
+            var confirmMsg = 'Вы действительно хотите БЕЗВОЗВРАТНО удалить выбранные ремонты (ID: ' + ids.join(', ') + ')?\n\n' +
+                             '⚠️ Внимание:\n' +
+                             '• Записи о ремонтах и их истории будут окончательно стёрты из базы данных.\n' +
+                             '• Это действие необратимо!\n\n' +
+                             'Подтвердить удаление?';
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            var btn = document.getElementById('deleteBulkRepairsBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = 'Удаление...';
+            }
+
+            try {
+                var response = await fetch('/repairs/repairs/bulk-delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ repair_ids: ids })
+                });
+
+                var result = await response.json();
+                if (response.ok && result.success) {
+                    alert('Успешно удалено ремонтов: ' + result.deleted_count);
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при удалении: ' + (result.detail || 'Неизвестная ошибка'));
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = '🗑️ Безвозвратно удалить (' + ids.length + ')';
+                    }
+                }
+            } catch (err) {
+                alert('Сетевая ошибка при удалении: ' + err);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '🗑️ Безвозвратно удалить (' + ids.length + ')';
+                }
+            }
+        }
+    </script>
+    {% endif %}
 {% endblock %}
+

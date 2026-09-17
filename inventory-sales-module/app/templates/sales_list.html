@@ -15,10 +15,31 @@
     </div>
 
     {% if sales_data and sales_data['items'] %}
+        {% if is_owner %}
+        <div id="ownerBulkBar" style="display: none; margin-bottom: 15px; padding: 12px 16px; background: #fef2f2; border: 1px solid #f87171; border-radius: 6px; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; color: #991b1b; font-weight: 600; font-size: 0.95rem;">
+                <span>🔒 Режим владельца (owner): выбрано продаж: <strong id="selectedSalesCount">0</strong></span>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" id="deleteBulkSalesBtn" class="btn" style="background: #dc2626; color: #fff; font-weight: bold; border: none; padding: 7px 16px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;" onclick="confirmBulkDeleteSales()">
+                    🗑️ Безвозвратно удалить (<span id="deleteBtnCount">0</span>)
+                </button>
+                <button type="button" class="btn" style="background: #fff; color: #374151; border: 1px solid #d1d5db; padding: 7px 12px; border-radius: 4px; cursor: pointer;" onclick="clearSaleSelection()">
+                    Снять выбор
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         <p>Всего найдено: {{ sales_data.total }}</p>
         <table>
             <thead>
                 <tr>
+                    {% if is_owner %}
+                    <th style="width: 38px; text-align: center;">
+                        <input type="checkbox" id="selectAllSalesCheckbox" title="Выбрать все продажи" style="cursor: pointer; width: 18px; height: 18px;" onchange="toggleSelectAllSales(this.checked)">
+                    </th>
+                    {% endif %}
                     <th>№</th>
                     <th>Дата</th>
                     <th>Товаров</th>
@@ -31,6 +52,11 @@
             <tbody>
                 {% for sale in sales_data['items'] %}
                 <tr>
+                    {% if is_owner %}
+                    <td style="text-align: center; vertical-align: middle;">
+                        <input type="checkbox" class="sale-select-box" value="{{ sale.id }}" style="cursor: pointer; width: 18px; height: 18px;" onchange="onSaleCheckboxChange()">
+                    </td>
+                    {% endif %}
                     <td>
                         #{{ sale.id }}
                         {% if sale.source_type == 'repair' %}
@@ -105,4 +131,100 @@
             <a href="/inventory/products" class="btn">Перейти к товарам</a>
         </div>
     {% endif %}
+
+    {% if is_owner %}
+    <script>
+        function getSelectedSaleIds() {
+            var boxes = document.querySelectorAll('.sale-select-box:checked');
+            var ids = [];
+            boxes.forEach(function(b) { ids.push(parseInt(b.value)); });
+            return ids;
+        }
+
+        function onSaleCheckboxChange() {
+            var ids = getSelectedSaleIds();
+            var count = ids.length;
+            var bar = document.getElementById('ownerBulkBar');
+            var countEl = document.getElementById('selectedSalesCount');
+            var btnCountEl = document.getElementById('deleteBtnCount');
+            var allBoxes = document.querySelectorAll('.sale-select-box');
+            var selectAllBox = document.getElementById('selectAllSalesCheckbox');
+
+            if (countEl) countEl.innerText = count;
+            if (btnCountEl) btnCountEl.innerText = count;
+            if (bar) bar.style.display = count > 0 ? 'flex' : 'none';
+            if (selectAllBox && allBoxes.length > 0) {
+                selectAllBox.checked = (count === allBoxes.length);
+            }
+        }
+
+        function toggleSelectAllSales(checked) {
+            var boxes = document.querySelectorAll('.sale-select-box');
+            boxes.forEach(function(b) { b.checked = checked; });
+            onSaleCheckboxChange();
+        }
+
+        function clearSaleSelection() {
+            var boxes = document.querySelectorAll('.sale-select-box');
+            boxes.forEach(function(b) { b.checked = false; });
+            var selectAllBox = document.getElementById('selectAllSalesCheckbox');
+            if (selectAllBox) selectAllBox.checked = false;
+            onSaleCheckboxChange();
+        }
+
+        async function confirmBulkDeleteSales() {
+            var ids = getSelectedSaleIds();
+            if (!ids || ids.length === 0) {
+                alert('Не выбрано ни одной продажи');
+                return;
+            }
+
+            var confirmMsg = 'Вы действительно хотите БЕЗВОЗВРАТНО удалить выбранные продажи (№ ' + ids.join(', ') + ')?\n\n' +
+                             '⚠️ Внимание:\n' +
+                             '• Записи о продажах будут окончательно стёрты из базы данных.\n' +
+                             '• Проданные товары автоматически вернутся на склад (статус «в наличии»).\n' +
+                             '• Это действие необратимо!\n\n' +
+                             'Подтвердить удаление?';
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            var btn = document.getElementById('deleteBulkSalesBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = 'Удаление...';
+            }
+
+            try {
+                var response = await fetch('/sales/bulk-delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ sale_ids: ids })
+                });
+
+                var result = await response.json();
+                if (response.ok && result.success) {
+                    alert('Успешно удалено продаж: ' + result.deleted_count);
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при удалении: ' + (result.detail || 'Неизвестная ошибка'));
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = '🗑️ Безвозвратно удалить (' + ids.length + ')';
+                    }
+                }
+            } catch (err) {
+                alert('Сетевая ошибка при удалении: ' + err);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '🗑️ Безвозвратно удалить (' + ids.length + ')';
+                }
+            }
+        }
+    </script>
+    {% endif %}
 {% endblock %}
+

@@ -613,3 +613,73 @@ def get_repair_receipt_data(repair_id: int, db: Session = Depends(get_db)):
         "sale_id": db_repair.sale_id or getattr(db_repair, "linked_sale_id", None),
         "organization": org_info
     }
+
+
+def _hard_delete_repair(db: Session, db_repair: models.RepairOrder) -> int:
+    repair_id = db_repair.id
+
+    # 1. Delete status history
+    histories = db.query(models.RepairStatusHistory).filter(
+        models.RepairStatusHistory.repair_id == repair_id
+    ).all()
+    for h in histories:
+        db.delete(h)
+
+    # 2. Decouple linked sale if any
+    if db_repair.sale_id:
+        linked_sale = db.query(models.Sale).filter(models.Sale.id == db_repair.sale_id).first()
+        if linked_sale and linked_sale.source_type == "repair" and linked_sale.source_id == repair_id:
+            linked_sale.source_type = None
+            linked_sale.source_id = None
+
+    sales_by_source = db.query(models.Sale).filter(
+        models.Sale.source_type == "repair",
+        models.Sale.source_id == repair_id
+    ).all()
+    for s in sales_by_source:
+        s.source_type = None
+        s.source_id = None
+
+    # 3. Log audit
+    log_audit(
+        db,
+        "repair_order",
+        repair_id,
+        "hard_delete",
+        old_value={"number": db_repair.number, "status": db_repair.status, "customer_name": db_repair.customer_name}
+    )
+
+    # 4. Delete repair order
+    db.delete(db_repair)
+    return repair_id
+
+
+@router.post("/bulk-delete", response_model=schemas.BulkDeleteResponse)
+def bulk_delete_repairs(req: schemas.RepairBulkDeleteRequest, db: Session = Depends(get_db)):
+    deleted = []
+    for r_id in req.repair_ids:
+        db_repair = db.query(models.RepairOrder).filter(models.RepairOrder.id == r_id).first()
+        if db_repair:
+            _hard_delete_repair(db, db_repair)
+            deleted.append(r_id)
+    db.commit()
+    return {
+        "status": "ok",
+        "deleted_count": len(deleted),
+        "deleted_ids": deleted
+    }
+
+
+@router.delete("/{repair_id}", response_model=schemas.BulkDeleteResponse)
+def delete_repair(repair_id: int, db: Session = Depends(get_db)):
+    db_repair = db.query(models.RepairOrder).filter(models.RepairOrder.id == repair_id).first()
+    if not db_repair:
+        raise HTTPException(status_code=404, detail="Ремонтный заказ не найден")
+    _hard_delete_repair(db, db_repair)
+    db.commit()
+    return {
+        "status": "ok",
+        "deleted_count": 1,
+        "deleted_ids": [repair_id]
+    }
+

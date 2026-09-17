@@ -459,6 +459,21 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def bulk_delete_sales(self, sale_ids: list) -> dict:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/api/sales/bulk-delete",
+                    json={"sale_ids": sale_ids},
+                    timeout=20.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                return {"error": True, "status_code": response.status_code, "detail": response.text}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
 core_client = CoreClient()
+
 
 

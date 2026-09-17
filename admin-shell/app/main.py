@@ -840,6 +840,7 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
     headers["x-forwarded-port"] = "8011"
     headers["x-forwarded-proto"] = request.url.scheme or "http"
     headers["x-forwarded-prefix"] = prefix
+    headers["x-auth-is-owner"] = "1" if _is_owner(request) else "0"
 
     body = await request.body()
     method = request.method

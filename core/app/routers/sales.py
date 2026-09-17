@@ -607,3 +607,133 @@ def get_sale_revisions(sale_id: int, db: Session = Depends(get_db)):
         "total": len(revisions)
     }
 
+
+def _hard_delete_sale(db: Session, db_sale: models.Sale) -> int:
+    sale_id = db_sale.id
+
+    # 1. Restore product inventory if the sale was active (not canceled)
+    if db_sale.status not in ["canceled", "cancelled"]:
+        sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
+        for item in sale_items:
+            if item.product_id:
+                db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+                if db_product:
+                    old_quantity = db_product.quantity or 0
+                    db_product.quantity = old_quantity + item.quantity
+                    old_status = db_product.status
+                    old_location = db_product.storage_location
+                    if db_product.status == "sold" and db_product.quantity > 0:
+                        db_product.status = "in_stock"
+                        if db_product.storage_location == "archive":
+                            db_product.storage_location = "store"
+
+                    log_product_event(
+                        db,
+                        db_product.id,
+                        "sale_deleted",
+                        old_value={"status": old_status, "quantity": old_quantity, "storage_location": old_location},
+                        new_value={"status": db_product.status, "quantity": db_product.quantity, "storage_location": db_product.storage_location},
+                        comment=f"Восстановлен остаток товара после безвозвратного удаления продажи #{sale_id}"
+                    )
+
+    # 2. Delete associated stock movements
+    stock_movs = db.query(models.StockMovement).filter(
+        models.StockMovement.comment.like(f"%Sale {sale_id}%")
+    ).all()
+    for sm in stock_movs:
+        db.delete(sm)
+
+    # 3. Delete avito post sale tasks
+    avito_tasks = db.query(models.AvitoPostSaleTask).filter(models.AvitoPostSaleTask.sale_id == sale_id).all()
+    for task in avito_tasks:
+        db.delete(task)
+
+    # 4. Delete sale revisions
+    revisions = db.query(models.SaleRevision).filter(models.SaleRevision.sale_id == sale_id).all()
+    for rev in revisions:
+        db.delete(rev)
+
+    # 5. Decouple linked repair orders
+    repairs = db.query(models.RepairOrder).filter(models.RepairOrder.sale_id == sale_id).all()
+    for rep in repairs:
+        rep.sale_id = None
+        rep.final_amount = None
+        rep.payment_method = None
+        rep.warranty_days = None
+
+    if db_sale.source_type == "repair" and db_sale.source_id:
+        rep_by_source = db.query(models.RepairOrder).filter(models.RepairOrder.id == db_sale.source_id).first()
+        if rep_by_source and rep_by_source.sale_id == sale_id:
+            rep_by_source.sale_id = None
+            rep_by_source.final_amount = None
+            rep_by_source.payment_method = None
+            rep_by_source.warranty_days = None
+
+    # 6. Decouple other sales referencing this sale
+    related_sales = db.query(models.Sale).filter(
+        or_(
+            models.Sale.original_sale_id == sale_id,
+            models.Sale.replaced_by_sale_id == sale_id,
+            models.Sale.source_sale_id == sale_id,
+            models.Sale.superseded_by_sale_id == sale_id
+        )
+    ).all()
+    for rs in related_sales:
+        if rs.original_sale_id == sale_id:
+            rs.original_sale_id = None
+        if rs.replaced_by_sale_id == sale_id:
+            rs.replaced_by_sale_id = None
+        if rs.source_sale_id == sale_id:
+            rs.source_sale_id = None
+        if rs.superseded_by_sale_id == sale_id:
+            rs.superseded_by_sale_id = None
+
+    # 7. Delete sale items
+    items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
+    for it in items:
+        db.delete(it)
+
+    # 8. Log audit before deletion
+    log_audit(
+        db,
+        "sale",
+        sale_id,
+        "hard_delete",
+        old_value={"total_amount": db_sale.total_amount, "status": db_sale.status, "comment": db_sale.comment}
+    )
+
+    # 9. Delete sale
+    db.delete(db_sale)
+    return sale_id
+
+
+@router.post("/bulk-delete", response_model=schemas.BulkDeleteResponse)
+def bulk_delete_sales(req: schemas.SaleBulkDeleteRequest, db: Session = Depends(get_db)):
+    deleted = []
+    for s_id in req.sale_ids:
+        db_sale = db.query(models.Sale).filter(models.Sale.id == s_id).first()
+        if db_sale:
+            _hard_delete_sale(db, db_sale)
+            deleted.append(s_id)
+    db.commit()
+    return {
+        "status": "ok",
+        "deleted_count": len(deleted),
+        "deleted_ids": deleted
+    }
+
+
+@router.delete("/{sale_id}", response_model=schemas.BulkDeleteResponse)
+def delete_sale(sale_id: int, db: Session = Depends(get_db)):
+    db_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not db_sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    _hard_delete_sale(db, db_sale)
+    db.commit()
+    return {
+        "status": "ok",
+        "deleted_count": 1,
+        "deleted_ids": [sale_id]
+    }
+
+
