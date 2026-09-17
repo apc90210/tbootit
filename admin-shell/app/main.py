@@ -613,7 +613,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.62"
+    version = "0.2.63"
     try:
         for manifest_candidate in [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")),
@@ -625,16 +625,16 @@ async def download_extension_zip():
                 break
     except Exception:
         pass
-    filename = f"technoreboot-avito-extension-{version}.zip"
     candidate_paths = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), filename)),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), f"technoreboot-avito-extension-{version}.zip")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension-0.2.63.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "app", filename)),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "app", f"technoreboot-avito-extension-{version}.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "app", "technoreboot-avito-extension.zip")),
-        os.path.abspath(f"/app/{filename}"),
-        os.path.abspath(f"/app/app/{filename}"),
-        os.path.abspath(f"dist/{filename}"),
-        os.path.abspath(f"admin-shell/app/{filename}"),
+        os.path.abspath("/app/app/technoreboot-avito-extension-0.2.63.zip"),
+        os.path.abspath("/app/app/technoreboot-avito-extension.zip"),
+        os.path.abspath(f"dist/technoreboot-avito-extension-{version}.zip"),
+        os.path.abspath(f"admin-shell/app/technoreboot-avito-extension-{version}.zip"),
     ]
     zip_path = None
     for p in candidate_paths:
@@ -644,6 +644,17 @@ async def download_extension_zip():
     if not zip_path or not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail="Файл расширения не найден.")
     
+    try:
+        import zipfile
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            if "manifest.json" in zf.namelist():
+                m = json.loads(zf.read("manifest.json").decode("utf-8"))
+                if "version" in m:
+                    version = m["version"]
+    except Exception:
+        pass
+
+    filename = f"technoreboot-avito-extension-{version}.zip"
     return FileResponse(
         zip_path,
         filename=filename,

@@ -11,20 +11,38 @@
         <span id="connBadge" class="badge badge-offline">Offline</span>
     </div>
 
+    <!-- Connection Card (Always visible at the top) -->
     <div class="card" id="statusCard">
-        <p id="statusMsg">Проверка подключения к Техноребут...</p>
+        <!-- Paired View -->
+        <div id="pairedConnectionBlock" style="display:none;">
+            <div class="small" style="color:#64748b; margin-bottom:2px;">Подключено к:</div>
+            <div id="connectedOriginDisplay" class="connection-origin">https://localhost:8443</div>
+            <div class="connection-status-row">
+                <div style="font-size:12px;">Статус: <strong id="connectionStatusText" class="status-text-online">Подключено</strong></div>
+                <button id="disconnectBtn" class="btn btn-secondary btn-sm" title="Отключить расширение от сервера">Отключиться</button>
+            </div>
+        </div>
+
+        <!-- Unpaired View -->
+        <div id="unpairedConnectionBlock">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:13px; color:#334155;">ТехноРебут не подключён</strong>
+                <span id="unpairedBadge" class="badge badge-offline">Не привязан</span>
+            </div>
+            <p id="statusMsg" class="small" style="margin-top:6px; color:#64748b;">Введите адрес сервера и код подключения со страницы <code>/avito/extension</code> ниже.</p>
+        </div>
     </div>
 
     <!-- Pairing Section -->
     <div class="card" id="pairSection">
         <h3>Подключение к Техноребут</h3>
-        <p class="small">Адрес сервера Техноребут (заполняется автоматически со страницы расширения):</p>
-        <div class="form-row" style="margin-bottom:6px; display:flex; gap:6px;">
-            <input type="url" id="serverUrlInput" placeholder="https://localhost:8443/admin-api/avito-extension" style="flex:1; font-size:12px;">
-            <button id="saveServerUrlBtn" class="btn btn-secondary" style="white-space:nowrap; padding:4px 10px; font-size:12px;">Зафиксировать</button>
+        <label for="serverUrlInput" class="small" style="display:block; margin-bottom:4px;">Адрес ТехноРебут:</label>
+        <div class="form-row" style="margin-bottom:8px;">
+            <input type="text" id="serverUrlInput" placeholder="https://localhost:8443" style="flex:1; font-size:12px;">
+            <button id="saveServerUrlBtn" class="btn btn-secondary" style="display:none;">Зафиксировать</button>
         </div>
-        <p id="serverUrlMsg" class="msg" style="margin-bottom:8px; display:none;"></p>
-        <p class="small">Введите 6-значный код подключения со страницы <code>/avito/extension</code> в Техноребут:</p>
+        <p id="serverUrlMsg" class="msg" style="display:none;"></p>
+        <label for="pairCodeInput" class="small" style="display:block; margin-bottom:4px;">Код подключения (со страницы <code>/avito/extension</code>):</label>
         <div class="form-row">
             <input type="text" id="pairCodeInput" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="123456" autofocus>
             <button id="pairBtn" class="btn btn-primary">Подключить</button>

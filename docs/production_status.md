@@ -270,3 +270,20 @@ WORKFLOW:
 | **Historical Records** | **PRESERVED UNCHANGED** | All historical stage logs, audit reports, and forensic data retain original IPs |
 | **Final Status** | `TECHNOREBOOT_STAGE10D_R1_NEW_VDS_CANONICAL_LOCAL_SYNC_COMPLETE` | **CANONICAL PRODUCTION PROMOTED & LOCAL SYNC VERIFIED** |
 
+---
+
+## 14. Extension Connection Switching (Stage 12A LOCAL DEV)
+
+| Parameter | Current Status | Details |
+| :--- | :--- | :--- |
+| **Stage Scope** | **LOCAL DEV ONLY** | Extension connection switching between LOCAL (`https://localhost:8443`) and Production (`https://144.31.15.88`) |
+| **Extension Version** | **v0.2.63** | Bumped from v0.2.62. ZIP rebuilt at `dist/technoreboot-avito-extension-0.2.63.zip` (SHA256: `bbaf780f75647c598c0725ad2de30239f865ea311ca529d405978960d1a16f9b`) |
+| **Connection Card UI** | **ACTIVE** | Shows current connected origin, paired/offline status badge, explicit `[Отключиться]` button with confirmation |
+| **Reconnection / Pairing UI** | **ACTIVE** | Dynamic server origin input (prefilled with active tab when unpaired) + 6-digit code + runtime permission request |
+| **Atomic State Transition** | **ENFORCED** | Service worker atomically stores `server_base_url`, `extension_token`, `active_connection`. Stale tokens cleared |
+| **Host Permissions Strategy** | **CLEANED MV3** | Retired `144.31.50.134` removed; `localhost:8443` and `144.31.15.88` retained; optional host permissions with runtime `chrome.permissions.request()` |
+| **Server-Side Revocation** | **ACTIVE** | Added `POST /extension/api/pairing/revoke` and `/pairing/unpair` to `avito-module` |
+| **Automated Tests** | **302 PASSED (0 FAILED)** | Targeted suite (164 tests) + Extension suite (138 tests, including 12 Stage 12A switching tests) |
+| **Production Target** | **UNTOUCHED (0 changes)** | VDS `144.31.15.88` untouched; DB unchanged; ready for Owner LOCAL acceptance |
+| **Final Status** | `TECHNOREBOOT_STAGE12A_LOCAL_READY_FOR_OWNER_ACCEPTANCE` | **READY FOR OWNER BROWSER ACCEPTANCE ON LOCAL** |
+

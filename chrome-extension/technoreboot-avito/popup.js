@@ -1,8 +1,13 @@
-// Technoreboot Avito Popup Script (v0.2.62)
+// Technoreboot Avito Popup Script (v0.2.63)
 
 document.addEventListener("DOMContentLoaded", async () => {
     const connBadge = document.getElementById("connBadge");
     const statusMsg = document.getElementById("statusMsg");
+    const pairedConnectionBlock = document.getElementById("pairedConnectionBlock");
+    const unpairedConnectionBlock = document.getElementById("unpairedConnectionBlock");
+    const connectedOriginDisplay = document.getElementById("connectedOriginDisplay");
+    const connectionStatusText = document.getElementById("connectionStatusText");
+    const disconnectBtn = document.getElementById("disconnectBtn");
     const pairSection = document.getElementById("pairSection");
     const pairCodeInput = document.getElementById("pairCodeInput");
     const pairBtn = document.getElementById("pairBtn");
@@ -83,7 +88,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.62";
+        let manifestVer = "0.2.63";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -98,6 +103,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let currentExtractionData = null;
     let isPaired = false;
     let isServerOnline = false;
+    let currentConnectedOrigin = null;
 
     // --- Session Storage Draft Helpers (30 min TTL) ---
     async function getSessionDraft() {
@@ -157,24 +163,97 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    function normalizeServerUrl(rawUrl) {
+    function normalizeOrigin(rawUrl) {
         if (!rawUrl || typeof rawUrl !== "string") return "";
-        let u = rawUrl.trim().replace(/\/+$/, "");
-        if (!u) return "";
-        if (!u.startsWith("http://") && !u.startsWith("https://")) {
-            u = "https://" + u;
+        let s = rawUrl.trim().replace(/\/+$/, "");
+        if (!s) return "";
+        if (s.includes("://")) {
+            if (!/^https?:\/\//i.test(s)) return "";
+        } else {
+            s = "https://" + s;
         }
-        if (!u.includes("/admin-api/avito-extension")) {
-            try {
-                const parsed = new URL(u);
-                u = `${parsed.protocol}//${parsed.host}/admin-api/avito-extension`;
-            } catch (e) {
-                if (!u.endsWith("/admin-api/avito-extension")) {
-                    u = u.replace(/\/+$/, "") + "/admin-api/avito-extension";
+        try {
+            const parsed = new URL(s);
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+            if (!parsed.hostname) return "";
+            return parsed.origin;
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function normalizeServerUrl(rawUrl) {
+        const origin = normalizeOrigin(rawUrl);
+        if (!origin) return "";
+        return `${origin}/admin-api/avito-extension`;
+    }
+
+    function renderConnectionState(state, data = {}) {
+        switch (state) {
+            case "PAIRED":
+                isPaired = true;
+                isServerOnline = true;
+                connBadge.className = "badge badge-online";
+                connBadge.textContent = "Подключен";
+                if (pairedConnectionBlock) pairedConnectionBlock.style.display = "block";
+                if (unpairedConnectionBlock) unpairedConnectionBlock.style.display = "none";
+                if (connectedOriginDisplay) {
+                    connectedOriginDisplay.textContent = data.origin || currentConnectedOrigin || "";
                 }
-            }
+                if (connectionStatusText) {
+                    connectionStatusText.className = "status-text-online";
+                    connectionStatusText.textContent = "Подключено";
+                }
+                if (pairSection) pairSection.style.display = "none";
+                break;
+
+            case "PAIRED_SERVER_UNREACHABLE":
+                isPaired = true;
+                isServerOnline = false;
+                connBadge.className = "badge badge-offline";
+                connBadge.textContent = "Offline";
+                if (pairedConnectionBlock) pairedConnectionBlock.style.display = "block";
+                if (unpairedConnectionBlock) unpairedConnectionBlock.style.display = "none";
+                if (connectedOriginDisplay) {
+                    connectedOriginDisplay.textContent = data.origin || currentConnectedOrigin || "";
+                }
+                if (connectionStatusText) {
+                    connectionStatusText.className = "status-text-offline";
+                    connectionStatusText.textContent = "Сервер недоступен";
+                }
+                if (pairSection) pairSection.style.display = "none";
+                break;
+
+            case "UNPAIRED":
+                isPaired = false;
+                isServerOnline = false;
+                currentConnectedOrigin = null;
+                connBadge.className = "badge badge-offline";
+                connBadge.textContent = "Не привязан";
+                if (pairedConnectionBlock) pairedConnectionBlock.style.display = "none";
+                if (unpairedConnectionBlock) unpairedConnectionBlock.style.display = "block";
+                if (statusMsg) {
+                    statusMsg.textContent = data.error || "ТехноРебут не подключён. Введите адрес сервера и код подключения со страницы /avito/extension ниже.";
+                }
+                if (pairSection) pairSection.style.display = "block";
+                break;
+
+            case "PAIRING":
+                if (pairBtn) pairBtn.disabled = true;
+                if (pairMsg) {
+                    pairMsg.className = "msg";
+                    pairMsg.textContent = "Подключение...";
+                }
+                break;
+
+            case "PAIRING_ERROR":
+                if (pairBtn) pairBtn.disabled = false;
+                if (pairMsg) {
+                    pairMsg.className = "msg msg-error";
+                    pairMsg.textContent = data.error || "Ошибка подключения.";
+                }
+                break;
         }
-        return u;
     }
 
     async function persistServerUrl(notifyUser = false) {
@@ -182,13 +261,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         const rawVal = serverUrlInput.value;
         if (!rawVal || !rawVal.trim()) return null;
         const normalized = normalizeServerUrl(rawVal);
+        const origin = normalizeOrigin(rawVal);
         if (normalized) {
-            serverUrlInput.value = normalized;
+            serverUrlInput.value = origin || normalized;
             if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
                 chrome.storage.local.set({ server_base_url: normalized });
             }
             if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-                chrome.runtime.sendMessage({ action: "set_server_url", server_url: normalized });
+                chrome.runtime.sendMessage({ action: "set_server_url", server_url: origin || normalized });
             }
             if (notifyUser && serverUrlMsg) {
                 serverUrlMsg.className = "msg msg-success";
@@ -213,72 +293,105 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (serverUrlInput) {
-        serverUrlInput.addEventListener("input", () => persistServerUrl(false));
-        serverUrlInput.addEventListener("change", () => persistServerUrl(false));
-        serverUrlInput.addEventListener("paste", () => setTimeout(() => persistServerUrl(false), 50));
-        serverUrlInput.addEventListener("blur", () => persistServerUrl(false));
-        serverUrlInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                persistServerUrl(true);
+        serverUrlInput.addEventListener("blur", () => {
+            if (serverUrlInput.value && serverUrlInput.value.trim()) {
+                const orig = normalizeOrigin(serverUrlInput.value);
+                if (orig) serverUrlInput.value = orig;
             }
         });
     }
 
-    // Load persisted server URL from storage immediately
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(["server_base_url"], res => {
-            if (res && res.server_base_url && serverUrlInput && !serverUrlInput.value) {
-                serverUrlInput.value = res.server_base_url;
-            }
+    // Disconnect Button Handler
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener("click", () => {
+            const targetOrigin = currentConnectedOrigin || (connectedOriginDisplay ? connectedOriginDisplay.textContent.trim() : "сервера");
+            const confirmed = confirm(`Отключить расширение от ${targetOrigin}?`);
+            if (!confirmed) return;
+
+            disconnectBtn.disabled = true;
+            disconnectBtn.textContent = "Отключение...";
+
+            chrome.runtime.sendMessage({ action: "unpair" }, () => {
+                disconnectBtn.disabled = false;
+                disconnectBtn.textContent = "Отключиться";
+                currentConnectedOrigin = null;
+                renderConnectionState("UNPAIRED");
+                hideAllCards();
+                if (pairSection) pairSection.style.display = "block";
+                if (pairCodeInput) pairCodeInput.value = "";
+                if (pairMsg) {
+                    pairMsg.className = "msg msg-success";
+                    pairMsg.textContent = "Расширение отключено.";
+                    setTimeout(() => {
+                        if (pairMsg && pairMsg.textContent === "Расширение отключено.") pairMsg.textContent = "";
+                    }, 3000);
+                }
+                detectActiveTabServer();
+            });
         });
     }
 
-    // Auto-detect server URL from current active tab if not yet set
-    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-            if (tabs && tabs.length > 0 && tabs[0].url) {
-                const tabUrl = tabs[0].url;
-                try {
-                    const parsed = new URL(tabUrl);
-                    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-                        // Detect if active tab is TechnoReboot admin / web app
-                        if (
-                            tabUrl.includes("144.31.15.88") ||
-                            tabUrl.includes("144.31.50.134") ||
-                            tabUrl.includes("localhost:8443") ||
-                            tabUrl.includes("127.0.0.1:8443") ||
-                            tabUrl.includes("localhost:8011") ||
-                            tabUrl.includes("127.0.0.1:8011") ||
-                            tabUrl.includes("localhost:8000") ||
-                            tabUrl.includes("/avito/extension") ||
-                            tabUrl.includes("/inventory") ||
-                            tabUrl.includes("/sales") ||
-                            tabUrl.includes("/admin-api")
-                        ) {
-                            const detected = `${parsed.protocol}//${parsed.host}/admin-api/avito-extension`;
-                            if (!serverUrlInput.value || serverUrlInput.value !== detected) {
-                                serverUrlInput.value = detected;
-                                persistServerUrl(false);
-                                checkStatus();
+    // Auto-detect server URL from current active tab if not yet set and not paired
+    function detectActiveTabServer() {
+        if (isPaired) return;
+        if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
+            chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+                if (tabs && tabs.length > 0 && tabs[0].url) {
+                    const tabUrl = tabs[0].url;
+                    try {
+                        const parsed = new URL(tabUrl);
+                        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+                            const isTechnoRebootPage = (
+                                tabUrl.includes("/avito/extension") ||
+                                tabUrl.includes("/inventory") ||
+                                tabUrl.includes("/sales") ||
+                                tabUrl.includes("/repairs") ||
+                                tabUrl.includes("/admin-api") ||
+                                parsed.hostname === "144.31.15.88" ||
+                                (parsed.hostname === "localhost" && (parsed.port === "8443" || parsed.port === "8011")) ||
+                                (parsed.hostname === "127.0.0.1" && (parsed.port === "8443" || parsed.port === "8011"))
+                            );
+                            if (isTechnoRebootPage) {
+                                const detected = parsed.origin;
+                                if (serverUrlInput && !serverUrlInput.value) {
+                                    serverUrlInput.value = detected;
+                                }
                             }
                         }
-                    }
-                } catch (e) {}
+                    } catch (e) {}
+                }
+            });
+        }
+    }
+
+    // Load persisted connection from storage
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["active_connection", "server_base_url"], res => {
+            if (res && res.active_connection && res.active_connection.origin) {
+                currentConnectedOrigin = res.active_connection.origin;
+                if (serverUrlInput && !serverUrlInput.value) {
+                    serverUrlInput.value = currentConnectedOrigin;
+                }
+            } else if (res && res.server_base_url && serverUrlInput && !serverUrlInput.value) {
+                const orig = normalizeOrigin(res.server_base_url);
+                if (orig) {
+                    currentConnectedOrigin = orig;
+                    serverUrlInput.value = orig;
+                }
             }
         });
     }
 
     // --- Status Check ---
     function checkStatus() {
-        // Fallback timer: if check takes more than 2 seconds, reveal pairSection so user is NEVER blocked
         const fallbackTimer = setTimeout(() => {
             if (!isPaired) {
-                isServerOnline = false;
-                connBadge.className = "badge badge-offline";
-                connBadge.textContent = "Offline";
-                statusMsg.textContent = "Проверка соединения заняла слишком много времени. Введите код или проверьте адрес ниже.";
+                renderConnectionState("UNPAIRED", {
+                    error: "Проверка соединения заняла слишком много времени. Введите код или проверьте адрес ниже."
+                });
+                hideAllCards();
                 if (pairSection) pairSection.style.display = "block";
+                detectActiveTabServer();
             }
         }, 2000);
 
@@ -286,66 +399,67 @@ document.addEventListener("DOMContentLoaded", async () => {
             chrome.runtime.sendMessage({ action: "get_status" }, response => {
                 clearTimeout(fallbackTimer);
                 if (chrome.runtime.lastError || !response) {
-                    isServerOnline = false;
-                    isPaired = false;
-                    connBadge.className = "badge badge-offline";
-                    connBadge.textContent = "Offline";
-                    statusMsg.textContent = "Сервер Техноребут недоступен (проверьте работу сервера или адрес ниже).";
+                    renderConnectionState("UNPAIRED", {
+                        error: "Сервер Техноребут недоступен (проверьте работу сервера или адрес ниже)."
+                    });
                     hideAllCards();
-                    pairSection.style.display = "block";
+                    if (pairSection) pairSection.style.display = "block";
+                    detectActiveTabServer();
+                    return;
+                }
+
+                if (response.origin) {
+                    currentConnectedOrigin = response.origin;
+                    if (serverUrlInput && !serverUrlInput.value) {
+                        serverUrlInput.value = response.origin;
+                    }
+                }
+
+                if (response.unreachable) {
+                    // Stored server is paired but currently offline
+                    renderConnectionState("PAIRED_SERVER_UNREACHABLE", {
+                        origin: response.origin,
+                        error: response.error
+                    });
+                    hideAllCards();
                     return;
                 }
 
                 if (!response.online) {
-                    isServerOnline = false;
-                    isPaired = false;
-                    connBadge.className = "badge badge-offline";
-                    connBadge.textContent = "Offline";
-                    statusMsg.textContent = response.error
-                        ? `Сервер недоступен: ${response.error}`
-                        : "Сервер Техноребут недоступен (проверьте работу сервера или адрес ниже).";
+                    renderConnectionState("UNPAIRED", {
+                        error: response.error ? `Сервер недоступен: ${response.error}` : "Сервер Техноребут не настроен."
+                    });
                     hideAllCards();
-                    pairSection.style.display = "block";
-                    if (serverUrlInput && !serverUrlInput.value && response.server_url) {
-                        serverUrlInput.value = response.server_url;
-                    }
+                    if (pairSection) pairSection.style.display = "block";
+                    detectActiveTabServer();
                 } else if (!response.paired) {
-                    isServerOnline = true;
-                    isPaired = false;
-                    connBadge.className = "badge badge-offline";
-                    connBadge.textContent = "Не привязан";
-                    statusMsg.textContent = "Сервер в сети. Введите 6-значный код подключения:";
+                    renderConnectionState("UNPAIRED", {
+                        error: "Сервер в сети. Введите 6-значный код подключения:"
+                    });
                     hideAllCards();
-                    pairSection.style.display = "block";
-                    if (serverUrlInput && !serverUrlInput.value && response.server_url) {
-                        serverUrlInput.value = response.server_url;
-                    }
+                    if (pairSection) pairSection.style.display = "block";
                     inspectActiveTab();
                 } else {
-                    isServerOnline = true;
-                    isPaired = true;
-                    connBadge.className = "badge badge-online";
-                    connBadge.textContent = "Подключен";
-                    statusMsg.textContent = "Расширение подключено к Техноребут.";
+                    renderConnectionState("PAIRED", {
+                        origin: response.origin,
+                        server_label: response.server_label
+                    });
                     hideAllCards();
-                    if (serverUrlInput && !serverUrlInput.value && response.server_url) {
-                        serverUrlInput.value = response.server_url;
-                    }
                     inspectActiveTab();
                 }
             });
         } catch (e) {
             clearTimeout(fallbackTimer);
-            isServerOnline = false;
-            isPaired = false;
-            connBadge.className = "badge badge-offline";
-            connBadge.textContent = "Offline";
-            statusMsg.textContent = "Ошибка расширения при проверке подключения.";
-            pairSection.style.display = "block";
+            renderConnectionState("UNPAIRED", {
+                error: "Ошибка расширения при проверке подключения."
+            });
+            if (pairSection) pairSection.style.display = "block";
+            detectActiveTabServer();
         }
     }
 
     checkStatus();
+    detectActiveTabServer();
 
     function hideAllCards() {
         pairSection.style.display = "none";
@@ -470,43 +584,65 @@ document.addEventListener("DOMContentLoaded", async () => {
         const cleanCode = rawCode.replace(/\D/g, "");
 
         if (!cleanCode || cleanCode.length !== 6) {
-            pairMsg.className = "msg msg-error";
-            pairMsg.textContent = "Введите 6-значный цифровой код.";
+            renderConnectionState("PAIRING_ERROR", { error: "Введите 6-значный цифровой код." });
             return;
         }
 
-        // Read and persist normalized server URL from input
-        let serverUrl = null;
-        if (serverUrlInput && serverUrlInput.value && serverUrlInput.value.trim()) {
-            serverUrl = normalizeServerUrl(serverUrlInput.value);
-            persistServerUrl(false);
+        const rawServer = serverUrlInput && serverUrlInput.value ? serverUrlInput.value.trim() : "";
+        const origin = normalizeOrigin(rawServer);
+        if (!origin) {
+            renderConnectionState("PAIRING_ERROR", {
+                error: "Некорректный адрес сервера Техноребут. Используйте https:// или http://."
+            });
+            return;
         }
 
-        pairMsg.className = "msg";
-        pairMsg.textContent = "Подключение...";
-        pairBtn.disabled = true;
+        const originPattern = origin + "/*";
+        if (typeof chrome !== "undefined" && chrome.permissions && chrome.permissions.contains) {
+            chrome.permissions.contains({ origins: [originPattern] }, hasPerm => {
+                if (hasPerm) {
+                    executePair(origin, cleanCode);
+                } else {
+                    chrome.permissions.request({ origins: [originPattern] }, granted => {
+                        if (granted) {
+                            executePair(origin, cleanCode);
+                        } else {
+                            renderConnectionState("PAIRING_ERROR", {
+                                error: `Разрешение на доступ к ${origin} отклонено пользователем.`
+                            });
+                        }
+                    });
+                }
+            });
+        } else {
+            executePair(origin, cleanCode);
+        }
+    });
 
-        chrome.runtime.sendMessage({ action: "pair", code: cleanCode, server_url: serverUrl }, res => {
-            pairBtn.disabled = false;
+    function executePair(origin, cleanCode) {
+        renderConnectionState("PAIRING");
+
+        chrome.runtime.sendMessage({ action: "pair", code: cleanCode, server_url: origin }, res => {
+            if (pairBtn) pairBtn.disabled = false;
             if (chrome.runtime.lastError || !res) {
-                pairMsg.className = "msg msg-error";
-                pairMsg.textContent = (chrome.runtime.lastError && chrome.runtime.lastError.message) || "Ошибка связи с сервером при привязке.";
+                renderConnectionState("PAIRING_ERROR", {
+                    error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || "Ошибка связи с сервером при привязке."
+                });
                 return;
             }
             if (res.success) {
-                isPaired = true;
-                connBadge.className = "badge badge-online";
-                connBadge.textContent = "Подключен";
-                statusMsg.textContent = "Расширение успешно привязано к серверу.";
-                pairSection.style.display = "none";
-                pairMsg.textContent = "";
+                currentConnectedOrigin = res.origin || origin;
+                renderConnectionState("PAIRED", { origin: currentConnectedOrigin });
+                if (pairMsg) pairMsg.textContent = "";
+                if (pairCodeInput) pairCodeInput.value = "";
                 inspectActiveTab();
             } else {
-                pairMsg.className = "msg msg-error";
-                pairMsg.textContent = res.message || "Ошибка привязки кода.";
+                renderConnectionState("PAIRING_ERROR", {
+                    error: res.message || "Ошибка привязки кода."
+                });
             }
         });
-    });
+    }
 
     if (pairCodeInput) {
         pairCodeInput.addEventListener("keydown", (e) => {
@@ -1399,13 +1535,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                             (photosImported + photosSkipped));
 
                         if (openProductBtn && productLinkContainer) {
-                            let baseOrigin = "http://localhost:8011";
-                            const currentServerUrl = (serverUrlInput && serverUrlInput.value) ? serverUrlInput.value : "";
-                            if (currentServerUrl) {
-                                try {
-                                    const parsed = new URL(currentServerUrl);
-                                    baseOrigin = `${parsed.protocol}//${parsed.host}`;
-                                } catch (e) {}
+                            let baseOrigin = currentConnectedOrigin;
+                            if (!baseOrigin && serverUrlInput && serverUrlInput.value) {
+                                baseOrigin = normalizeOrigin(serverUrlInput.value);
+                            }
+                            if (!baseOrigin) {
+                                baseOrigin = "https://localhost:8443";
                             }
                             const targetUrl = `${baseOrigin}/inventory/products/${res.product_id}`;
                             openProductBtn.onclick = () => {

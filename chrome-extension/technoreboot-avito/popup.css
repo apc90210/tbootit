@@ -137,3 +137,32 @@ input[type="text"] {
     margin-top: 10px;
 }
 
+.connection-origin {
+    font-weight: 600;
+    font-size: 13px;
+    color: #0f172a;
+    word-break: break-all;
+    background: #f1f5f9;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    margin-top: 2px;
+    margin-bottom: 8px;
+}
+
+.connection-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.status-text-online { color: #16a34a; }
+.status-text-offline { color: #dc2626; }
+.status-text-unpaired { color: #64748b; }
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 11px;
+}
+

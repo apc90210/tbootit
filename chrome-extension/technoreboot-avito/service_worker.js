@@ -1,6 +1,24 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.62)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.63)
 
-const DEFAULT_BRIDGE_BASE_URL = "http://localhost:8011/admin-api/avito-extension";
+// Normalizes arbitrary TechnoReboot URLs/inputs into a canonical origin (protocol + host/port, no trailing slash).
+function normalizeOrigin(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== "string") return null;
+    let s = rawUrl.trim().replace(/\/+$/, "");
+    if (!s) return null;
+    if (s.includes("://")) {
+        if (!/^https?:\/\//i.test(s)) return null;
+    } else {
+        s = "https://" + s;
+    }
+    try {
+        const parsed = new URL(s);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+        if (!parsed.hostname) return null;
+        return parsed.origin;
+    } catch (e) {
+        return null;
+    }
+}
 
 // Deprecated in Stage 09A-R4: All seller-initiated deactivations execute directly in real mode.
 async function getDryRunMode() {
@@ -51,18 +69,45 @@ function isValidAvitoTarget(listingUrl, avitoListingId) {
     }
 }
 
-async function getServerUrl() {
+async function getActiveOrigin() {
     return new Promise(resolve => {
-        chrome.storage.local.get(["server_base_url"], result => {
-            resolve(result.server_base_url || DEFAULT_BRIDGE_BASE_URL);
+        chrome.storage.local.get(["active_connection", "server_base_url"], result => {
+            if (result && result.active_connection && result.active_connection.origin) {
+                resolve(result.active_connection.origin);
+            } else if (result && result.server_base_url) {
+                const orig = normalizeOrigin(result.server_base_url);
+                resolve(orig || null);
+            } else {
+                resolve(null);
+            }
         });
     });
 }
 
+async function getServerUrl() {
+    const origin = await getActiveOrigin();
+    if (!origin) return null;
+    return `${origin}/admin-api/avito-extension`;
+}
+
 async function setServerUrl(url) {
+    const origin = normalizeOrigin(url);
     return new Promise(resolve => {
-        chrome.storage.local.set({ server_base_url: url }, () => {
-            resolve();
+        if (!origin) {
+            resolve(false);
+            return;
+        }
+        const bridgeUrl = `${origin}/admin-api/avito-extension`;
+        chrome.storage.local.set({
+            server_base_url: bridgeUrl,
+            active_connection: {
+                origin: origin,
+                paired: false,
+                paired_at: null,
+                server_label: null
+            }
+        }, () => {
+            resolve(true);
         });
     });
 }
@@ -158,10 +203,24 @@ async function parseJsonResponseSafely(res) {
 }
 
 async function checkBridgeStatus() {
-    let bridgeUrl = DEFAULT_BRIDGE_BASE_URL;
+    let origin = null;
+    let bridgeUrl = null;
     try {
-        bridgeUrl = await getServerUrl();
+        origin = await getActiveOrigin();
         const token = await getStoredToken();
+
+        if (!origin) {
+            return {
+                online: false,
+                paired: false,
+                not_configured: true,
+                origin: null,
+                server_url: null,
+                error: "Сервер Техноребут не настроен."
+            };
+        }
+
+        bridgeUrl = `${origin}/admin-api/avito-extension`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
         let res;
@@ -173,52 +232,153 @@ async function checkBridgeStatus() {
         } finally {
             clearTimeout(timeoutId);
         }
+
         const parsed = await parseJsonResponseSafely(res);
         if (parsed.ok) {
             const data = parsed.data;
             const isPaired = data.paired === true && Boolean(token);
             if (token && !data.paired) {
                 await new Promise(r => chrome.storage.local.remove(["extension_token"], r));
+                await new Promise(r => chrome.storage.local.set({
+                    active_connection: { origin: origin, paired: false, paired_at: null, server_label: null }
+                }, r));
             }
             return {
                 online: true,
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.2.62",
-                server_url: bridgeUrl
+                version: data.version || "0.2.63",
+                origin: origin,
+                server_url: bridgeUrl,
+                server_label: data.server_label || null
             };
         }
-        return { online: false, error: parsed.error, server_url: bridgeUrl };
-    } catch (e) {
+
         return {
             online: false,
-            error: e.name === "AbortError" ? "Таймаут подключения (3.5с)" : e.message,
+            paired: Boolean(token),
+            unreachable: true,
+            error: parsed.error,
+            origin: origin,
             server_url: bridgeUrl
+        };
+    } catch (e) {
+        const token = await getStoredToken();
+        const isAbort = e.name === "AbortError";
+        return {
+            online: false,
+            paired: Boolean(token),
+            unreachable: true,
+            error: isAbort ? "Таймаут подключения (3.5с)" : e.message,
+            origin: origin,
+            server_url: bridgeUrl || (origin ? `${origin}/admin-api/avito-extension` : null)
         };
     }
 }
 
-async function pairExtension(code, serverUrl) {
+async function pairExtension(code, rawOriginOrUrl) {
     try {
-        // If a server URL is provided, store it and use it for pairing
-        if (serverUrl) {
-            await setServerUrl(serverUrl);
+        const origin = normalizeOrigin(rawOriginOrUrl);
+        if (!origin) {
+            return {
+                success: false,
+                message: "Некорректный адрес сервера Техноребут. Используйте https:// или http://."
+            };
         }
-        const bridgeUrl = await getServerUrl();
-        const res = await fetch(`${bridgeUrl}/pairing/pair`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pair_code: code })
-        });
+
+        const bridgeUrl = `${origin}/admin-api/avito-extension`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        let res;
+        try {
+            res = await fetch(`${bridgeUrl}/pairing/pair`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pair_code: code }),
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
+
         const parsed = await parseJsonResponseSafely(res);
         if (parsed.ok && parsed.data.status === "paired" && parsed.data.extension_token) {
-            await setStoredToken(parsed.data.extension_token);
-            return { success: true, message: "Расширение успешно привязано к Техноребут!", server_url: bridgeUrl };
+            const newToken = parsed.data.extension_token;
+            // ATOMIC switch: persist token + origin + active_connection together
+            await new Promise(resolve => {
+                chrome.storage.local.set({
+                    extension_token: newToken,
+                    server_base_url: bridgeUrl,
+                    active_connection: {
+                        origin: origin,
+                        paired: true,
+                        paired_at: new Date().toISOString(),
+                        server_label: parsed.data.server_label || null
+                    }
+                }, resolve);
+            });
+
+            return {
+                success: true,
+                message: "Расширение успешно привязано к Техноребут!",
+                origin: origin,
+                server_url: bridgeUrl
+            };
         }
-        return { success: false, message: parsed.error || (parsed.data && parsed.data.detail) || "Неверный код подключения." };
+
+        // On failure: do NOT partially replace existing state!
+        const errDetail = parsed.error || (parsed.data && parsed.data.detail) || "Неверный код подключения.";
+        return { success: false, message: errDetail };
     } catch (e) {
-        return { success: false, message: `Ошибка связи с сервером: ${e.message}` };
+        const isAbort = e.name === "AbortError";
+        return {
+            success: false,
+            message: isAbort ? "Превышено время ожидания сервера при привязке (6с)." : `Ошибка связи с сервером: ${e.message}`
+        };
+    }
+}
+
+async function unpairExtension() {
+    try {
+        const origin = await getActiveOrigin();
+        const token = await getStoredToken();
+
+        // Optional server-side revocation if server reachable
+        if (origin && token) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1500);
+                await fetch(`${origin}/admin-api/avito-extension/pairing/revoke`, {
+                    method: "POST",
+                    headers: { "X-Extension-Token": token },
+                    signal: controller.signal
+                }).catch(() => {});
+                clearTimeout(timeoutId);
+            } catch (e) {
+                // Ignore errors during remote revocation
+            }
+        }
+
+        // Clean disconnect: clear credentials, server state, drafts
+        await new Promise(resolve => {
+            chrome.storage.local.remove([
+                "extension_token",
+                "active_connection",
+                "server_base_url",
+                "avito_publication_draft"
+            ], resolve);
+        });
+
+        if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
+            await new Promise(resolve => {
+                chrome.storage.session.remove(["avito_publication_draft"], () => resolve());
+            });
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
 }
 
@@ -466,6 +626,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request.action === "pair") {
         pairExtension(request.code, request.server_url).then(sendResponse);
+        return true;
+    }
+    if (request.action === "unpair") {
+        unpairExtension().then(sendResponse);
         return true;
     }
     if (request.action === "set_server_url") {

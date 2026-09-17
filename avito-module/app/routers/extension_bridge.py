@@ -155,6 +155,17 @@ async def pair_extension(payload: PairRequest):
 
     return {"status": "paired", "extension_token": raw_token}
 
+@router.post("/pairing/revoke")
+@router.post("/pairing/unpair")
+async def revoke_extension_pairing(token: str = Depends(verify_extension_token)):
+    """Revoke active extension pairing token and invalidate it."""
+    tokens = _load_json(TOKENS_FILE)
+    t_hash = _hash_token(token)
+    if t_hash in tokens:
+        del tokens[t_hash]
+        _save_json(TOKENS_FILE, tokens)
+    return {"status": "unpaired", "revoked": True}
+
 @router.post("/heartbeat")
 async def extension_heartbeat(token: str = Depends(verify_extension_token)):
     tokens = _load_json(TOKENS_FILE)
