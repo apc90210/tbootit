@@ -1,6 +1,10 @@
-// Technoreboot Avito Popup Script (v0.2.65)
+// Technoreboot Avito Popup Script (v0.2.66)
 
 document.addEventListener("DOMContentLoaded", async () => {
+    let authoritativeListingData = null;
+    let isScanComplete = false;
+    let activeScanRequestId = null;
+
     const connBadge = document.getElementById("connBadge");
     const statusMsg = document.getElementById("statusMsg");
     const pairedConnectionBlock = document.getElementById("pairedConnectionBlock");
@@ -88,7 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Dynamic version label from manifest.json
     if (versionLabel) {
-        let manifestVer = "0.2.65";
+        let manifestVer = "0.2.66";
         try {
             if (typeof chrome !== "undefined" && chrome.runtime && typeof chrome.runtime.getManifest === "function") {
                 const manifest = chrome.runtime.getManifest();
@@ -462,6 +466,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     detectActiveTabServer();
 
     function hideAllCards() {
+        authoritativeListingData = null;
+        isScanComplete = false;
+        activeScanRequestId = null;
         pairSection.style.display = "none";
         prepareSection.style.display = "none";
         fillSection.style.display = "none";
@@ -1133,42 +1140,87 @@ document.addEventListener("DOMContentLoaded", async () => {
         };
     }
 
-    function setupSingleListingSection(activeTab, response) {
+    function setupSingleListingSection(activeTab, response, scanRequestId) {
         actionSection.style.display = "block";
         bulkSection.style.display = "none";
         pageTypeTitle.textContent = "Карточка объявления";
         const item = response.listing || {};
         const detectedPhotosCount = (item.photos && item.photos.length) || 0;
         const visibleCount = (response.diagnostics && response.diagnostics.visible_gallery_count) || 0;
-        const initialDisplayCount = Math.max(detectedPhotosCount, visibleCount);
         const displayTitle = item.title || "Объявление Avito";
         const displayPrice = item.price ? item.price + " ₽" : "Не указана";
-        const photoStatusText = initialDisplayCount > 0 
-            ? `Обнаружено фото: <strong>${initialDisplayCount}</strong> <span style="color:#888; font-size:11px;">(сканирование HD...)</span>`
-            : `Обнаружено фото: <strong>0</strong>`;
-        pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>${photoStatusText}`;
-        
-        if (isPaired) {
-            sendBtn.disabled = false;
-            sendBtn.textContent = "Доимпортировать данные";
-            resultMsg.textContent = "";
+
+        const isStructured = response.source && (
+            response.source.includes("structured") ||
+            response.source.includes("initialData") ||
+            response.source.includes("staticRouter") ||
+            response.source.includes("mfeState")
+        );
+        const isProvisional = !response.complete || (detectedPhotosCount === 1 && (visibleCount > 1 || !isStructured));
+
+        if (!isProvisional && detectedPhotosCount > 0) {
+            authoritativeListingData = response;
+            currentExtractionData = response;
+            isScanComplete = true;
+            pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${detectedPhotosCount} (все в HD)</strong> ✓`;
+            if (isPaired) {
+                sendBtn.disabled = false;
+                sendBtn.textContent = "Доимпортировать данные";
+                resultMsg.textContent = "";
+            } else {
+                sendBtn.disabled = true;
+                sendBtn.textContent = "Доимпортировать данные";
+                resultMsg.className = "msg msg-error";
+                resultMsg.textContent = "Передача станет доступна после привязки расширения.";
+            }
         } else {
+            authoritativeListingData = null;
+            isScanComplete = false;
             sendBtn.disabled = true;
-            sendBtn.textContent = "Доимпортировать данные";
-            resultMsg.className = "msg msg-error";
-            resultMsg.textContent = "Передача станет доступна после привязки расширения.";
+            sendBtn.textContent = "Сбор полной галереи...";
+            const progressCount = detectedPhotosCount > 0 ? detectedPhotosCount : (visibleCount > 0 ? visibleCount : 0);
+            pageDetectInfo.innerHTML = `<strong>${displayTitle}</strong><br>ID: ${item.external_item_id || 'Авто'}<br>Цена: ${displayPrice}<br>Обнаружено фото: <strong>${progressCount}</strong> <span style="color:#e67e22; font-size:11px;">(сканирование HD галереи...)</span>`;
+            resultMsg.className = "msg";
+            resultMsg.textContent = "Идет сбор всех фото галереи в высоком разрешении...";
         }
 
-        // Run deep multi-pass scan (active gallery walker)
-        chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
+        // Run deep multi-pass scan (active gallery walker + base64 enrichment)
+        chrome.tabs.sendMessage(activeTab.id, { action: "extract_current_page", deepScan: true, scanRequestId: scanRequestId }, deepResponse => {
+            if (activeScanRequestId && scanRequestId && activeScanRequestId !== scanRequestId) return;
             if (deepResponse && deepResponse.listing) {
+                authoritativeListingData = deepResponse;
                 currentExtractionData = deepResponse;
-                const deepCount = (deepResponse.listing.photos && deepResponse.listing.photos.length) || 0;
-                const deepTitle = deepResponse.listing.title || displayTitle;
-                const deepPrice = deepResponse.listing.price ? deepResponse.listing.price + " ₽" : displayPrice;
-                pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepResponse.listing.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
-                if (isPaired) {
-                    sendBtn.disabled = false;
+                isScanComplete = true;
+                const deepItem = deepResponse.listing || {};
+                const deepCount = (deepItem.photos && deepItem.photos.length) || 0;
+                const deepVisible = (deepResponse.diagnostics && deepResponse.diagnostics.visible_gallery_count) || deepCount;
+                const deepTitle = deepItem.title || displayTitle;
+                const deepPrice = deepItem.price ? deepItem.price + " ₽" : displayPrice;
+
+                if (deepCount === 1 && deepVisible > 1) {
+                    pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepItem.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br><span style="color:#d9534f; font-weight:bold;">Найдена только 1 фотография из ${deepVisible}</span>`;
+                    resultMsg.className = "msg msg-warning";
+                    resultMsg.textContent = "Внимание: найдена только 1 фотография из галереи. Полный импорт фото не готов.";
+                    if (isPaired) {
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = "Импортировать 1 фото (неполный)";
+                    }
+                } else if (deepCount === 1) {
+                    pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepItem.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>1 (единственное фото)</strong> ✓`;
+                    resultMsg.className = "msg";
+                    resultMsg.textContent = "";
+                    if (isPaired) {
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = "Доимпортировать данные";
+                    }
+                } else {
+                    pageDetectInfo.innerHTML = `<strong>${deepTitle}</strong><br>ID: ${deepItem.external_item_id || 'Авто'}<br>Цена: ${deepPrice}<br>Обнаружено фото: <strong>${deepCount} (все в HD)</strong> ✓`;
+                    resultMsg.className = "msg";
+                    resultMsg.textContent = "";
+                    if (isPaired) {
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = "Доимпортировать данные";
+                    }
                 }
             }
         });
@@ -1463,8 +1515,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 pageDetectInfo.innerHTML = "Сканирование страницы Avito... <span style='font-size:11px;color:#888;'>(ожидание карточек)</span>";
                 sendBtn.disabled = true;
 
-                sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false }, response => {
+                const scanRequestId = "scan_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+                activeScanRequestId = scanRequestId;
+
+                sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: false, scanRequestId: scanRequestId }, response => {
                     actionSection.style.display = "none";
+                    if (activeScanRequestId && scanRequestId && activeScanRequestId !== scanRequestId) return;
                     if (!response) {
                         actionSection.style.display = "block";
                         pageDetectInfo.textContent = "Обновите страницу Avito (F5) для активации расширения.";
@@ -1480,7 +1536,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     } else if (response.page_type === "my_listings") {
                         setupBulkSection(activeTab, response);
                     } else {
-                        setupSingleListingSection(activeTab, response);
+                        setupSingleListingSection(activeTab, response, scanRequestId);
                     }
                 });
                 return;
@@ -1502,7 +1558,71 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
+        const executeIngest = (payloadToSend) => {
+            if (!payloadToSend) {
+                sendBtn.disabled = false;
+                resultMsg.className = "msg msg-error";
+                resultMsg.textContent = "Не удалось извлечь данные со страницы.";
+                return;
+            }
+
+            const action = payloadToSend.page_type === "listing" ? "ingest_listing" : "ingest_my_listings";
+            chrome.runtime.sendMessage({ action: action, payload: payloadToSend }, res => {
+                sendBtn.disabled = false;
+                if (res && res.success && res.product_id != null) {
+                    const photosImported = res.photos_imported || (res.details && res.details.photos_imported) || 0;
+                    const photosSkipped = res.photos_skipped || (res.details && res.details.photos_skipped) || 0;
+                    const photosTotal = res.photos_total !== undefined ? res.photos_total : 
+                        ((res.details && res.details.photos_total !== undefined) ? res.details.photos_total : 
+                        (photosImported + photosSkipped));
+
+                    if (openProductBtn && productLinkContainer) {
+                        let baseOrigin = currentConnectedOrigin;
+                        if (!baseOrigin && serverUrlInput && serverUrlInput.value) {
+                            baseOrigin = normalizeOrigin(serverUrlInput.value);
+                        }
+                        if (!baseOrigin) {
+                            baseOrigin = "https://localhost:8443";
+                        }
+                        const targetUrl = `${baseOrigin}/inventory/products/${res.product_id}`;
+                        openProductBtn.onclick = () => {
+                            chrome.tabs.create({ url: targetUrl });
+                        };
+                        productLinkContainer.style.display = "block";
+                    }
+
+                    if (res.status === "partial" || (res.details && res.details.result === "partial")) {
+                        resultMsg.className = "msg msg-warning";
+                        resultMsg.innerHTML = `Основные данные обновлены, но фотографии импортировать не удалось.<br>Product ID: <strong>${res.product_id}</strong>`;
+                    } else {
+                        resultMsg.className = "msg msg-success";
+                        if (photosImported > 0 && photosSkipped > 0) {
+                            resultMsg.innerHTML = `✓ Объявление обновлено.<br>Product ID: <strong>${res.product_id}</strong><br>Добавлено новых фото: <strong>${photosImported}</strong> (всего в товаре: <strong>${photosTotal}</strong>)`;
+                        } else if (photosImported === 0 && photosSkipped > 0) {
+                            resultMsg.innerHTML = `✓ Карточка актуальна.<br>Product ID: <strong>${res.product_id}</strong><br>Все фотографии синхронизированы (всего: <strong>${photosTotal}</strong>)`;
+                        } else {
+                            resultMsg.innerHTML = `✓ Объявление импортировано.<br>Product ID: <strong>${res.product_id}</strong><br>Фотографий: <strong>${photosTotal}</strong>`;
+                        }
+                    }
+                } else {
+                    resultMsg.className = "msg msg-error";
+                    const errDetail = res && res.message ? res.message : ((res && res.error) ? res.error : "Ошибка импорта товара в Core API.");
+                    resultMsg.innerHTML = `✕ Объявление получено, но импорт товара завершился ошибкой.<br>${errDetail}`;
+                }
+            });
+        };
+
         sendBtn.disabled = true;
+
+        // If authoritative listing data is ready and complete, use it directly without re-scanning!
+        if (authoritativeListingData && authoritativeListingData.page_type === "listing" && isScanComplete) {
+            const photoCount = (authoritativeListingData.listing && authoritativeListingData.listing.photos) ? authoritativeListingData.listing.photos.length : 0;
+            resultMsg.className = "msg";
+            resultMsg.textContent = `Передача ${photoCount} фото в Техноребут...`;
+            executeIngest(authoritativeListingData);
+            return;
+        }
+
         resultMsg.className = "msg";
         resultMsg.textContent = "Сбор фото в HD и передача в Техноребут...";
 
@@ -1515,59 +1635,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             const activeTab = tabs[0];
 
-            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: true }, deepResponse => {
-                const payloadToSend = (deepResponse && (deepResponse.listing || deepResponse.items)) ? deepResponse : currentExtractionData;
-                if (!payloadToSend) {
-                    sendBtn.disabled = false;
-                    resultMsg.className = "msg msg-error";
-                    resultMsg.textContent = "Не удалось извлечь данные со страницы.";
-                    return;
+            sendMessageToTabWithAutoInject(activeTab.id, { action: "extract_current_page", deepScan: true, scanRequestId: activeScanRequestId }, deepResponse => {
+                const payloadToSend = (deepResponse && (deepResponse.listing || deepResponse.items)) ? deepResponse : (authoritativeListingData || currentExtractionData);
+                if (deepResponse && deepResponse.listing) {
+                    authoritativeListingData = deepResponse;
+                    isScanComplete = true;
                 }
-
-                const action = payloadToSend.page_type === "listing" ? "ingest_listing" : "ingest_my_listings";
-                chrome.runtime.sendMessage({ action: action, payload: payloadToSend }, res => {
-                    sendBtn.disabled = false;
-                    if (res && res.success && res.product_id != null) {
-                        const photosImported = res.photos_imported || (res.details && res.details.photos_imported) || 0;
-                        const photosSkipped = res.photos_skipped || (res.details && res.details.photos_skipped) || 0;
-                        const photosTotal = res.photos_total !== undefined ? res.photos_total : 
-                            ((res.details && res.details.photos_total !== undefined) ? res.details.photos_total : 
-                            (photosImported + photosSkipped));
-
-                        if (openProductBtn && productLinkContainer) {
-                            let baseOrigin = currentConnectedOrigin;
-                            if (!baseOrigin && serverUrlInput && serverUrlInput.value) {
-                                baseOrigin = normalizeOrigin(serverUrlInput.value);
-                            }
-                            if (!baseOrigin) {
-                                baseOrigin = "https://localhost:8443";
-                            }
-                            const targetUrl = `${baseOrigin}/inventory/products/${res.product_id}`;
-                            openProductBtn.onclick = () => {
-                                chrome.tabs.create({ url: targetUrl });
-                            };
-                            productLinkContainer.style.display = "block";
-                        }
-
-                        if (res.status === "partial" || (res.details && res.details.result === "partial")) {
-                            resultMsg.className = "msg msg-warning";
-                            resultMsg.innerHTML = `Основные данные обновлены, но фотографии импортировать не удалось.<br>Product ID: <strong>${res.product_id}</strong>`;
-                        } else {
-                            resultMsg.className = "msg msg-success";
-                            if (photosImported > 0 && photosSkipped > 0) {
-                                resultMsg.innerHTML = `✓ Объявление обновлено.<br>Product ID: <strong>${res.product_id}</strong><br>Добавлено новых фото: <strong>${photosImported}</strong> (всего в товаре: <strong>${photosTotal}</strong>)`;
-                            } else if (photosImported === 0 && photosSkipped > 0) {
-                                resultMsg.innerHTML = `✓ Карточка актуальна.<br>Product ID: <strong>${res.product_id}</strong><br>Все фотографии синхронизированы (всего: <strong>${photosTotal}</strong>)`;
-                            } else {
-                                resultMsg.innerHTML = `✓ Объявление импортировано.<br>Product ID: <strong>${res.product_id}</strong><br>Фотографий: <strong>${photosTotal}</strong>`;
-                            }
-                        }
-                    } else {
-                        resultMsg.className = "msg msg-error";
-                        const errDetail = res && res.message ? res.message : "Ошибка импорта товара в Core API.";
-                        resultMsg.innerHTML = `✕ Объявление получено, но импорт товара завершился ошибкой.<br>${errDetail}`;
-                    }
-                });
+                executeIngest(payloadToSend);
             });
         });
     });

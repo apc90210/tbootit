@@ -375,7 +375,7 @@ def test_25_manifest_version_0_2_64():
     """Item 25: Extension version bumped to 0.2.64+ in manifest and scripts."""
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] in ("0.2.64", "0.2.65")
+    assert manifest["version"] in ("0.2.64", "0.2.65", "0.2.66")
 
 
 def test_27_automatic_avito_deactivation_remains_disabled(sw_js, content_js):

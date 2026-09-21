@@ -613,7 +613,7 @@ async def avito_extension_page(request: Request):
 
 @app.get("/avito/extension/download")
 async def download_extension_zip():
-    version = "0.2.65"
+    version = "0.2.66"
     try:
         for manifest_candidate in [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chrome-extension", "technoreboot-avito", "manifest.json")),
@@ -627,11 +627,13 @@ async def download_extension_zip():
         pass
     candidate_paths = [
         os.path.abspath(os.path.join(os.path.dirname(__file__), f"technoreboot-avito-extension-{version}.zip")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension-0.2.66.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension-0.2.65.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension-0.2.64.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "technoreboot-avito-extension.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "app", f"technoreboot-avito-extension-{version}.zip")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "app", "technoreboot-avito-extension.zip")),
+        os.path.abspath("/app/app/technoreboot-avito-extension-0.2.66.zip"),
         os.path.abspath("/app/app/technoreboot-avito-extension-0.2.65.zip"),
         os.path.abspath("/app/app/technoreboot-avito-extension-0.2.64.zip"),
         os.path.abspath("/app/app/technoreboot-avito-extension.zip"),

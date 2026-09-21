@@ -1,6 +1,7 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.65)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.66)
 
 let pageInitialData = null;
+let pageStructuredState = null;
 
 function getExtensionVersion() {
     try {
@@ -9,11 +10,30 @@ function getExtensionVersion() {
             if (m && m.version) return m.version;
         }
     } catch (e) {}
-    return "0.2.65";
+    return "0.2.66";
 }
 
-// Listen for direct initial data captured from main world
+// Listen for structured page state from MAIN-world bridge
 if (typeof document !== 'undefined') {
+    document.addEventListener('TechnorebootStructuredState', function(e) {
+        if (e && e.detail) {
+            try {
+                let data = e.detail;
+                if (typeof data === 'string') {
+                    if (data.includes('%7B') || data.includes('%22')) {
+                        try { data = decodeURIComponent(data); } catch(e1) {}
+                    }
+                    try { data = JSON.parse(data); } catch(e2) {}
+                }
+                if (typeof data === 'string') {
+                    try { data = JSON.parse(data); } catch(e3) {}
+                }
+                pageStructuredState = data;
+            } catch (err) {}
+        }
+    });
+
+    // Listen for direct initial data captured from main world
     document.addEventListener('TechnorebootInitialData', function(e) {
         if (e && e.detail) {
             try {
@@ -33,8 +53,17 @@ if (typeof document !== 'undefined') {
     });
 }
 
+function requestMainWorldStructuredState() {
+    try {
+        if (typeof document !== 'undefined') {
+            document.dispatchEvent(new CustomEvent('TechnorebootRequestStructuredState'));
+        }
+    } catch (e) {}
+}
+
 function triggerInitialDataCapture() {
     try {
+        requestMainWorldStructuredState();
         if (typeof document === 'undefined') return;
         const script = document.createElement('script');
         script.textContent = `
@@ -55,6 +84,7 @@ function triggerInitialDataCapture() {
 
 // Immediately attempt capture on load
 try {
+    requestMainWorldStructuredState();
     triggerInitialDataCapture();
 } catch (e) {}
 
@@ -401,10 +431,22 @@ function extractAvitoUrlsFromObject(obj, depth = 0, seen = new Set()) {
 }
 
 function extractGalleryFromInitialData(data, currentItemId) {
-    if (!data || typeof data !== 'object') return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false };
+    if (!data || typeof data !== 'object') return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false, source: "none" };
 
     let candidateBlocks = [];
 
+    // 1. Check loaderData from static router hydration (Modern Avito SSR / Remix)
+    if (data.loaderData && typeof data.loaderData === 'object') {
+        for (const [k, v] of Object.entries(data.loaderData)) {
+            if (v && typeof v === 'object') {
+                if (v.buyerItem || v.galleryInfo || v.item) {
+                    candidateBlocks.push({ key: 'loaderData.' + k, block: v });
+                }
+            }
+        }
+    }
+
+    // 2. Historical @avito/bx-item-view blocks
     for (const [key, value] of Object.entries(data)) {
         if (!value || typeof value !== 'object') continue;
         if (key.includes('@avito/bx-item-view') || key.includes('bx-item-view')) {
@@ -416,12 +458,21 @@ function extractGalleryFromInitialData(data, currentItemId) {
         for (const [topKey, topVal] of Object.entries(data)) {
             if (topVal && typeof topVal === 'object' && !Array.isArray(topVal)) {
                 for (const [nestedKey, nestedVal] of Object.entries(topVal)) {
-                    if (nestedVal && typeof nestedVal === 'object' && (nestedKey.includes('@avito/bx-item-view') || nestedKey.includes('bx-item-view'))) {
+                    if (nestedVal && typeof nestedVal === 'object' && (nestedKey.includes('@avito/bx-item-view') || nestedKey.includes('bx-item-view') || nestedKey === 'buyerItem')) {
                         candidateBlocks.push({ key: nestedKey, block: nestedVal });
                     }
                 }
             }
         }
+    }
+
+    // 3. Direct top-level buyerItem / galleryInfo
+    if (data.buyerItem && (data.buyerItem.galleryInfo || data.buyerItem.gallery)) {
+        candidateBlocks.push({ key: 'top.buyerItem', block: data });
+    } else if (data.galleryInfo && data.galleryInfo.media) {
+        candidateBlocks.push({ key: 'top.galleryInfo', block: { buyerItem: data } });
+    } else if (data.item && (data.item.galleryInfo || data.item.gallery)) {
+        candidateBlocks.push({ key: 'top.item', block: { buyerItem: data.item } });
     }
 
     let targetBlock = null;
@@ -431,8 +482,9 @@ function extractGalleryFromInitialData(data, currentItemId) {
         if (currentItemId) {
             for (const { key, block } of candidateBlocks) {
                 const item = block.buyerItem || block.item || block;
-                const bId = item.id || item.itemId || block.id || block.itemId;
-                if (bId && String(bId) === String(currentItemId)) {
+                const innerItem = item.item || {};
+                const bId = String(innerItem.id || innerItem.itemId || item.id || item.itemId || block.id || block.itemId || '');
+                if (bId && bId === String(currentItemId)) {
                     targetBlock = block;
                     break;
                 }
@@ -445,25 +497,20 @@ function extractGalleryFromInitialData(data, currentItemId) {
         if (!targetBlock) targetBlock = candidateBlocks[0].block;
     }
 
-    if (!targetBlock) {
-        if (data.buyerItem && data.buyerItem.galleryInfo) targetBlock = data;
-        else if (data.galleryInfo && data.galleryInfo.media) targetBlock = { buyerItem: data };
-        else if (data.item && data.item.galleryInfo) targetBlock = { buyerItem: data.item };
-    }
-
-    if (!targetBlock) return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false };
+    if (!targetBlock) return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: false, source: "none" };
 
     const buyerItem = targetBlock.buyerItem || targetBlock.item || targetBlock;
     const galleryInfo = buyerItem.galleryInfo || targetBlock.galleryInfo || buyerItem.gallery || targetBlock.gallery;
-    if (!galleryInfo) return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: true };
+    if (!galleryInfo) return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: true, source: "none" };
 
     const mediaList = galleryInfo.media || galleryInfo.images || galleryInfo.items || [];
     if (!Array.isArray(mediaList) || mediaList.length === 0) {
-        return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: true };
+        return { slots: [], rawMediaCount: 0, nonVideoCount: 0, blockFound: true, source: "none" };
     }
 
     const slots = [];
     let nonVideoCount = 0;
+    const sourceLabel = data._source || (data.loaderData ? "staticRouterHydration" : "initialData");
 
     for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i];
@@ -531,11 +578,14 @@ function extractGalleryFromInitialData(data, currentItemId) {
         slots.push({
             slot_index: slots.length,
             original_index: i,
-            source: "initialData.galleryInfo.media",
+            source: sourceLabel + ".galleryInfo.media",
+            canonical_id: getCanonicalAvitoImageIdentity(candidates[0].url) || String(i),
             candidates: candidates,
             candidate_count: candidates.length,
             selected_url: candidates[0].url,
             selected_resolution: candidates[0].resolution || "default",
+            width: candidates[0].width || 1280,
+            height: candidates[0].height || 960,
             score: candidates[0].score
         });
     }
@@ -544,31 +594,88 @@ function extractGalleryFromInitialData(data, currentItemId) {
         slots: slots,
         rawMediaCount: mediaList.length,
         nonVideoCount: nonVideoCount,
-        blockFound: true
+        blockFound: true,
+        source: sourceLabel
     };
 }
 
 function getAvitoInitialData() {
+    // 1. Check pageStructuredState captured from MAIN world bridge
+    if (typeof pageStructuredState !== 'undefined' && pageStructuredState) {
+        return pageStructuredState;
+    }
+
+    // 2. Check pageInitialData captured from TechnorebootInitialData event
     if (typeof pageInitialData !== 'undefined' && pageInitialData) {
         return pageInitialData;
     }
-    if (typeof window !== 'undefined' && window.__initialData__) {
-        try {
-            let data = window.__initialData__;
-            if (typeof data === 'string') {
-                if (data.includes('%')) data = decodeURIComponent(data);
-                data = JSON.parse(data);
-                if (typeof data === 'string') data = JSON.parse(data);
+
+    // 3. Direct window checks (if accessible in current execution world)
+    try {
+        if (typeof window !== 'undefined') {
+            if (window.__staticRouterHydrationData && typeof window.__staticRouterHydrationData === 'object') {
+                return Object.assign({ _source: "mainWorld_staticRouter" }, window.__staticRouterHydrationData);
             }
-            if (data && typeof data === 'object') return data;
-        } catch(e) {}
-    }
+            if (window.__initialData__) {
+                let data = window.__initialData__;
+                if (typeof data === 'string') {
+                    if (data.includes('%')) data = decodeURIComponent(data);
+                    data = JSON.parse(data);
+                    if (typeof data === 'string') data = JSON.parse(data);
+                }
+                if (data && typeof data === 'object') {
+                    return Object.assign({ _source: "mainWorld_initialData" }, data);
+                }
+            }
+        }
+    } catch(e) {}
+
+    // 4. Inspect DOM script tags (runs securely in isolated world)
     try {
         const scripts = document.querySelectorAll('script');
         for (const script of scripts) {
             const rawText = script.textContent || '';
             if (!rawText) continue;
 
+            // 4A. Modern Avito staticRouterHydrationData with JSON.parse("...")
+            if (rawText.includes('__staticRouterHydrationData')) {
+                const matchParse = rawText.match(/JSON\.parse\(\s*("[\s\S]+?")\s*\)/);
+                if (matchParse) {
+                    try {
+                        const rawJson = JSON.parse(matchParse[1]);
+                        const parsed = JSON.parse(rawJson);
+                        if (parsed && typeof parsed === 'object') {
+                            parsed._source = "script_staticRouterHydrationData";
+                            return parsed;
+                        }
+                    } catch(e) {}
+                }
+                const matchObj = rawText.match(/__staticRouterHydrationData\s*=\s*(\{[\s\S]+?\});/);
+                if (matchObj) {
+                    try {
+                        const parsed = JSON.parse(matchObj[1]);
+                        if (parsed && typeof parsed === 'object') {
+                            parsed._source = "script_staticRouterHydrationDataObj";
+                            return parsed;
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            // 4B. data-mfe-state or type="mime/invalid"
+            if (script.getAttribute('data-mfe-state') === 'true' || script.type === 'mime/invalid') {
+                try {
+                    let txt = rawText.trim();
+                    if (txt.startsWith('%7B') || txt.includes('%22')) txt = decodeURIComponent(txt);
+                    const parsed = JSON.parse(txt);
+                    if (parsed && typeof parsed === 'object') {
+                        parsed._source = "script_dataMfeState";
+                        return parsed;
+                    }
+                } catch(e) {}
+            }
+
+            // 4C. standard application/json or __NEXT_DATA__
             if (script.type === 'application/json' || script.id === '__NEXT_DATA__' || script.id === '__initialData__') {
                 try {
                     let parsed = JSON.parse(rawText);
@@ -576,10 +683,14 @@ function getAvitoInitialData() {
                         if (parsed.includes('%')) parsed = decodeURIComponent(parsed);
                         parsed = JSON.parse(parsed);
                     }
-                    if (parsed && typeof parsed === 'object') return parsed;
+                    if (parsed && typeof parsed === 'object') {
+                        parsed._source = "script_jsonApp";
+                        return parsed;
+                    }
                 } catch (e) {}
             }
 
+            // 4D. initialData / bx-item-view assignments
             if (rawText.includes('@avito/bx-item-view') || rawText.includes('%40avito%2Fbx-item-view') ||
                 rawText.includes('__initialData__') || rawText.includes('buyerItem') ||
                 rawText.includes('%22buyerItem%22') || rawText.includes('galleryInfo') ||
@@ -589,7 +700,10 @@ function getAvitoInitialData() {
                     if (rawText.includes(varName)) {
                         try {
                             const parsed = extractJsonAssignedToVar(rawText, varName);
-                            if (parsed) return parsed;
+                            if (parsed && typeof parsed === 'object') {
+                                parsed._source = "script_assignedVar_" + varName;
+                                return parsed;
+                            }
                         } catch (e) {}
                     }
                 }
@@ -602,7 +716,10 @@ function getAvitoInitialData() {
                         if (val.includes('%')) val = decodeURIComponent(val);
                         let parsed = JSON.parse(val);
                         if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-                        if (parsed && typeof parsed === 'object') return parsed;
+                        if (parsed && typeof parsed === 'object') {
+                            parsed._source = "script_quotedInitialData";
+                            return parsed;
+                        }
                     }
                 } catch(e) {}
             }
@@ -1166,21 +1283,19 @@ function extractAllPhotos(jsonLd, walkedSlots = []) {
 
     let chosenSlots = [];
 
-    // Decide whether Layer 1 is sufficient
+    // Decide whether Layer 1 is sufficient (Stage 13D Section 9: Structured Page State Primary)
     if (layer1Res && layer1Res.slots && layer1Res.slots.length > 0) {
-        if (expectedPhotoCount === 0 || layer1Res.slots.length >= expectedPhotoCount) {
-            // Layer 1 is complete!
-            chosenSlots = layer1Res.slots;
-            layerUsed = "initialData";
-        }
+        // Layer 1 structured page state provides authentic gallery!
+        chosenSlots = layer1Res.slots;
+        layerUsed = layer1Res.source || "structuredState";
     }
 
-    // LAYER 2: If Layer 1 was missing or incomplete, use traversal slots
+    // LAYER 2: If Layer 1 was missing or yielded 0, use traversal slots
     if (chosenSlots.length === 0 && traversalUsed) {
         chosenSlots = walkedSlots;
         layerUsed = "traversal";
-    } else if (chosenSlots.length > 0 && traversalUsed && walkedSlots.length > chosenSlots.length) {
-        // Traversal found MORE photos than initialData
+    } else if (chosenSlots.length > 0 && traversalUsed && walkedSlots.length > chosenSlots.length && layerUsed === "dom") {
+        // Traversal found MORE photos than basic dom
         chosenSlots = walkedSlots;
         layerUsed = "traversal";
     }
@@ -1234,9 +1349,13 @@ function extractAllPhotos(jsonLd, walkedSlots = []) {
     // Strict exact-N enforcement across all layers
     // If expectedPhotoCount was determined (> 1 or explicit counter), enforce exact-N.
     // If traversal discovered multiple genuine slides, do not truncate them down to a stale single-photo count.
-    const effectiveTargetN = (traversalUsed && walkedSlots.length > expectedPhotoCount && expectedPhotoCount <= 1)
-        ? walkedSlots.length
-        : expectedPhotoCount;
+    // Strict exact-N enforcement across all layers
+    const isStructured = layerUsed.includes("structured") || layerUsed.includes("initialData") || layerUsed.includes("staticRouter") || layerUsed.includes("mfeState");
+    const effectiveTargetN = isStructured
+        ? chosenSlots.length
+        : ((traversalUsed && walkedSlots.length > expectedPhotoCount && expectedPhotoCount <= 1)
+            ? walkedSlots.length
+            : expectedPhotoCount);
 
     if (effectiveTargetN > 0 && chosenSlots.length > effectiveTargetN) {
         foreignImagesRejectedCount += (chosenSlots.length - effectiveTargetN);
@@ -1281,17 +1400,24 @@ function extractAllPhotos(jsonLd, walkedSlots = []) {
             url: slot.selected_url || best.url,
             position: uniquePhotos.length,
             identity: slot.identity || getCanonicalAvitoImageIdentity(slot.selected_url) || slot.selected_url,
+            width: slot.width || best.width || 1280,
+            height: slot.height || best.height || 960,
             candidates: slot.candidates || [best],
             candidate_count: (slot.candidates && slot.candidates.length) || 1,
             selected_source: slot.source || "initialData",
-            selected_resolution: slot.selected_resolution || "default",
+            selected_resolution: slot.selected_resolution || best.resolution || "1280x960",
             quality_score: slot.score || (best && best.score) || 0
         });
     });
 
+    const isComplete = (uniquePhotos.length > 1) || (isStructured && uniquePhotos.length > 0);
+    const finalSource = (uniquePhotos.length === 1 && layerUsed === "dom") ? "heroOnly" : layerUsed;
+
     // Populate Section 10 diagnostics object
     lastExtractionDiagnostics = {
         listing_id: itemId,
+        source: finalSource,
+        complete: isComplete,
         visible_gallery_count: expectedPhotoCount || uniquePhotos.length,
         expected_photo_count: expectedPhotoCount || uniquePhotos.length,
         initial_data_found: initialDataFound,
@@ -2072,6 +2198,8 @@ function extractListingData(extraPhotos = []) {
 
         if (lastExtractionDiagnostics) {
             resultPayload.diagnostics = lastExtractionDiagnostics;
+            resultPayload.complete = lastExtractionDiagnostics.complete;
+            resultPayload.source = lastExtractionDiagnostics.source;
             if (lastExtractionDiagnostics.visible_gallery_count > 0 &&
                 lastExtractionDiagnostics.final_photo_count < lastExtractionDiagnostics.visible_gallery_count) {
                 resultPayload.warning = `Найдено только ${lastExtractionDiagnostics.final_photo_count} из ${lastExtractionDiagnostics.visible_gallery_count} фотографий объявления.`;
@@ -2941,12 +3069,10 @@ async function extractListingDataMultiPass() {
         const itemId = extractAvitoItemId(currentUrl, '') || 'unknown';
         const { root: galleryRoot } = findGalleryRootElement();
 
-        // 1. Check Layer 1 (__initialData__)
+        // 1. Check Layer 1 (Structured Page State)
         let layer1Res = null;
         try {
-            if (typeof triggerInitialDataCapture === 'function') {
-                triggerInitialDataCapture();
-            }
+            if (typeof triggerInitialDataCapture === 'function') triggerInitialDataCapture();
             layer1Res = extractGallerySlotsFromInitialData(itemId);
         } catch (e) {}
 
@@ -2963,7 +3089,7 @@ async function extractListingDataMultiPass() {
         }
 
         // 2. Extract listing data with the collected photos
-        let data = extractListingData(walkedSlots);
+        let data = extractListingData(layer1Count > 0 ? layer1Res.slots : walkedSlots);
 
         // 3. Enrich photos with base64 data downloaded via Extension Service Worker
         if (data && data.listing && Array.isArray(data.listing.photos)) {
@@ -3007,6 +3133,8 @@ async function extractListingDataMultiPass() {
 
         if (data && lastExtractionDiagnostics) {
             data.diagnostics = lastExtractionDiagnostics;
+            data.complete = lastExtractionDiagnostics.complete;
+            data.source = lastExtractionDiagnostics.source;
             if (lastExtractionDiagnostics.visible_gallery_count > 0 &&
                 lastExtractionDiagnostics.final_photo_count < lastExtractionDiagnostics.visible_gallery_count) {
                 data.warning = `Найдено только ${lastExtractionDiagnostics.final_photo_count} из ${lastExtractionDiagnostics.visible_gallery_count} фотографий объявления.`;
@@ -4473,25 +4601,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             if (pageType === "my_listings") {
                 extractMyListingsDataAsync(request.maxWaitMs || 10000)
-                    .then(data => sendResponse(data || extractMyListingsData()))
-                    .catch(() => sendResponse(extractMyListingsData()));
+                    .then(data => {
+                        const res = data || extractMyListingsData();
+                        if (res && request.scanRequestId) res.scanRequestId = request.scanRequestId;
+                        sendResponse(res);
+                    })
+                    .catch(() => {
+                        const fallback = extractMyListingsData();
+                        if (fallback && request.scanRequestId) fallback.scanRequestId = request.scanRequestId;
+                        sendResponse(fallback);
+                    });
                 return true; // Keep message channel open for async response
             } else if (request.deepScan) {
                 extractListingDataMultiPass()
-                    .then(data => sendResponse(data || extractListingData()))
-                    .catch(() => sendResponse(extractListingData()));
+                    .then(data => {
+                        const res = data || extractListingData();
+                        if (res && request.scanRequestId) res.scanRequestId = request.scanRequestId;
+                        sendResponse(res);
+                    })
+                    .catch(() => {
+                        const fallback = extractListingData();
+                        if (fallback && request.scanRequestId) fallback.scanRequestId = request.scanRequestId;
+                        sendResponse(fallback);
+                    });
                 return true;
             } else {
-                sendResponse(extractListingData());
+                const fastData = extractListingData();
+                if (fastData && request.scanRequestId) fastData.scanRequestId = request.scanRequestId;
+                sendResponse(fastData);
             }
         } catch (err) {
             try {
-                sendResponse(extractListingData());
+                const errData = extractListingData();
+                if (errData && request.scanRequestId) errData.scanRequestId = request.scanRequestId;
+                sendResponse(errData);
             } catch (e2) {
                 sendResponse({
                     schema_version: 1,
                     extension_version: getExtensionVersion(),
+                    scanRequestId: request.scanRequestId || null,
                     page_type: "listing",
+                    complete: false,
+                    source: "errorFallback",
                     listing: {
                         external_item_id: "item",
                         external_url: window.location.href,

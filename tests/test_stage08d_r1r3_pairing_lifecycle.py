@@ -167,7 +167,7 @@ def test_extension_package_version_and_dynamic_origin():
     manifest_path = os.path.join(ext_dir, "manifest.json")
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    assert manifest["version"] in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65")
+    assert manifest["version"] in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65", "0.2.66")
     if manifest["version"] < "0.2.63":
         assert "https://144.31.50.134/*" in manifest["host_permissions"]
     else:
@@ -182,7 +182,7 @@ def test_extension_package_version_and_dynamic_origin():
         sw_code = f.read()
     assert "getServerUrl" in sw_code
     assert "setServerUrl" in sw_code
-    assert any(v in sw_code for v in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65"))
+    assert any(v in sw_code for v in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65", "0.2.66"))
 
     # popup.js
     popup_js_path = os.path.join(ext_dir, "popup.js")
@@ -199,7 +199,7 @@ def test_extension_package_version_and_dynamic_origin():
         popup_html = f.read()
     assert 'id="serverUrlInput"' in popup_html
     assert 'id="saveServerUrlBtn"' in popup_html
-    assert any(f"v{v}" in popup_html for v in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65"))
+    assert any(f"v{v}" in popup_html for v in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65", "0.2.66"))
 
     # admin-shell template
     template_path = os.path.abspath("admin-shell/app/templates/avito_extension.html")
@@ -207,4 +207,4 @@ def test_extension_package_version_and_dynamic_origin():
         tmpl = f.read()
     assert "serverUrlDisplay" in tmpl
     assert "copyServerUrl" in tmpl
-    assert any(f"v{v}" in tmpl for v in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65"))
+    assert any(f"v{v}" in tmpl for v in ("0.2.56", "0.2.57", "0.2.58", "0.2.59", "0.2.60", "0.2.61", "0.2.62", "0.2.63", "0.2.64", "0.2.65", "0.2.66"))

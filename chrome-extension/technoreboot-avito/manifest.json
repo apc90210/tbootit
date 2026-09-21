@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Техноребут Avito Мост",
-  "version": "0.2.65",
+  "version": "0.2.66",
   "description": "Локальная интеграция объявлений Avito с системой учета Техноребут",
   "icons": {
     "16": "icons/icon16.png",
@@ -23,6 +23,18 @@
     "service_worker": "service_worker.js"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.avito.ru/*",
+        "https://avito.ru/*",
+        "http://avito.ru/*"
+      ],
+      "js": [
+        "main_world_bridge.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
     {
       "matches": [
         "*://*.avito.ru/*",
