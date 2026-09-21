@@ -1,4 +1,4 @@
-// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.64)
+// Technoreboot Avito Extension Service Worker (Manifest V3 v0.2.65)
 
 // Normalizes arbitrary TechnoReboot URLs/inputs into a canonical origin (protocol + host/port, no trailing slash).
 function normalizeOrigin(rawUrl) {
@@ -248,7 +248,7 @@ async function checkBridgeStatus() {
                 paired: isPaired,
                 has_token: Boolean(token),
                 token_valid: data.token_valid === true,
-                version: data.version || "0.2.64",
+                version: data.version || "0.2.65",
                 origin: origin,
                 server_url: bridgeUrl,
                 server_label: data.server_label || null

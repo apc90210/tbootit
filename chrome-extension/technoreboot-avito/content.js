@@ -1,4 +1,4 @@
-// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.64)
+// Technoreboot Avito Content Script (DOM Extractor & Safe Form Fill Adapter v0.2.65)
 
 let pageInitialData = null;
 
@@ -9,7 +9,7 @@ function getExtensionVersion() {
             if (m && m.version) return m.version;
         }
     } catch (e) {}
-    return "0.2.64";
+    return "0.2.65";
 }
 
 // Listen for direct initial data captured from main world
@@ -834,19 +834,42 @@ function findGalleryRootElement() {
         return { root: primary, selector: '[data-marker="item-view/gallery"]' };
     }
 
-    const candidateSelectors = [
-        '[data-marker="image-frame/image-wrapper"]',
-        '[data-marker="image-frame"]',
-        'ul[data-marker="gallery/list"]',
-        '.style-item-view-gallery-',
+    // Outer gallery layout containers checked first
+    const outerGallerySelectors = [
+        '[class*="gallery-root"]',
+        '[class*="gallery-layout"]',
+        '[class*="item-view-gallery"]',
+        '[class*="gallery_root"]',
         '.gallery-root',
-        '[class*="gallery-root"]'
+        '.style-item-view-gallery-',
+        '[data-marker="item-view/main"]'
+    ];
+    for (const sel of outerGallerySelectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+            return { root: el, selector: sel };
+        }
+    }
+
+    // Anchor selectors inside gallery
+    const candidateSelectors = [
+        'ul[data-marker="gallery/list"]',
+        '[data-marker="gallery/list"]',
+        '[data-marker="gallery/preview-item"]',
+        '[data-marker="image-frame/image-wrapper"]',
+        '[data-marker="image-frame"]'
     ];
     for (const sel of candidateSelectors) {
         const el = document.querySelector(sel);
         if (el) {
-            const root = el.closest('[data-marker="item-view/gallery"], .gallery-root, [class*="gallery-root"]') || el;
-            return { root: root, selector: sel };
+            const root = el.closest('[data-marker="item-view/gallery"], [class*="gallery-root"], [class*="gallery-layout"], [class*="item-view-gallery"], [class*="gallery_root"], [data-marker="item-view/main"], main, article');
+            if (root) {
+                return { root: root, selector: sel };
+            }
+            if (el.parentElement && (sel.includes('image-frame') || sel.includes('image-wrapper'))) {
+                return { root: el.parentElement, selector: sel };
+            }
+            return { root: el, selector: sel };
         }
     }
     return { root: null, selector: null };
@@ -857,6 +880,45 @@ const GALLERY_SELECTORS = [
     '[data-marker="gallery/image"] img',
     '[data-marker="slider-image/image"] img'
 ];
+
+const GALLERY_THUMB_SELECTORS = [
+    'ul[data-marker="gallery/list"] li',
+    'ul[data-marker="gallery/list"] > *',
+    '[data-marker="gallery/list"] li',
+    '[data-marker="gallery/list"] > *',
+    '[data-marker="gallery/preview-item"]',
+    '[data-marker="image-frame/preview"]',
+    '[data-marker="gallery/image"]',
+    '[data-marker="slider-image/image"]',
+    'div[class*="gallery-list"] > *',
+    'ul[class*="gallery-list"] li',
+    'div[class*="style-gallery-list"] li',
+    'div[class*="style-gallery-list"] > *',
+    '[class*="gallery-preview-item"]',
+    '[class*="images-preview-item"]',
+    '[data-marker="gallery"] ul li',
+    '[data-marker="gallery"] [data-marker*="preview"]'
+].join(', ');
+
+function findGalleryThumbnailElements(scope) {
+    const searchScope = scope || document;
+    let els = Array.from(searchScope.querySelectorAll(GALLERY_THUMB_SELECTORS));
+
+    // Fallback if searchScope was too restricted (e.g. image-frame only) and found 0 thumbnails
+    if (els.length === 0 && searchScope !== document) {
+        const docThumbs = Array.from(document.querySelectorAll(GALLERY_THUMB_SELECTORS));
+        if (docThumbs.length > 0) {
+            els = docThumbs;
+        }
+    }
+
+    // Strictly filter out foreign widgets (sticky, history, reviews, seller, similar items, etc.)
+    const filtered = els.filter(el => !isInsideExcluded(el));
+
+    // Deduplicate nested elements (keep parent thumbnail item if both parent and child matched)
+    const topLevel = filtered.filter(el => !filtered.some(other => other !== el && other.contains(el)));
+    return topLevel;
+}
 
 function isInsideExcluded(el) {
     if (!el || !el.closest) return false;
@@ -899,15 +961,8 @@ function extractPhotosFromDom() {
     }
 
     // 1. Extract from thumbnail list strictly inside gallery root (excluding foreign widgets and sticky previews)
-    const thumbSelectors = [
-        'ul[data-marker="gallery/list"] li',
-        'ul[data-marker="gallery/list"] > *',
-        '[data-marker="gallery/preview-item"]',
-        '[data-marker="image-frame/preview"]'
-    ].join(', ');
-
-    const allThumbEls = Array.from(scope.querySelectorAll(thumbSelectors)).filter(el => !isInsideExcluded(el));
-    const thumbEls = allThumbEls.filter(el => !allThumbEls.some(other => other !== el && other.contains(el)));
+    const thumbSelectors = GALLERY_THUMB_SELECTORS;
+    const thumbEls = findGalleryThumbnailElements(scope);
 
     thumbEls.forEach(thumb => {
         const imgs = thumb.querySelectorAll ? thumb.querySelectorAll('img, source') : [];
@@ -1040,12 +1095,11 @@ function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
 
     // 2. Secondary: Count unique logical gallery thumbnail items strictly inside gallery root
     try {
-        const thumbContainer = scope ? (scope.querySelector('ul[data-marker="gallery/list"]') || scope.querySelector('[data-marker="gallery/list"]')) : null;
-        if (thumbContainer) {
-            const thumbItems = Array.from(thumbContainer.children || []).filter(el => !isInsideExcluded(el));
+        const thumbItems = findGalleryThumbnailElements(scope);
+        if (thumbItems && thumbItems.length > 0) {
             const uniqueThumbs = new Set();
             for (const item of thumbItems) {
-                const img = item.querySelector('img, source');
+                const img = item.querySelector ? item.querySelector('img, source') : (item.tagName === 'IMG' ? item : null);
                 const src = img ? (img.currentSrc || img.src || img.getAttribute('data-src') || (img.srcset ? img.srcset.split(',')[0].split(' ')[0] : '')) : '';
                 const valid = validateListingImageUrl(src);
                 if (valid) {
@@ -1056,9 +1110,7 @@ function determineExpectedPhotoCount(galleryRoot, structuredCount = 0) {
             if (uniqueThumbs.size > 0) {
                 return uniqueThumbs.size;
             }
-            if (thumbItems.length > 0) {
-                return thumbItems.length;
-            }
+            return thumbItems.length;
         }
     } catch(e) {}
 
@@ -1180,9 +1232,15 @@ function extractAllPhotos(jsonLd, walkedSlots = []) {
     }
 
     // Strict exact-N enforcement across all layers
-    if (expectedPhotoCount > 0 && chosenSlots.length > expectedPhotoCount) {
-        foreignImagesRejectedCount += (chosenSlots.length - expectedPhotoCount);
-        chosenSlots = chosenSlots.slice(0, expectedPhotoCount);
+    // If expectedPhotoCount was determined (> 1 or explicit counter), enforce exact-N.
+    // If traversal discovered multiple genuine slides, do not truncate them down to a stale single-photo count.
+    const effectiveTargetN = (traversalUsed && walkedSlots.length > expectedPhotoCount && expectedPhotoCount <= 1)
+        ? walkedSlots.length
+        : expectedPhotoCount;
+
+    if (effectiveTargetN > 0 && chosenSlots.length > effectiveTargetN) {
+        foreignImagesRejectedCount += (chosenSlots.length - effectiveTargetN);
+        chosenSlots = chosenSlots.slice(0, effectiveTargetN);
     }
 
     // Ultimate fallback if still zero
@@ -1665,8 +1723,7 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
 
     // --- PHASE 1: EXACT SLOT DISCOVERY ---
     // 1. Locate thumbnail elements strictly inside galleryRoot / scope
-    const thumbContainer = scope ? (scope.querySelector('ul[data-marker="gallery/list"]') || scope.querySelector('[data-marker="gallery/list"]')) : null;
-    const thumbEls = thumbContainer ? Array.from(thumbContainer.children || []).filter(el => !isInsideExcluded(el)) : [];
+    const thumbEls = findGalleryThumbnailElements(scope);
 
     for (let i = 0; i < thumbEls.length; i++) {
         if (targetN > 0 && slots.length >= targetN) break;
@@ -1814,14 +1871,20 @@ async function walkAndCollectAllGalleryPhotos(expectedCount = 0) {
     }
 
     // --- VIRTUALIZED / LONG GALLERIES (Section 11) ---
-    if (targetN > 0 && slots.length < targetN && activeFrame) {
-        const nextBtn = (scope || document).querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"]');
-        const maxSteps = targetN + 2;
+    const nextBtn = (scope || document).querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [aria-label*="Следующ"], [class*="arrow-right"], [class*="control-next"], [class*="button-next"]');
+    const shouldWalkNext = activeFrame && nextBtn && (
+        (targetN > 0 && slots.length < targetN) ||
+        (slots.length <= 1) ||
+        (targetN === 0 && slots.length < 15)
+    );
+
+    if (shouldWalkNext) {
+        const maxSteps = targetN > 0 ? targetN + 2 : 15;
         let consecutiveNoChange = 0;
         const firstObservedId = slots.length > 0 ? slots[0].canonicalId : null;
 
         for (let step = 0; step < maxSteps; step++) {
-            if (slots.length >= targetN) break;
+            if (targetN > 0 && slots.length >= targetN) break;
 
             const prevId = slots[slots.length - 1].canonicalId;
             if (nextBtn) {
@@ -2891,8 +2954,9 @@ async function extractListingDataMultiPass() {
         const expectedCount = determineExpectedPhotoCount(galleryRoot, layer1Count);
 
         let walkedSlots = [];
-        // If Layer 1 is missing or returns fewer photos than visible gallery count, trigger Layer 2 traversal!
-        if (layer1Count === 0 || (expectedCount > 0 && layer1Count < expectedCount)) {
+        // If Layer 1 is missing, incomplete, or returned 1 photo while DOM indicates multiple photos/next button, trigger Layer 2 traversal!
+        const hasDomMultiPhotos = findGalleryThumbnailElements(galleryRoot).length > 1 || !!(document.querySelector('[data-marker="image-frame/next-button"], [data-marker="gallery/next-btn"], [class*="control-next"], [class*="button-next"]'));
+        if (layer1Count === 0 || (expectedCount > 0 && layer1Count < expectedCount) || (layer1Count === 1 && hasDomMultiPhotos)) {
             try {
                 walkedSlots = await walkAndCollectAllGalleryPhotos(expectedCount);
             } catch (err) {}
