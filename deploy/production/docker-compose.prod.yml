@@ -86,6 +86,7 @@ services:
     environment:
       - INVENTORY_SALES_MODULE_NAME=technoreboot-inventory-sales-module
       - CORE_API_BASE_URL=http://core:8000
+      - CORE_API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
       - APP_ENV=production
       - CART_SESSION_SECRET=${CART_SESSION_SECRET:?CART_SESSION_SECRET is required in production}
       - PYTHONPATH=/app
@@ -116,6 +117,7 @@ services:
     environment:
       - REPAIRS_MODULE_NAME=technoreboot-repairs-module
       - CORE_API_BASE_URL=http://core:8000
+      - CORE_API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
       - PYTHONPATH=/app
       - ROOT_PATH=/repairs
     healthcheck:
@@ -145,6 +147,7 @@ services:
       - AVITO_MODULE_NAME=technoreboot-avito-module
       - AVITO_MODULE_MODE=parser_mvp
       - CORE_API_BASE_URL=http://core:8000
+      - CORE_API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
       - AVITO_STORAGE_DIR=/app/data
       - AVITO_REQUEST_DELAY_SECONDS=3
       - AVITO_MAX_PAGES_PER_RUN=2
@@ -202,3 +205,4 @@ services:
 networks:
   technoreboot-network:
     driver: bridge
+    # temp
