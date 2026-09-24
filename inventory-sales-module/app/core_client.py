@@ -478,6 +478,28 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def delete_product(self, product_id: int, is_owner: bool = True) -> dict:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                headers = {"x-api-token": settings.core_api_token}
+                if is_owner:
+                    headers["x-auth-is-owner"] = "1"
+                response = await client.delete(
+                    f"{self.base_url}/api/products/{product_id}",
+                    headers=headers,
+                    timeout=15.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                detail = ""
+                try:
+                    detail = response.json().get("detail", "")
+                except Exception:
+                    detail = response.text
+                return {"error": True, "status_code": response.status_code, "detail": detail}
+            except Exception as e:
+                return {"error": True, "detail": str(e)}
+
 core_client = CoreClient()
 
 

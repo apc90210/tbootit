@@ -15,6 +15,9 @@
     <div id="product-actions-top" class="product-actions-bar" style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; padding: 12px 16px; background: #fff; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <a href="/inventory/products" class="btn" style="text-decoration: none;">Назад к товарам</a>
         <a id="btn-edit-product-top" href="/inventory/products/{{ product.id }}/edit" class="btn btn-primary btn-edit-product" style="background: #007bff; color: #fff; text-decoration: none;">✏️ Редактировать товар</a>
+        {% if is_owner %}
+            <button type="button" class="btn btn-danger btn-delete-product" onclick="deleteCurrentProduct()" style="background: #dc3545; color: #fff; border: none; border-radius: 4px; padding: 8px 14px; cursor: pointer; font-weight: 500;" title="Удалить товар (только для владельца)">🗑️ Удалить товар</button>
+        {% endif %}
         {% if product.status == 'in_stock' and product.storage_location == 'store' and product.quantity > 0 %}
             <a href="/inventory/sales/new?product_id={{ product.id }}" class="btn btn-success" style="text-decoration: none;">Продать</a>
         {% else %}
@@ -200,6 +203,9 @@
     <div id="product-actions-bottom" class="product-actions-bar" style="margin-top: 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 16px; background: #fff; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <a href="/inventory/products" class="btn" style="text-decoration: none;">Назад к товарам</a>
         <a id="btn-edit-product" href="/inventory/products/{{ product.id }}/edit" class="btn btn-primary btn-edit-product" style="background: #007bff; color: #fff; text-decoration: none;">✏️ Редактировать товар</a>
+        {% if is_owner %}
+            <button type="button" class="btn btn-danger btn-delete-product" onclick="deleteCurrentProduct()" style="background: #dc3545; color: #fff; border: none; border-radius: 4px; padding: 8px 14px; cursor: pointer; font-weight: 500;" title="Удалить товар (только для владельца)">🗑️ Удалить товар</button>
+        {% endif %}
         {% if product.status == 'in_stock' and product.storage_location == 'store' and product.quantity > 0 %}
             <a href="/inventory/sales/new?product_id={{ product.id }}" class="btn btn-success" style="text-decoration: none;">Продать</a>
         {% else %}
@@ -230,4 +236,31 @@
             <button class="btn" disabled title="Ценник доступен только для товаров в наличии">Ценник 58×40</button>
         {% endif %}
     </div>
+
+    <script>
+    async function deleteCurrentProduct() {
+        const productId = {{ product.id }};
+        const title = {{ product.title | tojson }};
+        if (!confirm('Вы уверены, что хотите удалить товар "' + title + '" (ID: ' + productId + ')?\n\nВнимание: операция удалит ошибочно созданный товар или перенесет его в архив.')) {
+            return;
+        }
+        try {
+            const response = await fetch('/inventory/products/' + productId + '/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            if (response.ok && !data.error) {
+                alert(data.message || 'Товар успешно удален');
+                window.location.href = '/inventory/products';
+            } else {
+                alert('Ошибка удаления: ' + (data.detail || data.error || 'Не удалось удалить товар'));
+            }
+        } catch (e) {
+            alert('Ошибка сети или сервера: ' + e);
+        }
+    }
+    </script>
 {% endblock %}

@@ -89,6 +89,7 @@ services:
     environment:
       INVENTORY_SALES_MODULE_NAME: technoreboot-inventory-sales-module
       CORE_API_BASE_URL: http://core:8000
+      CORE_API_TOKEN: dev-token
       PYTHONPATH: /app
       ROOT_PATH: /inventory
     ports:

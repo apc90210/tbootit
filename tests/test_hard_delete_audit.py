@@ -54,7 +54,7 @@ def test_hard_delete_route_inventory_ast():
                             if mod_name == "core" and path_val == "/{product_id}":
                                 is_soft = True  # Soft delete sets status = written_off
                                 is_user_allowed = True
-                            elif mod_name == "admin-shell" and path_val == "/admin-api/avito/profiles/{account_key}":
+                            elif mod_name == "admin-shell" and path_val in ("/admin-api/avito/profiles/{account_key}", "/admin-api/products/{product_id}"):
                                 is_soft = False
                                 is_owner_only = True
                                 is_user_allowed = False  # Protected by _require_owner

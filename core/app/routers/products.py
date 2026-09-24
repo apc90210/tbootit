@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func, case
 from typing import List, Optional, Dict, Any
@@ -9,6 +9,7 @@ from app.services.barcodes import generate_barcode_for_product, generate_missing
 from app.services.product_json_service import generate_canonical_sku
 from app.services.avito_schema_service import upsert_avito_category_schema, upsert_product_avito_attributes
 import json
+import os
 
 router = APIRouter()
 
@@ -81,29 +82,34 @@ def get_products(
     
     if q:
         q_clean = q.strip()
+        q_lower = q_clean.lower()
+        q_pattern = f"%{q_lower}%"
         conditions = [
-            models.Product.title.ilike(f"%{q_clean}%"),
-            models.Product.sku.ilike(f"%{q_clean}%"),
-            models.Product.barcode.ilike(f"%{q_clean}%"),
-            models.Product.brand.ilike(f"%{q_clean}%"),
-            models.Product.model.ilike(f"%{q_clean}%"),
-            models.Product.serial_number.ilike(f"%{q_clean}%")
+            func.lower(models.Product.title).like(q_pattern),
+            func.lower(models.Product.sku).like(q_pattern),
+            func.lower(models.Product.barcode).like(q_pattern),
+            func.lower(models.Product.brand).like(q_pattern),
+            func.lower(models.Product.model).like(q_pattern),
+            func.lower(models.Product.serial_number).like(q_pattern)
         ]
         if q_clean.isdigit():
             conditions.append(models.Product.id == int(q_clean))
         query = query.filter(or_(*conditions))
     if status:
         query = query.filter(models.Product.status == status)
+    else:
+        # Hide archived and written_off products from default search
+        query = query.filter(models.Product.status.notin_(["archived", "written_off"]))
     if source:
         query = query.filter(models.Product.source_type == source)
     if category_id:
         query = query.filter(models.Product.category_id == category_id)
     if brand:
-        query = query.filter(models.Product.brand.ilike(f"%{brand}%"))
+        query = query.filter(func.lower(models.Product.brand).like(f"%{brand.strip().lower()}%"))
     if model:
-        query = query.filter(models.Product.model.ilike(f"%{model}%"))
+        query = query.filter(func.lower(models.Product.model).like(f"%{model.strip().lower()}%"))
     if storage_location:
-        query = query.filter(models.Product.storage_location.ilike(f"%{storage_location}%"))
+        query = query.filter(func.lower(models.Product.storage_location).like(f"%{storage_location.strip().lower()}%"))
     if min_price is not None:
         query = query.filter(models.Product.sale_price >= min_price)
     if max_price is not None:
@@ -121,8 +127,13 @@ def get_products(
             
     if q:
         q_clean = q.strip()
+        q_lower = q_clean.lower()
         query = query.order_by(
-            case((models.Product.barcode == q_clean, 0), (models.Product.sku == q_clean, 1), else_=2)
+            case(
+                (func.lower(models.Product.barcode) == q_lower, 0),
+                (func.lower(models.Product.sku) == q_lower, 1),
+                else_=2
+            )
         )
 
     if sort == "price_asc":
@@ -163,15 +174,20 @@ def get_product_filter_options(
     # Base query for calculating dependent facets
     base_query = db.query(models.Product)
     if q:
-        base_query = base_query.filter(
-            or_(
-                models.Product.title.ilike(f"%{q}%"),
-                models.Product.sku.ilike(f"%{q}%"),
-                models.Product.brand.ilike(f"%{q}%"),
-                models.Product.model.ilike(f"%{q}%"),
-                models.Product.serial_number.ilike(f"%{q}%")
-            )
-        )
+        q_clean = q.strip()
+        q_lower = q_clean.lower()
+        q_pattern = f"%{q_lower}%"
+        opt_conditions = [
+            func.lower(models.Product.title).like(q_pattern),
+            func.lower(models.Product.sku).like(q_pattern),
+            func.lower(models.Product.barcode).like(q_pattern),
+            func.lower(models.Product.brand).like(q_pattern),
+            func.lower(models.Product.model).like(q_pattern),
+            func.lower(models.Product.serial_number).like(q_pattern)
+        ]
+        if q_clean.isdigit():
+            opt_conditions.append(models.Product.id == int(q_clean))
+        base_query = base_query.filter(or_(*opt_conditions))
 
     # 1. Categories - calculated without category/brand/model/status/storage/avito/site
     cat_query = base_query
@@ -198,7 +214,7 @@ def get_product_filter_options(
     # Apply brand for next levels
     q_brand = q_cat
     if brand:
-        q_brand = q_brand.filter(models.Product.brand.ilike(f"%{brand}%"))
+        q_brand = q_brand.filter(func.lower(models.Product.brand).like(f"%{brand.strip().lower()}%"))
 
     # 3. Models - calculated with category + brand
     models_list = [{"value": m, "count": c} for m, c in 
@@ -211,7 +227,7 @@ def get_product_filter_options(
     # Apply model for next levels
     q_model = q_brand
     if model:
-        q_model = q_model.filter(models.Product.model.ilike(f"%{model}%"))
+        q_model = q_model.filter(func.lower(models.Product.model).like(f"%{model.strip().lower()}%"))
 
     # 4. Statuses - calculated with category + brand + model
     status_labels = {
@@ -248,7 +264,7 @@ def get_product_filter_options(
     # Apply storage_location
     q_storage = q_status
     if storage_location:
-        q_storage = q_storage.filter(models.Product.storage_location.ilike(f"%{storage_location}%"))
+        q_storage = q_storage.filter(func.lower(models.Product.storage_location).like(f"%{storage_location.strip().lower()}%"))
 
     # 6. Avito & Site ready - calculated with all previous filters
     total_count = q_storage.count()
@@ -828,19 +844,119 @@ def avito_publication(product_id: int, pub: schemas.AvitoPublication, db: Sessio
     return db_product
 
 @router.delete("/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db)):
+def delete_product(product_id: int, request: Request, db: Session = Depends(get_db)):
+    auth_is_owner = request.headers.get("x-auth-is-owner")
+    api_token = request.headers.get("x-api-token")
+    
+    is_owner = False
+    from app.config import settings
+    if auth_is_owner == "1" and api_token == settings.api_token:
+        is_owner = True
+
+    if not is_owner:
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён: требуется сертификат владельца и внутренний токен"
+        )
+
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    old_status = db_product.status
-    db_product.status = "written_off"
-    db.commit()
-    
-    log_audit(db, "product", db_product.id, "delete_soft", old_value={"status": old_status}, new_value={"status": "written_off"})
-    log_product_event(db, product_id, "delete_soft", old_value=old_status, new_value="written_off", comment="Product softly deleted (written_off)")
-    db.commit()
-    return {"message": "Product softly deleted (written_off)"}
+
+    has_sales = db.query(models.SaleItem).filter(models.SaleItem.product_id == product_id).first() is not None
+    has_tasks = db.query(models.AvitoPostSaleTask).filter(models.AvitoPostSaleTask.product_id == product_id).first() is not None
+    has_non_initial_stock = db.query(models.StockMovement).filter(
+        models.StockMovement.product_id == product_id,
+        models.StockMovement.movement_type != "initial"
+    ).first() is not None
+    has_non_create_events = db.query(models.ProductEvent).filter(
+        models.ProductEvent.product_id == product_id,
+        models.ProductEvent.event_type != "create"
+    ).first() is not None
+
+    has_history = has_sales or has_tasks or has_non_initial_stock or has_non_create_events
+
+    if not has_history:
+        # OWNER deleting a new/erroneous product without historical links -> Hard delete
+        prod_title = db_product.title
+        prod_sku = db_product.sku
+
+        # Clean up photos
+        photos = db.query(models.ProductPhoto).filter(models.ProductPhoto.product_id == product_id).all()
+        for ph in photos:
+            if ph.storage_path and os.path.exists(ph.storage_path):
+                try:
+                    os.remove(ph.storage_path)
+                except Exception:
+                    pass
+            db.delete(ph)
+
+        db.query(models.ProductAvitoAttributeValue).filter(models.ProductAvitoAttributeValue.product_id == product_id).delete()
+        db.query(models.ProductExternalListing).filter(models.ProductExternalListing.product_id == product_id).delete()
+        
+        # Preserve historical logs instead of deleting them
+        db.query(models.ProductEvent).filter(models.ProductEvent.product_id == product_id).update({"product_id": None})
+        db.query(models.StockMovement).filter(models.StockMovement.product_id == product_id).update({"product_id": None})
+        
+        db.query(models.ProductCardImport).filter(models.ProductCardImport.product_id == product_id).update({"product_id": None})
+
+        db.delete(db_product)
+
+        log_audit(
+            db,
+            "product",
+            product_id,
+            "delete_hard",
+            old_value={"title": prod_title, "sku": prod_sku},
+            new_value=None,
+            comment="Product hard-deleted by OWNER"
+        )
+        db.commit()
+        return {
+            "status": "ok",
+            "action": "hard_deleted",
+            "message": f"Товар «{prod_title}» (ID: {product_id}) успешно удалён"
+        }
+    else:
+        # Soft delete (written_off / archived) to preserve historical records and FK integrity
+        old_status = db_product.status
+        old_loc = db_product.storage_location
+        target_status = "archived" if auth_is_owner == "1" else "written_off"
+        target_loc = "archive" if auth_is_owner == "1" else old_loc
+
+        db_product.status = target_status
+        if target_loc:
+            db_product.storage_location = target_loc
+        db.commit()
+
+        comment_msg = (
+            "Product softly deleted (archived) by OWNER to protect history"
+            if auth_is_owner == "1"
+            else "Product softly deleted (written_off)"
+        )
+        log_audit(
+            db,
+            "product",
+            db_product.id,
+            "delete_soft",
+            old_value={"status": old_status, "storage_location": old_loc},
+            new_value={"status": target_status, "storage_location": target_loc},
+            comment=comment_msg
+        )
+        log_product_event(
+            db,
+            product_id,
+            "delete_soft",
+            old_value=old_status,
+            new_value=target_status,
+            comment=comment_msg
+        )
+        db.commit()
+        return {
+            "status": "ok",
+            "action": "soft_deleted",
+            "message": f"Product softly deleted ({target_status})"
+        }
 
 @router.get("/by-barcode/{barcode}", response_model=schemas.Product)
 def get_product_by_barcode(barcode: str, db: Session = Depends(get_db)):

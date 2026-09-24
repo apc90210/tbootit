@@ -218,6 +218,13 @@
                         Применить
                     </button>
                 </div>
+
+                {% if is_owner %}
+                <!-- Массовое удаление (только OWNER) -->
+                <button type="button" id="btn-batch-delete" class="btn" style="background: #dc3545; color: #fff; padding: 7px 15px; border-radius: 5px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Удалить выбранные товары (только для владельца)">
+                    🗑️ Удалить
+                </button>
+                {% endif %}
             </div>
         </div>
 
@@ -496,8 +503,48 @@
                 });
             }
 
+            // 4. Массовое удаление (только OWNER)
+            const batchDeleteBtn = document.getElementById('btn-batch-delete');
+            if (batchDeleteBtn) {
+                batchDeleteBtn.addEventListener('click', function() {
+                    const ids = getSelectedIds();
+                    if (ids.length === 0) {
+                        alert('Выберите хотя бы один товар для удаления.');
+                        return;
+                    }
+                    if (confirm(`Вы уверены, что хотите удалить ${ids.length} выбранных товаров?\n\nВнимание: операция удалит ошибочно созданные товары или перенесет их в архив.`)) {
+                        formAction.value = 'delete';
+                        formIds.value = ids.join(',');
+                        form.submit();
+                    }
+                });
+            }
+
             updateBatchUI();
         });
+
+        async function deleteProduct(productId, title) {
+            if (!confirm('Вы уверены, что хотите удалить товар "' + title + '" (ID: ' + productId + ')?\n\nВнимание: операция удалит ошибочно созданный товар или перенесет его в архив.')) {
+                return;
+            }
+            try {
+                const response = await fetch('/inventory/products/' + productId + '/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (response.ok && !data.error) {
+                    alert(data.message || 'Товар успешно удален');
+                    window.location.reload();
+                } else {
+                    alert('Ошибка удаления: ' + (data.detail || data.error || 'Не удалось удалить товар'));
+                }
+            } catch (e) {
+                alert('Ошибка сети или сервера: ' + e);
+            }
+        }
         </script>
     {% endif %}
 {% endblock %}

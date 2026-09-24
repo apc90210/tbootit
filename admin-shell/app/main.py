@@ -34,8 +34,6 @@ def _is_owner(request: Request) -> bool:
             request.url.path,
         )
         return bool(ok and cert and cert.get("is_owner"))
-    if request.headers.get("x-auth-is-owner") == "1":
-        return True
     return False
 
 
@@ -320,6 +318,25 @@ async def proxy_avito_publication(product_id: int, request: Request):
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
             resp = await client.patch(f"{CORE_API_URL}/api/products/{product_id}/avito-publication", json=data)
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+@app.delete("/admin-api/products/{product_id}")
+@app.post("/admin-api/products/{product_id}/delete")
+async def proxy_delete_product(product_id: int, request: Request):
+    _require_owner(request)
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.delete(
+                f"{CORE_API_URL}/api/products/{product_id}",
+                headers={
+                    "x-auth-is-owner": "1",
+                    "x-api-token": os.getenv("CORE_API_TOKEN", "")
+                }
+            )
             if resp.status_code == 200:
                 return resp.json()
             raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
@@ -860,6 +877,7 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
     headers["x-forwarded-proto"] = request.url.scheme or "http"
     headers["x-forwarded-prefix"] = prefix
     headers["x-auth-is-owner"] = "1" if _is_owner(request) else "0"
+    headers["x-api-token"] = os.getenv("CORE_API_TOKEN", "")
 
     body = await request.body()
     method = request.method

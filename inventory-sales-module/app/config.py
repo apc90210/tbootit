@@ -6,6 +6,7 @@ INSECURE_SECRETS = {"technoreboot_secret_cart_key_mvp", "dev-token", "change-me"
 class Settings(BaseSettings):
     inventory_sales_module_name: str = "technoreboot-inventory-sales-module"
     core_api_base_url: str = "http://core:8000"
+    core_api_token: str = "dev-token"
     app_env: str = "dev"
     cart_session_secret: str = "technoreboot_secret_cart_key_mvp"
 

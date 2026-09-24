@@ -13,6 +13,10 @@ router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+def is_owner_request(request: Request) -> bool:
+    """Check if the request originates from an authenticated OWNER certificate."""
+    return request.headers.get("x-auth-is-owner") == "1"
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     health = await core_client.health()
@@ -95,7 +99,8 @@ async def list_products(
             "sort": sort or "",
             "limit": limit,
             "offset": offset,
-            "msg": msg or ""
+            "msg": msg or "",
+            "is_owner": is_owner_request(request)
         }
     )
 
@@ -217,6 +222,37 @@ async def products_batch_action(request: Request):
     elif action == "print_price_tags":
         ids_str = ",".join(str(x) for x in product_ids)
         return RedirectResponse(f"/inventory/products/price-tags/batch?ids={ids_str}", status_code=303)
+
+    elif action == "delete":
+        from app.config import settings
+        if request.headers.get("x-api-token") != settings.core_api_token:
+            err = "Invalid internal token. Request must go through gateway."
+            if is_ajax:
+                return JSONResponse({"error": True, "detail": err}, status_code=403)
+            return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+
+        if not is_owner_request(request):
+            err = "Доступ запрещён: функция удаления товара доступна только владельцу (сертификат owner)"
+            if is_ajax:
+                return JSONResponse({"error": True, "detail": err}, status_code=403)
+            return RedirectResponse(f"/inventory/products?error={err}", status_code=303)
+
+        success_count = 0
+        error_count = 0
+        for pid in product_ids:
+            res = await core_client.delete_product(pid, is_owner=True)
+            if res and res.get("status") == "ok":
+                success_count += 1
+            else:
+                error_count += 1
+
+        if is_ajax:
+            return JSONResponse({"success": True, "deleted": success_count, "failed": error_count})
+        
+        import urllib.parse
+        msg_str = f"Удалено {success_count} товаров. Ошибок: {error_count}"
+        encoded = urllib.parse.quote_plus(msg_str)
+        return RedirectResponse(f"/inventory/products?msg={encoded}", status_code=303)
 
     else:
         err = f"Неизвестное действие: {action}"
@@ -574,9 +610,36 @@ async def product_detail(request: Request, product_id: int):
             "barcode_svg": barcode_svg,
             "cart_items_count": cart_items_count,
             "cart_quantities_by_product_id": cart_quantities_by_product_id,
-            "cart_product_ids": cart_product_ids
+            "cart_product_ids": cart_product_ids,
+            "is_owner": is_owner_request(request)
         }
     )
+
+@router.post("/products/{product_id}/delete")
+async def delete_product_endpoint(request: Request, product_id: int):
+    from app.config import settings
+    # 1. Enforce service-to-service internal trust (prevents local 8030 direct access spoofing)
+    if request.headers.get("x-api-token") != settings.core_api_token:
+        return JSONResponse(
+            status_code=403,
+            content={"error": True, "detail": "Invalid internal token. Request must go through gateway."}
+        )
+
+    # 2. Enforce user authorization (Owner UI role)
+    if not is_owner_request(request):
+        return JSONResponse(
+            status_code=403,
+            content={"error": True, "detail": "Доступ запрещён: функция удаления товара доступна только владельцу (сертификат owner)"}
+        )
+
+    res = await core_client.delete_product(product_id, is_owner=True)
+    if res and isinstance(res, dict) and res.get("error"):
+        return JSONResponse(
+            status_code=res.get("status_code", 400),
+            content={"error": True, "detail": res.get("detail", "Ошибка при удалении товара в Core API")}
+        )
+
+    return JSONResponse(content=res if isinstance(res, dict) else {"status": "ok", "message": "Товар успешно удалён"})
 
 @router.post("/products/{product_id}/barcode/generate")
 async def generate_single_barcode_endpoint(request: Request, product_id: int):
