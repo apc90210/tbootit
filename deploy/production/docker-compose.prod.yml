@@ -20,6 +20,7 @@ services:
       - STORAGE_ROOT=/data/storage
       - BACKUP_ROOT=/data/backups
       - API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
+      - FORWARDED_ALLOW_IPS=*
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
@@ -51,6 +52,7 @@ services:
       - DATA_DIR=/data
       - ENVIRONMENT=production
       - APP_ENV=production
+      - FORWARDED_ALLOW_IPS=*
     volumes:
       - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/auth:/app/auth-data
       - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}:/data
@@ -91,6 +93,7 @@ services:
       - CART_SESSION_SECRET=${CART_SESSION_SECRET:?CART_SESSION_SECRET is required in production}
       - PYTHONPATH=/app
       - ROOT_PATH=/inventory
+      - FORWARDED_ALLOW_IPS=*
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/health')"]
       interval: 10s
@@ -120,6 +123,7 @@ services:
       - CORE_API_TOKEN=${CORE_API_TOKEN:?CORE_API_TOKEN is required in production}
       - PYTHONPATH=/app
       - ROOT_PATH=/repairs
+      - FORWARDED_ALLOW_IPS=*
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8040/health')"]
       interval: 10s
@@ -152,6 +156,7 @@ services:
       - AVITO_REQUEST_DELAY_SECONDS=3
       - AVITO_MAX_PAGES_PER_RUN=2
       - DISPLAY=:99
+      - FORWARDED_ALLOW_IPS=*
     volumes:
       - ${TECHNOREBOOT_DATA_ROOT:-/srv/technoreboot/data}/avito-module:/app/data
     healthcheck:

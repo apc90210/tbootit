@@ -872,9 +872,9 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
     headers.pop("x-auth-role", None)
     headers.pop("x-role", None)
     headers.pop("x-auth-is-owner", None)
-    headers["x-forwarded-host"] = request.headers.get("host", "localhost:8011")
-    headers["x-forwarded-port"] = "8011"
-    headers["x-forwarded-proto"] = request.url.scheme or "http"
+    headers["x-forwarded-host"] = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost:8011")
+    headers["x-forwarded-port"] = request.headers.get("x-forwarded-port") or "443"
+    headers["x-forwarded-proto"] = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
     headers["x-forwarded-prefix"] = prefix
     headers["x-auth-is-owner"] = "1" if _is_owner(request) else "0"
     headers["x-api-token"] = os.getenv("CORE_API_TOKEN", "")
