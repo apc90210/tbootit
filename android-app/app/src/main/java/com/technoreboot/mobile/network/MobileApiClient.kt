@@ -1,6 +1,7 @@
 package com.technoreboot.mobile.network
 
 import com.technoreboot.mobile.crypto.RequestBinding
+import com.technoreboot.mobile.model.SalesReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -149,6 +150,74 @@ class MobileApiClient(
         }
     }
 
+    /**
+     * Fetches canonical sales report for the specified period ("today", "week", "year")
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun getSalesReport(
+        period: String,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<SalesReport> = withContext(Dispatchers.IO) {
+        // Step 1: Obtain one-time challenge nonce
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            val msg = if (err.code == 403) {
+                if (err.message.contains("устройств", ignoreCase = true) || err.message.contains("device", ignoreCase = true)) {
+                    "Доступ этого устройства отозван"
+                } else {
+                    "Доступ отозван"
+                }
+            } else {
+                err.message
+            }
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = msg,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/reports/sales?period=$period"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        // Step 2: Build canonical signing payload
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        // Step 3: Cryptographically sign canonical payload with Android Keystore private key
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        // Step 4: Dispatch request with required PoP headers
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            SalesReport.fromJson(json)
+        }
+    }
+
     private fun <T> executeRequest(
         request: Request,
         parser: (JSONObject) -> T
@@ -162,10 +231,19 @@ class MobileApiClient(
                 } else {
                     val userMessage = try {
                         val errJson = JSONObject(bodyStr)
-                        errJson.optString("detail", "Ошибка сервера (код ${response.code})")
+                        val detail = errJson.optString("detail", "")
+                        if (response.code == 403) {
+                            if (detail.contains("устройств", ignoreCase = true) || detail.contains("device", ignoreCase = true)) {
+                                "Доступ этого устройства отозван"
+                            } else {
+                                "Доступ отозван"
+                            }
+                        } else {
+                            detail.ifBlank { "Ошибка сервера (код ${response.code})" }
+                        }
                     } catch (_: Exception) {
                         when (response.code) {
-                            400 -> "Неверные параметры запроса или некорректный код подключения"
+                            400 -> "Неверные параметры запроса или некорректный период"
                             401 -> "Требуется подтверждение владения ключом (PoP)"
                             403 -> "Доступ запрещён: устройство или сертификат деактивированы"
                             404 -> "Ресурс не найден на сервере"

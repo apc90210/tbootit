@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse, RedirectResponse
 from starlette.background import BackgroundTask
@@ -1987,3 +1987,113 @@ async def api_mobile_test_post(request: Request):
         "body_received_len": len(body),
         "user": ctx,
     }
+
+
+# =====================================================================
+# STAGE 01C: MOBILE SALES REPORTS API
+# =====================================================================
+
+MOBILE_REPORT_PERIOD_LABELS = {
+    "today": "Сегодня",
+    "week": "Неделя",
+    "year": "Год",
+}
+
+
+async def _fetch_canonical_sales_report(period: str) -> Dict[str, Any]:
+    """
+    Fetch canonical sales report strictly from Core HTTP API.
+    Reuses existing Core calculation without parallel business logic.
+    Does NOT spawn subprocesses or access Core DB directly.
+    Returns 502/503/504 on Core failure or timeout.
+    """
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/reports/sales"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, params={"period": period}, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API returned error status {resp.status_code}",
+                )
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
+
+
+
+@app.get("/api/mobile/reports/sales")
+async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
+    """
+    Mobile Sales Reports endpoint protected by TRMOBILE1 PoP.
+    Strictly accepts period in ('today', 'week', 'year').
+    Invalid period -> 400.
+    Reuses canonical Core calculation without parallel business logic.
+    """
+    if period not in ("today", "week", "year"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid period. Allowed: today, week, year",
+        )
+
+    # Enforce TRMOBILE1 Proof of Possession (PoP) authentication
+    ctx = await _get_mobile_auth(request)
+
+    canonical = await _fetch_canonical_sales_report(period)
+
+    # Format payment breakdown into compact mobile shape
+    payment_methods = []
+    for pb in canonical.get("payment_breakdown", []):
+        payment_methods.append({
+            "method": pb.get("payment_method", ""),
+            "label": pb.get("label", ""),
+            "amount": float(pb.get("amount", 0.0)),
+            "count": int(pb.get("sales_count", 0)),
+        })
+
+    # Format sales list
+    sales_list = []
+    for s in canonical.get("sales", []):
+        created_at_val = s.get("created_at")
+        if isinstance(created_at_val, datetime):
+            created_at_str = created_at_val.isoformat()
+        else:
+            created_at_str = str(created_at_val or "")
+
+        sales_list.append({
+            "id": s.get("id"),
+            "created_at": created_at_str,
+            "amount": float(s.get("total_amount", 0.0)),
+            "payment_method": s.get("payment_method", ""),
+            "payment_label": s.get("payment_method_label", ""),
+        })
+
+    return {
+        "period": period,
+        "label": MOBILE_REPORT_PERIOD_LABELS.get(period, period),
+        "date_from": str(canonical.get("date_from", "")),
+        "date_to": str(canonical.get("date_to", "")),
+        "currency": "RUB",
+        "sales_count": int(canonical.get("sales_count", 0)),
+        "revenue_total": float(canonical.get("total_amount", 0.0)),
+        "payment_methods": payment_methods,
+        "sales": sales_list,
+    }
+

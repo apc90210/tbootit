@@ -6,8 +6,11 @@ import com.technoreboot.mobile.crypto.KeystoreManager
 import com.technoreboot.mobile.data.DeviceIdentityManager
 import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.data.SessionRepository
+import com.technoreboot.mobile.model.SalesReportPeriod
 import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
+import com.technoreboot.mobile.ui.reports.SalesReportScreen
+import com.technoreboot.mobile.ui.reports.SalesReportUiState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -21,8 +24,53 @@ fun MobileApp(
     var currentSession by remember { mutableStateOf(sessionRepository.getSession()) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-    var isStatusError by remember { mutableStateOf(false) }
+
+    var selectedPeriod by remember { mutableStateOf(SalesReportPeriod.TODAY) }
+    var reportUiState by remember { mutableStateOf<SalesReportUiState>(SalesReportUiState.Loading) }
+
+    fun loadSalesReport(period: SalesReportPeriod) {
+        val session = currentSession ?: return
+        coroutineScope.launch {
+            reportUiState = SalesReportUiState.Loading
+            val privateKey = keystoreManager.getPrivateKey()
+            if (privateKey == null) {
+                reportUiState = SalesReportUiState.Error("Аппаратный ключ не найден в защищённом хранилище")
+                return@launch
+            }
+
+            when (val result = apiClient.getSalesReport(period.apiKey, session.credentialId, privateKey)) {
+                is ApiResult.Success -> {
+                    val report = result.data
+                    if (report.salesCount == 0 && report.revenueTotal == 0.0) {
+                        reportUiState = SalesReportUiState.Empty(period)
+                    } else {
+                        reportUiState = SalesReportUiState.Success(report)
+                    }
+                }
+                is ApiResult.Error -> {
+                    if (result.code == 403) {
+                        val msg = if (result.message.contains("устройств", ignoreCase = true) || result.message.contains("device", ignoreCase = true)) {
+                            "Доступ этого устройства отозван"
+                        } else {
+                            "Доступ отозван"
+                        }
+                        reportUiState = SalesReportUiState.Revoked(msg)
+                    } else {
+                        reportUiState = SalesReportUiState.Error(
+                            message = result.message,
+                            isNetworkError = result.isNetworkError
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(currentSession) {
+        if (currentSession != null) {
+            loadSalesReport(selectedPeriod)
+        }
+    }
 
     val defaultDeviceName = remember {
         val model = Build.MODEL ?: "Android Device"
@@ -37,54 +85,27 @@ fun MobileApp(
     TechnorebootTheme {
         val session = currentSession
         if (session != null) {
-            ConnectedScreen(
+            SalesReportScreen(
                 session = session,
-                isCheckingConnection = isLoading,
-                statusMessage = statusMessage,
-                isError = isStatusError,
-                onCheckConnectionClicked = {
-                    coroutineScope.launch {
-                        isLoading = true
-                        statusMessage = null
-                        val privateKey = keystoreManager.getPrivateKey()
-                        if (privateKey == null) {
-                            statusMessage = "Аппаратный ключ не найден в защищённом хранилище"
-                            isStatusError = true
-                            isLoading = false
-                            return@launch
-                        }
-
-                        when (val result = apiClient.getMobileMe(session.credentialId, privateKey)) {
-                            is ApiResult.Success -> {
-                                statusMessage = "Подключение активно. Роль: ${result.data.role}."
-                                isStatusError = false
-                                // Update session if role or status updated
-                                val updated = session.copy(
-                                    role = result.data.role,
-                                    isOwner = result.data.isOwner
-                                )
-                                sessionRepository.saveSession(updated)
-                                currentSession = updated
-                            }
-                            is ApiResult.Error -> {
-                                statusMessage = result.message
-                                isStatusError = true
-                                if (result.code == 403) {
-                                    // Revocation detected: clear session
-                                    sessionRepository.clearSession()
-                                    currentSession = null
-                                    errorMessage = "Доступ отозван на сервере. Пожалуйста, выполните повторное подключение."
-                                }
-                            }
-                        }
-                        isLoading = false
-                    }
+                selectedPeriod = selectedPeriod,
+                uiState = reportUiState,
+                onPeriodSelected = { period ->
+                    selectedPeriod = period
+                    loadSalesReport(period)
+                },
+                onRefreshClicked = {
+                    loadSalesReport(selectedPeriod)
+                },
+                onRevokedDismissed = {
+                    sessionRepository.clearSession()
+                    keystoreManager.deleteKey()
+                    currentSession = null
+                    errorMessage = "Доступ отозван на сервере. Пожалуйста, выполните повторное подключение."
                 },
                 onDisconnectClicked = {
                     sessionRepository.clearSession()
                     keystoreManager.deleteKey()
                     currentSession = null
-                    statusMessage = null
                     errorMessage = null
                 }
             )
@@ -124,21 +145,7 @@ fun MobileApp(
                                     // 3. Save active credential (pairing code is discarded!)
                                     sessionRepository.saveSession(newSession)
                                     currentSession = newSession
-
-                                    // 4. Verify live connection with first PoP challenge
-                                    val privKey = keystoreManager.getPrivateKey()
-                                    if (privKey != null) {
-                                        when (val meResult = apiClient.getMobileMe(data.credentialId, privKey)) {
-                                            is ApiResult.Success -> {
-                                                statusMessage = "Устройство успешно авторизовано на сервере."
-                                                isStatusError = false
-                                            }
-                                            is ApiResult.Error -> {
-                                                statusMessage = "Подключено (предупреждение: ${meResult.message})"
-                                                isStatusError = true
-                                            }
-                                        }
-                                    }
+                                    selectedPeriod = SalesReportPeriod.TODAY
                                 }
                                 is ApiResult.Error -> {
                                     errorMessage = enrollResult.message
