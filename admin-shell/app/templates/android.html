@@ -126,11 +126,30 @@
                 Приватный ключ никогда не покидает смартфон. Права мобильного доступа строго наследуются от вашего активного сертификата (<strong>{{ current_cert.name }}</strong>) и автоматически аннулируются в случае его отзыва.
             </div>
 
-            <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center;">
-                <button class="btn btn-outline" disabled title="Сборка APK находится в разработке (Stage 01B)">
-                    ⬇ Скачать APK (в разработке)
-                </button>
-                <span class="text-muted">Пакет приложения будет доступен после завершения сборки клиента.</span>
+            <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
+                {% if release_info %}
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <a href="/android/download" class="btn btn-primary" style="text-decoration: none; padding: 10px 20px;">
+                        ⬇ Скачать приложение Android (v{{ release_info.version }})
+                    </a>
+                    <span class="text-muted">Размер: {{ release_info.size_mb }} МБ | Версия: {{ release_info.version }} (сборка {{ release_info.version_code }})</span>
+                </div>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; font-size: 0.88rem; color: #475569;">
+                    <strong>Инструкция по установке:</strong>
+                    <ol style="margin: 6px 0 0 18px; padding: 0; line-height: 1.6;">
+                        <li>Скачайте APK-файл на устройство и откройте его.</li>
+                        <li>При запросе системы разрешите установку из неизвестных источников для вашего браузера / проводника.</li>
+                        <li>Откройте приложение «ТЕХНОРЕБУТ» и нажмите «🔗 Подключить устройство» выше для получения 6-значного кода сопряжения.</li>
+                    </ol>
+                </div>
+                {% else %}
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button class="btn btn-outline" disabled>
+                        ⬇ Скачать APK (релиз подготавливается)
+                    </button>
+                    <span class="text-muted">Релизный пакет приложения формируется администратором.</span>
+                </div>
+                {% endif %}
             </div>
         </div>
 

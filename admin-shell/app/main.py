@@ -1848,12 +1848,42 @@ async def android_page(request: Request):
     cert = _require_auth(request)
     is_owner = bool(cert.get("is_owner"))
     devices = mobile_manager.list_devices(parent_certificate_id=None if is_owner else cert["id"])
+    
+    release_info = None
+    try:
+        manifest_data, apk_path = _get_active_release_info()
+        release_info = {
+            "version": manifest_data.get("version_name", "1.0.0"),
+            "version_code": manifest_data.get("version_code", 1),
+            "size_mb": round(apk_path.stat().st_size / (1024 * 1024), 2),
+        }
+    except Exception:
+        pass
+
     return templates.TemplateResponse("android.html", {
         "request": request,
         "is_owner": is_owner,
         "current_cert": cert,
         "devices": devices,
+        "release_info": release_info,
     })
+
+
+@app.get("/android/download")
+async def android_download_apk(request: Request):
+    """
+    Initial Android APK package download route for browser users.
+    Protected by mTLS client certificate authentication (USER or OWNER).
+    Does NOT require a mobile credential.
+    Streams only from fixed same-origin release directory.
+    """
+    _require_auth(request)
+    manifest_data, apk_path = _get_active_release_info()
+    return FileResponse(
+        path=str(apk_path),
+        media_type="application/vnd.android.package-archive",
+        filename=f"technoreboot-v{manifest_data.get('version_name', '1.0.0')}.apk",
+    )
 
 
 @app.post("/admin-api/mobile/pairing/generate")
