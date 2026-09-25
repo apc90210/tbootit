@@ -7,12 +7,19 @@ android {
     namespace = "com.technoreboot.mobile"
     compileSdk = 34
 
+    val propVersionCode = project.findProperty("appVersionCode")?.toString()?.toIntOrNull()
+        ?: System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+        ?: 1
+    val propVersionName = project.findProperty("appVersionName")?.toString()
+        ?: System.getenv("APP_VERSION_NAME")
+        ?: "1.0.0"
+
     defaultConfig {
         applicationId = "com.technoreboot.mobile"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0-stage01b"
+        versionCode = propVersionCode
+        versionName = propVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
