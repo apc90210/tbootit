@@ -12,6 +12,7 @@ import httpx
 import asyncio
 import urllib.parse
 import tempfile
+import hashlib
 from pathlib import Path
 
 from app.auth_manager import AuthManager
@@ -2096,4 +2097,138 @@ async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
         "payment_methods": payment_methods,
         "sales": sales_list,
     }
+
+
+# =====================================================================
+# STAGE 01D: MOBILE IN-APP UPDATE API
+# =====================================================================
+
+MOBILE_APP_RELEASE_DIR = os.getenv(
+    "MOBILE_APP_RELEASE_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "releases", "mobile"),
+)
+
+
+def _compute_file_sha256(filepath: str) -> str:
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest().lower()
+
+
+def _get_active_release_info() -> Tuple[Dict[str, Any], Path]:
+    """
+    Load release manifest and verify underlying APK file exists and has matching SHA-256.
+    Returns (manifest_data, apk_path).
+    Raises HTTPException(404) if release is not found, or HTTPException(503) if corrupt.
+    """
+    release_dir = Path(MOBILE_APP_RELEASE_DIR)
+    manifest_file = release_dir / "manifest.json"
+    if not manifest_file.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Обновление приложения не найдено на сервере (манифест отсутствует)",
+        )
+
+    try:
+        manifest_data = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Некорректный манифест обновления на сервере: {str(e)}",
+        )
+
+    # Validate required manifest schema
+    required_keys = ["application_id", "version_code", "version_name", "sha256"]
+    for k in required_keys:
+        if k not in manifest_data:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Манифест обновления повреждён: отсутствует поле {k}",
+            )
+
+    apk_filename = manifest_data.get("apk_filename", f"app-v{manifest_data['version_code']}.apk")
+    # Path traversal protection
+    if ".." in apk_filename or "/" in apk_filename or "\\" in apk_filename:
+        raise HTTPException(
+            status_code=503,
+            detail="Недопустимое имя файла обновления в манифесте",
+        )
+
+    apk_path = (release_dir / apk_filename).resolve()
+    if not str(apk_path).startswith(str(release_dir.resolve())):
+        raise HTTPException(status_code=403, detail="Path traversal forbidden")
+
+    if not apk_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="APK-файл обновления не найден на сервере",
+        )
+
+    # Verify SHA-256 before advertising
+    actual_sha = _compute_file_sha256(str(apk_path))
+    expected_sha = str(manifest_data["sha256"]).strip().lower()
+    if actual_sha != expected_sha:
+        raise HTTPException(
+            status_code=503,
+            detail="Контрольная сумма APK-файла на сервере не совпадает с манифестом",
+        )
+
+    # Ensure actual apk_size is accurate
+    manifest_data["apk_size"] = apk_path.stat().st_size
+    manifest_data.setdefault("min_sdk", 26)
+    manifest_data.setdefault("signing_cert_sha256", "")
+    manifest_data.setdefault("release_notes", "")
+    manifest_data.setdefault("mandatory", False)
+
+    return manifest_data, apk_path
+
+
+@app.get("/api/mobile/app/update/manifest")
+async def api_mobile_app_update_manifest(request: Request):
+    """
+    Retrieve mobile application update manifest.
+    Protected by TRMOBILE1 PoP authentication.
+    Available to any active USER or OWNER device.
+    """
+    await _get_mobile_auth(request)
+    manifest_data, _ = _get_active_release_info()
+    # Return manifest metadata only (NO external or arbitrary download URL)
+    return {
+        "application_id": manifest_data["application_id"],
+        "version_code": int(manifest_data["version_code"]),
+        "version_name": str(manifest_data["version_name"]),
+        "min_sdk": int(manifest_data.get("min_sdk", 26)),
+        "apk_size": int(manifest_data["apk_size"]),
+        "sha256": manifest_data["sha256"].lower(),
+        "signing_cert_sha256": manifest_data.get("signing_cert_sha256", "").lower(),
+        "release_notes": manifest_data.get("release_notes", ""),
+        "mandatory": bool(manifest_data.get("mandatory", False)),
+    }
+
+
+@app.get("/api/mobile/app/update/apk")
+async def api_mobile_app_update_apk(request: Request, version_code: int = Query(...)):
+    """
+    Download mobile application update APK package.
+    Protected by TRMOBILE1 PoP authentication.
+    Streams only from fixed same-origin release directory.
+    Validates version_code matches advertised version.
+    """
+    await _get_mobile_auth(request)
+    manifest_data, apk_path = _get_active_release_info()
+
+    if int(version_code) != int(manifest_data["version_code"]):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Запрошенная версия ({version_code}) не совпадает с актуальным релизом ({manifest_data['version_code']})",
+        )
+
+    return FileResponse(
+        path=str(apk_path),
+        media_type="application/vnd.android.package-archive",
+        filename=apk_path.name,
+    )
+
 

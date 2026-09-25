@@ -18,6 +18,19 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://144.31.15.88\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            val storeFilePath = System.getenv("ANDROID_RELEASE_STORE_FILE")
+            if (!storeFilePath.isNullOrBlank() && file(storeFilePath).exists()) {
+                storeFile = file(storeFilePath)
+                storePassword = System.getenv("ANDROID_RELEASE_STORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD") ?: ""
+            }
+        }
     }
 
     buildTypes {
@@ -27,6 +40,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -42,6 +56,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.11"

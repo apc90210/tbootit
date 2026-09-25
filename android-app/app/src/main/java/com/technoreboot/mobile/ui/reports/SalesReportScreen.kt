@@ -44,6 +44,8 @@ fun SalesReportScreen(
     onRefreshClicked: () -> Unit,
     onRevokedDismissed: () -> Unit,
     onDisconnectClicked: () -> Unit,
+    onSettingsClicked: () -> Unit = {},
+    hasUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -96,6 +98,20 @@ fun SalesReportScreen(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Обновить"
                         )
+                    }
+                    IconButton(onClick = onSettingsClicked) {
+                        BadgedBox(
+                            badge = {
+                                if (hasUpdateBadge) {
+                                    Badge { Text("!") }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Настройки"
+                            )
+                        }
                     }
                     IconButton(onClick = onDisconnectClicked) {
                         Icon(

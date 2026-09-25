@@ -2,6 +2,7 @@ package com.technoreboot.mobile.network
 
 import com.technoreboot.mobile.crypto.RequestBinding
 import com.technoreboot.mobile.model.SalesReport
+import com.technoreboot.mobile.model.UpdateManifest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,19 +10,28 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
 import java.security.PrivateKey
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 
 class MobileApiClient(
-    private val baseUrl: String = DEFAULT_BASE_URL,
+    baseUrl: String = DEFAULT_BASE_URL,
     customClient: OkHttpClient? = null
 ) {
     companion object {
         // Standard production placeholder; Stage01B dev runs against local gateway equivalent
         const val DEFAULT_BASE_URL = "https://127.0.0.1:8443"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+    }
+
+    @Volatile
+    var baseUrl: String = baseUrl.trimEnd('/')
+        private set
+
+    fun updateBaseUrl(newUrl: String) {
+        baseUrl = newUrl.trimEnd('/')
     }
 
     // Strict TLS configuration: Standard platform trust manager & hostname verification enabled.
@@ -215,6 +225,162 @@ class MobileApiClient(
 
         executeRequest(request) { json ->
             SalesReport.fromJson(json)
+        }
+    }
+
+    /**
+     * Retrieves update manifest from /api/mobile/app/update/manifest protected by TRMOBILE1 PoP.
+     */
+    suspend fun getUpdateManifest(
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<UpdateManifest> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Устройство или родительский сертификат отозваны" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/app/update/manifest"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            UpdateManifest.fromJson(json)
+        }
+    }
+
+    /**
+     * Downloads APK from /api/mobile/app/update/apk?version_code=$versionCode
+     * protected by TRMOBILE1 PoP, streaming directly to destinationFile in chunks.
+     * Deletes incomplete destinationFile on failure or cancellation.
+     */
+    suspend fun downloadApk(
+        versionCode: Int,
+        credentialId: String,
+        privateKey: PrivateKey,
+        destinationFile: File,
+        onProgress: ((bytesRead: Long, totalBytes: Long) -> Unit)? = null
+    ): ApiResult<File> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Устройство или родительский сертификат отозваны" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/app/update/apk?version_code=$versionCode"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        try {
+            destinationFile.parentFile?.mkdirs()
+            if (destinationFile.exists()) {
+                destinationFile.delete()
+            }
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val bodyStr = response.body?.string().orEmpty()
+                    val userMessage = try {
+                        val errJson = JSONObject(bodyStr)
+                        errJson.optString("detail", "Ошибка скачивания (${response.code})")
+                    } catch (_: Exception) {
+                        "Ошибка скачивания (${response.code})"
+                    }
+                    return@withContext ApiResult.Error(response.code, userMessage)
+                }
+
+                val responseBody = response.body ?: return@withContext ApiResult.Error(500, "Пустой ответ сервера")
+                val totalLength = responseBody.contentLength()
+
+                responseBody.byteStream().use { inputStream ->
+                    destinationFile.outputStream().use { outputStream ->
+                        val buffer = ByteArray(32768)
+                        var bytesRead: Int
+                        var totalRead = 0L
+
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                            totalRead += bytesRead
+                            onProgress?.invoke(totalRead, totalLength)
+                        }
+                        outputStream.flush()
+                    }
+                }
+
+                ApiResult.Success(destinationFile)
+            }
+        } catch (e: SSLException) {
+            if (destinationFile.exists()) destinationFile.delete()
+            ApiResult.Error(0, "Ошибка безопасности TLS: сертификат сервера не подтверждён", isNetworkError = true)
+        } catch (e: IOException) {
+            if (destinationFile.exists()) destinationFile.delete()
+            ApiResult.Error(0, "Ошибка сети при скачивании обновления: ${e.message ?: "соединение разорвано"}", isNetworkError = true)
+        } catch (e: Exception) {
+            if (destinationFile.exists()) destinationFile.delete()
+            ApiResult.Error(0, "Ошибка при скачивании: ${e.message ?: "неизвестная ошибка"}")
         }
     }
 

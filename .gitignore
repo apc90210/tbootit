@@ -30,6 +30,7 @@ backups/
 
 # Data and Runtime databases
 data/
+!android-app/app/src/main/java/com/technoreboot/mobile/data/
 data/db/
 data/avito-module/
 data/auth/

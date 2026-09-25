@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +32,7 @@ fun EnrollmentScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onConnectClicked: (pairingCode: String, deviceName: String) -> Unit,
+    onSettingsClicked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var pairingCode by remember { mutableStateOf("") }
@@ -188,6 +190,20 @@ fun EnrollmentScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextButton(
+                onClick = onSettingsClicked
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Настройки сервера")
+            }
         }
     }
 }
