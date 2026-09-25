@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 from app.auth_manager import AuthManager
+from app.mobile_manager import MobileAccessManager
 from app import backup_service
 
 
@@ -22,9 +23,10 @@ app = FastAPI(title="Technoreboot Admin Shell")
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=templates_dir)
 auth_manager = AuthManager()
+mobile_manager = MobileAccessManager(auth_manager=auth_manager)
 
 
-def _is_owner(request: Request) -> bool:
+def _get_current_cert(request: Request) -> Optional[Dict]:
     client_serial = request.headers.get("x-client-cert-serial")
     if client_serial:
         ok, code, msg, cert = auth_manager.verify_request(
@@ -33,23 +35,28 @@ def _is_owner(request: Request) -> bool:
             request.headers.get("x-client-cert-fingerprint"),
             request.url.path,
         )
-        return bool(ok and cert and cert.get("is_owner"))
-    return False
+        if ok and cert:
+            return cert
+    return None
+
+
+def _require_auth(request: Request) -> Dict:
+    cert = _get_current_cert(request)
+    if not cert:
+        raise HTTPException(status_code=403, detail="Valid client certificate required")
+    return cert
+
+
+def _is_owner(request: Request) -> bool:
+    cert = _get_current_cert(request)
+    return bool(cert and cert.get("is_owner"))
 
 
 def _require_owner(request: Request):
     if not _is_owner(request):
         raise HTTPException(status_code=403, detail="Owner certificate required")
-    client_serial = request.headers.get("x-client-cert-serial")
-    if client_serial:
-        _, _, _, cert = auth_manager.verify_request(
-            request.headers.get("x-client-cert-verify", "SUCCESS"),
-            client_serial,
-            request.headers.get("x-client-cert-fingerprint"),
-            request.url.path,
-        )
-        return cert
-    return {"is_owner": True}
+    cert = _get_current_cert(request)
+    return cert or {"is_owner": True}
 
 
 
@@ -1034,6 +1041,17 @@ async def internal_auth_verify(request: Request):
     client_serial = request.headers.get("x-client-cert-serial")
     client_fingerprint = request.headers.get("x-client-cert-fingerprint")
     request_uri = request.headers.get("x-original-uri", "/")
+    uri = (request_uri or "/").split("?")[0]
+
+    # Mobile API routes handle mobile-specific token/pairing verification
+    if uri == "/api/mobile/enroll" or uri.startswith("/api/mobile/"):
+        return JSONResponse(
+            content={"status": "ok", "mode": "mobile_passthrough"},
+            headers={
+                "X-Auth-Subject": "mobile_client",
+                "X-Auth-Is-Owner": "0",
+            },
+        )
 
     ok, status_code, msg, cert = auth_manager.verify_request(
         verify_status=verify_status,
@@ -1766,4 +1784,206 @@ async def api_operations_audit(request: Request):
     return JSONResponse(content={"records": records})
 
 
+# ============================================================================
+# Stage 01A R2: Mobile Access — Challenge-Response Proof of Possession (PoP)
+# ============================================================================
+# Auth scheme: client obtains nonce via GET /api/mobile/challenge,
+# signs it with Android Keystore private key (ECDSA SHA-256),
+# then sends: X-Mobile-Credential-Id, X-Mobile-Nonce, X-Mobile-Signature.
+# Bearer token alone is NOT sufficient — signature over nonce required.
+# ============================================================================
 
+class MobileEnrollRequest(BaseModel):
+    pairing_code: str
+    public_key: str
+    device_identifier: str
+    device_name: Optional[str] = None
+    role: Optional[str] = None  # Explicitly rejected/ignored for role spoof safety
+
+
+async def _get_mobile_auth(request: Request) -> Dict:
+    """
+    R3 Request-Bound PoP authentication: requires three headers:
+      X-Mobile-Credential-Id: <credential_id from enrollment>
+      X-Mobile-Nonce: <hex nonce from /api/mobile/challenge>
+      X-Mobile-Signature: <base64 ECDSA signature over canonical signing payload>
+    Canonical format:
+      TRMOBILE1\\n<credential_id>\\n<nonce>\\n<METHOD>\\n<canonical_path>\\n<body_sha256>
+    """
+    credential_id = request.headers.get("x-mobile-credential-id", "").strip()
+    nonce_hex = request.headers.get("x-mobile-nonce", "").strip()
+    signature_b64 = request.headers.get("x-mobile-signature", "").strip()
+    if not credential_id or not nonce_hex or not signature_b64:
+        raise HTTPException(
+            status_code=401,
+            detail="Mobile PoP auth required: X-Mobile-Credential-Id, X-Mobile-Nonce, X-Mobile-Signature headers missing",
+        )
+
+    body_bytes = await request.body()
+    method = request.method
+    canonical_path = request.url.path
+    if request.url.query:
+        params = sorted(urllib.parse.parse_qsl(request.url.query, keep_blank_values=True))
+        canonical_path = f"{canonical_path}?{urllib.parse.urlencode(params)}"
+
+    ok, code, msg, ctx = mobile_manager.verify_mobile_pop(
+        credential_id=credential_id,
+        nonce_hex=nonce_hex,
+        signature_b64=signature_b64,
+        method=method,
+        canonical_path=canonical_path,
+        body_bytes=body_bytes,
+    )
+    if not ok or not ctx:
+        raise HTTPException(status_code=code, detail=msg)
+    return ctx
+
+
+@app.get("/android", response_class=HTMLResponse)
+async def android_page(request: Request):
+    """
+    Android application management page (accessible by any valid client certificate: OWNER or USER).
+    """
+    cert = _require_auth(request)
+    is_owner = bool(cert.get("is_owner"))
+    devices = mobile_manager.list_devices(parent_certificate_id=None if is_owner else cert["id"])
+    return templates.TemplateResponse("android.html", {
+        "request": request,
+        "is_owner": is_owner,
+        "current_cert": cert,
+        "devices": devices,
+    })
+
+
+@app.post("/admin-api/mobile/pairing/generate")
+async def api_mobile_pairing_generate(request: Request):
+    """
+    Generate short-lived one-time pairing code for the authenticated parent certificate.
+    """
+    cert = _require_auth(request)
+    try:
+        return mobile_manager.generate_pairing_code(
+            parent_certificate_id=cert["id"],
+            ttl_seconds=600,
+        )
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.get("/admin-api/mobile/devices")
+async def api_mobile_devices_list(request: Request):
+    """
+    List mobile devices. OWNER sees all devices; USER sees only their own paired devices.
+    """
+    cert = _require_auth(request)
+    is_owner = bool(cert.get("is_owner"))
+    devices = mobile_manager.list_devices(parent_certificate_id=None if is_owner else cert["id"])
+    return devices
+
+
+@app.post("/admin-api/mobile/devices/{device_id}/revoke")
+async def api_mobile_device_revoke(device_id: int, request: Request):
+    """
+    Revoke a mobile device. Caller must own the device or be system OWNER.
+    """
+    cert = _require_auth(request)
+    is_owner = bool(cert.get("is_owner"))
+    try:
+        return mobile_manager.revoke_device(device_id=device_id, actor_cert_id=cert["id"], is_owner=is_owner)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.post("/api/mobile/enroll")
+@app.post("/api/mobile/pairing/enroll")
+async def api_mobile_enroll(req: MobileEnrollRequest):
+    """
+    Enroll an Android client device using a one-time pairing code and ECDSA public key
+    generated in Android Keystore. Private key is never sent, received, or stored.
+    Role is strictly inherited from the parent certificate.
+    R2: No bearer token issued. Auth requires signed challenge (PoP).
+    """
+    try:
+        return mobile_manager.enroll_device(
+            pairing_code=req.pairing_code,
+            public_key=req.public_key,
+            device_identifier=req.device_identifier,
+            device_name=req.device_name,
+            role_payload=req.role,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.get("/api/mobile/challenge")
+async def api_mobile_challenge(credential_id: str):
+    """
+    Issue a one-time challenge nonce for Proof of Possession (PoP) authentication.
+    The Android app signs this nonce with the Keystore private key (ECDSA SHA-256),
+    then includes the signature in subsequent requests.
+    TTL: 60 seconds. Nonce is one-time — replay rejected.
+    """
+    try:
+        return mobile_manager.get_challenge(credential_id=credential_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@app.get("/api/mobile/me")
+@app.get("/api/mobile/status")
+async def api_mobile_status(request: Request):
+    """
+    Inspect current mobile session and inherited role permissions.
+    Requires PoP headers: X-Mobile-Credential-Id, X-Mobile-Nonce, X-Mobile-Signature.
+    """
+    ctx = await _get_mobile_auth(request)
+    return {
+        "status": "authenticated",
+        "device_id": ctx["device_id"],
+        "device_identifier": ctx["device_identifier"],
+        "display_name": ctx["display_name"],
+        "parent_certificate_id": ctx["parent_certificate_id"],
+        "parent_name": ctx.get("parent_name") or ctx.get("parent_cert_name"),
+        "role": ctx["role"],
+        "is_owner": ctx["is_owner"],
+        "auth_scheme": ctx.get("auth_scheme", "challenge_response_pop"),
+        "protocol_version": ctx.get("protocol_version", "TRMOBILE1"),
+    }
+
+
+@app.get("/api/mobile/owner-only")
+async def api_mobile_owner_only_test(request: Request):
+    """
+    Test endpoint for role permission inheritance: requires OWNER rights on mobile session.
+    Requires PoP headers.
+    """
+    ctx = await _get_mobile_auth(request)
+    if not ctx.get("is_owner"):
+        raise HTTPException(status_code=403, detail="Owner permissions required")
+    return {
+        "status": "ok",
+        "message": "Owner access granted",
+        "user": ctx,
+    }
+
+
+@app.post("/api/mobile/test-post")
+async def api_mobile_test_post(request: Request):
+    """
+    Test endpoint for mobile POST with body: verifies request binding over method, path, and body SHA-256.
+    Requires PoP headers.
+    """
+    ctx = await _get_mobile_auth(request)
+    body = await request.body()
+    return {
+        "status": "ok",
+        "message": "Post request verified",
+        "body_received_len": len(body),
+        "user": ctx,
+    }

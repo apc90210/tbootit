@@ -522,3 +522,44 @@ class AvitoPostSaleTask(Base):
     sale = relationship("Sale", back_populates="avito_post_sale_tasks")
     product = relationship("Product", back_populates="avito_post_sale_tasks")
     external_listing = relationship("ProductExternalListing", back_populates="post_sale_tasks")
+
+
+class MobileDevice(Base):
+    __tablename__ = "mobile_devices"
+    id = Column(Integer, primary_key=True, index=True)
+    device_identifier = Column(String, unique=True, index=True, nullable=False)
+    display_name = Column(String, nullable=True)
+    parent_certificate_id = Column(String, index=True, nullable=False)
+    status = Column(String, default="active", index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    credentials = relationship("MobileCredential", back_populates="device", cascade="all, delete-orphan")
+
+
+class MobileCredential(Base):
+    __tablename__ = "mobile_credentials"
+    id = Column(Integer, primary_key=True, index=True)
+    mobile_device_id = Column(Integer, ForeignKey("mobile_devices.id", ondelete="CASCADE"), nullable=False, index=True)
+    credential_id = Column(String, unique=True, index=True, nullable=False)
+    public_key = Column(Text, nullable=False)
+    credential_token_hash = Column(String, unique=True, index=True, nullable=True)
+    status = Column(String, default="active", index=True, nullable=False)
+    issued_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    device = relationship("MobileDevice", back_populates="credentials")
+
+
+class MobilePairingCode(Base):
+    __tablename__ = "mobile_pairing_codes"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(32), unique=True, index=True, nullable=False)
+    parent_certificate_id = Column(String, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    device_name = Column(String, nullable=True)

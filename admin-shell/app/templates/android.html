@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ТЕХНОРЕБУТ — ANDROID ПРИЛОЖЕНИЕ</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background-color: #f8fafc; color: #1e293b; }
+        nav.main-nav { background: #0f172a; color: #fff; padding: 10px 18px; margin-bottom: 20px; border-radius: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.92rem; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        nav.main-nav a { color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; }
+        nav.main-nav a:hover { text-decoration: underline; color: #fff; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        h1 { margin-top: 0; font-size: 1.6rem; color: #0f172a; margin-bottom: 8px; }
+        h2 { font-size: 1.25rem; color: #1e293b; margin-top: 0; margin-bottom: 16px; }
+        p { line-height: 1.5; margin: 0 0 12px 0; color: #475569; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .badge-active { background: #dcfce7; color: #15803d; }
+        .badge-revoked { background: #fee2e2; color: #b91c1c; }
+        .badge-mvp { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-owner { background: #e0e7ff; color: #4338ca; }
+        .badge-user { background: #f1f5f9; color: #475569; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer; text-decoration: none; border: none; transition: background 0.15s ease; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-outline { background: #fff; border: 1px solid #cbd5e1; color: #334155; }
+        .btn-outline:hover:not(:disabled) { background: #f1f5f9; }
+        .btn-sm { padding: 5px 12px; font-size: 0.85rem; }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 0.92rem; }
+        th { background: #f8fafc; font-weight: 600; color: #475569; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .text-muted { color: #94a3b8; font-size: 0.85rem; }
+        .alert-box { padding: 14px; border-radius: 6px; margin-bottom: 20px; font-size: 0.95rem; }
+        .alert-info { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; }
+        .alert-warning { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; }
+        .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 28px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 1px solid #cbd5e1;
+            text-align: center;
+        }
+        .pairing-code-display {
+            font-size: 2.4rem;
+            font-weight: 800;
+            letter-spacing: 6px;
+            color: #1e293b;
+            background: #f1f5f9;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-family: monospace;
+            border: 2px dashed #94a3b8;
+        }
+        .timer-badge {
+            font-size: 0.95rem;
+            color: #d97706;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/" style="color: #fff; text-decoration: none; font-weight: 700; font-size: 1.05rem; margin-right: 8px; display: inline-flex; align-items: center; gap: 6px;">
+            <span style="background: #2563eb; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.5px;">TR</span>
+            Техноребут
+        </a>
+        <a href="/" class="nav-item">Панель управления</a>
+        <a href="/inventory/products" class="nav-item">Товары</a>
+        <a href="/products/json" class="nav-item">JSON импорт / экспорт</a>
+        <a href="/inventory/sales" class="nav-item">Продажи</a>
+        <a href="/inventory/cart" class="nav-item">Корзина</a>
+        <a href="/inventory/reports/sales" class="nav-item">Отчёты</a>
+        <a href="/repairs/repairs" class="nav-item">Ремонты</a>
+        <a href="/avito/extension" class="nav-item">Расширение Avito</a>
+        <a href="/android" class="nav-item" style="color: #60a5fa; font-weight: 600;">📱 Android</a>
+        <a href="/inventory/settings/organization" class="nav-item">Настройки</a>
+        <a href="/help/user-manual.pdf" class="nav-item">📘 Инструкция</a>
+        {% if is_owner %}
+        <a href="/system/operations" class="nav-item" style="margin-left: auto;">Операции</a>
+        <a href="/backups" class="nav-item">Резервные копии</a>
+        <a href="/certificates" class="nav-item">Доступ (mTLS)</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="header-row">
+                <div>
+                    <h1>📱 Android приложение Техноребут</h1>
+                    <span class="badge badge-mvp">MVP в разработке</span>
+                </div>
+                <div>
+                    <button id="btnConnectDevice" class="btn btn-primary" onclick="openPairingModal()">
+                        🔗 Подключить устройство
+                    </button>
+                </div>
+            </div>
+
+            <p>
+                Мобильный доступ позволяет операторам и руководству просматривать оперативные отчёты, состояние склада и продажи прямо со смартфона.
+            </p>
+
+            <div class="alert-box alert-info">
+                <strong>Безопасность мобильного доступа:</strong>
+                Приложение на устройстве генерирует персональную пару ключей в защищённом хранилище Android Keystore.
+                Приватный ключ никогда не покидает смартфон. Права мобильного доступа строго наследуются от вашего активного сертификата (<strong>{{ current_cert.name }}</strong>) и автоматически аннулируются в случае его отзыва.
+            </div>
+
+            <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-outline" disabled title="Сборка APK находится в разработке (Stage 01B)">
+                    ⬇ Скачать APK (в разработке)
+                </button>
+                <span class="text-muted">Пакет приложения будет доступен после завершения сборки клиента.</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Подключенные мобильные устройства</h2>
+            {% if devices and devices|length > 0 %}
+            <table id="devicesTable">
+                <thead>
+                    <tr>
+                        <th>Устройство</th>
+                        <th>Идентификатор</th>
+                        <th>Сертификат</th>
+                        <th>Подключено</th>
+                        <th>Активность</th>
+                        <th>Статус</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dev in devices %}
+                    <tr id="device-row-{{ dev.id }}">
+                        <td><strong>{{ dev.display_name }}</strong></td>
+                        <td><code style="font-size: 0.85rem; color: #475569;">{{ dev.device_identifier }}</code></td>
+                        <td>
+                            <span class="badge {% if dev.parent_certificate_id == 'owner' %}badge-owner{% else %}badge-user{% endif %}">
+                                {{ dev.parent_certificate_id }}
+                            </span>
+                        </td>
+                        <td>{{ dev.created_at[:19] if dev.created_at else '—' }}</td>
+                        <td>{{ dev.last_seen_at[:19] if dev.last_seen_at else 'Ещё не заходил' }}</td>
+                        <td>
+                            {% if dev.status == 'active' %}
+                            <span class="badge badge-active">Активно</span>
+                            {% else %}
+                            <span class="badge badge-revoked">Отозвано</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if dev.status == 'active' %}
+                            <button class="btn btn-danger btn-sm" onclick="revokeDevice({{ dev.id }})">
+                                Отозвать доступ
+                            </button>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted" style="margin: 12px 0;">Нет подключенных мобильных устройств. Нажмите «Подключить устройство», чтобы сгенерировать код сопряжения.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal Pairing Code -->
+    <div id="pairingModal" class="modal-overlay">
+        <div class="modal-card">
+            <h2>Подключение Android устройства</h2>
+            <p>Введите данный одноразовый код на экране входа в мобильном приложении:</p>
+            
+            <div id="pairingCodeDisplay" class="pairing-code-display">------</div>
+            <div id="pairingTimer" class="timer-badge">Срок действия: 10:00</div>
+
+            <div style="text-align: left; font-size: 0.88rem; color: #475569; background: #f8fafc; border-radius: 6px; padding: 12px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
+                <strong>Инструкция по сопряжению:</strong>
+                <ol style="margin: 6px 0 0 16px; padding: 0; line-height: 1.4;">
+                    <li>Откройте приложение «Техноребут» на Android.</li>
+                    <li>Введите 6-значный код выше и укажите имя смартфона.</li>
+                    <li>Нажмите «Подключить» — приложение безопасно свяжет аппаратный ключ Keystore с вашим профилем.</li>
+                </ol>
+            </div>
+
+            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 20px;">
+                Код действителен в течение 10 минут и может быть использован только один раз. Протокол TRMOBILE1 не требует установки корневых сертификатов в систему.
+            </p>
+
+            <button class="btn btn-outline" onclick="closePairingModal()">Закрыть</button>
+        </div>
+    </div>
+
+    <script>
+        var timerInterval = null;
+
+        async function openPairingModal() {
+            var modal = document.getElementById('pairingModal');
+            var codeDisplay = document.getElementById('pairingCodeDisplay');
+            var timerDisplay = document.getElementById('pairingTimer');
+
+            codeDisplay.textContent = "Загрузка...";
+            modal.style.display = 'flex';
+
+            try {
+                var resp = await fetch('/admin-api/mobile/pairing/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                    var err = await resp.json();
+                    alert("Ошибка генерации кода: " + (err.detail || resp.statusText));
+                    closePairingModal();
+                    return;
+                }
+                var data = await resp.json();
+                codeDisplay.textContent = data.pairing_code;
+
+                var secondsLeft = data.expires_in_seconds || 600;
+                if (timerInterval) clearInterval(timerInterval);
+
+                function updateTimer() {
+                    if (secondsLeft <= 0) {
+                        clearInterval(timerInterval);
+                        timerDisplay.textContent = "Срок действия кода истёк";
+                        codeDisplay.style.color = "#dc2626";
+                        return;
+                    }
+                    var m = Math.floor(secondsLeft / 60);
+                    var s = secondsLeft % 60;
+                    timerDisplay.textContent = "Срок действия: " + m + ":" + (s < 10 ? "0" : "") + s;
+                    secondsLeft--;
+                }
+                updateTimer();
+                timerInterval = setInterval(updateTimer, 1000);
+            } catch (e) {
+                alert("Ошибка запроса к серверу: " + e.message);
+                closePairingModal();
+            }
+        }
+
+        function closePairingModal() {
+            var modal = document.getElementById('pairingModal');
+            modal.style.display = 'none';
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        async function revokeDevice(deviceId) {
+            if (!confirm("Вы уверены, что хотите отозвать мобильный доступ для этого устройства? Приложение немедленно потеряет доступ к системе.")) {
+                return;
+            }
+            try {
+                var resp = await fetch('/admin-api/mobile/devices/' + deviceId + '/revoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (resp.ok) {
+                    window.location.reload();
+                } else {
+                    var err = await resp.json();
+                    alert("Ошибка отзыва устройства: " + (err.detail || resp.statusText));
+                }
+            } catch (e) {
+                alert("Ошибка соединения с сервером: " + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
