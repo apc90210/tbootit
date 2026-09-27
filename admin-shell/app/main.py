@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Query
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse, RedirectResponse, StreamingResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
 from typing import Optional, Tuple, Dict, Any, List
@@ -2153,7 +2153,7 @@ def _get_active_release_info() -> Tuple[Dict[str, Any], Path]:
     Returns (manifest_data, apk_path).
     Raises HTTPException(404) if release is not found, or HTTPException(503) if corrupt.
     """
-    release_dir = Path(MOBILE_APP_RELEASE_DIR)
+    release_dir = Path(os.getenv("MOBILE_APP_RELEASE_DIR", str(MOBILE_APP_RELEASE_DIR)))
     manifest_file = release_dir / "manifest.json"
     if not manifest_file.is_file():
         raise HTTPException(
@@ -2245,6 +2245,7 @@ async def api_mobile_app_update_apk(request: Request, version_code: int = Query(
     Protected by TRMOBILE1 PoP authentication.
     Streams only from fixed same-origin release directory.
     Validates version_code matches advertised version.
+    Supports standard HTTP Range/206 for resumable background downloads.
     """
     await _get_mobile_auth(request)
     manifest_data, apk_path = _get_active_release_info()
@@ -2255,10 +2256,133 @@ async def api_mobile_app_update_apk(request: Request, version_code: int = Query(
             detail=f"Запрошенная версия ({version_code}) не совпадает с актуальным релизом ({manifest_data['version_code']})",
         )
 
-    return FileResponse(
-        path=str(apk_path),
+    file_size = apk_path.stat().st_size
+    etag = f'"{manifest_data["sha256"]}"'
+    range_header = request.headers.get("range", "").strip()
+    if_range = request.headers.get("if-range", "").strip()
+
+    # Handle If-Range header:
+    # If If-Range is provided and does not match current ETag, ignore Range and serve full content (200 OK)
+    serve_full = False
+    if range_header and if_range:
+        clean_if_range = if_range.strip('"')
+        clean_etag = etag.strip('"')
+        if clean_if_range != clean_etag:
+            serve_full = True
+
+    if not range_header or serve_full:
+        return FileResponse(
+            path=str(apk_path),
+            media_type="application/vnd.android.package-archive",
+            filename=apk_path.name,
+            headers={
+                "Accept-Ranges": "bytes",
+                "ETag": etag,
+            },
+        )
+
+    # Validate Range prefix
+    if not range_header.startswith("bytes="):
+        return Response(
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+                "ETag": etag,
+            },
+            content="Range Not Satisfiable",
+        )
+
+    range_spec = range_header[len("bytes="):].strip()
+    if "," in range_spec:
+        # Multiple ranges are not supported for APK packages
+        return Response(
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+                "ETag": etag,
+            },
+            content="Multiple ranges not supported",
+        )
+
+    parts = range_spec.split("-", 1)
+    if len(parts) != 2:
+        return Response(
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+                "ETag": etag,
+            },
+            content="Invalid range format",
+        )
+
+    start_str, end_str = parts[0].strip(), parts[1].strip()
+
+    try:
+        if not start_str and end_str:
+            suffix_len = int(end_str)
+            if suffix_len <= 0:
+                raise ValueError()
+            start = max(0, file_size - suffix_len)
+            end = file_size - 1
+        elif start_str and not end_str:
+            start = int(start_str)
+            end = file_size - 1
+        elif start_str and end_str:
+            start = int(start_str)
+            end = int(end_str)
+        else:
+            raise ValueError()
+    except ValueError:
+        return Response(
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+                "ETag": etag,
+            },
+            content="Invalid range numbers",
+        )
+
+    if start < 0 or start >= file_size or end < start:
+        return Response(
+            status_code=416,
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Accept-Ranges": "bytes",
+                "ETag": etag,
+            },
+            content="Range out of bounds",
+        )
+
+    end = min(end, file_size - 1)
+    content_length = end - start + 1
+
+    def file_chunk_generator():
+        with open(apk_path, "rb") as f:
+            f.seek(start)
+            remaining = content_length
+            chunk_size = 65536
+            while remaining > 0:
+                to_read = min(remaining, chunk_size)
+                data = f.read(to_read)
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    return StreamingResponse(
+        file_chunk_generator(),
+        status_code=206,
         media_type="application/vnd.android.package-archive",
-        filename=apk_path.name,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Content-Length": str(content_length),
+            "Accept-Ranges": "bytes",
+            "ETag": etag,
+        },
     )
 
 

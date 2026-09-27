@@ -31,25 +31,15 @@ import com.technoreboot.mobile.crypto.SignerVerificationResult
 import com.technoreboot.mobile.crypto.UpdateManager
 import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.data.ServerSettingsRepository
+import com.technoreboot.mobile.download.DownloadStatus
+import com.technoreboot.mobile.download.UpdateDownloadRepository
+import com.technoreboot.mobile.download.UpdateDownloadService
 import com.technoreboot.mobile.model.UpdateManifest
 import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
-
-sealed class UpdateUiState {
-    object Idle : UpdateUiState()
-    object Checking : UpdateUiState()
-    data class UpToDate(val manifest: UpdateManifest) : UpdateUiState()
-    data class UpdateAvailable(val manifest: UpdateManifest) : UpdateUiState()
-    data class Downloading(val progressPercent: Int, val bytesDownloaded: Long, val totalBytes: Long) : UpdateUiState()
-    object Verifying : UpdateUiState()
-    data class ReadyToInstall(val apkFile: File, val manifest: UpdateManifest) : UpdateUiState()
-    data class Error(val message: String) : UpdateUiState()
-    data class Revoked(val message: String) : UpdateUiState()
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,29 +54,37 @@ fun SettingsScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    val downloadRepo = remember { UpdateDownloadRepository.getInstance(context) }
+    val downloadRecord by downloadRepo.state.collectAsState()
+
     var serverUrlText by remember { mutableStateOf(serverSettingsRepository.getServerUrl()) }
     var serverUrlError by remember { mutableStateOf<String?>(null) }
     var showServerChangeDialog by remember { mutableStateOf(false) }
     var pendingServerUrl by remember { mutableStateOf("") }
 
-    var updateUiState by remember { mutableStateOf<UpdateUiState>(UpdateUiState.Idle) }
-    var downloadJob by remember { mutableStateOf<Job?>(null) }
+    var updateCheckError by remember { mutableStateOf<String?>(null) }
+    var revokedError by remember { mutableStateOf<String?>(null) }
+    var isUpToDate by remember { mutableStateOf(false) }
     var showUnknownSourcesDialog by remember { mutableStateOf(false) }
     var targetApkToInstall by remember { mutableStateOf<File?>(null) }
 
     fun checkUpdates() {
         if (session == null) {
-            updateUiState = UpdateUiState.Error("Для проверки обновлений необходимо выполнить сопряжение с сервером")
+            updateCheckError = "Для проверки обновлений необходимо выполнить сопряжение с сервером"
             return
         }
         val privateKey = keystoreManager.getPrivateKey()
         if (privateKey == null) {
-            updateUiState = UpdateUiState.Error("Ключ авторизации не найден в защищённом хранилище")
+            updateCheckError = "Ключ авторизации не найден в защищённом хранилище"
             return
         }
 
         coroutineScope.launch {
-            updateUiState = UpdateUiState.Checking
+            updateCheckError = null
+            revokedError = null
+            isUpToDate = false
+            downloadRepo.setChecking()
+
             when (val result = apiClient.getUpdateManifest(session.credentialId, privateKey)) {
                 is ApiResult.Success -> {
                     val manifest = result.data
@@ -100,19 +98,23 @@ fun SettingsScreen(
 
                     when (validation) {
                         is ManifestValidationResult.Valid -> {
-                            updateUiState = UpdateUiState.UpdateAvailable(manifest)
+                            downloadRepo.onManifestAvailable(manifest)
                         }
                         is ManifestValidationResult.Downgrade -> {
-                            updateUiState = UpdateUiState.UpToDate(manifest)
+                            isUpToDate = true
+                            downloadRepo.onManifestAvailable(manifest)
                         }
                         is ManifestValidationResult.IncompatibleApplicationId -> {
-                            updateUiState = UpdateUiState.Error("Обновление предназначено для другого приложения (${manifest.applicationId})")
+                            updateCheckError = "Обновление предназначено для другого приложения (${manifest.applicationId})"
+                            downloadRepo.setFailed(manifest.versionCode, updateCheckError!!)
                         }
                         is ManifestValidationResult.IncompatibleMinSdk -> {
-                            updateUiState = UpdateUiState.Error("Требуется более новая версия Android (API ${manifest.minSdk})")
+                            updateCheckError = "Требуется более новая версия Android (API ${manifest.minSdk})"
+                            downloadRepo.setFailed(manifest.versionCode, updateCheckError!!)
                         }
                         is ManifestValidationResult.InvalidManifest -> {
-                            updateUiState = UpdateUiState.Error("Некорректный манифест обновления: ${validation.reason}")
+                            updateCheckError = "Некорректный манифест обновления: ${validation.reason}"
+                            downloadRepo.setFailed(manifest.versionCode, updateCheckError!!)
                         }
                     }
                 }
@@ -123,94 +125,47 @@ fun SettingsScreen(
                         } else {
                             "Доступ отозван"
                         }
-                        updateUiState = UpdateUiState.Revoked(msg)
+                        revokedError = msg
+                        downloadRepo.setFailed(0, msg)
                     } else {
-                        updateUiState = UpdateUiState.Error("Не удалось проверить обновление: ${result.message}")
+                        updateCheckError = "Не удалось проверить обновление: ${result.message}"
+                        downloadRepo.setFailed(0, updateCheckError!!)
                     }
                 }
             }
         }
     }
 
-    fun startDownload(manifest: UpdateManifest) {
+    fun startDownload(versionCode: Int) {
         if (session == null) return
-        val privateKey = keystoreManager.getPrivateKey() ?: return
+        UpdateDownloadService.startDownload(context, versionCode)
+    }
 
-        val targetFile = UpdateManager.getTargetApkFile(context, manifest.versionCode)
+    fun retryDownload(versionCode: Int) {
+        if (session == null) return
+        UpdateDownloadService.retryDownload(context, versionCode)
+    }
 
-        downloadJob = coroutineScope.launch {
-            updateUiState = UpdateUiState.Downloading(0, 0, manifest.apkSize)
+    fun cancelDownload() {
+        UpdateDownloadService.cancelDownload(context)
+    }
 
-            val downloadResult = apiClient.downloadApk(
-                versionCode = manifest.versionCode,
-                credentialId = session.credentialId,
-                privateKey = privateKey,
-                destinationFile = targetFile,
-                onProgress = { bytesRead, totalBytes ->
-                    val total = if (totalBytes > 0) totalBytes else manifest.apkSize
-                    val percent = if (total > 0) ((bytesRead * 100) / total).toInt().coerceIn(0, 100) else 0
-                    updateUiState = UpdateUiState.Downloading(percent, bytesRead, total)
-                }
-            )
-
-            when (downloadResult) {
-                is ApiResult.Success -> {
-                    updateUiState = UpdateUiState.Verifying
-
-                    // 1. Verify SHA-256
-                    val shaValid = UpdateManager.verifyApkSha256(targetFile, manifest.sha256)
-                    if (!shaValid) {
-                        targetFile.delete()
-                        updateUiState = UpdateUiState.Error("Файл обновления повреждён или не прошёл проверку SHA-256.")
-                        return@launch
-                    }
-
-                    // 2. Verify Signing Certificate
-                    val signerResult = UpdateManager.verifyApkSignerAgainstInstalled(
-                        context = context,
-                        apkFile = targetFile,
-                        expectedCertSha256 = manifest.signingCertSha256.ifBlank { null }
-                    )
-
-                    when (signerResult) {
-                        is SignerVerificationResult.Valid -> {
-                            updateUiState = UpdateUiState.ReadyToInstall(targetFile, manifest)
-                            targetApkToInstall = targetFile
-                            // Check install permission
-                            if (!UpdateManager.canRequestPackageInstalls(context)) {
-                                showUnknownSourcesDialog = true
-                            } else {
-                                try {
-                                    val installIntent = UpdateManager.createInstallIntent(context, targetFile)
-                                    context.startActivity(installIntent)
-                                } catch (e: Exception) {
-                                    updateUiState = UpdateUiState.Error("Не удалось запустить установщик: ${e.message}")
-                                }
-                            }
-                        }
-                        is SignerVerificationResult.Mismatch -> {
-                            targetFile.delete()
-                            updateUiState = UpdateUiState.Error("Цифровая подпись обновления не совпадает с установленным приложением. Установка заблокирована.")
-                        }
-                        is SignerVerificationResult.Error -> {
-                            targetFile.delete()
-                            updateUiState = UpdateUiState.Error("Ошибка проверки цифровой подписи: ${signerResult.message}")
-                        }
-                    }
-                }
-                is ApiResult.Error -> {
-                    targetFile.delete()
-                    if (downloadResult.code == 403) {
-                        val msg = if (downloadResult.message.contains("устройств", ignoreCase = true) || downloadResult.message.contains("device", ignoreCase = true)) {
-                            "Доступ этого устройства отозван"
-                        } else {
-                            "Доступ отозван"
-                        }
-                        updateUiState = UpdateUiState.Revoked(msg)
-                    } else {
-                        updateUiState = UpdateUiState.Error("Ошибка скачивания: ${downloadResult.message}")
-                    }
-                }
+    fun launchInstaller(versionCode: Int) {
+        val targetFile = UpdateManager.getTargetApkFile(context, versionCode)
+        if (!targetFile.exists()) {
+            downloadRepo.setFailed(versionCode, "Файл обновления не найден на устройстве")
+            return
+        }
+        if (!UpdateManager.canRequestPackageInstalls(context)) {
+            targetApkToInstall = targetFile
+            showUnknownSourcesDialog = true
+        } else {
+            try {
+                downloadRepo.setInstallerLaunched(versionCode)
+                val installIntent = UpdateManager.createInstallIntent(context, targetFile)
+                context.startActivity(installIntent)
+            } catch (e: Exception) {
+                downloadRepo.setFailed(versionCode, "Ошибка запуска установщика: ${e.message}")
             }
         }
     }
@@ -368,15 +323,29 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Dynamic update status block
-                    when (val state = updateUiState) {
-                        is UpdateUiState.Idle -> {
-                            Text(
-                                "Установлена актуальная версия приложения",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp
-                            )
+                    val isChecking = downloadRecord.status == DownloadStatus.CHECKING
+                    val isDownloading = downloadRecord.status == DownloadStatus.DOWNLOADING || downloadRecord.status == DownloadStatus.QUEUED
+
+                    when {
+                        revokedError != null -> {
+                            Row(
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Text(revokedError!!, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            }
                         }
-                        is UpdateUiState.Checking -> {
+                        updateCheckError != null -> {
+                            Row(
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Text(updateCheckError!!, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
+                            }
+                        }
+                        isChecking -> {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -385,80 +354,22 @@ fun SettingsScreen(
                                 Text("Проверка наличия обновлений на сервере...", fontSize = 14.sp)
                             }
                         }
-                        is UpdateUiState.UpToDate -> {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32))
-                                Text("Установлена актуальная версия", color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
-                            }
-                        }
-                        is UpdateUiState.UpdateAvailable -> {
-                            val manifest = state.manifest
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    "Доступно обновление!",
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text("Новая версия: ${manifest.versionName} (код ${manifest.versionCode})")
-                                Text("Размер загрузки: ${formatBytes(manifest.apkSize)}")
-                                if (manifest.releaseNotes.isNotBlank()) {
-                                    Text(
-                                        "Что нового: ${manifest.releaseNotes}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Button(
-                                    onClick = { startDownload(manifest) },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Скачать и установить")
-                                }
-                            }
-                        }
-                        is UpdateUiState.Downloading -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Скачивание обновления (${state.progressPercent}%)...", fontWeight = FontWeight.Medium)
-                                LinearProgressIndicator(
-                                    progress = { state.progressPercent / 100f },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        "${formatBytes(state.bytesDownloaded)} из ${formatBytes(state.totalBytes)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    TextButton(onClick = {
-                                        downloadJob?.cancel()
-                                        updateUiState = UpdateUiState.Idle
-                                    }) {
-                                        Text("Отмена")
-                                    }
-                                }
-                            }
-                        }
-                        is UpdateUiState.Verifying -> {
+                        downloadRecord.status == DownloadStatus.VERIFYING_SHA256 || downloadRecord.status == DownloadStatus.VERIFYING_SIGNER -> {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                Text("Проверка целостности и цифровой подписи (SHA-256)...", fontSize = 14.sp)
+                                Text(
+                                    if (downloadRecord.status == DownloadStatus.VERIFYING_SHA256)
+                                        "Проверка целостности SHA-256..."
+                                    else
+                                        "Проверка цифровой подписи (Signer)...",
+                                    fontSize = 14.sp
+                                )
                             }
                         }
-                        is UpdateUiState.ReadyToInstall -> {
+                        downloadRecord.status == DownloadStatus.READY_TO_INSTALL || downloadRecord.status == DownloadStatus.INSTALLER_LAUNCHED -> {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -468,41 +379,158 @@ fun SettingsScreen(
                                     Text("Проверка пройдена. Файл готов к установке.", color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
                                 }
                                 Button(
-                                    onClick = {
-                                        if (!UpdateManager.canRequestPackageInstalls(context)) {
-                                            showUnknownSourcesDialog = true
-                                        } else {
-                                            try {
-                                                val intent = UpdateManager.createInstallIntent(context, state.apkFile)
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                updateUiState = UpdateUiState.Error("Ошибка запуска установщика: ${e.message}")
-                                            }
-                                        }
-                                    },
+                                    onClick = { launchInstaller(downloadRecord.versionCode) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Установить обновление")
+                                    Text(
+                                        if (downloadRecord.status == DownloadStatus.INSTALLER_LAUNCHED)
+                                            "Запустить установщик повторно"
+                                        else
+                                            "Установить обновление"
+                                    )
                                 }
                             }
                         }
-                        is UpdateUiState.Error -> {
-                            Row(
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                Text(state.message, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
+                        downloadRecord.status == DownloadStatus.DOWNLOADING || downloadRecord.status == DownloadStatus.QUEUED -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Скачивание обновления (${downloadRecord.progressPercent}%)...", fontWeight = FontWeight.Medium)
+                                LinearProgressIndicator(
+                                    progress = { downloadRecord.progressPercent / 100f },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "${formatBytes(downloadRecord.downloadedBytes)} из ${formatBytes(downloadRecord.expectedSize)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    TextButton(onClick = { cancelDownload() }) {
+                                        Text("Отмена")
+                                    }
+                                }
                             }
                         }
-                        is UpdateUiState.Revoked -> {
+                        downloadRecord.status == DownloadStatus.WAITING_NETWORK -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFE65100))
+                                    Text(
+                                        "Ожидание подключения к сети... Сохранено ${formatBytes(downloadRecord.downloadedBytes)} из ${formatBytes(downloadRecord.expectedSize)}",
+                                        color = Color(0xFFE65100),
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                LinearProgressIndicator(
+                                    progress = { downloadRecord.progressPercent / 100f },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color(0xFFE65100)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { retryDownload(downloadRecord.versionCode) },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Повторить")
+                                    }
+                                    OutlinedButton(
+                                        onClick = { cancelDownload() },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Отмена")
+                                    }
+                                }
+                            }
+                        }
+                        downloadRecord.status == DownloadStatus.CANCELED -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "Скачивание приостановлено (сохранено ${formatBytes(downloadRecord.downloadedBytes)} из ${formatBytes(downloadRecord.expectedSize)})",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 14.sp
+                                )
+                                Button(
+                                    onClick = { startDownload(downloadRecord.versionCode) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Возобновить скачивание")
+                                }
+                            }
+                        }
+                        downloadRecord.status == DownloadStatus.FAILED -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    Text(downloadRecord.lastError ?: "Ошибка при скачивании обновления", color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
+                                }
+                                if (downloadRecord.versionCode > 0) {
+                                    Button(
+                                        onClick = { retryDownload(downloadRecord.versionCode) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Повторить скачивание")
+                                    }
+                                }
+                            }
+                        }
+                        downloadRecord.status == DownloadStatus.AVAILABLE -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "Доступно обновление!",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text("Новая версия: ${downloadRecord.versionName} (код ${downloadRecord.versionCode})")
+                                Text("Размер загрузки: ${formatBytes(downloadRecord.expectedSize)}")
+                                if (downloadRecord.releaseNotes.isNotBlank()) {
+                                    Text(
+                                        "Что нового: ${downloadRecord.releaseNotes}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Button(
+                                    onClick = { startDownload(downloadRecord.versionCode) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Скачать и установить")
+                                }
+                            }
+                        }
+                        isUpToDate -> {
                             Row(
-                                verticalAlignment = Alignment.Top,
+                                verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                Text(state.message, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32))
+                                Text("Установлена актуальная версия", color = Color(0xFF2E7D32), fontWeight = FontWeight.Medium)
                             }
+                        }
+                        else -> {
+                            Text(
+                                "Установлена актуальная версия приложения",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
                         }
                     }
 
@@ -510,7 +538,7 @@ fun SettingsScreen(
 
                     OutlinedButton(
                         onClick = { checkUpdates() },
-                        enabled = updateUiState !is UpdateUiState.Checking && updateUiState !is UpdateUiState.Downloading,
+                        enabled = !isChecking && !isDownloading,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
@@ -574,7 +602,7 @@ fun SettingsScreen(
                         val intent = UpdateManager.createManageUnknownSourcesIntent(context)
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        updateUiState = UpdateUiState.Error("Не удалось открыть настройки: ${e.message}")
+                        updateCheckError = "Не удалось открыть настройки: ${e.message}"
                     }
                 }) {
                     Text("Перейти в настройки")

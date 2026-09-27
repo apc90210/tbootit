@@ -16,6 +16,13 @@ import java.security.PrivateKey
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
 
+sealed class ResumableDownloadResult {
+    data class Success(val file: File) : ResumableDownloadResult()
+    data class NetworkInterrupted(val downloadedBytes: Long, val totalBytes: Long, val message: String) : ResumableDownloadResult()
+    data class Error(val code: Int, val message: String, val isNetworkError: Boolean = false) : ResumableDownloadResult()
+    object Canceled : ResumableDownloadResult()
+}
+
 class MobileApiClient(
     baseUrl: String = DEFAULT_BASE_URL,
     customClient: OkHttpClient? = null
@@ -278,6 +285,220 @@ class MobileApiClient(
 
         executeRequest(request) { json ->
             UpdateManifest.fromJson(json)
+        }
+    }
+
+    /**
+     * Resumable APK download supporting HTTP Range / 206 Partial Content, ETag / If-Range,
+     * fresh TRMOBILE1 PoP challenge per request, network loss backoff, and partial .part file preservation.
+     */
+    suspend fun downloadApkResumable(
+        versionCode: Int,
+        credentialId: String,
+        privateKey: PrivateKey,
+        partFile: File,
+        targetFile: File,
+        expectedSize: Long,
+        expectedSha256: String,
+        etag: String? = null,
+        onProgress: ((bytesRead: Long, totalBytes: Long) -> Unit)? = null,
+        onEtagReceived: ((etag: String) -> Unit)? = null,
+        isCanceled: () -> Boolean = { false }
+    ): ResumableDownloadResult = withContext(Dispatchers.IO) {
+        if (isCanceled()) {
+            return@withContext ResumableDownloadResult.Canceled
+        }
+
+        // 1. Inspect existing partial on disk
+        var currentBytes = if (partFile.exists()) partFile.length() else 0L
+
+        if (expectedSize > 0 && currentBytes > expectedSize) {
+            // Corrupt partial (oversized) -> wipe
+            partFile.delete()
+            currentBytes = 0L
+        } else if (expectedSize > 0 && currentBytes == expectedSize) {
+            // Already completely downloaded in partFile
+            if (partFile.renameTo(targetFile) || (targetFile.exists() && targetFile.length() == expectedSize)) {
+                return@withContext ResumableDownloadResult.Success(targetFile)
+            }
+        }
+
+        // 2. Obtain fresh mobile challenge
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ResumableDownloadResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Устройство или родительский сертификат отозваны" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/app/update/apk?version_code=$versionCode"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ResumableDownloadResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        // 3. Build HTTP request with Range & If-Range
+        val reqBuilder = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+
+        if (currentBytes > 0) {
+            reqBuilder.header("Range", "bytes=$currentBytes-")
+            if (!etag.isNullOrBlank()) {
+                reqBuilder.header("If-Range", etag.trim())
+            }
+        }
+
+        val request = reqBuilder.get().build()
+
+        try {
+            partFile.parentFile?.mkdirs()
+
+            client.newCall(request).execute().use { response ->
+                val respEtag = response.header("ETag")?.trim()
+                if (!respEtag.isNullOrBlank()) {
+                    onEtagReceived?.invoke(respEtag)
+                }
+
+                if (response.code == 403) {
+                    val bodyStr = response.body?.string().orEmpty()
+                    val msg = if (bodyStr.contains("устройств", ignoreCase = true) || bodyStr.contains("device", ignoreCase = true)) {
+                        "Доступ этого устройства отозван"
+                    } else {
+                        "Доступ отозван"
+                    }
+                    return@withContext ResumableDownloadResult.Error(403, msg)
+                }
+
+                if (response.code == 416) {
+                    // Range Not Satisfiable
+                    if (expectedSize > 0 && partFile.exists() && partFile.length() == expectedSize) {
+                        if (targetFile.exists()) targetFile.delete()
+                        val renamed = partFile.renameTo(targetFile)
+                        if (!renamed) {
+                            partFile.copyTo(targetFile, overwrite = true)
+                            partFile.delete()
+                        }
+                        return@withContext ResumableDownloadResult.Success(targetFile)
+                    }
+                    // Otherwise reset corrupted partial
+                    partFile.delete()
+                    return@withContext ResumableDownloadResult.Error(416, "Некорректный диапазон байт (416). Файл сброшен.")
+                }
+
+                if (!response.isSuccessful) {
+                    val bodyStr = response.body?.string().orEmpty()
+                    val userMessage = try {
+                        val errJson = JSONObject(bodyStr)
+                        errJson.optString("detail", "Ошибка скачивания (${response.code})")
+                    } catch (_: Exception) {
+                        "Ошибка скачивания (${response.code})"
+                    }
+                    return@withContext ResumableDownloadResult.Error(response.code, userMessage)
+                }
+
+                val appendMode: Boolean
+                val startByte: Long
+                val totalLength: Long
+
+                if (response.code == 206) {
+                    // Partial content: verify Content-Range starts at expected byte
+                    val contentRange = response.header("Content-Range").orEmpty().trim()
+                    val expectedPrefix = "bytes $currentBytes-"
+                    if (!contentRange.startsWith(expectedPrefix)) {
+                        partFile.delete()
+                        return@withContext ResumableDownloadResult.Error(400, "Сервер вернул неверный Content-Range: $contentRange. Частичный файл сброшен.")
+                    }
+                    appendMode = true
+                    startByte = currentBytes
+                    totalLength = expectedSize
+                } else {
+                    // 200 OK: restart cleanly from 0
+                    appendMode = false
+                    startByte = 0L
+                    totalLength = response.body?.contentLength()?.takeIf { it > 0 } ?: expectedSize
+                }
+
+                val responseBody = response.body ?: return@withContext ResumableDownloadResult.Error(500, "Пустой ответ сервера")
+
+                var bytesWritten = startByte
+                try {
+                    responseBody.byteStream().use { inputStream ->
+                        java.io.FileOutputStream(partFile, appendMode).use { outputStream ->
+                            val buffer = ByteArray(65536)
+                            var read: Int
+
+                            while (inputStream.read(buffer).also { read = it } != -1) {
+                                if (isCanceled()) {
+                                    outputStream.flush()
+                                    return@withContext ResumableDownloadResult.Canceled
+                                }
+                                outputStream.write(buffer, 0, read)
+                                bytesWritten += read
+                                onProgress?.invoke(bytesWritten, totalLength)
+                            }
+                            outputStream.flush()
+                        }
+                    }
+                } catch (e: IOException) {
+                    // Network interrupted: keep partial file, return NetworkInterrupted
+                    return@withContext ResumableDownloadResult.NetworkInterrupted(
+                        downloadedBytes = partFile.length(),
+                        totalBytes = totalLength,
+                        message = "Ошибка сети при скачивании: ${e.message ?: "соединение разорвано"}"
+                    )
+                }
+
+                val finalPartLen = partFile.length()
+                val targetLen = if (expectedSize > 0) expectedSize else totalLength
+                if (finalPartLen >= targetLen && targetLen > 0) {
+                    if (targetFile.exists()) targetFile.delete()
+                    val renamed = partFile.renameTo(targetFile)
+                    if (!renamed) {
+                        partFile.copyTo(targetFile, overwrite = true)
+                        partFile.delete()
+                    }
+                    ResumableDownloadResult.Success(targetFile)
+                } else {
+                    ResumableDownloadResult.NetworkInterrupted(
+                        downloadedBytes = finalPartLen,
+                        totalBytes = targetLen,
+                        message = "Загрузка прервана: получено $finalPartLen из $targetLen байт"
+                    )
+                }
+            }
+        } catch (e: SSLException) {
+            ResumableDownloadResult.Error(0, "Ошибка безопасности TLS: сертификат сервера не подтверждён", isNetworkError = true)
+        } catch (e: IOException) {
+            ResumableDownloadResult.NetworkInterrupted(
+                downloadedBytes = if (partFile.exists()) partFile.length() else 0L,
+                totalBytes = expectedSize,
+                message = "Ошибка сети: ${e.message ?: "соединение разорвано"}"
+            )
+        } catch (e: Exception) {
+            ResumableDownloadResult.Error(0, "Ошибка при скачивании: ${e.message ?: "неизвестная ошибка"}")
         }
     }
 

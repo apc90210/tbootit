@@ -101,6 +101,7 @@ fun MobileApp(
                             )
                             if (validation is ManifestValidationResult.Valid) {
                                 hasUpdateBadge = true
+                                com.technoreboot.mobile.download.UpdateDownloadRepository.getInstance(context).onManifestAvailable(manifest)
                             }
                         }
                         is ApiResult.Error -> {

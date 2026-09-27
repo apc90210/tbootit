@@ -273,8 +273,13 @@ object UpdateManager {
     }
 
     fun getTargetApkFile(context: Context, versionCode: Int): File {
-        return File(getUpdatesDir(context), "update_v${versionCode}.apk")
+        return File(getUpdatesDir(context), "update_${versionCode}.apk")
     }
+
+    fun getPartApkFile(context: Context, versionCode: Int): File {
+        return File(getUpdatesDir(context), "update_${versionCode}.apk.part")
+    }
+
 
     fun cleanUpdatesDir(context: Context) {
         try {
