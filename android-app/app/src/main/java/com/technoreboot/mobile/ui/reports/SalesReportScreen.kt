@@ -46,6 +46,7 @@ fun SalesReportScreen(
     onRevokedDismissed: () -> Unit,
     onDisconnectClicked: () -> Unit,
     onSettingsClicked: () -> Unit = {},
+    onSaleClicked: (Int) -> Unit = {},
     hasUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -175,7 +176,10 @@ fun SalesReportScreen(
                         )
                     }
                     is SalesReportUiState.Success -> {
-                        SuccessReportView(report = uiState.report)
+                        SuccessReportView(
+                            report = uiState.report,
+                            onSaleClicked = onSaleClicked
+                        )
                     }
                 }
             }
@@ -393,7 +397,10 @@ fun EmptyStateView(
 }
 
 @Composable
-fun SuccessReportView(report: SalesReport) {
+fun SuccessReportView(
+    report: SalesReport,
+    onSaleClicked: (Int) -> Unit = {}
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp),
@@ -528,7 +535,11 @@ fun SuccessReportView(report: SalesReport) {
             }
         } else {
             items(report.sales, key = { it.id }) { sale ->
-                SaleItemCard(sale = sale, period = report.period)
+                SaleItemCard(
+                    sale = sale,
+                    period = report.period,
+                    onSaleClicked = onSaleClicked
+                )
             }
         }
     }
@@ -566,9 +577,11 @@ fun PaymentMethodRow(pm: PaymentMethodSummary) {
 @Composable
 fun SaleItemCard(
     sale: SaleListItem,
-    period: SalesReportPeriod
+    period: SalesReportPeriod,
+    onSaleClicked: (Int) -> Unit = {}
 ) {
     Card(
+        onClick = { onSaleClicked(sale.id) },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()
@@ -580,7 +593,7 @@ fun SaleItemCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = ReportFormatters.formatSaleDateTime(sale.createdAt, period),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -593,24 +606,36 @@ fun SaleItemCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = ReportFormatters.formatAmount(sale.amount),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = sale.paymentLabel.ifBlank { sale.paymentMethod },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        text = ReportFormatters.formatAmount(sale.amount),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = sale.paymentLabel.ifBlank { sale.paymentMethod },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Подробнее",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

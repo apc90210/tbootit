@@ -148,6 +148,57 @@ def get_sale(sale_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Sale not found")
     return db_sale
 
+@router.get("/{sale_id}/receipt", response_model=schemas.SaleReceiptResponse)
+def get_sale_receipt(sale_id: int, db: Session = Depends(get_db)):
+    db_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not db_sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+
+    org_settings = db.query(models.OrganizationSettings).first()
+    cashier_name = org_settings.default_cashier_name if org_settings else None
+
+    raw_pm = db_sale.payment_method if db_sale.payment_method else "unspecified"
+    raw_pm = raw_pm.strip() if raw_pm else "unspecified"
+    pm_label = PAYMENT_METHODS_LABELS.get(raw_pm, PAYMENT_METHODS_LABELS.get("other", raw_pm))
+
+    items = []
+    for item in db_sale.items:
+        sku = None
+        barcode = None
+        if item.product_id:
+            prod = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if prod:
+                sku = prod.sku
+                barcode = prod.barcode
+        unit_price = float(item.price) if item.price is not None else 0.0
+        qty = int(item.quantity) if item.quantity is not None else 0
+        line_total = round(unit_price * qty, 2)
+        items.append(
+            schemas.SaleReceiptItem(
+                id=item.id,
+                product_id=item.product_id,
+                title=item.title or f"Товар #{item.product_id}" if item.product_id else "Позиция",
+                sku=sku,
+                barcode=barcode,
+                quantity=qty,
+                unit_price=unit_price,
+                line_total=line_total,
+            )
+        )
+
+    return schemas.SaleReceiptResponse(
+        sale_id=db_sale.id,
+        receipt_number=str(db_sale.id),
+        status=db_sale.status or "completed",
+        created_at=db_sale.created_at,
+        total_amount=float(db_sale.total_amount) if db_sale.total_amount is not None else 0.0,
+        payment_method=raw_pm,
+        payment_label=pm_label,
+        cashier_name=cashier_name,
+        items=items,
+    )
+
+
 @router.post("/{sale_id}/cancel", response_model=schemas.Sale)
 def cancel_sale(sale_id: int, cancel_data: schemas.SaleCancel, db: Session = Depends(get_db)):
     db_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()

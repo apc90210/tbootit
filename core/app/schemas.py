@@ -285,6 +285,31 @@ class SaleListResponse(BaseModel):
     limit: int
     offset: int
 
+class SaleReceiptItem(BaseModel):
+    id: Optional[int] = None
+    product_id: Optional[int] = None
+    title: str
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
+    quantity: int
+    unit_price: float
+    line_total: float
+
+class SaleReceiptResponse(BaseModel):
+    sale_id: int
+    receipt_number: str
+    status: str
+    created_at: datetime
+    total_amount: float
+    payment_method: str
+    payment_label: str
+    cashier_name: Optional[str] = None
+    items: List[SaleReceiptItem]
+
+    class Config:
+        from_attributes = True
+
+
 # Photo Schemas
 class ProductPhoto(BaseModel):
     id: int
