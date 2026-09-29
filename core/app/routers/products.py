@@ -810,18 +810,58 @@ def adjust_stock(product_id: int, adj: schemas.StockAdjustment, db: Session = De
     return db_product
 
 @router.patch("/{product_id}/site-publication", response_model=schemas.Product)
-def site_publication(product_id: int, pub: schemas.SitePublication, db: Session = Depends(get_db)):
+@router.put("/{product_id}/site-publication", response_model=schemas.Product)
+def site_publication(product_id: int, pub: schemas.SitePublication, request: Request, db: Session = Depends(get_db)):
+    auth_is_owner = request.headers.get("x-auth-is-owner")
+    api_token = request.headers.get("x-api-token")
+
+    from app.config import settings
+    if auth_is_owner != "1" or api_token != settings.api_token:
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён: требуется сертификат владельца и внутренний токен"
+        )
+
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
-        
-    db_product.is_published_site = pub.is_published_site
+
+    # Business validation: if enabling publication, product must be in_stock and have quantity > 0
+    if pub.is_published_site:
+        if db_product.status != "in_stock":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Невозможно опубликовать товар: статус должен быть 'in_stock' (в наличии), текущий статус: {db_product.status}"
+            )
+        if (db_product.quantity or 0) <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Невозможно опубликовать товар: количество должно быть больше 0, текущий остаток: {db_product.quantity or 0}"
+            )
+
+    old_state = {
+        "is_published_site": db_product.is_published_site,
+        "site_title": db_product.site_title,
+        "site_description": db_product.site_description
+    }
+
+    db_product.is_published_site = 1 if pub.is_published_site else 0
     if pub.site_title is not None:
-        db_product.site_title = pub.site_title
+        db_product.site_title = pub.site_title.strip() if pub.site_title.strip() else None
     if pub.site_description is not None:
-        db_product.site_description = pub.site_description
-        
-    log_product_event(db, product_id, "site_publication_prep", new_value=pub.model_dump(), comment="Prepared for site")
+        db_product.site_description = pub.site_description.strip() if pub.site_description.strip() else None
+
+    new_state = {
+        "is_published_site": db_product.is_published_site,
+        "site_title": db_product.site_title,
+        "site_description": db_product.site_description
+    }
+
+    action = "publish_site" if db_product.is_published_site else "unpublish_site"
+    comment = f"Site publication updated: is_published_site={db_product.is_published_site}"
+
+    log_product_event(db, product_id, "site_publication", old_value=old_state, new_value=new_state, comment=comment)
+    log_audit(db, "product", product_id, action, old_value=old_state, new_value=new_state, comment=comment)
     db.commit()
     db.refresh(db_product)
     return db_product

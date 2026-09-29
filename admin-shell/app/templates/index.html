@@ -69,6 +69,7 @@
         <a href="/inventory/reports/sales" class="nav-item" data-path="reports" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Отчёты</a>
         <a href="/repairs/repairs" class="nav-item" data-path="repairs" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Ремонты</a>
         <a href="/avito/extension" class="nav-item" data-path="avito" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Расширение Avito</a>
+        <a href="/android" class="nav-item" data-path="android" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Android-приложение</a>
         <a href="/inventory/settings/organization" class="nav-item" data-path="settings" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Настройки</a>
         <a href="/help/user-manual.pdf" class="nav-item" data-path="manual" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">📘 Инструкция</a>
         {% if is_owner %}
@@ -99,6 +100,8 @@
             } else if (href === '/repairs/repairs' && p.indexOf('/repairs') === 0) {
                 isActive = true;
             } else if (href === '/avito/extension' && (p.indexOf('/avito') === 0)) {
+                isActive = true;
+            } else if (href === '/android' && (p.indexOf('/android') === 0)) {
                 isActive = true;
             } else if (href === '/inventory/settings/organization' && (p.indexOf('/inventory/settings') === 0 || p.indexOf('/settings') === 0)) {
                 isActive = true;
@@ -318,18 +321,33 @@
 
         <!-- Tab: Сайт -->
         <div id="tab-site" class="tab-pane">
-            <h3>Данные для сайта</h3>
+            <h3>Публикация на сайте</h3>
             <table class="info-table" style="margin-bottom:14px;">
-                <tr><td>Заголовок</td><td id="sTitle"></td></tr>
-                <tr><td>Описание</td><td id="sDesc" style="font-size:0.88em;white-space:pre-wrap"></td></tr>
+                <tr><td style="width:180px;">Текущий статус на сайте</td><td id="sStatusBadge"></td></tr>
+                <tr><td>Заголовок для сайта</td><td id="sTitle"></td></tr>
+                <tr><td>Описание для сайта</td><td id="sDesc" style="font-size:0.88em;white-space:pre-wrap"></td></tr>
             </table>
             <hr>
-            <h4>Подготовка к публикации на сайте</h4>
+            <h4>Управление публикацией</h4>
             <form onsubmit="updateSitePublication(event)">
                 <input type="hidden" id="spId">
-                <label><input type="checkbox" id="spCheck"> Опубликовать на сайте</label>
-                <input type="text" id="spTitle" placeholder="SEO заголовок" style="width:280px">
-                <input type="text" id="spDesc" placeholder="SEO описание" style="width:280px">
+                <div style="margin-bottom:12px;">
+                    <label style="font-weight:600;font-size:1.05em;cursor:pointer;">
+                        <input type="checkbox" id="spCheck" style="transform:scale(1.2);margin-right:8px;"> Показывать на сайте
+                    </label>
+                    <small style="color:#666;display:block;margin-top:4px;">Товар появится в каталоге tboot-site при условии, что он в наличии (status: in_stock, остаток > 0).</small>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label for="spTitle" style="font-weight:600;display:block;margin-bottom:4px;">Название для сайта:</label>
+                    <input type="text" id="spTitle" placeholder="Основное название используется по умолчанию" style="width:100%;max-width:480px;padding:6px 8px;">
+                    <small style="color:#666;display:block;margin-top:2px;">Если поле пустое — сайт использует стандартное название товара.</small>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label for="spDesc" style="font-weight:600;display:block;margin-bottom:4px;">Описание для сайта:</label>
+                    <textarea id="spDesc" rows="4" placeholder="Основное описание используется по умолчанию" style="width:100%;max-width:480px;padding:6px 8px;font-family:inherit;"></textarea>
+                    <small style="color:#666;display:block;margin-top:2px;">Если поле пустое — сайт использует стандартное описание товара.</small>
+                </div>
+                <div id="spError" style="display:none;color:#dc3545;font-weight:500;margin-bottom:10px;"></div>
                 <button type="submit" class="btn-primary">Сохранить</button>
             </form>
         </div>
@@ -624,12 +642,19 @@
         document.getElementById('iSiteReady').textContent = d.site_ready ? '✅ Готово' : '❌ Нет';
 
         // --- Tab: Сайт ---
-        document.getElementById('sTitle').textContent = d.site_title || '—';
-        document.getElementById('sDesc').textContent = d.site_description || '—';
+        const isPub = !!d.is_published_site;
+        const sBadge = document.getElementById('sStatusBadge');
+        if (sBadge) {
+            sBadge.innerHTML = isPub ? '<span class="badge green">Опубликован</span>' : '<span class="badge" style="background:#888;color:#fff;">Не опубликован</span>';
+        }
+        document.getElementById('sTitle').textContent = d.site_title || '— (по умолчанию)';
+        document.getElementById('sDesc').textContent = d.site_description || '— (по умолчанию)';
         document.getElementById('spId').value = id;
-        document.getElementById('spCheck').checked = !!d.is_published_site;
+        document.getElementById('spCheck').checked = isPub;
         document.getElementById('spTitle').value = d.site_title || '';
         document.getElementById('spDesc').value = d.site_description || '';
+        const spErr = document.getElementById('spError');
+        if (spErr) { spErr.style.display = 'none'; spErr.textContent = ''; }
 
         // --- Tab: Остатки ---
         document.getElementById('adjId').value = id;
@@ -672,12 +697,17 @@
     async function updateSitePublication(e) {
         e.preventDefault();
         const id = document.getElementById('spId').value;
+        const spErr = document.getElementById('spError');
+        if (spErr) { spErr.style.display = 'none'; spErr.textContent = ''; }
         const r = await apiCall(`/admin-api/products/${id}/site-publication`, 'PATCH', {
             is_published_site: document.getElementById('spCheck').checked ? 1 : 0,
             site_title: document.getElementById('spTitle').value,
             site_description: document.getElementById('spDesc').value
         });
-        if (r) alert('Данные для сайта сохранены.');
+        if (r) {
+            alert('Данные для сайта сохранены.');
+            openProductModal(id);
+        }
     }
 
     async function updateAvitoPublication(e) {

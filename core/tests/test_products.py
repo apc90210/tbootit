@@ -49,23 +49,91 @@ def test_stock_adjustment():
     assert movements[0]["quantity_delta"] == -2
 
 def test_publication_flags():
+    # Helper headers
+    owner_headers = {"x-auth-is-owner": "1", "x-api-token": "dev-token"}
+    non_owner_headers = {"x-auth-is-owner": "0", "x-api-token": "dev-token"}
+
+    # 1. Create a product with in_stock and quantity = 2
     sku = f"TEST002-{uuid.uuid4().hex[:8]}"
     product_data = {
         "sku": sku,
         "title": "Test Prod 2",
-        "category_id": 1
+        "category_id": 1,
+        "status": "in_stock",
+        "quantity": 2
     }
     create_response = client.post("/api/products/", json=product_data)
     product_id = create_response.json()["id"]
 
+    # 2. Non-owner cannot publish (403)
     site_data = {
         "is_published_site": 1,
-        "site_title": "Cool Prod"
+        "site_title": "Cool Prod",
+        "site_description": "Great description"
     }
-    site_resp = client.patch(f"/api/products/{product_id}/site-publication", json=site_data)
+    forbidden_resp = client.patch(f"/api/products/{product_id}/site-publication", json=site_data, headers=non_owner_headers)
+    assert forbidden_resp.status_code == 403
+
+    # Without headers at all -> 403
+    unauth_resp = client.patch(f"/api/products/{product_id}/site-publication", json=site_data)
+    assert unauth_resp.status_code == 403
+
+    # 3. Owner can publish eligible product via PATCH
+    site_resp = client.patch(f"/api/products/{product_id}/site-publication", json=site_data, headers=owner_headers)
     assert site_resp.status_code == 200
     assert site_resp.json()["is_published_site"] == 1
     assert site_resp.json()["site_title"] == "Cool Prod"
+    assert site_resp.json()["site_description"] == "Great description"
+
+    # Also test PUT method
+    put_data = {
+        "is_published_site": 1,
+        "site_title": "Cool Prod PUT",
+        "site_description": "Great description PUT"
+    }
+    put_resp = client.put(f"/api/products/{product_id}/site-publication", json=put_data, headers=owner_headers)
+    assert put_resp.status_code == 200
+    assert put_resp.json()["site_title"] == "Cool Prod PUT"
+
+    # 4. Verify audit event was logged
+    details = client.get(f"/api/products/{product_id}/details").json()
+    events = [e for e in details.get("events", []) if e.get("event_type") == "site_publication"]
+    assert len(events) >= 1
+    assert "is_published_site=1" in events[0].get("comment", "")
+
+    # 5. Owner can unpublish
+    unpub_data = {"is_published_site": 0}
+    unpub_resp = client.patch(f"/api/products/{product_id}/site-publication", json=unpub_data, headers=owner_headers)
+    assert unpub_resp.status_code == 200
+    assert unpub_resp.json()["is_published_site"] == 0
+
+    # 6. Cannot publish when quantity == 0
+    sku_zero = f"TEST-ZERO-{uuid.uuid4().hex[:8]}"
+    create_zero = client.post("/api/products/", json={
+        "sku": sku_zero,
+        "title": "Zero Qty Prod",
+        "category_id": 1,
+        "status": "in_stock",
+        "quantity": 0
+    })
+    pid_zero = create_zero.json()["id"]
+    zero_pub_resp = client.patch(f"/api/products/{pid_zero}/site-publication", json={"is_published_site": 1}, headers=owner_headers)
+    assert zero_pub_resp.status_code == 400
+    assert "количество должно быть больше 0" in zero_pub_resp.json()["detail"]
+
+    # 7. Cannot publish when status is draft / sold / archived
+    sku_draft = f"TEST-DRAFT-{uuid.uuid4().hex[:8]}"
+    create_draft = client.post("/api/products/", json={
+        "sku": sku_draft,
+        "title": "Draft Prod",
+        "category_id": 1,
+        "status": "draft",
+        "quantity": 5
+    })
+    pid_draft = create_draft.json()["id"]
+    draft_pub_resp = client.patch(f"/api/products/{pid_draft}/site-publication", json={"is_published_site": 1}, headers=owner_headers)
+    assert draft_pub_resp.status_code == 400
+    assert "статус должен быть 'in_stock'" in draft_pub_resp.json()["detail"]
 
 def test_patch_product_safe_fields():
     # create a product
