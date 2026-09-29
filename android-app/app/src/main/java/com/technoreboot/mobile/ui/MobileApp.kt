@@ -1,6 +1,7 @@
 package com.technoreboot.mobile.ui
 
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import com.technoreboot.mobile.BuildConfig
@@ -14,6 +15,8 @@ import com.technoreboot.mobile.data.SessionRepository
 import com.technoreboot.mobile.model.SalesReportPeriod
 import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
+import com.technoreboot.mobile.data.ReceiptCacheRepository
+import com.technoreboot.mobile.ui.reports.ReceiptDetailScreen
 import com.technoreboot.mobile.ui.reports.SalesReportScreen
 import com.technoreboot.mobile.ui.reports.SalesReportUiState
 import com.technoreboot.mobile.ui.settings.SettingsScreen
@@ -21,7 +24,8 @@ import kotlinx.coroutines.launch
 
 enum class AppScreen {
     MAIN,
-    SETTINGS
+    SETTINGS,
+    RECEIPT_DETAIL
 }
 
 @Composable
@@ -34,12 +38,17 @@ fun MobileApp(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val receiptCacheRepository = remember {
+        ReceiptCacheRepository(context) { serverSettingsRepository.getServerUrl() }
+    }
     var currentSession by remember { mutableStateOf(sessionRepository.getSession()) }
     var currentScreen by remember { mutableStateOf(AppScreen.MAIN) }
+    var selectedSaleId by remember { mutableStateOf<Int?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var hasUpdateBadge by remember { mutableStateOf(false) }
 
+    val periodHistory = remember { mutableStateListOf<SalesReportPeriod>() }
     var selectedPeriod by remember { mutableStateOf(SalesReportPeriod.TODAY) }
     var reportUiState by remember { mutableStateOf<SalesReportUiState>(SalesReportUiState.Loading) }
 
@@ -76,6 +85,31 @@ fun MobileApp(
                             isNetworkError = result.isNetworkError
                         )
                     }
+                }
+            }
+        }
+    }
+
+    BackHandler(enabled = true) {
+        when {
+            currentScreen == AppScreen.RECEIPT_DETAIL -> {
+                selectedSaleId = null
+                currentScreen = AppScreen.MAIN
+            }
+            currentScreen == AppScreen.SETTINGS -> {
+                currentScreen = AppScreen.MAIN
+            }
+            currentScreen == AppScreen.MAIN -> {
+                if (periodHistory.isNotEmpty()) {
+                    val previousPeriod = periodHistory.removeAt(periodHistory.size - 1)
+                    selectedPeriod = previousPeriod
+                    loadSalesReport(previousPeriod)
+                } else if (selectedPeriod != SalesReportPeriod.TODAY) {
+                    selectedPeriod = SalesReportPeriod.TODAY
+                    loadSalesReport(SalesReportPeriod.TODAY)
+                } else {
+                    // Already at Today (home root). Minimize app smoothly to background.
+                    (context as? android.app.Activity)?.moveTaskToBack(true)
                 }
             }
         }
@@ -133,14 +167,44 @@ fun MobileApp(
                     keystoreManager = keystoreManager,
                     onBackClicked = { currentScreen = AppScreen.MAIN },
                     onServerUrlChanged = { newUrl ->
+                        receiptCacheRepository.clearAll()
                         sessionRepository.clearSession()
                         keystoreManager.deleteKey()
                         currentSession = null
+                        selectedSaleId = null
                         apiClient.updateBaseUrl(newUrl)
                         currentScreen = AppScreen.MAIN
                         errorMessage = "Сервер изменён на $newUrl. Выполните подключение."
                     }
                 )
+            }
+            AppScreen.RECEIPT_DETAIL -> {
+                val saleId = selectedSaleId
+                val session = currentSession
+                if (saleId != null && session != null) {
+                    ReceiptDetailScreen(
+                        saleId = saleId,
+                        session = session,
+                        privateKey = keystoreManager.getPrivateKey(),
+                        apiClient = apiClient,
+                        cacheRepository = receiptCacheRepository,
+                        onBackClicked = {
+                            currentScreen = AppScreen.MAIN
+                            selectedSaleId = null
+                        },
+                        onRevokedDismissed = {
+                            receiptCacheRepository.clearAll()
+                            sessionRepository.clearSession()
+                            keystoreManager.deleteKey()
+                            currentSession = null
+                            selectedSaleId = null
+                            currentScreen = AppScreen.MAIN
+                            errorMessage = "Доступ отозван на сервере. Пожалуйста, выполните повторное подключение."
+                        }
+                    )
+                } else {
+                    currentScreen = AppScreen.MAIN
+                }
             }
             AppScreen.MAIN -> {
                 val session = currentSession
@@ -150,8 +214,11 @@ fun MobileApp(
                         selectedPeriod = selectedPeriod,
                         uiState = reportUiState,
                         onPeriodSelected = { period ->
-                            selectedPeriod = period
-                            loadSalesReport(period)
+                            if (period != selectedPeriod) {
+                                periodHistory.add(selectedPeriod)
+                                selectedPeriod = period
+                                loadSalesReport(period)
+                            }
                         },
                         onRefreshClicked = {
                             loadSalesReport(selectedPeriod)
@@ -159,17 +226,27 @@ fun MobileApp(
                         onSettingsClicked = {
                             currentScreen = AppScreen.SETTINGS
                         },
+                        onSaleClicked = { saleId ->
+                            selectedSaleId = saleId
+                            currentScreen = AppScreen.RECEIPT_DETAIL
+                        },
                         hasUpdateBadge = hasUpdateBadge,
                         onRevokedDismissed = {
+                            receiptCacheRepository.clearAll()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
                             currentSession = null
+                            selectedSaleId = null
                             errorMessage = "Доступ отозван на сервере. Пожалуйста, выполните повторное подключение."
                         },
                         onDisconnectClicked = {
+                            receiptCacheRepository.clearAll()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
                             currentSession = null
+                            selectedSaleId = null
+                            periodHistory.clear()
+                            selectedPeriod = SalesReportPeriod.TODAY
                             errorMessage = null
                         }
                     )
@@ -187,6 +264,7 @@ fun MobileApp(
                                 errorMessage = null
 
                                 try {
+                                    receiptCacheRepository.clearAll()
                                     // 1. Generate hardware-isolated EC P-256 keypair in Android Keystore
                                     keystoreManager.generateKeyPair()
                                     val pubKeyPem = keystoreManager.getPublicKeyPem()

@@ -1,6 +1,7 @@
 package com.technoreboot.mobile.network
 
 import com.technoreboot.mobile.crypto.RequestBinding
+import com.technoreboot.mobile.model.SaleReceipt
 import com.technoreboot.mobile.model.SalesReport
 import com.technoreboot.mobile.model.UpdateManifest
 import kotlinx.coroutines.Dispatchers
@@ -234,6 +235,75 @@ class MobileApiClient(
             SalesReport.fromJson(json)
         }
     }
+
+    /**
+     * Fetches detailed sale receipt for the specified saleId
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun getSaleReceipt(
+        saleId: Int,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<SaleReceipt> = withContext(Dispatchers.IO) {
+        // Step 1: Obtain one-time challenge nonce
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            val msg = if (err.code == 403) {
+                if (err.message.contains("устройств", ignoreCase = true) || err.message.contains("device", ignoreCase = true)) {
+                    "Доступ этого устройства отозван"
+                } else {
+                    "Доступ отозван"
+                }
+            } else {
+                err.message
+            }
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = msg,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/sales/$saleId/receipt"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        // Step 2: Build canonical signing payload
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        // Step 3: Cryptographically sign canonical payload with Android Keystore private key
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        // Step 4: Dispatch request with required PoP headers
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            SaleReceipt.fromJson(json)
+        }
+    }
+
 
     /**
      * Retrieves update manifest from /api/mobile/app/update/manifest protected by TRMOBILE1 PoP.

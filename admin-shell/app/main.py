@@ -309,14 +309,29 @@ async def proxy_stock_adjustment(product_id: int, request: Request):
             raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
 
 @app.patch("/admin-api/products/{product_id}/site-publication")
+@app.put("/admin-api/products/{product_id}/site-publication")
 async def proxy_site_publication(product_id: int, request: Request):
+    _require_owner(request)
     data = await request.json()
     async with httpx.AsyncClient(trust_env=False) as client:
         try:
-            resp = await client.patch(f"{CORE_API_URL}/api/products/{product_id}/site-publication", json=data)
+            resp = await client.request(
+                method=request.method,
+                url=f"{CORE_API_URL}/api/products/{product_id}/site-publication",
+                json=data,
+                headers={
+                    "x-auth-is-owner": "1",
+                    "x-api-token": os.getenv("CORE_API_TOKEN", "")
+                }
+            )
             if resp.status_code == 200:
                 return resp.json()
-            raise HTTPException(status_code=resp.status_code, detail=f"Core API error: {resp.text}")
+            try:
+                err_json = resp.json()
+                detail = err_json.get("detail", resp.text)
+            except Exception:
+                detail = resp.text
+            raise HTTPException(status_code=resp.status_code, detail=detail)
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
 
@@ -2128,6 +2143,69 @@ async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
         "payment_methods": payment_methods,
         "sales": sales_list,
     }
+
+
+# =====================================================================
+# STAGE 03A: MOBILE SALE RECEIPT DETAIL API
+# =====================================================================
+
+async def _fetch_canonical_sale_receipt(sale_id: int) -> Dict[str, Any]:
+    """
+    Fetch canonical sale receipt strictly from Core HTTP API.
+    Reuses existing Core calculation without parallel business logic.
+    Does NOT access Core DB directly.
+    Returns 404 on sale not found, and 502/503/504 on Core failure or timeout.
+    """
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/sales/{sale_id}/receipt"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Sale {sale_id} not found",
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API returned error status {resp.status_code}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
+
+
+@app.get("/api/mobile/sales/{sale_id}/receipt")
+async def api_mobile_sale_receipt(request: Request, sale_id: int):
+    """
+    Mobile Sale Receipt Detail endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication.
+    Path tampering (sale_id changed) causes signature verification failure.
+    Reuses canonical Core receipt endpoint without duplicate business logic.
+    """
+    ctx = await _get_mobile_auth(request)
+    receipt = await _fetch_canonical_sale_receipt(sale_id)
+    return receipt
+
 
 
 # =====================================================================
