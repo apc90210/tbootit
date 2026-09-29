@@ -36,6 +36,10 @@ data/avito-module/
 data/auth/
 auth-data/
 *.db
+/technoreboot.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 *.key

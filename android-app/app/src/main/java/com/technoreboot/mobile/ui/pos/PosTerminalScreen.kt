@@ -1,0 +1,677 @@
+package com.technoreboot.mobile.ui.pos
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.technoreboot.mobile.crypto.KeystoreManager
+import com.technoreboot.mobile.data.AddToCartResult
+import com.technoreboot.mobile.data.MobileSession
+import com.technoreboot.mobile.data.PosCartRepository
+import com.technoreboot.mobile.model.PosCartLine
+import com.technoreboot.mobile.network.ApiResult
+import com.technoreboot.mobile.network.MobileApiClient
+import com.technoreboot.mobile.ui.reports.ReportFormatters
+import kotlinx.coroutines.launch
+
+data class PosNotification(
+    val message: String,
+    val isError: Boolean,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PosTerminalScreen(
+    session: MobileSession,
+    keystoreManager: KeystoreManager,
+    apiClient: MobileApiClient,
+    cartRepository: PosCartRepository,
+    onBackClicked: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val cartState by cartRepository.cartState.collectAsState()
+
+    var manualBarcodeText by remember { mutableStateOf("") }
+    var isLookingUp by remember { mutableStateOf(false) }
+    var notification by remember { mutableStateOf<PosNotification?>(null) }
+    var lineToEditPrice by remember { mutableStateOf<PosCartLine?>(null) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
+    var isScannerVisible by remember { mutableStateOf(true) }
+
+    fun showFeedback(msg: String, isError: Boolean) {
+        notification = PosNotification(message = msg, isError = isError)
+    }
+
+    fun handleLookup(barcodeRaw: String) {
+        val cleanBarcode = barcodeRaw.trim()
+        if (cleanBarcode.isEmpty()) return
+
+        coroutineScope.launch {
+            isLookingUp = true
+            val privateKey = keystoreManager.getPrivateKey()
+            if (privateKey == null) {
+                showFeedback("Аппаратный ключ не найден в защищённом хранилище", isError = true)
+                isLookingUp = false
+                return@launch
+            }
+
+            when (val result = apiClient.getProductByBarcode(cleanBarcode, session.credentialId, privateKey)) {
+                is ApiResult.Success -> {
+                    val product = result.data
+                    when (val addRes = cartRepository.addProduct(product)) {
+                        is AddToCartResult.Added -> {
+                            showFeedback("Добавлен: ${product.title}", isError = false)
+                        }
+                        is AddToCartResult.Incremented -> {
+                            showFeedback("Количество увеличено: ${product.title} (x${addRes.line.quantity})", isError = false)
+                        }
+                        is AddToCartResult.MaxStockReached -> {
+                            showFeedback("Достигнут максимум остатка на складе (${addRes.availableStock} шт.)", isError = true)
+                        }
+                        is AddToCartResult.NotSellable -> {
+                            showFeedback(addRes.reason, isError = true)
+                        }
+                    }
+                    manualBarcodeText = ""
+                    focusManager.clearFocus()
+                }
+                is ApiResult.Error -> {
+                    if (result.code == 404) {
+                        showFeedback("Товар со штрихкодом $cleanBarcode не найден", isError = true)
+                    } else if (result.code == 403) {
+                        showFeedback("Доступ отозван на сервере", isError = true)
+                    } else {
+                        showFeedback("Ошибка поиска: ${result.message}", isError = true)
+                    }
+                }
+            }
+            isLookingUp = false
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Касса",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                        if (cartState.totalItemsCount > 0) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "${cartState.totalItemsCount} шт.",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClicked) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { isScannerVisible = !isScannerVisible }) {
+                        Icon(
+                            imageVector = if (isScannerVisible) Icons.Default.CameraAlt else Icons.Default.NoPhotography,
+                            contentDescription = if (isScannerVisible) "Скрыть сканер" else "Показать сканер",
+                            tint = if (isScannerVisible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        bottomBar = {
+            if (cartState.lines.isNotEmpty()) {
+                Surface(
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Товаров: ${cartState.totalItemsCount} шт. (${cartState.lines.size} поз.)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Итого к оплате:",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                            Text(
+                                text = ReportFormatters.formatAmount(cartState.totalAmount),
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { showClearConfirmDialog = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteSweep,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Очистить")
+                            }
+
+                            Button(
+                                onClick = { /* Stage 04B checkout */ },
+                                enabled = false,
+                                modifier = Modifier.weight(2f),
+                                colors = ButtonDefaults.buttonColors(
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            ) {
+                                Text("Оформить (Stage 04B)")
+                            }
+                        }
+
+                        Text(
+                            text = "Оформление продажи и фискализация будут доступны в Stage 04B",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                        )
+                    }
+                }
+            }
+        },
+        modifier = modifier
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Scanner area (toggleable)
+            AnimatedVisibility(visible = isScannerVisible) {
+                CameraBarcodeScanner(
+                    onBarcodeScanned = { barcode ->
+                        if (!isLookingUp) {
+                            handleLookup(barcode)
+                        }
+                    },
+                    isPaused = isLookingUp
+                )
+            }
+
+            // Manual Barcode Input Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = manualBarcodeText,
+                    onValueChange = { manualBarcodeText = it },
+                    label = { Text("Штрихкод вручную") },
+                    placeholder = { Text("Например 200000000101") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            focusManager.clearFocus()
+                            handleLookup(manualBarcodeText)
+                        }
+                    ),
+                    trailingIcon = {
+                        if (manualBarcodeText.isNotEmpty()) {
+                            IconButton(onClick = { manualBarcodeText = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        handleLookup(manualBarcodeText)
+                    },
+                    enabled = manualBarcodeText.isNotBlank() && !isLookingUp,
+                    modifier = Modifier.height(56.dp)
+                ) {
+                    if (isLookingUp) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = "Найти")
+                    }
+                }
+            }
+
+            // Notification / Feedback banner
+            notification?.let { notif ->
+                Surface(
+                    color = if (notif.isError) MaterialTheme.colorScheme.errorContainer else Color(0xFFE8F5E9),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (notif.isError) Icons.Default.Warning else Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = if (notif.isError) MaterialTheme.colorScheme.error else Color(0xFF2E7D32),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = notif.message,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = if (notif.isError) MaterialTheme.colorScheme.onErrorContainer else Color(0xFF1B5E20),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { notification = null },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Закрыть",
+                                tint = if (notif.isError) MaterialTheme.colorScheme.error else Color(0xFF2E7D32),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Cart Items List
+            if (cartState.lines.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCartCheckout,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Корзина пуста",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Отсканируйте штрихкод камерой или введите номер вручную",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(cartState.lines, key = { it.productId }) { line ->
+                        PosCartLineCard(
+                            line = line,
+                            onIncrement = { cartRepository.incrementQuantity(line.productId) },
+                            onDecrement = { cartRepository.decrementQuantity(line.productId) },
+                            onEditPrice = { lineToEditPrice = line },
+                            onRemove = { cartRepository.removeLine(line.productId) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Edit Unit Price Dialog
+    lineToEditPrice?.let { line ->
+        var priceInput by remember { mutableStateOf(line.saleUnitPrice.toString()) }
+        var isPriceError by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { lineToEditPrice = null },
+            title = { Text("Изменение цены") },
+            text = {
+                Column {
+                    Text(
+                        text = line.title,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Базовая цена: ${ReportFormatters.formatAmount(line.defaultUnitPrice)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = priceInput,
+                        onValueChange = {
+                            priceInput = it.replace(',', '.')
+                            val parsed = priceInput.toDoubleOrNull()
+                            isPriceError = parsed == null || parsed < 0.0
+                        },
+                        label = { Text("Новая цена за 1 шт. (₽)") },
+                        isError = isPriceError,
+                        supportingText = {
+                            if (isPriceError) {
+                                Text("Введите корректную сумму ≥ 0.0")
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val parsed = priceInput.toDoubleOrNull()
+                        if (parsed != null && parsed >= 0.0) {
+                            cartRepository.setUnitPrice(line.productId, parsed)
+                            lineToEditPrice = null
+                            showFeedback("Цена обновлена: ${ReportFormatters.formatAmount(parsed)}", isError = false)
+                        } else {
+                            isPriceError = true
+                        }
+                    },
+                    enabled = !isPriceError
+                ) {
+                    Text("Сохранить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { lineToEditPrice = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Clear Cart Confirmation Dialog
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            title = { Text("Очистить корзину?") },
+            text = { Text("Все ${cartState.totalItemsCount} шт. товаров будут удалены из текущей корзины.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        cartRepository.clearCart()
+                        showClearConfirmDialog = false
+                        showFeedback("Корзина очищена", isError = false)
+                    }
+                ) {
+                    Text("Очистить", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun PosCartLineCard(
+    line: PosCartLine,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    onEditPrice: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            // Title & Delete Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = line.title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Удалить",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // SKU & Barcode subtitle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (line.sku.isNotBlank()) {
+                    Text(
+                        text = "Арт: ${line.sku}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = "ШК: ${line.barcode}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Price & Quantity controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Unit Price with tap to edit
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { onEditPrice() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${ReportFormatters.formatAmount(line.saleUnitPrice)} / шт.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Изменить цену",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                // Quantity Controls (- / count / +)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(
+                        onClick = onDecrement,
+                        enabled = line.quantity > 1,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                color = if (line.quantity > 1) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = "Уменьшить",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "${line.quantity}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+
+                    IconButton(
+                        onClick = onIncrement,
+                        enabled = line.quantity < line.availableStock,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                color = if (line.quantity < line.availableStock) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Увеличить",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // Line Total & Stock indicator
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Остаток: ${line.availableStock} шт.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (line.quantity >= line.availableStock) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = ReportFormatters.formatAmount(line.lineTotal),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}

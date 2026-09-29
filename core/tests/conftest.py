@@ -1,19 +1,35 @@
 import os
 import sys
 import tempfile
+from pathlib import Path
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-import app.database
 
-# CRITICAL SECURITY RULE: Pytest MUST NEVER connect to or mutate live production DB (/data/db/technoreboot.db)
+# Ensure core package is importable
+_core_dir = str(Path(__file__).resolve().parent.parent)
+if _core_dir not in sys.path:
+    sys.path.insert(0, _core_dir)
+
+# CRITICAL SECURITY RULE: Pytest MUST NEVER connect to or mutate live canonical DB
+def assert_not_canonical_db(url_or_path: str):
+    norm = str(url_or_path).replace("\\", "/").lower()
+    for forbidden in ["data/db/technoreboot.db", "/srv/technoreboot"]:
+        if forbidden in norm:
+            raise RuntimeError(f"FATAL SECURITY VIOLATION: Test database points to canonical DB: {url_or_path}")
+
+# Initialize isolated temporary database BEFORE importing app modules
 _temp_dir = tempfile.TemporaryDirectory(prefix="pytest_core_isolated_")
 TEST_DB_PATH = os.path.join(_temp_dir.name, "isolated_test.db")
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["IS_TESTING"] = "1"
+assert_not_canonical_db(TEST_DATABASE_URL)
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+import app.database
 from app.config import settings
+
 settings.database_url = TEST_DATABASE_URL
 
 # Re-bind app.database engine and SessionLocal to isolated temporary SQLite DB

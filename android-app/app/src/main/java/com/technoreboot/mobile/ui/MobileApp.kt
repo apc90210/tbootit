@@ -15,7 +15,9 @@ import com.technoreboot.mobile.data.SessionRepository
 import com.technoreboot.mobile.model.SalesReportPeriod
 import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
+import com.technoreboot.mobile.data.PosCartRepository
 import com.technoreboot.mobile.data.ReceiptCacheRepository
+import com.technoreboot.mobile.ui.pos.PosTerminalScreen
 import com.technoreboot.mobile.ui.reports.ReceiptDetailScreen
 import com.technoreboot.mobile.ui.reports.SalesReportScreen
 import com.technoreboot.mobile.ui.reports.SalesReportUiState
@@ -25,7 +27,8 @@ import kotlinx.coroutines.launch
 enum class AppScreen {
     MAIN,
     SETTINGS,
-    RECEIPT_DETAIL
+    RECEIPT_DETAIL,
+    POS_TERMINAL
 }
 
 @Composable
@@ -40,6 +43,9 @@ fun MobileApp(
     val coroutineScope = rememberCoroutineScope()
     val receiptCacheRepository = remember {
         ReceiptCacheRepository(context) { serverSettingsRepository.getServerUrl() }
+    }
+    val cartRepository = remember {
+        PosCartRepository { serverSettingsRepository.getServerUrl() }
     }
     var currentSession by remember { mutableStateOf(sessionRepository.getSession()) }
     var currentScreen by remember { mutableStateOf(AppScreen.MAIN) }
@@ -92,6 +98,9 @@ fun MobileApp(
 
     BackHandler(enabled = true) {
         when {
+            currentScreen == AppScreen.POS_TERMINAL -> {
+                currentScreen = AppScreen.MAIN
+            }
             currentScreen == AppScreen.RECEIPT_DETAIL -> {
                 selectedSaleId = null
                 currentScreen = AppScreen.MAIN
@@ -168,6 +177,7 @@ fun MobileApp(
                     onBackClicked = { currentScreen = AppScreen.MAIN },
                     onServerUrlChanged = { newUrl ->
                         receiptCacheRepository.clearAll()
+                        cartRepository.clearCart()
                         sessionRepository.clearSession()
                         keystoreManager.deleteKey()
                         currentSession = null
@@ -206,6 +216,20 @@ fun MobileApp(
                     currentScreen = AppScreen.MAIN
                 }
             }
+            AppScreen.POS_TERMINAL -> {
+                val session = currentSession
+                if (session != null) {
+                    PosTerminalScreen(
+                        session = session,
+                        keystoreManager = keystoreManager,
+                        apiClient = apiClient,
+                        cartRepository = cartRepository,
+                        onBackClicked = { currentScreen = AppScreen.MAIN }
+                    )
+                } else {
+                    currentScreen = AppScreen.MAIN
+                }
+            }
             AppScreen.MAIN -> {
                 val session = currentSession
                 if (session != null) {
@@ -230,9 +254,13 @@ fun MobileApp(
                             selectedSaleId = saleId
                             currentScreen = AppScreen.RECEIPT_DETAIL
                         },
+                        onPosClicked = {
+                            currentScreen = AppScreen.POS_TERMINAL
+                        },
                         hasUpdateBadge = hasUpdateBadge,
                         onRevokedDismissed = {
                             receiptCacheRepository.clearAll()
+                            cartRepository.clearCart()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
                             currentSession = null
@@ -241,6 +269,7 @@ fun MobileApp(
                         },
                         onDisconnectClicked = {
                             receiptCacheRepository.clearAll()
+                            cartRepository.clearCart()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
                             currentSession = null

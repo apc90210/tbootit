@@ -2273,6 +2273,104 @@ async def api_mobile_sale_receipt(request: Request, sale_id: int):
     return receipt
 
 
+# =====================================================================
+# STAGE 04A: MOBILE POS BARCODE LOOKUP API
+# =====================================================================
+
+async def _fetch_canonical_product_by_barcode(barcode: str) -> Dict[str, Any]:
+    """
+    Fetch canonical product by barcode strictly from Core HTTP API.
+    Reuses existing Core lookup without parallel business logic.
+    Does NOT access Core DB directly.
+    Returns 404 if product not found, and 502/503/504 on Core failure.
+    """
+    clean_bc = (barcode or "").strip()
+    if not clean_bc:
+        raise HTTPException(
+            status_code=400,
+            detail="Штрихкод не может быть пустым",
+        )
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/products/by-barcode/{urllib.parse.quote(clean_bc)}"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Товар со штрихкодом '{clean_bc}' не найден",
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API returned error status {resp.status_code}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
+
+
+@app.get("/api/mobile/products/by-barcode/{barcode}")
+async def api_mobile_product_by_barcode(request: Request, barcode: str):
+    """
+    Mobile Product Barcode Lookup endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication.
+    Path tampering (barcode changed in transit) causes signature verification failure.
+    Reuses canonical Core product endpoint without duplicate business logic.
+    Returns only POS-needed canonical fields.
+    """
+    ctx = await _get_mobile_auth(request)
+    raw_prod = await _fetch_canonical_product_by_barcode(barcode)
+
+    prod_id = int(raw_prod.get("id"))
+    title = raw_prod.get("title") or f"Товар #{prod_id}"
+    bc = raw_prod.get("barcode") or barcode.strip()
+    sku = raw_prod.get("sku") or ""
+    sale_price = float(raw_prod.get("sale_price") if raw_prod.get("sale_price") is not None else (raw_prod.get("price") or 0.0))
+    available_stock = int(raw_prod.get("quantity") or 0)
+    status_val = raw_prod.get("status") or "unknown"
+    storage_location = raw_prod.get("storage_location") or ""
+    main_photo_url = raw_prod.get("main_photo_url")
+
+    # Sellability check consistent with desktop POS rules:
+    # status must be in ['in_stock', 'available'] and quantity > 0
+    is_sellable = (status_val in ["in_stock", "available"]) and (available_stock > 0)
+
+    return {
+        "product_id": prod_id,
+        "barcode": bc,
+        "sku": sku,
+        "title": title,
+        "default_sale_price": sale_price,
+        "available_stock": available_stock,
+        "status": status_val,
+        "is_sellable": is_sellable,
+        "storage_location": storage_location,
+        "main_photo_url": main_photo_url,
+        "currency": "RUB",
+    }
+
+
+
 
 # =====================================================================
 # STAGE 01D: MOBILE IN-APP UPDATE API
