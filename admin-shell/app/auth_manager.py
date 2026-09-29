@@ -433,6 +433,9 @@ class AuthManager:
             uri == "/backups" or
             uri.startswith("/backups/") or
             uri.startswith("/admin-api/backups") or
+            uri == "/inventory/reservations" or
+            uri.startswith("/inventory/reservations/") or
+            uri.startswith("/admin-api/reservations") or
             uri == "/admin-api/dev-reset" or
             uri.startswith("/admin-api/dev-reset") or
             uri == "/admin-api/seed" or

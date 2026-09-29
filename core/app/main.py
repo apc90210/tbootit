@@ -330,4 +330,7 @@ app.include_router(integrations_router.router, prefix="/api/integrations", tags=
 app.include_router(avito_categories_router.router)
 app.include_router(avito_categories_router.product_router)
 app.include_router(avito_post_sale_router.router)
+from app.routers import reservations as reservations_router
+app.include_router(reservations_router.router, prefix="/api/reservation-requests", tags=["reservations"])
+
 

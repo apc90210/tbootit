@@ -1062,3 +1062,43 @@ class BulkDeleteResponse(BaseModel):
     deleted_count: int
     deleted_ids: List[int]
 
+
+# --- Reservation Requests (WEB-02A) ---
+class ReservationRequestCreate(BaseModel):
+    product_id: int
+    phone: str
+    customer_name: Optional[str] = None
+
+
+class ReservationRequestStatusUpdate(BaseModel):
+    status: str
+    comment: Optional[str] = None
+
+
+class ReservationRequestResponse(BaseModel):
+    id: int
+    product_id: int
+    phone: str
+    status: str
+    customer_name: Optional[str] = None
+    comment: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    confirmed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    product_title: Optional[str] = None
+    product_price: Optional[float] = None
+    product_status: Optional[str] = None
+    is_duplicate: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class ReservationRequestListResponse(BaseModel):
+    items: List[ReservationRequestResponse]
+    total: int
+    limit: int
+    offset: int
+
+

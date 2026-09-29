@@ -928,6 +928,15 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
         headers=resp_headers,
     )
 
+@app.get("/inventory/reservations", response_class=HTMLResponse)
+async def reservations_page(request: Request):
+    """Reservation Requests Management Page (OWNER only)."""
+    _require_owner(request)
+    return templates.TemplateResponse("reservations.html", {
+        "request": request,
+        "is_owner": True,
+    })
+
 
 @app.api_route("/inventory", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.api_route("/inventory/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
@@ -1233,6 +1242,63 @@ async def api_restore_backup(request: Request, backup_file: UploadFile = File(No
                 temp_zip.unlink()
             except Exception:
                 pass
+
+
+# ============================================================================
+# WEB-02A: Reservation Requests Proxy (OWNER only)
+# ============================================================================
+
+
+@app.get("/admin-api/reservations")
+async def proxy_list_reservations(request: Request):
+    """Proxy list of reservation requests from Core (OWNER only)."""
+    _require_owner(request)
+    params = dict(request.query_params)
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.get(
+                f"{CORE_API_URL}/api/reservation-requests/",
+                params=params,
+                headers={
+                    "x-auth-is-owner": "1",
+                    "x-api-token": os.getenv("CORE_API_TOKEN", "")
+                }
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                detail = resp.text
+            raise HTTPException(status_code=resp.status_code, detail=detail)
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
+
+
+@app.patch("/admin-api/reservations/{req_id}/status")
+async def proxy_update_reservation_status(req_id: int, request: Request):
+    """Proxy reservation request status change to Core (OWNER only)."""
+    _require_owner(request)
+    data = await request.json()
+    async with httpx.AsyncClient(trust_env=False) as client:
+        try:
+            resp = await client.patch(
+                f"{CORE_API_URL}/api/reservation-requests/{req_id}/status",
+                json=data,
+                headers={
+                    "x-auth-is-owner": "1",
+                    "x-api-token": os.getenv("CORE_API_TOKEN", "")
+                }
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                detail = resp.text
+            raise HTTPException(status_code=resp.status_code, detail=detail)
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Core API: {str(e)}")
 
 
 # ============================================================================

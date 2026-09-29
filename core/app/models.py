@@ -563,3 +563,21 @@ class MobilePairingCode(Base):
     used = Column(Boolean, default=False, nullable=False)
     used_at = Column(DateTime(timezone=True), nullable=True)
     device_name = Column(String, nullable=True)
+
+
+class ReservationRequest(Base):
+    __tablename__ = "reservation_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    phone = Column(String, nullable=False, index=True)
+    status = Column(String, default="pending", nullable=False, index=True)
+    customer_name = Column(String, nullable=True)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+
+    product = relationship("Product", backref="reservation_requests")
+
