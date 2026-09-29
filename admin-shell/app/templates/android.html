@@ -92,7 +92,7 @@
         <a href="/inventory/reports/sales" class="nav-item">Отчёты</a>
         <a href="/repairs/repairs" class="nav-item">Ремонты</a>
         <a href="/avito/extension" class="nav-item">Расширение Avito</a>
-        <a href="/android" class="nav-item" style="color: #60a5fa; font-weight: 600;">📱 Android</a>
+        <a href="/android" class="nav-item" data-path="android">Android-приложение</a>
         <a href="/inventory/settings/organization" class="nav-item">Настройки</a>
         <a href="/help/user-manual.pdf" class="nav-item">📘 Инструкция</a>
         {% if is_owner %}
@@ -101,6 +101,62 @@
         <a href="/certificates" class="nav-item">Доступ (mTLS)</a>
         {% endif %}
     </nav>
+    <script>
+    (function() {
+        var p = window.location.pathname;
+        var links = document.querySelectorAll('nav.main-nav a.nav-item');
+        links.forEach(function(a) {
+            var href = a.getAttribute('href');
+            var isActive = false;
+            if (href === '/' && (p === '/' || p === '')) {
+                isActive = true;
+            } else if (href === '/inventory/products' && (p.indexOf('/inventory/products') === 0 || p === '/products' || p.indexOf('/products/') === 0) && p.indexOf('/products/json') !== 0) {
+                isActive = true;
+            } else if (href === '/products/json' && p.indexOf('/products/json') === 0) {
+                isActive = true;
+            } else if (href === '/inventory/sales' && (p.indexOf('/inventory/sales') === 0 || p.indexOf('/sales') === 0)) {
+                isActive = true;
+            } else if (href === '/inventory/cart' && (p.indexOf('/inventory/cart') === 0 || p.indexOf('/cart') === 0)) {
+                isActive = true;
+            } else if (href === '/inventory/reports/sales' && (p.indexOf('/inventory/reports') === 0 || p.indexOf('/reports') === 0)) {
+                isActive = true;
+            } else if (href === '/repairs/repairs' && p.indexOf('/repairs') === 0) {
+                isActive = true;
+            } else if (href === '/avito/extension' && (p.indexOf('/avito') === 0)) {
+                isActive = true;
+            } else if (href === '/android' && (p.indexOf('/android') === 0)) {
+                isActive = true;
+            } else if (href === '/inventory/settings/organization' && (p.indexOf('/inventory/settings') === 0 || p.indexOf('/settings') === 0)) {
+                isActive = true;
+            } else if (href === '/system/operations' && p.indexOf('/system/operations') === 0) {
+                isActive = true;
+            } else if (href === '/backups' && p.indexOf('/backups') === 0) {
+                isActive = true;
+            } else if (href === '/help/user-manual.pdf' && (p.indexOf('/help') === 0)) {
+                isActive = true;
+            } else if (href === '/certificates' && p.indexOf('/certificates') === 0) {
+                isActive = true;
+            }
+            if (isActive) {
+                a.style.background = '#2563eb';
+                a.style.color = '#fff';
+                a.style.fontWeight = '600';
+            }
+            a.addEventListener('mouseenter', function() {
+                if (!isActive) {
+                    a.style.background = '#1e293b';
+                    a.style.color = '#fff';
+                }
+            });
+            a.addEventListener('mouseleave', function() {
+                if (!isActive) {
+                    a.style.background = 'transparent';
+                    a.style.color = '#cbd5e1';
+                }
+            });
+        });
+    })();
+    </script>
 
     <div class="container">
         <div class="card">

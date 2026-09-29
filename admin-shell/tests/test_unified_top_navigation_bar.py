@@ -25,6 +25,7 @@ EXPECTED_LINKS = [
     ("/inventory/reports/sales", "Отчёты"),
     ("/repairs/repairs", "Ремонты"),
     ("/avito/extension", "Расширение Avito"),
+    ("/android", "Android-приложение"),
     ("/inventory/settings/organization", "Настройки"),
     ("/help/user-manual.pdf", "Инструкция"),
     ("/backups", "Резервные копии"),
@@ -118,3 +119,39 @@ def test_repairs_base_template_unified_navbar():
     assert_unified_navbar_in_html(content, "repairs base.html")
     # Ensure disparate header banner is gone
     assert "Техноребут — Модуль ремонтов" not in content
+
+
+def test_admin_shell_android_page_unified_navbar(owner_headers):
+    resp = client.get("/android", headers=owner_headers)
+    assert resp.status_code == 200
+    assert_unified_navbar_in_html(resp.text, "admin-shell android")
+    assert resp.text.count('href="/android"') == 1
+    assert "Android-приложение" in resp.text
+
+
+def test_stage03b_nav_button_authenticated_dashboard(owner_headers):
+    resp = client.get("/", headers=owner_headers)
+    assert resp.status_code == 200
+    assert 'href="/android"' in resp.text
+    assert "Android-приложение" in resp.text
+    assert resp.text.count('href="/android"') == 1
+
+
+def test_stage03b_android_route_auth_protection(owner_headers):
+    unauth_resp = client.get("/android")
+    assert unauth_resp.status_code == 403
+
+    auth_resp = client.get("/android", headers=owner_headers)
+    assert auth_resp.status_code == 200
+    assert "Android-приложение" in auth_resp.text
+    assert "Подключить устройство" in auth_resp.text
+
+
+def test_stage03b_android_download_route_unchanged(owner_headers):
+    unauth_resp = client.get("/android/download")
+    assert unauth_resp.status_code == 403
+
+    auth_resp = client.get("/android/download", headers=owner_headers)
+    if auth_resp.status_code == 200:
+        assert auth_resp.headers.get("content-type") == "application/vnd.android.package-archive"
+
