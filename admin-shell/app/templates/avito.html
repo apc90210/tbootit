@@ -49,6 +49,7 @@
         <a href="/inventory/reports/sales" class="nav-item" data-path="reports" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Отчёты</a>
         <a href="/repairs/repairs" class="nav-item" data-path="repairs" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Ремонты</a>
         <a href="/avito/extension" class="nav-item" data-path="avito" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Расширение Avito</a>
+        <a href="/android" class="nav-item" data-path="android" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Android-приложение</a>
         <a href="/inventory/settings/organization" class="nav-item" data-path="settings" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Настройки</a>
         <a href="/help/user-manual.pdf" class="nav-item" data-path="manual" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">📘 Инструкция</a>
         <a href="/backups" class="nav-item" data-path="backups" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; margin-left: auto;">Резервные копии</a>
@@ -76,6 +77,8 @@
             } else if (href === '/repairs/repairs' && p.indexOf('/repairs') === 0) {
                 isActive = true;
             } else if (href === '/avito/extension' && (p.indexOf('/avito') === 0)) {
+                isActive = true;
+            } else if (href === '/android' && (p.indexOf('/android') === 0)) {
                 isActive = true;
             } else if (href === '/inventory/settings/organization' && (p.indexOf('/inventory/settings') === 0 || p.indexOf('/settings') === 0)) {
                 isActive = true;

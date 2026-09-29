@@ -13,6 +13,8 @@ def test_top_navigation_links_on_dashboard():
     assert 'href="/inventory/reports/sales"' in html
     assert 'href="/repairs/repairs"' in html
     assert 'href="/avito/extension"' in html
+    assert 'href="/android"' in html
+    assert 'Android-приложение' in html
 
 def test_top_navigation_links_on_avito_pages():
     for url in ["/avito/extension"]:
@@ -24,3 +26,5 @@ def test_top_navigation_links_on_avito_pages():
         assert 'href="/inventory/reports/sales"' in html
         assert 'href="/repairs/repairs"' in html
         assert 'href="/avito/extension"' in html
+        assert 'href="/android"' in html
+        assert 'Android-приложение' in html
