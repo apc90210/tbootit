@@ -38,7 +38,7 @@ object ReportFormatters {
             SalesReportPeriod.TODAY -> {
                 if (timePart.length >= 5) timePart.substring(0, 5) else timePart.ifBlank { datePart }
             }
-            SalesReportPeriod.WEEK, SalesReportPeriod.YEAR -> {
+            SalesReportPeriod.WEEK, SalesReportPeriod.MONTH, SalesReportPeriod.YEAR -> {
                 if (datePart.contains("-")) {
                     val dParts = datePart.split("-")
                     if (dParts.size == 3) {

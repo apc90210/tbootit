@@ -5,6 +5,7 @@ import org.json.JSONObject
 enum class SalesReportPeriod(val apiKey: String, val displayName: String) {
     TODAY("today", "Сегодня"),
     WEEK("week", "Неделя"),
+    MONTH("month", "Месяц"),
     YEAR("year", "Год");
 
     companion object {

@@ -88,15 +88,17 @@ class SalesReportTest {
     fun testPeriodMapping() {
         assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("today"))
         assertEquals(SalesReportPeriod.WEEK, SalesReportPeriod.fromApiKey("week"))
+        assertEquals(SalesReportPeriod.MONTH, SalesReportPeriod.fromApiKey("month"))
         assertEquals(SalesReportPeriod.YEAR, SalesReportPeriod.fromApiKey("year"))
 
         // Case insensitivity
         assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("TODAY"))
         assertEquals(SalesReportPeriod.WEEK, SalesReportPeriod.fromApiKey("Week"))
+        assertEquals(SalesReportPeriod.MONTH, SalesReportPeriod.fromApiKey("Month"))
         assertEquals(SalesReportPeriod.YEAR, SalesReportPeriod.fromApiKey("YEAR"))
 
         // Fallback for unknown / invalid period
-        assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("month"))
+        assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("quarter"))
         assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("custom"))
         assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey(""))
     }
@@ -248,9 +250,12 @@ class SalesReportTest {
         val todayIso = ReportFormatters.formatSaleDateTime("2026-09-25T09:12:00.000", SalesReportPeriod.TODAY)
         assertEquals("09:12", todayIso)
 
-        // Week and Year periods prefer date
+        // Week, Month and Year periods prefer date
         val weekDate = ReportFormatters.formatSaleDateTime("2026-09-21 18:20:00", SalesReportPeriod.WEEK)
         assertEquals("21.09.2026", weekDate)
+
+        val monthDate = ReportFormatters.formatSaleDateTime("2026-09-15 11:00:00", SalesReportPeriod.MONTH)
+        assertEquals("15.09.2026", monthDate)
 
         val yearDate = ReportFormatters.formatSaleDateTime("2026-01-15T10:00:00", SalesReportPeriod.YEAR)
         assertEquals("15.01.2026", yearDate)
@@ -263,7 +268,7 @@ class SalesReportTest {
     @Test
     fun testPeriodSelectorState() {
         val periods = SalesReportPeriod.entries
-        assertEquals(3, periods.size)
+        assertEquals(4, periods.size)
 
         assertEquals("today", SalesReportPeriod.TODAY.apiKey)
         assertEquals("Сегодня", SalesReportPeriod.TODAY.displayName)
@@ -271,7 +276,51 @@ class SalesReportTest {
         assertEquals("week", SalesReportPeriod.WEEK.apiKey)
         assertEquals("Неделя", SalesReportPeriod.WEEK.displayName)
 
+        assertEquals("month", SalesReportPeriod.MONTH.apiKey)
+        assertEquals("Месяц", SalesReportPeriod.MONTH.displayName)
+
         assertEquals("year", SalesReportPeriod.YEAR.apiKey)
         assertEquals("Год", SalesReportPeriod.YEAR.displayName)
+    }
+
+    // 11. Month Report Parsing
+    @Test
+    fun testMonthReportParsing() {
+        val json = JSONObject().apply {
+            put("period", "month")
+            put("label", "Месяц")
+            put("date_from", "2026-09-01")
+            put("date_to", "2026-09-28")
+            put("currency", "RUB")
+            put("sales_count", 1)
+            put("revenue_total", 5000.0)
+            put("payment_methods", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("method", "card")
+                    put("label", "Безнал / карта")
+                    put("amount", 5000.0)
+                    put("count", 1)
+                })
+            })
+            put("sales", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("id", 42)
+                    put("created_at", "2026-09-15 12:00:00")
+                    put("amount", 5000.0)
+                    put("payment_method", "card")
+                    put("payment_label", "Безнал / карта")
+                })
+            })
+        }
+
+        val report = SalesReport.fromJson(json)
+        assertEquals(SalesReportPeriod.MONTH, report.period)
+        assertEquals("Месяц", report.label)
+        assertEquals("2026-09-01", report.dateFrom)
+        assertEquals("2026-09-28", report.dateTo)
+        assertEquals(1, report.salesCount)
+        assertEquals(5000.0, report.revenueTotal, 0.001)
+        assertEquals(1, report.sales.size)
+        assertEquals(42, report.sales[0].id)
     }
 }

@@ -66,8 +66,14 @@ def parse_date_or_none(value):
         raise HTTPException(status_code=400, detail="Некорректная дата. Используйте формат YYYY-MM-DD")
 
 
-def get_date_range(period: str, date_from: Optional[str] = None, date_to: Optional[str] = None):
-    now = datetime.now()
+def _current_datetime() -> datetime:
+    """Return current datetime, isolated for deterministic testing."""
+    return datetime.now()
+
+
+def get_date_range(period: str, date_from: Optional[str] = None, date_to: Optional[str] = None, now: Optional[datetime] = None):
+    if now is None:
+        now = _current_datetime()
     today = now.date()
     
     # Clean params

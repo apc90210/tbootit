@@ -392,7 +392,7 @@ def test_06_totals_match_canonical_core(enrolled_user):
     cred_id = enrolled_user["credential_id"]
     priv = enrolled_user["priv_key"]
 
-    for period in ("today", "week", "year"):
+    for period in ("today", "week", "month", "year"):
         canonical_path = f"/api/mobile/reports/sales?period={period}"
         headers = _get_pop_headers(cred_id, priv, "GET", canonical_path)
 
@@ -447,7 +447,7 @@ def test_08_sales_count_contract_correct(enrolled_user):
     cred_id = enrolled_user["credential_id"]
     priv = enrolled_user["priv_key"]
 
-    for period in ("today", "week", "year"):
+    for period in ("today", "week", "month", "year"):
         path = f"/api/mobile/reports/sales?period={period}"
         headers = _get_pop_headers(cred_id, priv, "GET", path)
         resp = client.get(path, headers=headers)
@@ -674,7 +674,7 @@ def test_16_tampered_period_query_invalidates_trmobile1(enrolled_user):
 # 17. Invalid period -> 400
 # ===========================================================================
 
-@pytest.mark.parametrize("invalid_period", ["month", "custom", "yesterday", "all", ""])
+@pytest.mark.parametrize("invalid_period", ["custom", "yesterday", "all", ""])
 def test_17_invalid_period_rejected_with_400(enrolled_user, invalid_period):
     cred_id = enrolled_user["credential_id"]
     priv = enrolled_user["priv_key"]
@@ -700,7 +700,8 @@ def test_18_r1_sample_regression_today_vs_sep17(enrolled_user):
     - Sep 25 sale MUST appear;
     - Sep 17 sale MUST NOT appear.
     """
-    sep25_sale = _insert_test_sale(3500.0, "completed", "cash", "2026-09-25 15:30:00")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    sep25_sale = _insert_test_sale(3500.0, "completed", "cash", f"{today_str} 15:30:00")
     sep17_sale = _insert_test_sale(4455.0, "completed", "cash", "2026-09-17 06:47:11")
 
     try:
@@ -717,15 +718,15 @@ def test_18_r1_sample_regression_today_vs_sep17(enrolled_user):
         sep17_ids = [row_id for _, row_id in sep17_sale]
         mobile_sale_ids = [s["id"] for s in data["sales"]]
 
-        # Sep 25 sale MUST appear
-        assert any(sid in mobile_sale_ids for sid in sep25_ids), "Sep 25 sale missing from today report"
+        # Today sale MUST appear
+        assert any(sid in mobile_sale_ids for sid in sep25_ids), "Today sale missing from today report"
 
         # Sep 17 sale MUST NOT appear
         assert not any(sid in mobile_sale_ids for sid in sep17_ids), "Sep 17 sale incorrectly included in today report!"
 
-        # Summary dates must match 2026-09-25
-        assert data["date_from"] == "2026-09-25"
-        assert data["date_to"] == "2026-09-25"
+        # Summary dates must match today
+        assert data["date_from"] == today_str
+        assert data["date_to"] == today_str
     finally:
         _delete_test_sales(sep25_sale + sep17_sale)
 

@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.technoreboot.mobile.data.MobileSession
@@ -209,7 +210,7 @@ fun PeriodSelectorRow(
                             shape = RoundedCornerShape(8.dp)
                         )
                         .clickable { onPeriodSelected(period) }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 10.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -217,6 +218,8 @@ fun PeriodSelectorRow(
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -370,6 +373,7 @@ fun EmptyStateView(
             val subtext = when (period) {
                 SalesReportPeriod.TODAY -> "За сегодняшний день завершённых продаж пока не зарегистрировано"
                 SalesReportPeriod.WEEK -> "За текущую неделю завершённых продаж нет"
+                SalesReportPeriod.MONTH -> "За текущий месяц завершённых продаж нет"
                 SalesReportPeriod.YEAR -> "За текущий год завершённых продаж нет"
             }
             Text(

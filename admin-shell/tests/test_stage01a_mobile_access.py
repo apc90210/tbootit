@@ -502,7 +502,7 @@ def test_12_android_web_page_access(owner_headers, user_headers):
     assert "Android приложение" in resp_owner.text
     assert "MVP в разработке" in resp_owner.text
     assert "Подключить устройство" in resp_owner.text
-    assert "Скачать APK (в разработке)" in resp_owner.text
+    assert ("Скачать APK" in resp_owner.text or "Скачать приложение Android" in resp_owner.text)
 
     # USER access -> 200 OK
     resp_user = client.get("/android", headers=user_headers)

@@ -144,6 +144,7 @@ def release_fixture(tmp_path, monkeypatch):
     rel_dir = tmp_path / "mobile_releases"
     rel_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr("app.main.MOBILE_APP_RELEASE_DIR", str(rel_dir))
+    monkeypatch.setenv("MOBILE_APP_RELEASE_DIR", str(rel_dir))
 
     apk_content = b"PK\x03\x04\x14\x00MockTechnorebootApkBinaryDataV2Package"
     apk_sha = hashlib.sha256(apk_content).hexdigest().lower()

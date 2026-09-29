@@ -2027,6 +2027,7 @@ async def api_mobile_test_post(request: Request):
 MOBILE_REPORT_PERIOD_LABELS = {
     "today": "Сегодня",
     "week": "Неделя",
+    "month": "Месяц",
     "year": "Год",
 }
 
@@ -2074,14 +2075,14 @@ async def _fetch_canonical_sales_report(period: str) -> Dict[str, Any]:
 async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
     """
     Mobile Sales Reports endpoint protected by TRMOBILE1 PoP.
-    Strictly accepts period in ('today', 'week', 'year').
+    Strictly accepts period in ('today', 'week', 'month', 'year').
     Invalid period -> 400.
     Reuses canonical Core calculation without parallel business logic.
     """
-    if period not in ("today", "week", "year"):
+    if period not in ("today", "week", "month", "year"):
         raise HTTPException(
             status_code=400,
-            detail="Invalid period. Allowed: today, week, year",
+            detail="Invalid period. Allowed: today, week, month, year",
         )
 
     # Enforce TRMOBILE1 Proof of Possession (PoP) authentication
