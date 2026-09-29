@@ -271,3 +271,22 @@ def test_audit_log_created(client, db_session):
         models.AuditLog.action == "status_confirmed"
     ).first()
     assert audit_status is not None
+
+
+def test_internal_token_required_for_reservation(client, db_session):
+    """13. Reservation creation requires valid internal token -> 401 when missing or invalid."""
+    product = _create_product(db_session, status="in_stock", quantity=1, is_published_site=1)
+    payload = {"product_id": product.id, "phone": "+79991230011"}
+
+    # Missing token
+    res_no_token = client.post("/api/reservation-requests/", json=payload)
+    assert res_no_token.status_code == 401
+
+    # Invalid token
+    res_bad_token = client.post(
+        "/api/reservation-requests/",
+        json=payload,
+        headers={"x-api-token": "wrong-token-abc"}
+    )
+    assert res_bad_token.status_code == 401
+
