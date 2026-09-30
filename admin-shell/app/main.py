@@ -1383,103 +1383,6 @@ async def api_proxy_products_json_export(request: Request, ids: Optional[str] = 
             )
 
 
-# =====================================================================
-# STAGE 04A: MOBILE POS BARCODE LOOKUP API
-# =====================================================================
-
-async def _fetch_canonical_product_by_barcode(barcode: str) -> Dict[str, Any]:
-    """
-    Fetch canonical product by barcode strictly from Core HTTP API.
-    Reuses existing Core lookup without parallel business logic.
-    Does NOT access Core DB directly.
-    Returns 404 if product not found, and 502/503/504 on Core failure.
-    """
-    clean_bc = (barcode or "").strip()
-    if not clean_bc:
-        raise HTTPException(
-            status_code=400,
-            detail="Штрихкод не может быть пустым",
-        )
-
-    headers = {
-        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
-    }
-    url = f"{CORE_API_URL}/api/products/by-barcode/{urllib.parse.quote(clean_bc)}"
-    try:
-        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-            resp = await client.get(url, headers=headers)
-            if resp.status_code == 200:
-                return resp.json()
-            elif resp.status_code == 404:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Товар со штрихкодом '{clean_bc}' не найден",
-                )
-            elif resp.status_code in (502, 503, 504):
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
-                )
-            else:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Core API returned error status {resp.status_code}",
-                )
-    except HTTPException:
-        raise
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="Core API request timed out",
-        )
-    except (httpx.ConnectError, httpx.RequestError) as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Core API connection failed: {str(e)}",
-        )
-
-
-@app.get("/api/mobile/products/by-barcode/{barcode}")
-async def api_mobile_product_by_barcode(request: Request, barcode: str):
-    """
-    Mobile Product Barcode Lookup endpoint protected by TRMOBILE1 PoP.
-    Strictly enforces TRMOBILE1 PoP authentication.
-    Path tampering (barcode changed in transit) causes signature verification failure.
-    Reuses canonical Core product endpoint without duplicate business logic.
-    Returns only POS-needed canonical fields.
-    """
-    ctx = await _get_mobile_auth(request)
-    raw_prod = await _fetch_canonical_product_by_barcode(barcode)
-
-    prod_id = int(raw_prod.get("id"))
-    title = raw_prod.get("title") or f"Товар #{prod_id}"
-    bc = raw_prod.get("barcode") or barcode.strip()
-    sku = raw_prod.get("sku") or ""
-    sale_price = float(raw_prod.get("sale_price") if raw_prod.get("sale_price") is not None else (raw_prod.get("price") or 0.0))
-    available_stock = int(raw_prod.get("quantity") or 0)
-    status_val = raw_prod.get("status") or "unknown"
-    storage_location = raw_prod.get("storage_location") or ""
-    main_photo_url = raw_prod.get("main_photo_url")
-
-    # Sellability check consistent with desktop POS rules:
-    # status must be in ['in_stock', 'available'] and quantity > 0
-    is_sellable = (status_val in ["in_stock", "available"]) and (available_stock > 0)
-
-    return {
-        "product_id": prod_id,
-        "barcode": bc,
-        "sku": sku,
-        "title": title,
-        "default_sale_price": sale_price,
-        "available_stock": available_stock,
-        "status": status_val,
-        "is_sellable": is_sellable,
-        "storage_location": storage_location,
-        "main_photo_url": main_photo_url,
-        "currency": "RUB",
-    }
-
-
 # ============================================================================
 # Stage 08D-R1R5: Owner Operations (Sync VDS -> Local, Update Git -> VDS)
 # ============================================================================
@@ -2304,8 +2207,180 @@ async def api_mobile_sale_receipt(request: Request, sale_id: int):
     return receipt
 
 
+# =====================================================================
+# STAGE 04A: MOBILE POS BARCODE LOOKUP API
+# =====================================================================
+
+async def _fetch_canonical_product_by_barcode(barcode: str) -> Dict[str, Any]:
+    """
+    Fetch canonical product by barcode strictly from Core HTTP API.
+    Reuses existing Core lookup without parallel business logic.
+    Does NOT access Core DB directly.
+    Returns 404 if product not found, and 502/503/504 on Core failure.
+    """
+    clean_bc = (barcode or "").strip()
+    if not clean_bc:
+        raise HTTPException(
+            status_code=400,
+            detail="Штрихкод не может быть пустым",
+        )
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/products/by-barcode/{urllib.parse.quote(clean_bc)}"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Товар со штрихкодом '{clean_bc}' не найден",
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API returned error status {resp.status_code}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
+
+
+@app.get("/api/mobile/products/by-barcode/{barcode}")
+async def api_mobile_product_by_barcode(request: Request, barcode: str):
+    """
+    Mobile Product Barcode Lookup endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication.
+    Path tampering (barcode changed in transit) causes signature verification failure.
+    Reuses canonical Core product endpoint without duplicate business logic.
+    Returns only POS-needed canonical fields.
+    """
+    ctx = await _get_mobile_auth(request)
+    raw_prod = await _fetch_canonical_product_by_barcode(barcode)
+
+    prod_id = int(raw_prod.get("id"))
+    title = raw_prod.get("title") or f"Товар #{prod_id}"
+    bc = raw_prod.get("barcode") or barcode.strip()
+    sku = raw_prod.get("sku") or ""
+    sale_price = float(raw_prod.get("sale_price") if raw_prod.get("sale_price") is not None else (raw_prod.get("price") or 0.0))
+    available_stock = int(raw_prod.get("quantity") or 0)
+    status_val = raw_prod.get("status") or "unknown"
+    storage_location = raw_prod.get("storage_location") or ""
+    main_photo_url = raw_prod.get("main_photo_url")
+
+    # Sellability check consistent with desktop POS rules:
+    # status must be in ['in_stock', 'available'] and quantity > 0
+    is_sellable = (status_val in ["in_stock", "available"]) and (available_stock > 0)
+
+    return {
+        "product_id": prod_id,
+        "barcode": bc,
+        "sku": sku,
+        "title": title,
+        "default_sale_price": sale_price,
+        "available_stock": available_stock,
+        "status": status_val,
+        "is_sellable": is_sellable,
+        "storage_location": storage_location,
+        "main_photo_url": main_photo_url,
+        "currency": "RUB",
+    }
+
 
 # =====================================================================
+# STAGE 04B: MOBILE POS CANONICAL CHECKOUT API
+# =====================================================================
+
+@app.post("/api/mobile/sales/checkout")
+async def api_mobile_sales_checkout(request: Request):
+    """
+    Mobile POS Canonical Checkout endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication with body SHA-256 binding.
+    Parent/device revocation enforced; inherited role/permissions enforced.
+    Body tampering denied by signature mismatch.
+    Admin-shell delegates entirely to Core HTTP API: does NOT modify DB directly.
+    """
+    ctx = await _get_mobile_auth(request)
+
+    try:
+        body_bytes = await request.body()
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Некорректный JSON в теле запроса: {str(e)}",
+        )
+
+    # Derive cashier identity from authenticated mobile session context
+    cashier_name = (
+        payload.get("cashier_name")
+        or ctx.get("parent_name")
+        or ctx.get("display_name")
+        or "Мобильный кассир"
+    )
+    payload["cashier_name"] = cashier_name
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+        "Content-Type": "application/json",
+    }
+    url = f"{CORE_API_URL}/api/sales/checkout"
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code in (400, 404, 409):
+                err_detail = "Ошибка оформления заказа"
+                try:
+                    err_json = resp.json()
+                    err_detail = err_json.get("detail", err_detail)
+                except Exception:
+                    err_detail = resp.text or err_detail
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=err_detail,
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=f"Core API returned error status {resp.status_code}: {resp.text}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
 # STAGE 01D: MOBILE IN-APP UPDATE API
 # =====================================================================
 

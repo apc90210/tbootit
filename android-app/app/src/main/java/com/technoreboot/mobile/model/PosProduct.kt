@@ -1,5 +1,6 @@
 package com.technoreboot.mobile.model
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class PosProduct(
@@ -85,4 +86,60 @@ data class PosCartState(
     val lines: List<PosCartLine> = emptyList(),
     val totalItemsCount: Int = lines.sumOf { it.quantity },
     val totalAmount: Double = Math.round(lines.sumOf { it.lineTotal } * 100.0) / 100.0
+)
+
+data class PosCheckoutItem(
+    val productId: Int,
+    val quantity: Int,
+    val price: Double,
+    val title: String? = null
+) {
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+        json.put("product_id", productId)
+        json.put("quantity", quantity)
+        json.put("price", price)
+        json.put("unit_price", price)
+        if (title != null) json.put("title", title)
+        return json
+    }
+}
+
+data class PosCheckoutRequest(
+    val clientCheckoutId: String,
+    val items: List<PosCheckoutItem>,
+    val paymentMethod: String = "cash",
+    val comment: String? = null,
+    val customerId: Int? = null,
+    val cashierName: String? = null
+) {
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+        json.put("client_checkout_id", clientCheckoutId)
+        val arr = JSONArray()
+        for (item in items) {
+            arr.put(item.toJson())
+        }
+        json.put("items", arr)
+        json.put("payment_method", paymentMethod)
+        if (comment != null) json.put("comment", comment)
+        if (customerId != null) json.put("customer_id", customerId)
+        if (cashierName != null) json.put("cashier_name", cashierName)
+        return json
+    }
+}
+
+data class PosPaymentMethodOption(
+    val id: String,
+    val label: String
+)
+
+val CANONICAL_PAYMENT_METHODS = listOf(
+    PosPaymentMethodOption("cash", "Наличные"),
+    PosPaymentMethodOption("card", "Безнал / карта"),
+    PosPaymentMethodOption("transfer", "Перевод"),
+    PosPaymentMethodOption("sbp", "СБП"),
+    PosPaymentMethodOption("legal_entity_account", "Счёт юрлица"),
+    PosPaymentMethodOption("mixed", "Смешанная оплата"),
+    PosPaymentMethodOption("other", "Другое")
 )

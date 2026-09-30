@@ -27,9 +27,10 @@ except Exception as e:
 Base.metadata.create_all(bind=engine)
 
 # Ad-hoc migrations for Stage 02
-def migrate_db():
+def migrate_db(target_engine=None):
     from sqlalchemy import text
-    with engine.begin() as conn:
+    eng = target_engine or engine
+    with eng.begin() as conn:
         res = conn.execute(text("PRAGMA table_info(products);")).fetchall()
         columns = [row[1] for row in res]
         
@@ -89,7 +90,8 @@ def migrate_db():
             ("warranty_days", "INTEGER"),
             ("warranty_enabled", "INTEGER DEFAULT 1"),
             ("source_type", "VARCHAR"),
-            ("source_id", "INTEGER")
+            ("source_id", "INTEGER"),
+            ("client_checkout_id", "VARCHAR(64)")
         ]
         for col_name, col_type in sales_updates:
             if col_name not in sales_columns:
@@ -102,6 +104,59 @@ def migrate_db():
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sales_source_type_source_id ON sales(source_type, source_id) WHERE source_type IS NOT NULL AND source_id IS NOT NULL;"))
         except Exception as e:
             print(f"Index creation error on ix_sales_source_type_source_id: {e}")
+
+        try:
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sales_client_checkout_id ON sales(client_checkout_id) WHERE client_checkout_id IS NOT NULL;"))
+        except Exception as e:
+            print(f"Index creation error on ix_sales_client_checkout_id: {e}")
+
+        # Migrate checkout_idempotency table for Stage 04B
+        try:
+            res_idemp = conn.execute(text("PRAGMA table_info(checkout_idempotency);")).fetchall()
+            idemp_columns = [row[1] for row in res_idemp]
+            if not res_idemp:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS checkout_idempotency (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        client_checkout_id VARCHAR(64) NOT NULL UNIQUE,
+                        sale_id INTEGER NOT NULL,
+                        request_hash VARCHAR(64) NOT NULL,
+                        cashier_name VARCHAR(255),
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (sale_id) REFERENCES sales(id)
+                    );
+                """))
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_checkout_idempotency_client_checkout_id ON checkout_idempotency(client_checkout_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_checkout_idempotency_sale_id ON checkout_idempotency(sale_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_checkout_idempotency_id ON checkout_idempotency(id);"))
+            elif "id" not in idemp_columns:
+                # Upgrading from legacy/broken table without id primary key
+                conn.execute(text("""
+                    CREATE TABLE checkout_idempotency_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        client_checkout_id VARCHAR(64) NOT NULL UNIQUE,
+                        sale_id INTEGER NOT NULL,
+                        request_hash VARCHAR(64) NOT NULL,
+                        cashier_name VARCHAR(255),
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (sale_id) REFERENCES sales(id)
+                    );
+                """))
+                conn.execute(text("""
+                    INSERT INTO checkout_idempotency_new (client_checkout_id, sale_id, request_hash, cashier_name, created_at)
+                    SELECT client_checkout_id, sale_id, request_hash, cashier_name, created_at FROM checkout_idempotency;
+                """))
+                conn.execute(text("DROP TABLE checkout_idempotency;"))
+                conn.execute(text("ALTER TABLE checkout_idempotency_new RENAME TO checkout_idempotency;"))
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_checkout_idempotency_client_checkout_id ON checkout_idempotency(client_checkout_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_checkout_idempotency_sale_id ON checkout_idempotency(sale_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_checkout_idempotency_id ON checkout_idempotency(id);"))
+            else:
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_checkout_idempotency_client_checkout_id ON checkout_idempotency(client_checkout_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_checkout_idempotency_sale_id ON checkout_idempotency(sale_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_checkout_idempotency_id ON checkout_idempotency(id);"))
+        except Exception as e:
+            print(f"Migration error on checkout_idempotency: {e}")
 
         # Migrate organization_settings table
         res_org = conn.execute(text("PRAGMA table_info(organization_settings);")).fetchall()
@@ -118,9 +173,10 @@ def migrate_db():
                     print(f"Migration error on {col_name}: {e}")
 
         # Seed organization settings if not present
-        settings_count = conn.execute(text("SELECT COUNT(*) FROM organization_settings")).scalar()
-        if settings_count == 0:
-            conn.execute(text("""
+        if res_org:
+            settings_count = conn.execute(text("SELECT COUNT(*) FROM organization_settings")).scalar()
+            if settings_count == 0:
+                conn.execute(text("""
                 INSERT INTO organization_settings (
                     organization_name, inn, address, phone, default_customer_label, warranty_text, no_warranty_text
                 ) VALUES (
@@ -291,8 +347,9 @@ def migrate_db():
 
     try:
         from app.services.repair_migration import run_repair_additive_migration
-        db_file = settings.database_url.replace("sqlite:///", "")
-        run_repair_additive_migration(db_file)
+        db_file = (target_engine.url.database if target_engine else settings.database_url.replace("sqlite:///", ""))
+        if db_file:
+            run_repair_additive_migration(db_file)
     except Exception as e:
         print(f"Migration error on run_repair_additive_migration: {e}")
 

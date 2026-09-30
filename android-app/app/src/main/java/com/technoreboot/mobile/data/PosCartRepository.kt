@@ -1,5 +1,6 @@
 package com.technoreboot.mobile.data
 
+import android.content.SharedPreferences
 import com.technoreboot.mobile.model.PosCartLine
 import com.technoreboot.mobile.model.PosCartState
 import com.technoreboot.mobile.model.PosProduct
@@ -16,17 +17,59 @@ sealed class AddToCartResult {
 }
 
 class PosCartRepository(
+    private val prefs: SharedPreferences? = null,
     private val serverUrlProvider: () -> String = { "" }
 ) {
+    constructor(serverUrlProvider: () -> String) : this(null, serverUrlProvider)
+
     private var lastBoundServerUrl: String = serverUrlProvider().trimEnd('/')
 
     private val _cartState = MutableStateFlow(PosCartState())
     val cartState: StateFlow<PosCartState> = _cartState.asStateFlow()
 
+    private var _pendingCheckoutId: String? = null
+    val pendingCheckoutId: String? get() = _pendingCheckoutId
+
+    /**
+     * Obtains the stable pending checkout ID or generates a new one.
+     * Retained across network timeouts to guarantee idempotency on retry.
+     */
+    fun getOrCreateCheckoutId(): String {
+        var id = _pendingCheckoutId
+        if (id == null) {
+            id = java.util.UUID.randomUUID().toString()
+            _pendingCheckoutId = id
+        }
+        return id
+    }
+
+    /**
+     * Clears pending checkout ID upon confirmed success or session termination.
+     */
+    fun clearPendingCheckoutId() {
+        _pendingCheckoutId = null
+    }
+
+    /**
+     * Resets checkout ID if cart parameters change.
+     */
+    fun resetCheckoutId() {
+        _pendingCheckoutId = null
+    }
+
+    /**
+     * Explicit hook for server or session change.
+     */
+    fun onServerOrSessionChanged() {
+        clearCart()
+        _pendingCheckoutId = null
+    }
+
     fun checkServerSync() {
         val current = serverUrlProvider().trimEnd('/')
         if (current.isNotEmpty() && lastBoundServerUrl.isNotEmpty() && current != lastBoundServerUrl) {
             clearCart()
+            _pendingCheckoutId = null
             lastBoundServerUrl = current
         } else if (lastBoundServerUrl.isEmpty() && current.isNotEmpty()) {
             lastBoundServerUrl = current
@@ -83,8 +126,17 @@ class PosCartRepository(
             }
         }
 
+        if (result is AddToCartResult.Added || result is AddToCartResult.Incremented) {
+            _pendingCheckoutId = null
+        }
+
         return result
     }
+
+    /**
+     * Convenience alias for addProduct.
+     */
+    fun addToCart(product: PosProduct): AddToCartResult = addProduct(product)
 
     /**
      * Increments quantity of an existing line if below availableStock.
@@ -108,6 +160,7 @@ class PosCartRepository(
                 current
             }
         }
+        if (updated) _pendingCheckoutId = null
         return updated
     }
 
@@ -133,6 +186,7 @@ class PosCartRepository(
                 current
             }
         }
+        if (updated) _pendingCheckoutId = null
         return updated
     }
 
@@ -156,8 +210,14 @@ class PosCartRepository(
                 current
             }
         }
+        if (updated) _pendingCheckoutId = null
         return updated
     }
+
+    /**
+     * Convenience alias for setQuantity.
+     */
+    fun updateQuantity(productId: Int, quantity: Int): Boolean = setQuantity(productId, quantity)
 
     /**
      * Overrides unit sale price for a line.
@@ -179,14 +239,21 @@ class PosCartRepository(
                 current
             }
         }
+        if (updated) _pendingCheckoutId = null
         return updated
     }
+
+    /**
+     * Convenience alias for setUnitPrice.
+     */
+    fun updateSalePrice(productId: Int, newPrice: Double): Boolean = setUnitPrice(productId, newPrice)
 
     /**
      * Removes a single line item by productId.
      */
     fun removeLine(productId: Int) {
         checkServerSync()
+        _pendingCheckoutId = null
         _cartState.update { current ->
             val newLines = current.lines.filter { it.productId != productId }
             PosCartState(lines = newLines)
@@ -197,6 +264,7 @@ class PosCartRepository(
      * Empties the entire cart.
      */
     fun clearCart() {
+        _pendingCheckoutId = null
         _cartState.value = PosCartState()
     }
 }

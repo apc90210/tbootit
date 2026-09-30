@@ -27,10 +27,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.technoreboot.mobile.crypto.KeystoreManager
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.technoreboot.mobile.data.AddToCartResult
 import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.data.PosCartRepository
+import com.technoreboot.mobile.model.CANONICAL_PAYMENT_METHODS
 import com.technoreboot.mobile.model.PosCartLine
+import com.technoreboot.mobile.model.PosCheckoutItem
+import com.technoreboot.mobile.model.PosCheckoutRequest
+import com.technoreboot.mobile.model.SaleReceipt
 import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
 import com.technoreboot.mobile.ui.reports.ReportFormatters
@@ -50,6 +56,7 @@ fun PosTerminalScreen(
     apiClient: MobileApiClient,
     cartRepository: PosCartRepository,
     onBackClicked: () -> Unit,
+    onOpenReceipt: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -62,6 +69,12 @@ fun PosTerminalScreen(
     var lineToEditPrice by remember { mutableStateOf<PosCartLine?>(null) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var isScannerVisible by remember { mutableStateOf(true) }
+
+    var isCheckingOut by remember { mutableStateOf(false) }
+    var showCheckoutDialog by remember { mutableStateOf(false) }
+    var selectedPaymentMethod by remember { mutableStateOf("cash") }
+    var checkoutErrorMessage by remember { mutableStateOf<String?>(null) }
+    var completedSaleReceipt by remember { mutableStateOf<SaleReceipt?>(null) }
 
     fun showFeedback(msg: String, isError: Boolean) {
         notification = PosNotification(message = msg, isError = isError)
@@ -120,7 +133,7 @@ fun PosTerminalScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Продажа",
+                            text = if (com.technoreboot.mobile.BuildConfig.DEBUG) "Продажа (Тест)" else "Продажа",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         if (cartState.totalItemsCount > 0) {
@@ -216,27 +229,22 @@ fun PosTerminalScreen(
                             }
 
                             Button(
-                                onClick = { /* Stage 04B checkout */ },
-                                enabled = false,
-                                modifier = Modifier.weight(2f),
-                                colors = ButtonDefaults.buttonColors(
-                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                onClick = {
+                                    checkoutErrorMessage = null
+                                    showCheckoutDialog = true
+                                },
+                                enabled = cartState.lines.isNotEmpty() && !isCheckingOut,
+                                modifier = Modifier.weight(2f)
                             ) {
-                                Text("Оформить (Stage 04B)")
+                                Icon(
+                                    imageVector = Icons.Default.ShoppingCartCheckout,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Оформить продажу")
                             }
                         }
-
-                        Text(
-                            text = "Оформление продажи и фискализация будут доступны в Stage 04B",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 6.dp)
-                        )
                     }
                 }
             }
@@ -499,6 +507,332 @@ fun PosTerminalScreen(
             dismissButton = {
                 TextButton(onClick = { showClearConfirmDialog = false }) {
                     Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Checkout Confirmation & Payment Dialog
+    if (showCheckoutDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isCheckingOut) {
+                    showCheckoutDialog = false
+                    checkoutErrorMessage = null
+                }
+            },
+            title = {
+                Text(
+                    text = "Оформление продажи",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    checkoutErrorMessage?.let { err ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Text(
+                                text = err,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Товаров в чеке: ${cartState.totalItemsCount} шт. (${cartState.lines.size} поз.)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    cartState.lines.forEach { line ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${line.title} (x${line.quantity})",
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = ReportFormatters.formatAmount(line.lineTotal),
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Итого к оплате:",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = ReportFormatters.formatAmount(cartState.totalAmount),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Способ оплаты:",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    CANONICAL_PAYMENT_METHODS.forEach { methodOption ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedPaymentMethod == methodOption.id) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .clickable(enabled = !isCheckingOut) {
+                                    selectedPaymentMethod = methodOption.id
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedPaymentMethod == methodOption.id,
+                                    onClick = { if (!isCheckingOut) selectedPaymentMethod = methodOption.id },
+                                    enabled = !isCheckingOut
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = methodOption.label,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = if (selectedPaymentMethod == methodOption.id) FontWeight.Bold else FontWeight.Normal
+                                    ),
+                                    color = if (selectedPaymentMethod == methodOption.id) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    checkoutErrorMessage?.let { err ->
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = err,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (isCheckingOut) return@Button
+                        coroutineScope.launch {
+                            isCheckingOut = true
+                            checkoutErrorMessage = null
+
+                            val privateKey = keystoreManager.getPrivateKey()
+                            if (privateKey == null) {
+                                checkoutErrorMessage = "Аппаратный ключ не найден в защищённом хранилище"
+                                isCheckingOut = false
+                                return@launch
+                            }
+
+                            val checkoutId = cartRepository.getOrCreateCheckoutId()
+                            val items = cartState.lines.map {
+                                PosCheckoutItem(
+                                    productId = it.productId,
+                                    quantity = it.quantity,
+                                    price = it.saleUnitPrice,
+                                    title = it.title
+                                )
+                            }
+                            val req = PosCheckoutRequest(
+                                clientCheckoutId = checkoutId,
+                                items = items,
+                                paymentMethod = selectedPaymentMethod,
+                                cashierName = session.displayName.ifBlank { session.role }
+                            )
+
+                            when (val result = apiClient.checkout(req, session.credentialId, privateKey)) {
+                                is ApiResult.Success -> {
+                                    cartRepository.clearPendingCheckoutId()
+                                    cartRepository.clearCart()
+                                    isCheckingOut = false
+                                    showCheckoutDialog = false
+                                    completedSaleReceipt = result.data
+                                }
+                                is ApiResult.Error -> {
+                                    isCheckingOut = false
+                                    if (result.isNetworkError) {
+                                        checkoutErrorMessage = "Сетевая ошибка: ${result.message}. Чек сохранён для повторной отправки."
+                                    } else if (result.code == 403) {
+                                        checkoutErrorMessage = "Доступ отозван на сервере"
+                                    } else {
+                                        checkoutErrorMessage = result.message
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isCheckingOut && selectedPaymentMethod.isNotBlank() && cartState.lines.isNotEmpty()
+                ) {
+                    if (isCheckingOut) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Оформление...")
+                    } else {
+                        Text("Подтвердить оплату")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showCheckoutDialog = false
+                        checkoutErrorMessage = null
+                    },
+                    enabled = !isCheckingOut
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Sale Completed Success Dialog
+    completedSaleReceipt?.let { receipt ->
+        AlertDialog(
+            onDismissRequest = { completedSaleReceipt = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Продажа завершена",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Чек № ${receipt.receiptNumber}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = ReportFormatters.formatAmount(receipt.totalAmount),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Оплата: ${receipt.paymentLabel}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    receipt.cashierName?.let { cName ->
+                        Text(
+                            text = "Кассир: $cName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Товаров: ${receipt.items.sumOf { it.quantity }} шт. (${receipt.items.size} поз.)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val saleId = receipt.saleId
+                        completedSaleReceipt = null
+                        onOpenReceipt(saleId)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ReceiptLong,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Открыть чек")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { completedSaleReceipt = null },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Новая продажа")
                 }
             }
         )

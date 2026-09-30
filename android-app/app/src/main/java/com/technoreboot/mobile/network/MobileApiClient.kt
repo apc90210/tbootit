@@ -370,6 +370,72 @@ class MobileApiClient(
         }
     }
 
+    /**
+     * Executes canonical POS checkout via POST /api/mobile/sales/checkout
+     * protected by TRMOBILE1 PoP authentication with request body SHA-256 binding.
+     */
+    suspend fun checkout(
+        request: com.technoreboot.mobile.model.PosCheckoutRequest,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<SaleReceipt> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            val msg = if (err.code == 403) {
+                if (err.message.contains("устройств", ignoreCase = true) || err.message.contains("device", ignoreCase = true)) {
+                    "Доступ этого устройства отозван"
+                } else {
+                    "Доступ отозван"
+                }
+            } else {
+                err.message
+            }
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = msg,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "POST"
+        val canonicalPath = "/api/mobile/sales/checkout"
+        val jsonPayload = request.toJson()
+        val bodyBytes = jsonPayload.toString().toByteArray(Charsets.UTF_8)
+        val bodyHash = RequestBinding.computeBodySha256(bodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val requestBody = bodyBytes.toRequestBody(JSON_MEDIA_TYPE)
+        val httpRequest = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .post(requestBody)
+            .build()
+
+        executeRequest(httpRequest) { json ->
+            SaleReceipt.fromJson(json)
+        }
+    }
+
 
 
     /**

@@ -45,7 +45,7 @@ fun ConnectedScreen(
                 modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text(
-                    text = "ТЕХНОРЕБУТ",
+                    text = if (com.technoreboot.mobile.BuildConfig.DEBUG) "ТЕХНОРЕБУТ ТЕСТ" else "ТЕХНОРЕБУТ",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,

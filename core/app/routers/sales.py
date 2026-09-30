@@ -9,6 +9,7 @@ from app import models, schemas
 from app.routers.customers import log_audit
 from app.routers.products import log_product_event
 from app.routers.reports import PAYMENT_METHODS_LABELS
+from app.services import sale_service
 
 router = APIRouter()
 
@@ -65,81 +66,39 @@ def get_sales_today(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.Sale)
 def create_sale(sale: schemas.SaleCreate, db: Session = Depends(get_db)):
-    if sale.payment_method not in VALID_PAYMENT_METHODS:
-        raise HTTPException(status_code=400, detail=f"Invalid payment method. Allowed: {', '.join(VALID_PAYMENT_METHODS)}")
-        
-    if not sale.items:
-        raise HTTPException(status_code=400, detail="Sale must contain at least one item")
-
-    # Validate items before processing
-    product_ids = set()
-    for item in sale.items:
-        if item.quantity <= 0:
-            raise HTTPException(status_code=400, detail="Item quantity must be > 0")
-        if item.price < 0:
-            raise HTTPException(status_code=400, detail="Item price must be >= 0")
-        if item.product_id in product_ids:
-            raise HTTPException(status_code=400, detail=f"Duplicate product_id {item.product_id} in sale")
-        product_ids.add(item.product_id)
-        
-        db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-        if not db_product:
-            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-        if db_product.status not in ["in_stock", "reserved"]:
-            raise HTTPException(status_code=400, detail=f"Cannot sell product {item.product_id} in status '{db_product.status}'")
-        if db_product.storage_location != "store":
-            raise HTTPException(status_code=400, detail=f"Product {item.product_id} must be in 'store' location to be sold")
-        if (db_product.quantity or 0) < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Insufficient quantity for product {item.product_id}. Available: {db_product.quantity or 0}")
-
-    calculated_total = sum(item.price * item.quantity for item in sale.items)
-
     sale_data = sale.model_dump()
-    items_data = sale_data.pop("items")
-    
-    sale_data["total_amount"] = calculated_total
-    sale_data["warranty_enabled"] = 1 if sale_data.get("warranty_enabled") else 0
-    sale_data["status"] = "completed"
-    
-    db_sale = models.Sale(**sale_data)
-    db.add(db_sale)
-    db.commit()
-    db.refresh(db_sale)
-    
-    for item in items_data:
-        db_item = models.SaleItem(**item, sale_id=db_sale.id)
-        db.add(db_item)
-        
-        db_product = db.query(models.Product).filter(models.Product.id == item["product_id"]).first()
-        old_status = db_product.status
-        old_location = db_product.storage_location
-        old_quantity = db_product.quantity or 0
-        db_product.quantity = old_quantity - item["quantity"]
-        
-        mov = models.StockMovement(
-            product_id=db_product.id,
-            movement_type="sale",
-            quantity_delta=-item["quantity"],
-            old_quantity=old_quantity,
-            new_quantity=db_product.quantity,
-            reason="sale",
-            comment=f"Sale {db_sale.id}"
-        )
-        db.add(mov)
-
-        if db_product.quantity == 0:
-            db_product.status = "sold"
-            db_product.storage_location = "archive"
-        
-        log_product_event(db, db_product.id, "sale_completed", old_value={"status": old_status, "quantity": old_quantity, "storage_location": old_location}, new_value={"status": db_product.status, "quantity": db_product.quantity, "storage_location": db_product.storage_location}, comment=f"Sold {item['quantity']} items in sale {db_sale.id}. Price: {item['price']}")
-
-    db.commit()
-    db.refresh(db_sale)
-    
-    log_audit(db, "sale", db_sale.id, "create", new_value={"total_amount": sale.total_amount, "payment_method": sale.payment_method})
-    db.commit()
-    
+    items_data = sale_data.pop("items", [])
+    db_sale, _ = sale_service.execute_canonical_sale(
+        db=db,
+        items_data=items_data,
+        payment_method=sale_data.get("payment_method", "cash"),
+        customer_id=sale_data.get("customer_id"),
+        comment=sale_data.get("comment"),
+        source_type=sale_data.get("source_type"),
+        source_id=sale_data.get("source_id"),
+        warranty_days=sale_data.get("warranty_days", 30),
+        warranty_enabled=sale_data.get("warranty_enabled", True),
+        client_checkout_id=sale_data.get("client_checkout_id"),
+        cashier_name="Администратор"
+    )
     return db_sale
+
+
+@router.post("/checkout", response_model=schemas.SaleCheckoutResponse)
+def checkout_sale(req: schemas.SaleCheckoutRequest, db: Session = Depends(get_db)):
+    items_data = [item.model_dump() for item in req.items]
+    db_sale, _ = sale_service.execute_canonical_sale(
+        db=db,
+        items_data=items_data,
+        payment_method=req.payment_method,
+        customer_id=req.customer_id,
+        comment=req.comment,
+        warranty_days=req.warranty_days,
+        warranty_enabled=req.warranty_enabled,
+        client_checkout_id=req.client_checkout_id,
+        cashier_name=req.cashier_name
+    )
+    return sale_service.build_sale_checkout_response(db, db_sale, req.client_checkout_id)
 
 @router.get("/{sale_id}", response_model=schemas.Sale)
 def get_sale(sale_id: int, db: Session = Depends(get_db)):

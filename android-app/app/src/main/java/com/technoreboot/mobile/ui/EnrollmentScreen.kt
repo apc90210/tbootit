@@ -54,7 +54,7 @@ fun EnrollmentScreen(
         ) {
             // App Branding & Title
             Text(
-                text = "ТЕХНОРЕБУТ",
+                text = if (com.technoreboot.mobile.BuildConfig.DEBUG) "ТЕХНОРЕБУТ ТЕСТ" else "ТЕХНОРЕБУТ",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,
