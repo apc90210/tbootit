@@ -99,7 +99,7 @@ fun SalesReportScreen(
                     IconButton(onClick = onPosClicked) {
                         Icon(
                             imageVector = Icons.Default.QrCodeScanner,
-                            contentDescription = "Касса",
+                            contentDescription = "Продажа",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -142,10 +142,10 @@ fun SalesReportScreen(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "Касса"
+                        contentDescription = "Продажа"
                     )
                 },
-                text = { Text("Касса") },
+                text = { Text("Продажа") },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )

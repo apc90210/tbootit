@@ -120,7 +120,7 @@ fun PosTerminalScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Касса",
+                            text = "Продажа",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         if (cartState.totalItemsCount > 0) {

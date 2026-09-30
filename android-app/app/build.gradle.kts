@@ -52,6 +52,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://127.0.0.1:8011\"")
         }
     }
     compileOptions {
