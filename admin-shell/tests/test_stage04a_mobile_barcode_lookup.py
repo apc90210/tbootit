@@ -30,10 +30,14 @@ import base64
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 admin_shell_dir = os.path.join(project_root, "admin-shell")
-core_dir = os.path.join(project_root, "core")
 
-if admin_shell_dir not in sys.path:
-    sys.path.insert(0, admin_shell_dir)
+for k in list(sys.modules.keys()):
+    if k == "app" or k.startswith("app."):
+        sys.modules.pop(k, None)
+
+while admin_shell_dir in sys.path:
+    sys.path.remove(admin_shell_dir)
+sys.path.insert(0, admin_shell_dir)
 
 import app.main as admin_main
 from app.main import app, auth_manager, mobile_manager, CORE_API_URL

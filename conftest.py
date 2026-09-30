@@ -10,9 +10,6 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent
-_core_path = str(REPO_ROOT / "core")
-if _core_path not in sys.path:
-    sys.path.insert(0, _core_path)
 
 # Ensure IS_TESTING flag is set early
 os.environ["IS_TESTING"] = "1"
@@ -27,7 +24,7 @@ def assert_not_canonical_db(url_or_path: str):
             )
 
 # Create session-scoped isolated temporary directory and test database
-_root_test_dir = tempfile.TemporaryDirectory(prefix="pytest_root_isolated_")
+_root_test_dir = tempfile.TemporaryDirectory(prefix="pytest_root_isolated_", ignore_cleanup_errors=True)
 _root_test_db_path = os.path.join(_root_test_dir.name, "isolated_test.db")
 _root_test_db_url = f"sqlite:///{_root_test_db_path}"
 
@@ -46,6 +43,11 @@ def fail_safe_canonical_db_protection():
     assert_not_canonical_db(active_url)
     yield
     assert_not_canonical_db(active_url)
+    try:
+        from core.app.database import engine
+        engine.dispose()
+    except Exception:
+        pass
     try:
         _root_test_dir.cleanup()
     except Exception:
