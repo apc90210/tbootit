@@ -1,4 +1,4 @@
-﻿# Development Databases
+# Development Databases
 
 > **One-liner rule:** Tests MUST NEVER touch the canonical DB. All test runs use
 > a throwaway SQLite file in a `tempfile.mkdtemp()` directory that is destroyed
@@ -23,9 +23,9 @@ The isolation layer rejects any attempt to write to:
 
 | Pattern | Guard |
 |---------|-------|
-| `data/db/technoreboot.db` | `database.py` runtime fail-safe |
+| `data/db/technoreboot.db` | `database.py` and `mobile_manager.py` runtime fail-safe |
 | `core/technoreboot.db` | `database.py` runtime fail-safe |
-| `technoreboot.db` (repository root) | `conftest.py` env-var override + `.gitignore` |
+| `technoreboot.db` (repository root) | `conftest.py` env-var override + `core/app/config.py` factory + `.gitignore` |
 
 If a test accidentally targets any of the above paths, a `RuntimeError` is
 raised before any `SessionLocal()` is created.
@@ -34,15 +34,18 @@ raised before any `SessionLocal()` is created.
 
 ## How Isolation Is Enforced
 
-`
+```
 pytest
  |-- C:\tbootit\conftest.py           <- root session fixture
  |    |-- os.environ["IS_TESTING"] = "1"
- |    |-- os.environ["DATABASE_URL"] = "sqlite:////<tmpdir>/isolated_test.db"
+ |    |-- os.environ["DATABASE_URL"] = "sqlite:///<tmpdir>/isolated_test.db"
  |    +-- yields -> test runs in complete isolation
  +-- C:\tbootit\core\tests\conftest.py <- core-specific fixtures
-      +-- re-applies same override for the core test suite
-`
+ |    +-- re-applies same override for the core test suite
+ +-- C:\tbootit\core\app\config.py    <- _get_default_database_url() returns temp DB when testing,
+ |                                       and canonical data/db/technoreboot.db for host dev runtime
+ +-- C:\tbootit\admin-shell\app\mobile_manager.py <- _get_default_db_path() guards against canonical DB during tests
+```
 
 `core/app/database.py` checks `IS_TESTING` at engine-bind time. If the flag is
 set and the resolved URL path contains `technoreboot.db`, it raises

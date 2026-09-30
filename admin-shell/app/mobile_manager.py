@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import uuid
 import secrets
@@ -61,8 +62,22 @@ def _get_default_db_path() -> str:
     env_db = os.getenv("DATABASE_PATH") or os.getenv("DATABASE_URL")
     if env_db:
         clean = env_db.replace("sqlite:///", "").replace("sqlite://", "")
-        if os.path.exists(clean):
-            return clean
+        if len(clean) > 2 and clean[0] == "/" and clean[2] == ":":
+            clean = clean[1:]
+        # Fail-safe protection: tests must NEVER connect to canonical development/production DB
+        if os.getenv("IS_TESTING") == "1" or "pytest" in sys.modules:
+            norm = clean.replace("\\", "/").lower()
+            if "data/db/technoreboot.db" in norm or "/srv/technoreboot" in norm:
+                raise RuntimeError(
+                    f"FATAL SECURITY VIOLATION: Test environment attempted to bind to canonical DB: {clean}"
+                )
+        return clean
+
+    # Fail-safe check: test environment must never reach canonical DB fallback
+    if os.getenv("IS_TESTING") == "1" or "pytest" in sys.modules:
+        raise RuntimeError(
+            "FATAL SECURITY VIOLATION: Test environment called _get_default_db_path() without isolated DATABASE_URL!"
+        )
 
     env_data = os.getenv("DATA_DIR")
     if env_data and os.path.isdir(env_data):
@@ -74,16 +89,8 @@ def _get_default_db_path() -> str:
         return "/data/db/technoreboot.db"
 
     root = _get_project_root()
-    candidates = [
-        root / "data" / "db" / "technoreboot.db",
-        root / "technoreboot.db",
-        root / "core" / "technoreboot.db",
-    ]
-    for c in candidates:
-        if c.is_file():
-            return str(c)
-
-    return str(root / "data" / "db" / "technoreboot.db")
+    canonical = root / "data" / "db" / "technoreboot.db"
+    return str(canonical)
 
 
 PROTOCOL_VERSION = "TRMOBILE1"

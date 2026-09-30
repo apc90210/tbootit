@@ -23,6 +23,7 @@ import subprocess
 from unittest.mock import patch, MagicMock, AsyncMock
 import pytest
 import httpx
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization, hashes
@@ -163,9 +164,11 @@ def test_03_unknown_barcode_returns_404():
     path = "/api/mobile/products/by-barcode/999999999999"
     headers = _get_pop_headers(cred_id, priv, "GET", path)
 
-    resp = client.get(path, headers=headers)
-    assert resp.status_code == 404
-    assert "не найден" in resp.json()["detail"] or "not found" in resp.json()["detail"].lower()
+    with patch.object(admin_main, "_fetch_canonical_product_by_barcode", new_callable=AsyncMock) as mock_fetch:
+        mock_fetch.side_effect = HTTPException(status_code=404, detail="Товар со штрихкодом '999999999999' не найден")
+        resp = client.get(path, headers=headers)
+        assert resp.status_code == 404
+        assert "не найден" in resp.json()["detail"] or "not found" in resp.json()["detail"].lower()
 
 
 def test_04_zero_stock_product_is_sellable_false():

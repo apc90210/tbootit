@@ -26,6 +26,7 @@ def assert_not_canonical_db(url_or_path: str):
 # Create session-scoped isolated temporary directory and test database
 _root_test_dir = tempfile.TemporaryDirectory(prefix="pytest_root_isolated_", ignore_cleanup_errors=True)
 _root_test_db_path = os.path.join(_root_test_dir.name, "isolated_test.db")
+Path(_root_test_db_path).touch()
 _root_test_db_url = f"sqlite:///{_root_test_db_path}"
 
 # Only set if DATABASE_URL is not set or points to relative/canonical technoreboot.db

@@ -17,7 +17,11 @@ def _is_testing() -> bool:
 def _get_default_database_url() -> str:
     if _is_testing():
         return f"sqlite:///{tempfile.gettempdir().replace(chr(92), '/')}/technoreboot_isolated_test.db"
-    return "sqlite:///./technoreboot.db"
+    # Canonical development runtime DB: data/db/technoreboot.db
+    # Never return ./technoreboot.db in repository root
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    canonical_path = os.path.join(base_dir, "data", "db", "technoreboot.db").replace("\\", "/")
+    return f"sqlite:///{canonical_path}"
 
 class Settings(BaseSettings):
     app_env: str = "dev"
