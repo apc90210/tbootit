@@ -2370,9 +2370,83 @@ async def api_mobile_product_by_barcode(request: Request, barcode: str):
     }
 
 
-
-
 # =====================================================================
+# STAGE 04B: MOBILE POS CANONICAL CHECKOUT API
+# =====================================================================
+
+@app.post("/api/mobile/sales/checkout")
+async def api_mobile_sales_checkout(request: Request):
+    """
+    Mobile POS Canonical Checkout endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication with body SHA-256 binding.
+    Parent/device revocation enforced; inherited role/permissions enforced.
+    Body tampering denied by signature mismatch.
+    Admin-shell delegates entirely to Core HTTP API: does NOT modify DB directly.
+    """
+    ctx = await _get_mobile_auth(request)
+
+    try:
+        body_bytes = await request.body()
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Некорректный JSON в теле запроса: {str(e)}",
+        )
+
+    # Derive cashier identity from authenticated mobile session context
+    cashier_name = (
+        payload.get("cashier_name")
+        or ctx.get("parent_name")
+        or ctx.get("display_name")
+        or "Мобильный кассир"
+    )
+    payload["cashier_name"] = cashier_name
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+        "Content-Type": "application/json",
+    }
+    url = f"{CORE_API_URL}/api/sales/checkout"
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code in (400, 404, 409):
+                err_detail = "Ошибка оформления заказа"
+                try:
+                    err_json = resp.json()
+                    err_detail = err_json.get("detail", err_detail)
+                except Exception:
+                    err_detail = resp.text or err_detail
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=err_detail,
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=f"Core API returned error status {resp.status_code}: {resp.text}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
 # STAGE 01D: MOBILE IN-APP UPDATE API
 # =====================================================================
 

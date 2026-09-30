@@ -57,7 +57,7 @@ fun SalesReportScreen(
                 title = {
                     Column {
                         Text(
-                            text = "ТЕХНОРЕБУТ",
+                            text = if (com.technoreboot.mobile.BuildConfig.DEBUG) "ТЕХНОРЕБУТ ТЕСТ" else "ТЕХНОРЕБУТ",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp

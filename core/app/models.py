@@ -441,10 +441,22 @@ class Sale(Base):
     reissued_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     revision_count = Column(Integer, default=0, nullable=False, server_default="0")
+    client_checkout_id = Column(String(64), nullable=True, unique=True, index=True)
     
     items = relationship("SaleItem", back_populates="sale")
     avito_post_sale_tasks = relationship("AvitoPostSaleTask", back_populates="sale")
     revisions = relationship("SaleRevision", back_populates="sale", order_by="SaleRevision.revision_no.asc()")
+
+class CheckoutIdempotency(Base):
+    __tablename__ = "checkout_idempotency"
+    id = Column(Integer, primary_key=True, index=True)
+    client_checkout_id = Column(String(64), unique=True, index=True, nullable=False)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False, index=True)
+    request_hash = Column(String(64), nullable=False)
+    cashier_name = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    sale = relationship("Sale")
 
 class SaleRevision(Base):
     __tablename__ = "sale_revisions"

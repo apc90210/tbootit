@@ -224,7 +224,11 @@ fun MobileApp(
                         keystoreManager = keystoreManager,
                         apiClient = apiClient,
                         cartRepository = cartRepository,
-                        onBackClicked = { currentScreen = AppScreen.MAIN }
+                        onBackClicked = { currentScreen = AppScreen.MAIN },
+                        onOpenReceipt = { saleId ->
+                            selectedSaleId = saleId
+                            currentScreen = AppScreen.RECEIPT_DETAIL
+                        }
                     )
                 } else {
                     currentScreen = AppScreen.MAIN

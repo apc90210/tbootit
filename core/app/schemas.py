@@ -5,7 +5,7 @@ from datetime import datetime
 # Category Schemas
 class CategoryBase(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None
     description: Optional[str] = None
 
 class CategoryCreate(CategoryBase):
@@ -219,6 +219,7 @@ class SaleBase(BaseModel):
     source_id: Optional[int] = None
     warranty_days: Optional[int] = 30
     warranty_enabled: Optional[bool] = True
+    client_checkout_id: Optional[str] = None
 
 class SaleCreate(SaleBase):
     items: List[SaleItemCreate]
@@ -308,6 +309,39 @@ class SaleReceiptResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SaleCheckoutItem(BaseModel):
+    product_id: int
+    quantity: int
+    price: Optional[float] = None
+    unit_price: Optional[float] = None
+    title: Optional[str] = None
+
+    @model_validator(mode="after")
+    def populate_and_validate_price(self):
+        if self.price is None and self.unit_price is not None:
+            self.price = float(self.unit_price)
+        elif self.unit_price is None and self.price is not None:
+            self.unit_price = float(self.price)
+        if self.price is None:
+            raise ValueError("Price or unit_price must be specified")
+        return self
+
+
+class SaleCheckoutRequest(BaseModel):
+    client_checkout_id: str
+    items: List[SaleCheckoutItem]
+    payment_method: str = "cash"
+    comment: Optional[str] = None
+    customer_id: Optional[int] = None
+    cashier_name: Optional[str] = None
+    warranty_days: Optional[int] = 30
+    warranty_enabled: Optional[bool] = True
+
+
+class SaleCheckoutResponse(SaleReceiptResponse):
+    client_checkout_id: str
 
 
 # Photo Schemas
