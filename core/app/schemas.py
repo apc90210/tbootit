@@ -311,6 +311,9 @@ class SaleReceiptResponse(BaseModel):
         from_attributes = True
 
 
+from app.services.receipt_presentation import ReceiptDocumentData, ReceiptDocumentItem
+
+
 class SaleCheckoutItem(BaseModel):
     product_id: int
     quantity: int
