@@ -199,6 +199,8 @@ class SaleItemBase(BaseModel):
     title: Optional[str] = None
     price: float
     quantity: int
+    avito_item_id: Optional[str] = None
+    avito_listing_url: Optional[str] = None
 
 class SaleItemCreate(SaleItemBase):
     pass
@@ -1099,3 +1101,21 @@ class BulkDeleteResponse(BaseModel):
     deleted_count: int
     deleted_ids: List[int]
 
+
+
+class AvitoHandoffItem(BaseModel):
+    product_id: Optional[int] = None
+    title: str
+    avito_item_id: Optional[str] = None
+    listing_id: Optional[str] = None
+    listing_url: Optional[str] = None
+    remote_status: Optional[str] = None
+    remaining_stock: Optional[int] = 0
+    source_of_linkage: str
+    can_open_avito: bool
+    needs_manual_avito_removal: bool = True
+
+
+class AvitoHandoffResponse(BaseModel):
+    sale_id: int
+    items: List[AvitoHandoffItem]

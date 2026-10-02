@@ -23,6 +23,9 @@ import com.technoreboot.mobile.data.CachedReceipt
 import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.data.ReceiptCacheRepository
 import com.technoreboot.mobile.data.ReceiptPrintCache
+import com.technoreboot.mobile.handoff.AvitoHandoffCard
+import com.technoreboot.mobile.handoff.AvitoHandoffHelper
+import com.technoreboot.mobile.model.AvitoHandoffItem
 import com.technoreboot.mobile.print.ReceiptPrintHelper
 import com.technoreboot.mobile.model.SaleReceipt
 import com.technoreboot.mobile.model.SaleReceiptItem
@@ -69,6 +72,7 @@ fun ReceiptDetailScreen(
     val context = LocalContext.current
     var isPrinting by remember { mutableStateOf(false) }
     var printError by remember { mutableStateOf<String?>(null) }
+    var avitoHandoffItems by remember { mutableStateOf<List<AvitoHandoffItem>>(emptyList()) }
 
     fun printReceipt() {
         if (privateKey == null) {
@@ -180,6 +184,14 @@ fun ReceiptDetailScreen(
     LaunchedEffect(saleId) {
         val cached = cacheRepository.get(saleId)
         fetchFromNetwork(cached)
+        if (privateKey != null) {
+            val avitoResult = apiClient.getAvitoHandoff(saleId, session.credentialId, privateKey)
+            if (avitoResult is ApiResult.Success) {
+                avitoHandoffItems = avitoResult.data.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() || it.needsManualAvitoRemoval }
+            } else {
+                avitoHandoffItems = emptyList()
+            }
+        }
     }
 
     Scaffold(
@@ -232,6 +244,16 @@ fun ReceiptDetailScreen(
                             cacheRepository.get(saleId)
                         }
                         fetchFromNetwork(currentCached)
+                        if (privateKey != null) {
+                            coroutineScope.launch {
+                                val avitoResult = apiClient.getAvitoHandoff(saleId, session.credentialId, privateKey)
+                                if (avitoResult is ApiResult.Success) {
+                                    avitoHandoffItems = avitoResult.data.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() || it.needsManualAvitoRemoval }
+                                } else {
+                                    avitoHandoffItems = emptyList()
+                                }
+                            }
+                        }
                     }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -407,7 +429,11 @@ fun ReceiptDetailScreen(
                         onPrintClicked = { printReceipt() },
                         onSettingsClicked = { ReceiptPrintHelper.openPrintSettings(context) },
                         isPrinting = isPrinting,
-                        printError = printError
+                        printError = printError,
+                        avitoHandoffItems = avitoHandoffItems,
+                        onOpenAvitoListing = { item ->
+                            AvitoHandoffHelper.openAvitoListing(context, item.listingUrl)
+                        }
                     )
                 }
             }
@@ -425,7 +451,9 @@ fun ReceiptDetailContent(
     onPrintClicked: () -> Unit = {},
     onSettingsClicked: () -> Unit = {},
     isPrinting: Boolean = false,
-    printError: String? = null
+    printError: String? = null,
+    avitoHandoffItems: List<AvitoHandoffItem> = emptyList(),
+    onOpenAvitoListing: (AvitoHandoffItem) -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -682,6 +710,16 @@ fun ReceiptDetailContent(
                         )
                     }
                 }
+            }
+        }
+
+        // Avito Handoff Card
+        if (avitoHandoffItems.isNotEmpty()) {
+            item {
+                AvitoHandoffCard(
+                    items = avitoHandoffItems,
+                    onOpenListing = onOpenAvitoListing
+                )
             }
         }
 

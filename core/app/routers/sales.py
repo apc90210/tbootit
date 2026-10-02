@@ -306,7 +306,26 @@ def reissue_sale(sale_id: int, reissue_data: schemas.SaleReissue, db: Session = 
     db_old_sale.replaced_by_sale_id = new_sale.id
     
     for item in reissue_data.items:
-        db_item = models.SaleItem(**item.model_dump(), sale_id=new_sale.id)
+        item_dict = item.model_dump()
+        if not item_dict.get("avito_item_id") and item.product_id:
+            old_item = db.query(models.SaleItem).filter(
+                models.SaleItem.sale_id == sale_id,
+                models.SaleItem.product_id == item.product_id
+            ).first()
+            if old_item and old_item.avito_item_id:
+                item_dict["avito_item_id"] = old_item.avito_item_id
+                item_dict["avito_listing_url"] = old_item.avito_listing_url
+            else:
+                ext_listing = db.query(models.ProductExternalListing).filter(
+                    models.ProductExternalListing.product_id == item.product_id,
+                    models.ProductExternalListing.marketplace == "avito"
+                ).first()
+                if ext_listing:
+                    item_dict["avito_item_id"] = str(ext_listing.external_item_id)
+                    from app.routers.avito_post_sale import _canonical_avito_url
+                    item_dict["avito_listing_url"] = _canonical_avito_url(ext_listing.external_url, item_dict["avito_item_id"])
+
+        db_item = models.SaleItem(**item_dict, sale_id=new_sale.id)
         db.add(db_item)
         
         db_product = db.query(models.Product).filter(models.Product.id == item.product_id).first()

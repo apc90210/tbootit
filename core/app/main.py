@@ -110,6 +110,27 @@ def migrate_db(target_engine=None):
         except Exception as e:
             print(f"Index creation error on ix_sales_client_checkout_id: {e}")
 
+        # Migrate sale_items table for Stage 04D R2 (immutable Avito snapshots)
+        try:
+            res_sale_items = conn.execute(text("PRAGMA table_info(sale_items);")).fetchall()
+            sale_items_columns = [row[1] for row in res_sale_items]
+            sale_items_updates = [
+                ("avito_item_id", "VARCHAR"),
+                ("avito_listing_url", "VARCHAR"),
+            ]
+            for col_name, col_type in sale_items_updates:
+                if col_name not in sale_items_columns:
+                    try:
+                        conn.execute(text(f"ALTER TABLE sale_items ADD COLUMN {col_name} {col_type};"))
+                    except Exception as e:
+                        print(f"Migration error on sale_items.{col_name}: {e}")
+            try:
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_items_avito_item_id ON sale_items(avito_item_id) WHERE avito_item_id IS NOT NULL;"))
+            except Exception as e:
+                print(f"Index creation error on ix_sale_items_avito_item_id: {e}")
+        except Exception as e:
+            print(f"Migration error on sale_items: {e}")
+
         # Migrate checkout_idempotency table for Stage 04B
         try:
             res_idemp = conn.execute(text("PRAGMA table_info(checkout_idempotency);")).fetchall()

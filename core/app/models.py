@@ -480,6 +480,8 @@ class SaleItem(Base):
     title = Column(String)
     price = Column(Float)
     quantity = Column(Integer)
+    avito_item_id = Column(String, nullable=True, index=True)
+    avito_listing_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     sale = relationship("Sale", back_populates="items")
