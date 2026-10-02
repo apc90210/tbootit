@@ -52,6 +52,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://127.0.0.1:8011\"")
         }
     }
     compileOptions {
@@ -99,6 +100,13 @@ dependencies {
 
     // Security & Keystore
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // CameraX & Barcode Scanning (Stage 04A Mobile POS)
+    implementation("androidx.camera:camera-core:1.3.2")
+    implementation("androidx.camera:camera-camera2:1.3.2")
+    implementation("androidx.camera:camera-lifecycle:1.3.2")
+    implementation("androidx.camera:camera-view:1.3.2")
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
 
     // Unit tests
     testImplementation("junit:junit:4.13.2")

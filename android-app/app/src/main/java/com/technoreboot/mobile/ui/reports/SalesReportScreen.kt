@@ -47,6 +47,7 @@ fun SalesReportScreen(
     onDisconnectClicked: () -> Unit,
     onSettingsClicked: () -> Unit = {},
     onSaleClicked: (Int) -> Unit = {},
+    onPosClicked: () -> Unit = {},
     hasUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -95,6 +96,13 @@ fun SalesReportScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onPosClicked) {
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = "Продажа",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = onRefreshClicked) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -126,6 +134,20 @@ fun SalesReportScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onPosClicked,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "Продажа"
+                    )
+                },
+                text = { Text("Продажа") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             )
         },
         modifier = modifier

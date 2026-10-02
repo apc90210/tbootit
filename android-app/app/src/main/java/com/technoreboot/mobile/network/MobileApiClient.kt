@@ -1,6 +1,7 @@
 package com.technoreboot.mobile.network
 
 import com.technoreboot.mobile.crypto.RequestBinding
+import com.technoreboot.mobile.model.PosProduct
 import com.technoreboot.mobile.model.SaleReceipt
 import com.technoreboot.mobile.model.SalesReport
 import com.technoreboot.mobile.model.UpdateManifest
@@ -303,6 +304,72 @@ class MobileApiClient(
             SaleReceipt.fromJson(json)
         }
     }
+
+    /**
+     * Looks up product by barcode via /api/mobile/products/by-barcode/{barcode}
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun getProductByBarcode(
+        barcode: String,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<PosProduct> = withContext(Dispatchers.IO) {
+        val trimmedBarcode = barcode.trim()
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            val msg = if (err.code == 403) {
+                if (err.message.contains("устройств", ignoreCase = true) || err.message.contains("device", ignoreCase = true)) {
+                    "Доступ этого устройства отозван"
+                } else {
+                    "Доступ отозван"
+                }
+            } else {
+                err.message
+            }
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = msg,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/products/by-barcode/$trimmedBarcode"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            PosProduct.fromJson(json)
+        }
+    }
+
 
 
     /**
