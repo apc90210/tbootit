@@ -428,4 +428,128 @@ class AvitoHandoffTest {
         assertEquals("555123456", candidates[0].avitoItemId)
         assertEquals("555789012", candidates[1].avitoItemId)
     }
+
+    // 12. snapshot ID + no URL -> article visible, not clickable
+    @Test
+    fun test_12_snapshot_id_no_url_article_visible_not_clickable() {
+        val item = AvitoHandoffItem(
+            productId = 301,
+            title = "Товар со снапшотом без URL",
+            remainingStock = 1,
+            avitoItemId = "888999000",
+            listingUrl = "",
+            canOpenAvito = false,
+            sourceOfLinkage = "sale_snapshot"
+        )
+        val response = AvitoHandoffResponse(saleId = 15, items = listOf(item))
+        val visibleCandidates = response.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() }
+
+        assertEquals("Item with snapshot ID must be visible", 1, visibleCandidates.size)
+        assertEquals("888999000", visibleCandidates[0].avitoItemId)
+        assertFalse("Item without URL must have canOpenAvito = false", visibleCandidates[0].canOpenAvito)
+        assertTrue("Item without URL must have empty listingUrl", visibleCandidates[0].listingUrl.isBlank())
+    }
+
+    // 13. legacy mapping ID + missing external_url -> article visible, not clickable
+    @Test
+    fun test_13_legacy_mapping_missing_url_article_visible_not_clickable() {
+        val json = JSONObject().apply {
+            put("product_id", 302)
+            put("title", "Товар с маппингом без внешнего URL")
+            put("remaining_stock", 0)
+            put("avito_item_id", "444555666")
+            put("listing_url", "")
+            put("can_open_avito", false)
+            put("source_of_linkage", "current_product_mapping")
+        }
+        val item = AvitoHandoffItem.fromJson(json)
+        val response = AvitoHandoffResponse(saleId = 15, items = listOf(item))
+        val visibleCandidates = response.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() }
+
+        assertEquals(1, visibleCandidates.size)
+        assertEquals("444555666", visibleCandidates[0].avitoItemId)
+        assertFalse(visibleCandidates[0].canOpenAvito)
+        assertTrue(visibleCandidates[0].listingUrl.isBlank())
+    }
+
+    // 14. unsafe external_url -> article visible, button suppressed
+    @Test
+    fun test_14_unsafe_external_url_article_visible_button_suppressed() {
+        val json = JSONObject().apply {
+            put("product_id", 303)
+            put("title", "Товар с небезопасным URL")
+            put("remaining_stock", 0)
+            put("avito_item_id", "11223344")
+            put("listing_url", "")
+            put("can_open_avito", false)
+        }
+        val item = AvitoHandoffItem.fromJson(json)
+        val response = AvitoHandoffResponse(saleId = 15, items = listOf(item))
+        val visibleCandidates = response.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() }
+
+        assertEquals(1, visibleCandidates.size)
+        assertEquals("11223344", visibleCandidates[0].avitoItemId)
+        assertFalse(visibleCandidates[0].canOpenAvito)
+    }
+
+    // 15. multi-item mixed case: one clickable, one ID-only, one non-Avito
+    @Test
+    fun test_15_multi_item_mixed_clickable_id_only_non_avito() {
+        val itemClickable = AvitoHandoffItem(
+            productId = 401,
+            title = "Принтер с URL",
+            remainingStock = 0,
+            avitoItemId = "111",
+            listingUrl = "https://www.avito.ru/111",
+            canOpenAvito = true
+        )
+        val itemIdOnly = AvitoHandoffItem(
+            productId = 402,
+            title = "Картридж без URL",
+            remainingStock = 2,
+            avitoItemId = "222",
+            listingUrl = "",
+            canOpenAvito = false
+        )
+        val itemNonAvito = AvitoHandoffItem(
+            productId = 403,
+            title = "Бумага без Авито",
+            remainingStock = 10,
+            avitoItemId = "",
+            listingUrl = "",
+            canOpenAvito = false,
+            needsManualAvitoRemoval = false
+        )
+        val response = AvitoHandoffResponse(saleId = 25, items = listOf(itemClickable, itemIdOnly, itemNonAvito))
+        val visibleCandidates = response.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() }
+
+        assertEquals("Exactly 2 items must be visible (clickable + ID-only)", 2, visibleCandidates.size)
+        val clickable = visibleCandidates.first { it.productId == 401 }
+        val idOnly = visibleCandidates.first { it.productId == 402 }
+
+        assertTrue("Item 401 must be clickable", clickable.canOpenAvito)
+        assertEquals("https://www.avito.ru/111", clickable.listingUrl)
+
+        assertFalse("Item 402 must not be clickable", idOnly.canOpenAvito)
+        assertEquals("222", idOnly.avitoItemId)
+        assertTrue("Item 402 must have empty URL", idOnly.listingUrl.isBlank())
+    }
+
+    // 16. no synthetic URL fallback remains
+    @Test
+    fun test_16_no_synthetic_url_fallback() {
+        val json = JSONObject().apply {
+            put("product_id", 501)
+            put("title", "Товар без синтетического URL")
+            put("remaining_stock", 0)
+            put("avito_item_id", "999999999")
+            put("listing_url", "")
+            put("can_open_avito", false)
+        }
+        val item = AvitoHandoffItem.fromJson(json)
+        assertNotEquals("https://www.avito.ru/999999999", item.listingUrl)
+        assertTrue(item.listingUrl.isEmpty())
+        assertFalse(item.canOpenAvito)
+    }
 }
+

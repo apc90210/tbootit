@@ -193,7 +193,7 @@ def execute_canonical_sale(
             if item.get("avito_item_id"):
                 snap_item_id = str(item["avito_item_id"]).strip()
                 from app.routers.avito_post_sale import _canonical_avito_url
-                snap_listing_url = _canonical_avito_url(item.get("avito_listing_url"), snap_item_id)
+                snap_listing_url = _canonical_avito_url(item.get("avito_listing_url"))
             else:
                 ext_listing = db.query(models.ProductExternalListing).filter(
                     models.ProductExternalListing.product_id == p_id,
@@ -207,13 +207,13 @@ def execute_canonical_sale(
                 if ext_listing and ext_listing.external_item_id:
                     snap_item_id = str(ext_listing.external_item_id).strip()
                     from app.routers.avito_post_sale import _canonical_avito_url
-                    snap_listing_url = _canonical_avito_url(ext_listing.external_url, snap_item_id)
+                    snap_listing_url = _canonical_avito_url(ext_listing.external_url)
                 elif db_product.sku and str(db_product.sku).startswith("AVITO-"):
                     candidate_id = str(db_product.sku)[len("AVITO-"):].strip()
                     if candidate_id:
                         snap_item_id = candidate_id
-                        from app.routers.avito_post_sale import _canonical_avito_url
-                        snap_listing_url = _canonical_avito_url(None, snap_item_id)
+                        snap_listing_url = None
+
 
             item_title = item.get("title") or db_product.title or f"Товар #{p_id}"
             db_item = models.SaleItem(
