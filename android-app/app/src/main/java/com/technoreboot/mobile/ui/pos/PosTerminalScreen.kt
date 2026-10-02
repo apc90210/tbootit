@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import com.technoreboot.mobile.data.ReceiptPrintCache
+import com.technoreboot.mobile.handoff.PostSaleListingHandoff
 import com.technoreboot.mobile.print.ReceiptPrintHelper
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -880,6 +881,13 @@ fun PosTerminalScreen(
                             )
                         }
                     }
+
+                    PostSaleListingHandoff(
+                        receipt = receipt,
+                        session = session,
+                        keystoreManager = keystoreManager,
+                        apiClient = apiClient
+                    )
 
                     Button(
                         onClick = { handlePrintReceipt(receipt) },

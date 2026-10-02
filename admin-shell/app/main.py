@@ -2446,6 +2446,71 @@ async def api_mobile_sales_checkout(request: Request):
             status_code=503,
             detail=f"Core API connection failed: {str(e)}",
         )
+
+
+# =====================================================================
+# STAGE 04D: MOBILE SALE AVITO HANDOFF API
+# =====================================================================
+
+async def _fetch_canonical_sale_avito_handoff(sale_id: int) -> Dict[str, Any]:
+    """
+    Fetch canonical Avito post-sale handoff candidates strictly from Core HTTP API.
+    Reuses existing Core derivation without parallel business logic.
+    Does NOT access Core DB directly.
+    Returns 404 on sale not found, and 502/503/504 on Core failure or timeout.
+    """
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/sales/{sale_id}/avito-handoff"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Sale {sale_id} not found",
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API returned error status {resp.status_code}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
+
+
+@app.get("/api/mobile/sales/{sale_id}/avito-handoff")
+async def api_mobile_sale_avito_handoff(request: Request, sale_id: int):
+    """
+    Mobile Sale Avito Handoff endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication.
+    Path tampering (sale_id changed) causes signature verification failure.
+    Reuses canonical Core avito handoff endpoint without duplicate business logic.
+    """
+    ctx = await _get_mobile_auth(request)
+    handoff = await _fetch_canonical_sale_avito_handoff(sale_id)
+    return handoff
+
+
+# =====================================================================
 # STAGE 01D: MOBILE IN-APP UPDATE API
 # =====================================================================
 
