@@ -140,11 +140,38 @@ def test_sale_receipt_renders_revision_note():
         "items": [{"title": "Мышь игровая", "price": 3500.0, "quantity": 1, "product_id": 2}]
     }
 
-    with patch("app.core_client.core_client.get_sale", new_callable=AsyncMock) as mock_get_sale, \
-         patch("app.core_client.core_client.get_organization_settings", new_callable=AsyncMock) as mock_get_org:
-        mock_get_sale.return_value = mock_sale
-        mock_get_org.return_value = {"organization_name": "ТехноРебут"}
+    mock_receipt = {
+        "id": 15,
+        "sale_id": 15,
+        "receipt_number": "REC-000015",
+        "receipt_title": "Товарный чек № 15 от 2026-07-22",
+        "date_formatted": "2026-07-22",
+        "revision_count": 1,
+        "revision_notice": "Продажа скорректирована — ревизия №1",
+        "organization_name": "ТехноРебут",
+        "inn": "667009336901",
+        "address": "Екатеринбург",
+        "phone": "+7 343 344 88 95",
+        "total_amount": 3500.0,
+        "total_amount_formatted": "3500.00",
+        "prepayment_formatted": "0.00",
+        "to_pay_formatted": "3500.00",
+        "payment_method": "cash",
+        "payment_method_label": "Наличные",
+        "status": "completed",
+        "warranty_title": "Гарантийные условия",
+        "warranty_enabled": True,
+        "warranty_days": 30,
+        "warranty_headline": "Гарантия",
+        "warranty_body_text": "Условия",
+        "items": [{"idx": 1, "title": "Мышь игровая", "price": 3500.0, "unit_price": 3500.0, "line_total": 3500.0, "price_formatted": "3500.00", "line_total_formatted": "3500.00", "quantity": 1, "unit": "шт"}],
+        "total_items_count": 1,
+    }
+
+    with patch("app.core_client.core_client.get_sale_receipt_data", new_callable=AsyncMock) as mock_get_data:
+        mock_get_data.return_value = mock_receipt
 
         response = client.get("/sales/15/receipt")
         assert response.status_code == 200
         assert "Продажа скорректирована — ревизия №1" in response.text
+
