@@ -504,6 +504,30 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
             characteristics=chars
         )
 
+    # 7. Reference model auto-enrichment for missing fields
+    try:
+        from app.services.product_reference_matcher import match_product
+        from app.services.product_reference_enricher import enrich_product_from_reference
+        m_res = match_product(
+            db=db,
+            title=db_product.title,
+            brand=db_product.brand,
+            model=db_product.model,
+            description=db_product.description,
+            active_only=True
+        )
+        if m_res.matched and m_res.reference_model:
+            enrich_product_from_reference(
+                db=db,
+                product=db_product,
+                reference=m_res.reference_model,
+                method=m_res.method or "auto_create",
+                confidence=m_res.confidence or 1.0,
+                apply=True
+            )
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(db_product)
 

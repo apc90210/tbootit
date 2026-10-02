@@ -231,7 +231,29 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                     new_value={"status": product.status, "storage_location": product.storage_location, "quantity": product.quantity},
                     comment=f"Товар восстановлен в наличии в магазине при импорте активного объявления Avito {item_id_str}"
                 )
-        # Inactive/closed/blocked/removed/archived remote states update external metadata only; physical stock remains untouched.
+        # Stage 07A: Auto-enrichment from reference catalog for missing fields
+        try:
+            from app.services.product_reference_matcher import match_product
+            from app.services.product_reference_enricher import enrich_product_from_reference
+            m_res = match_product(
+                db=db,
+                title=product.title,
+                brand=product.brand,
+                model=product.model,
+                description=product.description,
+                active_only=True
+            )
+            if m_res.matched and m_res.reference_model:
+                enrich_product_from_reference(
+                    db=db,
+                    product=product,
+                    reference=m_res.reference_model,
+                    method=m_res.method or "avito_import",
+                    confidence=m_res.confidence or 1.0,
+                    apply=True
+                )
+        except Exception:
+            pass
 
         db.flush()
 

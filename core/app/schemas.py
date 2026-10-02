@@ -222,6 +222,11 @@ class ProductReferenceListResponse(BaseModel):
     limit: int
     offset: int
 
+class ProductReferenceLearnRequest(BaseModel):
+    canonical_name: Optional[str] = None
+    custom_aliases: Optional[List[str]] = None
+    raw_alias: Optional[str] = None
+
 # Customer Schemas
 class CustomerBase(BaseModel):
     name: str

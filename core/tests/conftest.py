@@ -17,7 +17,7 @@ def assert_not_canonical_db(url_or_path: str):
             raise RuntimeError(f"FATAL SECURITY VIOLATION: Test database points to canonical DB: {url_or_path}")
 
 # Initialize isolated temporary database BEFORE importing app modules
-_temp_dir = tempfile.TemporaryDirectory(prefix="pytest_core_isolated_")
+_temp_dir = tempfile.TemporaryDirectory(prefix="pytest_core_isolated_", ignore_cleanup_errors=True)
 TEST_DB_PATH = os.path.join(_temp_dir.name, "isolated_test.db")
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
@@ -58,12 +58,25 @@ def db_session():
     finally:
         db.close()
 
+@pytest.fixture
+def db(db_session):
+    """Alias for db_session fixture for consistency across test suites."""
+    return db_session
+
+
 @pytest.fixture(autouse=True, scope="session")
 def setup_isolated_test_database():
     """Ensure isolated temp DB tables are initialized before tests and cleaned up after session."""
     Base.metadata.create_all(bind=engine)
     yield
     try:
+        engine.dispose()
+        if hasattr(app.database, "engine"):
+            app.database.engine.dispose()
+    except Exception:
+        pass
+    try:
         _temp_dir.cleanup()
     except Exception:
         pass
+

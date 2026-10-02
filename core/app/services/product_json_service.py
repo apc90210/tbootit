@@ -468,6 +468,30 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
         except Exception:
             pass  # Attributes schema is auxiliary and shouldn't block product creation
 
+        # Auto-enrichment from reference catalog for missing fields
+        try:
+            from app.services.product_reference_matcher import match_product
+            from app.services.product_reference_enricher import enrich_product_from_reference
+            m_res = match_product(
+                db=db,
+                title=product.title,
+                brand=product.brand,
+                model=product.model,
+                description=product.description,
+                active_only=True
+            )
+            if m_res.matched and m_res.reference_model:
+                enrich_product_from_reference(
+                    db=db,
+                    product=product,
+                    reference=m_res.reference_model,
+                    method=m_res.method or "json_import",
+                    confidence=m_res.confidence or 1.0,
+                    apply=True
+                )
+        except Exception:
+            pass
+
         # Event log
         event_comment = f"Успешно {'обновлен' if operation == 'updated' else 'создан'} через канонический JSON импорт"
         db_event = models.ProductEvent(

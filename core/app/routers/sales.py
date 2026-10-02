@@ -323,7 +323,7 @@ def reissue_sale(sale_id: int, reissue_data: schemas.SaleReissue, db: Session = 
                 if ext_listing:
                     item_dict["avito_item_id"] = str(ext_listing.external_item_id)
                     from app.routers.avito_post_sale import _canonical_avito_url
-                    item_dict["avito_listing_url"] = _canonical_avito_url(ext_listing.external_url, item_dict["avito_item_id"])
+                    item_dict["avito_listing_url"] = _canonical_avito_url(ext_listing.external_url)
 
         db_item = models.SaleItem(**item_dict, sale_id=new_sale.id)
         db.add(db_item)
