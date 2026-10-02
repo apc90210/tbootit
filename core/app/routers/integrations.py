@@ -134,6 +134,20 @@ def import_avito_item(payload: schemas.AvitoItemImportPayload, db: Session = Dep
                 db.add(cat)
                 db.flush()
             category_id = cat.id
+        else:
+            from app.services.product_categorizer import classify_product, CANONICAL_CATEGORIES
+            c_res = classify_product(
+                title=payload.title,
+                brand=payload.brand,
+                model=payload.model,
+                description=payload.description,
+            )
+            cat = db.query(models.Category).filter(models.Category.name == c_res.category_name).first()
+            if not cat:
+                cat = models.Category(name=c_res.category_name, slug=c_res.category_slug)
+                db.add(cat)
+                db.flush()
+            category_id = cat.id
 
         init_status = "in_stock" if is_remote_active else "sold"
         init_location = "store" if is_remote_active else "archive"

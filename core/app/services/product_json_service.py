@@ -416,10 +416,21 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
             product.barcode = str(p.get("barcode")).strip() or None
 
         # Resolve category
-        cat_name = (p.get("category") or "Без категории").strip()
+        cat_name = (p.get("category") or "").strip()
+        if not cat_name or cat_name in ("Без категории", "Другое"):
+            from app.services.product_categorizer import classify_product
+            c_res = classify_product(
+                title=product.title,
+                brand=product.brand,
+                model=product.model,
+                description=product.description,
+            )
+            cat_name = c_res.category_name
+
         cat = db.query(models.Category).filter(models.Category.name == cat_name).first()
         if not cat:
-            cat_slug = cat_name.lower().replace(" ", "-").replace("/", "-")
+            from app.services.product_categorizer import CANONICAL_CATEGORIES
+            cat_slug = CANONICAL_CATEGORIES.get(cat_name, {}).get("slug") or cat_name.lower().replace(" ", "-").replace("/", "-")
             cat = models.Category(name=cat_name, slug=cat_slug)
             db.add(cat)
             db.flush()

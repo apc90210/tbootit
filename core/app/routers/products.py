@@ -472,6 +472,21 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
         )
         if avito_cat:
             db_product.avito_category_id = avito_cat.id
+    elif not db_product.category_id:
+        from app.services.product_categorizer import classify_product, CANONICAL_CATEGORIES
+        c_res = classify_product(
+            title=db_product.title,
+            site_title=db_product.site_title,
+            brand=db_product.brand,
+            model=db_product.model,
+            description=db_product.description,
+        )
+        cat = db.query(models.Category).filter(models.Category.name == c_res.category_name).first()
+        if not cat:
+            cat = models.Category(name=c_res.category_name, slug=c_res.category_slug)
+            db.add(cat)
+            db.flush()
+        db_product.category_id = cat.id
 
     # 6. Characteristics
     if chars:

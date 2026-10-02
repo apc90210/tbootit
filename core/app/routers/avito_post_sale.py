@@ -153,6 +153,64 @@ def get_sale_avito_tasks(sale_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/api/sales/{sale_id}/avito-handoff")
+def get_sale_avito_handoff(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Read-only inspection of sale items for post-sale manual Avito handoff.
+    Returns candidates where sold product has an active Avito listing and remaining stock is 0.
+    Does NOT mutate any database tables, does NOT call Avito API, does NOT store credentials.
+    """
+    sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail=f"Sale #{sale_id} not found")
+
+    items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
+    candidates = []
+    seen = set()
+
+    for item in items:
+        if not item.product_id:
+            continue
+
+        prod = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        if not prod:
+            continue
+
+        # Zero stock rule: only suggest manual removal if remaining sellable stock is <= 0
+        remaining_stock = int(prod.quantity or 0)
+        if remaining_stock > 0:
+            continue
+
+        # Look up active/published Avito listings for this product
+        ext_listings = db.query(models.ProductExternalListing).filter(
+            models.ProductExternalListing.product_id == item.product_id,
+            models.ProductExternalListing.marketplace == "avito",
+            models.ProductExternalListing.remote_status.in_(["active", "published"])
+        ).all()
+
+        for ext in ext_listings:
+            listing_id_str = str(ext.external_item_id)
+            pair_key = (item.product_id, listing_id_str)
+            if pair_key in seen:
+                continue
+            seen.add(pair_key)
+
+            canonical_url = _canonical_avito_url(ext.external_url, listing_id_str)
+            candidates.append({
+                "product_id": item.product_id,
+                "title": prod.title or f"Товар #{item.product_id}",
+                "remaining_stock": remaining_stock,
+                "needs_manual_avito_removal": True,
+                "listing_id": listing_id_str,
+                "listing_url": canonical_url
+            })
+
+    return {
+        "sale_id": sale_id,
+        "items": candidates
+    }
+
+
 @router.post("/api/sales/{sale_id}/avito-deactivate")
 def queue_sale_avito_deactivation(
     sale_id: int,
