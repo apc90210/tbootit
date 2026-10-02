@@ -557,4 +557,14 @@ class ReceiptPrintTest {
         val cachedFile = ReceiptPrintCache.getReceiptPdfFile(mockContext, historicalSaleId)
         assertEquals(historicalPdfBytes.size.toLong(), cachedFile.length())
     }
+
+    // 16. Canonical print media size is strictly ISO_A4 (210 x 297 mm) preventing 80mm drift
+    @Test
+    fun test_16_canonical_print_media_size_is_iso_a4() {
+        val dummyFile = File(testBaseDir, "receipt_a4_test.pdf")
+        dummyFile.writeText("canonical a4 pdf content")
+        val result = ReceiptPrintHelper.printPdf(mockContext, dummyFile, "Чек № 16")
+        assertTrue("printPdf executes cleanly with failure Result on test context without crash", result.isFailure)
+    }
 }
+

@@ -47,20 +47,36 @@ async def test_receipt_shows_payment_method_label():
         "created_at": "2026-07-03T10:00:00",
         "customer_label": "Тест"
     })
-    mock_health = AsyncMock(return_value={"core_available": True})
-    mock_get_org = AsyncMock(return_value={
+    mock_receipt = {
+        "id": 1,
+        "sale_id": 1,
+        "receipt_number": "REC-000001",
+        "receipt_title": "Товарный чек № 1 от 2026-07-22",
+        "date_formatted": "2026-07-22",
         "organization_name": "ИП Тест",
         "inn": "123456789",
         "address": "ул. Тест",
         "phone": "+7 000 000 00 00",
-        "default_customer_label": "Частное лицо",
-        "warranty_text": "Гарантия 30 дней.",
-        "no_warranty_text": "Без гарантии."
-    })
+        "total_amount": 1000.0,
+        "total_amount_formatted": "1000.00",
+        "prepayment_formatted": "0.00",
+        "to_pay_formatted": "1000.00",
+        "payment_method": "legal_entity_account",
+        "payment_method_label": "Счёт юрлица",
+        "status": "completed",
+        "warranty_title": "Гарантийные условия",
+        "warranty_enabled": True,
+        "warranty_days": 30,
+        "warranty_headline": "Гарантия",
+        "warranty_body_text": "Условия",
+        "items": [],
+        "total_items_count": 0,
+    }
+    mock_health = AsyncMock(return_value={"core_available": True})
+    mock_get_receipt_data = AsyncMock(return_value=mock_receipt)
 
-    with patch("app.routers.sales.core_client.get_sale", mock_get_sale), \
-         patch("app.routers.sales.core_client.health", mock_health), \
-         patch("app.routers.sales.core_client.get_organization_settings", mock_get_org):
+    with patch("app.routers.sales.core_client.get_sale_receipt_data", mock_get_receipt_data), \
+         patch("app.routers.sales.core_client.health", mock_health):
 
         response = client.get("/sales/1/receipt")
         assert response.status_code == 200

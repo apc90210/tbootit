@@ -294,11 +294,15 @@ async def sale_avito_dismiss_endpoint(request: Request, sale_id: int):
 
 @router.get("/sales/{sale_id}/receipt", response_class=HTMLResponse)
 async def sale_receipt(request: Request, sale_id: int):
-    """Sale warranty and product receipt preview using canonical presentation model."""
-    sale = await core_client.get_sale(sale_id)
+    """
+    Sale warranty and product receipt preview.
+    Consumes canonical presentation model directly from Core API.
+    Guarantees true single-source presentation logic without local drift.
+    """
+    receipt_data_raw = await core_client.get_sale_receipt_data(sale_id)
 
-    if sale and isinstance(sale, dict) and "error" in sale:
-        if sale.get("status_code") == 404:
+    if receipt_data_raw and isinstance(receipt_data_raw, dict) and "error" in receipt_data_raw:
+        if receipt_data_raw.get("status_code") == 404:
             return templates.TemplateResponse(
                 request=request,
                 name="error.html",
@@ -310,17 +314,8 @@ async def sale_receipt(request: Request, sale_id: int):
             context={"message": "Ошибка Core API"},
         )
 
-    # Fetch organization settings
-    try:
-        from app.defaults import get_effective_settings
-        response = await core_client.get_organization_settings()
-        org_settings = get_effective_settings(response if not response.get("error") else {})
-    except Exception:
-        from app.defaults import get_effective_settings
-        org_settings = get_effective_settings({})
-
-    from app.services.receipt_presentation import build_receipt_document_data
-    receipt_data = build_receipt_document_data(sale, org_settings)
+    from app.services.receipt_presentation import parse_receipt_document_data
+    receipt_data = parse_receipt_document_data(receipt_data_raw)
 
     return templates.TemplateResponse(
         request=request,
@@ -333,6 +328,7 @@ async def sale_receipt(request: Request, sale_id: int):
             "payment_methods": PAYMENT_METHODS,
         },
     )
+
 
 
 @router.get("/sales/{sale_id}/receipt/print")
