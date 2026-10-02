@@ -20,7 +20,7 @@ fun AvitoHandoffCard(
     onOpenListing: (AvitoHandoffItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val candidates = items.filter { it.needsManualAvitoRemoval }
+    val candidates = items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() || it.needsManualAvitoRemoval }
     if (candidates.isEmpty()) return
 
     Card(
@@ -47,8 +47,8 @@ fun AvitoHandoffCard(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = if (candidates.size == 1) "Товар продан. Снимите с Авито:" else "Товары проданы. Снимите с Авито:",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    text = "Авито",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -69,18 +69,27 @@ fun AvitoHandoffCard(
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    OutlinedButton(
-                        onClick = { onOpenListing(item) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                    if (item.avitoItemId.isNotBlank()) {
+                        Text(
+                            text = "Артикул Avito: ${item.avitoItemId}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Снять с Авито")
+                    }
+                    if (item.canOpenAvito && item.listingUrl.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { onOpenListing(item) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Снять с Авито")
+                        }
                     }
                 }
             }

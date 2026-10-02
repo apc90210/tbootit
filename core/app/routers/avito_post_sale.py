@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, case
 
 from app.database import get_db
 from app import models, schemas
@@ -12,6 +12,7 @@ from app import models, schemas
 router = APIRouter()
 
 OFFICIAL_API_AVAILABLE = False
+ALLOWED_AVITO_HOSTS = {"www.avito.ru", "avito.ru", "m.avito.ru"}
 
 
 def log_audit(db: Session, entity_type: str, entity_id: int, action: str, old_value: Any = None, new_value: Any = None):
@@ -25,18 +26,40 @@ def log_audit(db: Session, entity_type: str, entity_id: int, action: str, old_va
     db.add(log)
 
 
-def _canonical_avito_url(listing_url: Optional[str], avito_listing_id: str) -> str:
-    canonical = f"https://www.avito.ru/{avito_listing_id}"
+def _is_safe_avito_url(url: Optional[str]) -> bool:
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        parsed = urllib.parse.urlparse(url.strip())
+        if parsed.scheme.lower() != "https":
+            return False
+        host = (parsed.netloc or "").lower()
+        if host in ALLOWED_AVITO_HOSTS or host.endswith(".avito.ru"):
+            return bool(parsed.path and parsed.path != "/")
+        return False
+    except Exception:
+        return False
+
+
+def _canonical_avito_url(listing_url: Optional[str], avito_listing_id: Optional[str]) -> Optional[str]:
+    """
+    Preferred source order per Stage 04D R2:
+    1. Immutable snapshot / stored listing URL if it is a valid HTTPS Avito URL;
+    2. Fallback to existing project URL builder https://www.avito.ru/{avito_listing_id} when listing_url is absent;
+    If listing_url is provided but unsafe/malformed (e.g. non-HTTPS, non-Avito domain, or invalid path),
+    do NOT return the unsafe URL and return None.
+    """
     if listing_url:
-        try:
-            parsed = urllib.parse.urlparse(listing_url)
-            host = (parsed.netloc or "").lower()
-            if host in ["www.avito.ru", "avito.ru", "m.avito.ru"]:
-                if str(avito_listing_id) in parsed.path or str(avito_listing_id) in parsed.query:
-                    return listing_url
-        except Exception:
-            pass
-    return canonical
+        if _is_safe_avito_url(listing_url):
+            return listing_url.strip()
+        return None
+
+    if avito_listing_id:
+        clean_id = str(avito_listing_id).strip()
+        if clean_id and not any(c in clean_id for c in "/?#&\\ \t\r\n"):
+            return f"https://www.avito.ru/{clean_id}"
+
+    return None
 
 
 def _enrich_task(task: models.AvitoPostSaleTask, db: Session) -> Dict[str, Any]:
@@ -157,8 +180,15 @@ def get_sale_avito_tasks(sale_id: int, db: Session = Depends(get_db)):
 def get_sale_avito_handoff(sale_id: int, db: Session = Depends(get_db)):
     """
     Read-only inspection of sale items for post-sale manual Avito handoff.
-    Returns candidates where sold product has an active Avito listing and remaining stock is 0.
-    Does NOT mutate any database tables, does NOT call Avito API, does NOT store credentials.
+    Returns candidates where sold line can be reliably associated with an Avito item/article.
+
+    Canonical Business Rule (Stage 04D R2):
+    - Key criterion is the Avito article / item ID belonging to the sold item.
+    - If a sold line can be reliably associated with an Avito item/article, return candidate.
+    - Stock does NOT suppress action (stock 0 and stock > 0 both eligible).
+    - Remote listing status does NOT suppress action (active, removed, archived all eligible).
+    - Immutable sale-line snapshot used if present; otherwise fallback to exact product mapping.
+    - Strictly read-only: zero DB state changes, zero Avito API mutation.
     """
     sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
     if not sale:
@@ -166,44 +196,80 @@ def get_sale_avito_handoff(sale_id: int, db: Session = Depends(get_db)):
 
     items = db.query(models.SaleItem).filter(models.SaleItem.sale_id == sale_id).all()
     candidates = []
-    seen = set()
 
     for item in items:
-        if not item.product_id:
+        avito_item_id = None
+        listing_url = None
+        source_of_linkage = None
+        remote_status = "active"
+        remaining_stock = 0
+        prod = None
+
+        if item.product_id:
+            prod = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if prod:
+                remaining_stock = int(prod.quantity or 0)
+
+        # 1. Prefer immutable sale-item snapshot if present
+        if getattr(item, "avito_item_id", None) and str(item.avito_item_id).strip():
+            avito_item_id = str(item.avito_item_id).strip()
+            source_of_linkage = "sale_snapshot"
+            raw_url = getattr(item, "avito_listing_url", None)
+            listing_url = _canonical_avito_url(raw_url, avito_item_id)
+
+            # Informational status from product listing if still present
+            if item.product_id:
+                ext = db.query(models.ProductExternalListing).filter(
+                    models.ProductExternalListing.product_id == item.product_id,
+                    models.ProductExternalListing.marketplace == "avito",
+                    models.ProductExternalListing.external_item_id == avito_item_id
+                ).first()
+                if ext and ext.remote_status:
+                    remote_status = ext.remote_status
+
+        # 2. Fallback to current canonical product mapping for legacy receipts
+        elif item.product_id and prod:
+            ext = db.query(models.ProductExternalListing).filter(
+                models.ProductExternalListing.product_id == item.product_id,
+                models.ProductExternalListing.marketplace == "avito"
+            ).order_by(
+                case((models.ProductExternalListing.remote_status.in_(["active", "published"]), 1), else_=0).desc(),
+                models.ProductExternalListing.updated_at.desc().nullslast(),
+                models.ProductExternalListing.id.desc()
+            ).first()
+
+            if ext and ext.external_item_id:
+                avito_item_id = str(ext.external_item_id).strip()
+                source_of_linkage = "current_product_mapping"
+                remote_status = ext.remote_status or "active"
+                listing_url = _canonical_avito_url(ext.external_url, avito_item_id)
+            elif prod.sku and str(prod.sku).startswith("AVITO-"):
+                candidate_id = str(prod.sku)[len("AVITO-"):].strip()
+                if candidate_id:
+                    avito_item_id = candidate_id
+                    source_of_linkage = "current_product_mapping"
+                    remote_status = "active"
+                    listing_url = _canonical_avito_url(None, candidate_id)
+
+        # If no reliable Avito item reference determined, omit action
+        if not avito_item_id:
             continue
 
-        prod = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-        if not prod:
-            continue
+        can_open_avito = bool(listing_url and _is_safe_avito_url(listing_url))
+        item_title = item.title or (prod.title if prod else f"Товар #{item.product_id}")
 
-        # Zero stock rule: only suggest manual removal if remaining sellable stock is <= 0
-        remaining_stock = int(prod.quantity or 0)
-        if remaining_stock > 0:
-            continue
-
-        # Look up active/published Avito listings for this product
-        ext_listings = db.query(models.ProductExternalListing).filter(
-            models.ProductExternalListing.product_id == item.product_id,
-            models.ProductExternalListing.marketplace == "avito",
-            models.ProductExternalListing.remote_status.in_(["active", "published"])
-        ).all()
-
-        for ext in ext_listings:
-            listing_id_str = str(ext.external_item_id)
-            pair_key = (item.product_id, listing_id_str)
-            if pair_key in seen:
-                continue
-            seen.add(pair_key)
-
-            canonical_url = _canonical_avito_url(ext.external_url, listing_id_str)
-            candidates.append({
-                "product_id": item.product_id,
-                "title": prod.title or f"Товар #{item.product_id}",
-                "remaining_stock": remaining_stock,
-                "needs_manual_avito_removal": True,
-                "listing_id": listing_id_str,
-                "listing_url": canonical_url
-            })
+        candidates.append({
+            "product_id": item.product_id,
+            "title": item_title,
+            "avito_item_id": avito_item_id,
+            "listing_id": avito_item_id,  # backward compatibility alias
+            "listing_url": listing_url or "",
+            "remote_status": remote_status,
+            "remaining_stock": remaining_stock,
+            "source_of_linkage": source_of_linkage,
+            "can_open_avito": can_open_avito,
+            "needs_manual_avito_removal": can_open_avito  # backward compatibility alias
+        })
 
     return {
         "sale_id": sale_id,

@@ -55,6 +55,10 @@ class ProductBase(BaseModel):
     source_json: Optional[str] = None
     source_type: Optional[str] = None
     last_imported_at: Optional[datetime] = None
+    reference_model_id: Optional[int] = None
+    reference_match_method: Optional[str] = None
+    reference_match_confidence: Optional[float] = None
+    reference_enriched_at: Optional[datetime] = None
     
     @field_validator("storage_location", mode="before")
     def set_default_location(cls, v):
@@ -133,6 +137,91 @@ class BarcodeBulkGenerateResponse(BaseModel):
     skipped_existing: int
     errors: List[str] = []
 
+# Product Reference Catalog Schemas
+class ProductReferenceAliasBase(BaseModel):
+    alias: str
+    normalized_alias: Optional[str] = None
+    priority: Optional[int] = 100
+    active: Optional[bool] = True
+
+class ProductReferenceAliasCreate(ProductReferenceAliasBase):
+    pass
+
+class ProductReferenceAlias(ProductReferenceAliasBase):
+    id: int
+    reference_model_id: int
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class ProductReferenceModelBase(BaseModel):
+    canonical_name: str
+    brand: str
+    model: str
+    device_type: Optional[str] = None
+    default_category_id: Optional[int] = None
+    specifications_json: Optional[str] = None
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+    active: Optional[bool] = True
+    source: Optional[str] = "manual"
+    source_note: Optional[str] = None
+
+class ProductReferenceModelCreate(ProductReferenceModelBase):
+    stable_key: Optional[str] = None
+    aliases: Optional[List[str]] = None
+    specifications: Optional[Dict[str, Any]] = None
+
+class ProductReferenceModelUpdate(BaseModel):
+    canonical_name: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    device_type: Optional[str] = None
+    default_category_id: Optional[int] = None
+    specifications_json: Optional[str] = None
+    specifications: Optional[Dict[str, Any]] = None
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+    active: Optional[bool] = None
+    source: Optional[str] = None
+    source_note: Optional[str] = None
+
+class ProductReferenceModel(ProductReferenceModelBase):
+    id: int
+    stable_key: str
+    aliases: List[ProductReferenceAlias] = []
+    specifications: Optional[Dict[str, Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class ProductReferenceMatchPreviewRequest(BaseModel):
+    title: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    description: Optional[str] = None
+    existing_specs: Optional[Dict[str, Any]] = None
+
+class ProductReferenceMatchPreviewResponse(BaseModel):
+    matched: bool
+    reference_model_id: Optional[int] = None
+    canonical_name: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    method: Optional[str] = None
+    confidence: Optional[float] = None
+    status: str = "ok"
+    reason: Optional[str] = None
+    candidates: List[Dict[str, Any]] = []
+    would_fill: Dict[str, Any] = {}
+
+class ProductReferenceListResponse(BaseModel):
+    items: List[ProductReferenceModel]
+    total: int
+    limit: int
+    offset: int
+
 # Customer Schemas
 class CustomerBase(BaseModel):
     name: str
@@ -199,6 +288,8 @@ class SaleItemBase(BaseModel):
     title: Optional[str] = None
     price: float
     quantity: int
+    avito_item_id: Optional[str] = None
+    avito_listing_url: Optional[str] = None
 
 class SaleItemCreate(SaleItemBase):
     pass
@@ -1137,5 +1228,24 @@ class ReservationRequestListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class AvitoHandoffItem(BaseModel):
+    product_id: Optional[int] = None
+    title: str
+    avito_item_id: Optional[str] = None
+    listing_id: Optional[str] = None
+    listing_url: Optional[str] = None
+    remote_status: Optional[str] = None
+    remaining_stock: Optional[int] = 0
+    source_of_linkage: str
+    can_open_avito: bool
+    needs_manual_avito_removal: bool = True
+
+
+class AvitoHandoffResponse(BaseModel):
+    sale_id: int
+    items: List[AvitoHandoffItem]
+
 
 

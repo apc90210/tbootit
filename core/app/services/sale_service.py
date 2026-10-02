@@ -2,7 +2,7 @@ import json
 import hashlib
 from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Any
-from sqlalchemy import update
+from sqlalchemy import update, case
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
@@ -186,13 +186,44 @@ def execute_canonical_sale(
             new_quantity = db_product.quantity
             old_quantity = new_quantity + qty
 
+            # Resolve immutable Avito item ID and URL snapshot at checkout time
+            snap_item_id = None
+            snap_listing_url = None
+
+            if item.get("avito_item_id"):
+                snap_item_id = str(item["avito_item_id"]).strip()
+                from app.routers.avito_post_sale import _canonical_avito_url
+                snap_listing_url = _canonical_avito_url(item.get("avito_listing_url"), snap_item_id)
+            else:
+                ext_listing = db.query(models.ProductExternalListing).filter(
+                    models.ProductExternalListing.product_id == p_id,
+                    models.ProductExternalListing.marketplace == "avito"
+                ).order_by(
+                    case((models.ProductExternalListing.remote_status.in_(["active", "published"]), 1), else_=0).desc(),
+                    models.ProductExternalListing.updated_at.desc().nullslast(),
+                    models.ProductExternalListing.id.desc()
+                ).first()
+
+                if ext_listing and ext_listing.external_item_id:
+                    snap_item_id = str(ext_listing.external_item_id).strip()
+                    from app.routers.avito_post_sale import _canonical_avito_url
+                    snap_listing_url = _canonical_avito_url(ext_listing.external_url, snap_item_id)
+                elif db_product.sku and str(db_product.sku).startswith("AVITO-"):
+                    candidate_id = str(db_product.sku)[len("AVITO-"):].strip()
+                    if candidate_id:
+                        snap_item_id = candidate_id
+                        from app.routers.avito_post_sale import _canonical_avito_url
+                        snap_listing_url = _canonical_avito_url(None, snap_item_id)
+
             item_title = item.get("title") or db_product.title or f"Товар #{p_id}"
             db_item = models.SaleItem(
                 product_id=p_id,
                 title=item_title,
                 price=unit_price,
                 quantity=qty,
-                sale_id=db_sale.id
+                sale_id=db_sale.id,
+                avito_item_id=snap_item_id,
+                avito_listing_url=snap_listing_url
             )
             db.add(db_item)
 

@@ -26,7 +26,7 @@ fun PostSaleListingHandoff(
         if (key != null) {
             val result = apiClient.getAvitoHandoff(receipt.saleId, session.credentialId, key)
             if (result is ApiResult.Success) {
-                items = result.data.items.filter { it.needsManualAvitoRemoval }
+                items = result.data.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() || it.needsManualAvitoRemoval }
             } else {
                 items = emptyList()
             }

@@ -1,26 +1,26 @@
 """
-Stage 04D - Core Avito Post-Sale Manual Handoff Tests.
-Verifies Section 12 requirements:
-- 1. sold product with active Avito listing + remaining stock 0 -> candidate returned;
-- 2. sold product with no Avito listing -> no candidate;
-- 3. remaining stock > 0 -> no removal candidate under default rule;
-- 4. inactive/removed listing -> no candidate;
-- 5. multi-item sale -> only eligible products returned;
-- 6. historical sale lookup works;
-- 7. unknown sale -> 404;
-- 12. handoff fetch does not alter sale count;
-- 13. handoff fetch does not alter stock;
-- 14. handoff fetch does not alter stock movements;
-- 15. handoff fetch does not alter external listing row/status;
-- 16. no Avito API call occurs;
-- 17. repeated fetch is read-only;
-- 18. canonical listing URL returned unchanged.
+Stage 04D R2 - Core Avito Post-Sale Manual Handoff Tests.
+Verifies Section 10 requirements:
+- 1. active listing + stock 0 -> show;
+- 2. active listing + stock >0 -> show;
+- 3. removed/inactive listing + stock 0 -> show;
+- 4. removed/inactive listing + stock >0 -> show;
+- 5. no Avito reference -> hide;
+- 6. new sale persists immutable Avito item snapshot;
+- 7. new sale persists URL snapshot when available;
+- 8. product/listing edited after sale -> receipt still uses sale snapshot;
+- 9. legacy sale without snapshot -> current exact product mapping fallback works;
+- 10. legacy sale with removed listing -> still returned;
+- 11. multiple items -> each resolved independently;
+- 12. malformed URL -> item ID returned but unsafe URL not launchable;
+- 13. unknown sale -> 404;
+- 14. repeated fetch is read-only;
+- 15. no sale/stock/listing mutation.
 """
 
 import sys
 import os
 import pytest
-from decimal import Decimal
 from fastapi.testclient import TestClient
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,28 +35,33 @@ while core_dir in sys.path:
 sys.path.insert(0, core_dir)
 
 from app.main import app
-from app.database import get_db, SessionLocal
+from app.database import SessionLocal
 from app import models
+from app.services import sale_service
 
 client = TestClient(app)
 
 
 @pytest.fixture(scope="module")
 def setup_stage04d_data():
-    """Sets up isolated products, listings, and sales for Stage 04D tests."""
+    """Sets up isolated products, listings, and sales for Stage 04D R2 tests."""
     db = SessionLocal()
+    created_sale_ids = []
+    created_product_ids = []
     try:
-        # Product 1: Stock 0, active Avito listing -> ELIGIBLE
+        # Product 1: Stock 0, active Avito listing
         p1 = models.Product(
             title="Тестовый МФУ Со Складом 0",
             sku="SKU-STAGE04D-01",
             barcode="4600000004011",
             sale_price=15000.0,
             quantity=0,
-            status="out_of_stock"
+            status="out_of_stock",
+            storage_location="store"
         )
         db.add(p1)
         db.flush()
+        created_product_ids.append(p1.id)
 
         listing1 = models.ProductExternalListing(
             product_id=p1.id,
@@ -69,29 +74,33 @@ def setup_stage04d_data():
         )
         db.add(listing1)
 
-        # Product 2: Stock 0, NO Avito listing -> NOT ELIGIBLE
+        # Product 2: Stock 0, NO Avito listing
         p2 = models.Product(
             title="Тестовый Картридж Без Авито",
             sku="SKU-STAGE04D-02",
             barcode="4600000004022",
             sale_price=2000.0,
             quantity=0,
-            status="out_of_stock"
+            status="out_of_stock",
+            storage_location="store"
         )
         db.add(p2)
         db.flush()
+        created_product_ids.append(p2.id)
 
-        # Product 3: Stock 5 (> 0), active Avito listing -> NOT ELIGIBLE under stock=0 rule
+        # Product 3: Stock 5 (> 0), active Avito listing
         p3 = models.Product(
             title="Тестовый Монитор Со Складом 5",
             sku="SKU-STAGE04D-03",
             barcode="4600000004033",
             sale_price=8000.0,
             quantity=5,
-            status="in_stock"
+            status="in_stock",
+            storage_location="store"
         )
         db.add(p3)
         db.flush()
+        created_product_ids.append(p3.id)
 
         listing3 = models.ProductExternalListing(
             product_id=p3.id,
@@ -104,17 +113,19 @@ def setup_stage04d_data():
         )
         db.add(listing3)
 
-        # Product 4: Stock 0, archived/inactive Avito listing -> NOT ELIGIBLE
+        # Product 4: Stock 0, archived/inactive Avito listing
         p4 = models.Product(
             title="Тестовый Ноутбук С Архивом",
             sku="SKU-STAGE04D-04",
             barcode="4600000004044",
             sale_price=25000.0,
             quantity=0,
-            status="out_of_stock"
+            status="out_of_stock",
+            storage_location="store"
         )
         db.add(p4)
         db.flush()
+        created_product_ids.append(p4.id)
 
         listing4 = models.ProductExternalListing(
             product_id=p4.id,
@@ -127,101 +138,132 @@ def setup_stage04d_data():
         )
         db.add(listing4)
 
-        # Sale 1: Only product 1 (Eligible single item)
-        s1 = models.Sale(
-            total_amount=15000.0,
-            payment_method="cash",
-            status="completed"
+        # Product 5: Stock 4 (> 0), removed/inactive Avito listing
+        p5 = models.Product(
+            title="Тестовый Системный Блок Снятый",
+            sku="SKU-STAGE04D-05",
+            barcode="4600000004055",
+            sale_price=30000.0,
+            quantity=4,
+            status="in_stock",
+            storage_location="store"
         )
+        db.add(p5)
+        db.flush()
+        created_product_ids.append(p5.id)
+
+        listing5 = models.ProductExternalListing(
+            product_id=p5.id,
+            marketplace="avito",
+            external_account_key="acc1",
+            external_item_id="9000000005",
+            external_url="https://www.avito.ru/ekaterinburg/kompyutery/test_pc_9000000005",
+            remote_status="removed",
+            sync_state="synced"
+        )
+        db.add(listing5)
+
+        # Product 6: Malformed / Unsafe URL
+        p6 = models.Product(
+            title="Тестовый Товар С Опасным URL",
+            sku="SKU-STAGE04D-06",
+            barcode="4600000004066",
+            sale_price=1000.0,
+            quantity=0,
+            status="out_of_stock",
+            storage_location="store"
+        )
+        db.add(p6)
+        db.flush()
+        created_product_ids.append(p6.id)
+
+        listing6 = models.ProductExternalListing(
+            product_id=p6.id,
+            marketplace="avito",
+            external_account_key="acc1",
+            external_item_id="9000000006",
+            external_url="http://unsafe-phishing.example.com/item/9000000006",
+            remote_status="active",
+            sync_state="synced"
+        )
+        db.add(listing6)
+
+        # Product 7: New sale candidate with initial stock 10
+        p7 = models.Product(
+            title="Тестовый Планшет Для Продажи",
+            sku="SKU-STAGE04D-07",
+            barcode="4600000004077",
+            sale_price=12000.0,
+            quantity=10,
+            status="in_stock",
+            storage_location="store"
+        )
+        db.add(p7)
+        db.flush()
+        created_product_ids.append(p7.id)
+
+        listing7 = models.ProductExternalListing(
+            product_id=p7.id,
+            marketplace="avito",
+            external_account_key="acc1",
+            external_item_id="9000000007",
+            external_url="https://www.avito.ru/ekaterinburg/planshety/test_tab_9000000007",
+            remote_status="active",
+            sync_state="synced"
+        )
+        db.add(listing7)
+
+        # Sale 1: Only product 1 (active listing + stock 0)
+        s1 = models.Sale(total_amount=15000.0, payment_method="cash", status="completed")
         db.add(s1)
         db.flush()
+        created_sale_ids.append(s1.id)
+        db.add(models.SaleItem(sale_id=s1.id, product_id=p1.id, title=p1.title, quantity=1, price=15000.0))
 
-        item1 = models.SaleItem(
-            sale_id=s1.id,
-            product_id=p1.id,
-            title=p1.title,
-            quantity=1,
-            price=15000.0
-        )
-        db.add(item1)
-
-        # Sale 2: Only product 2 (No listing)
-        s2 = models.Sale(
-            total_amount=2000.0,
-            payment_method="card",
-            status="completed"
-        )
+        # Sale 2: Only product 2 (no Avito listing)
+        s2 = models.Sale(total_amount=2000.0, payment_method="card", status="completed")
         db.add(s2)
         db.flush()
+        created_sale_ids.append(s2.id)
+        db.add(models.SaleItem(sale_id=s2.id, product_id=p2.id, title=p2.title, quantity=1, price=2000.0))
 
-        item2 = models.SaleItem(
-            sale_id=s2.id,
-            product_id=p2.id,
-            title=p2.title,
-            quantity=1,
-            price=2000.0
-        )
-        db.add(item2)
-
-        # Sale 3: Only product 3 (Stock > 0)
-        s3 = models.Sale(
-            total_amount=8000.0,
-            payment_method="cash",
-            status="completed"
-        )
+        # Sale 3: Only product 3 (active listing + stock > 0)
+        s3 = models.Sale(total_amount=8000.0, payment_method="card", status="completed")
         db.add(s3)
         db.flush()
+        created_sale_ids.append(s3.id)
+        db.add(models.SaleItem(sale_id=s3.id, product_id=p3.id, title=p3.title, quantity=1, price=8000.0))
 
-        item3 = models.SaleItem(
-            sale_id=s3.id,
-            product_id=p3.id,
-            title=p3.title,
-            quantity=1,
-            price=8000.0
-        )
-        db.add(item3)
-
-        # Sale 4: Only product 4 (Archived listing)
-        s4 = models.Sale(
-            total_amount=25000.0,
-            payment_method="cash",
-            status="completed"
-        )
+        # Sale 4: Only product 4 (removed/archived listing + stock 0)
+        s4 = models.Sale(total_amount=25000.0, payment_method="cash", status="completed")
         db.add(s4)
         db.flush()
+        created_sale_ids.append(s4.id)
+        db.add(models.SaleItem(sale_id=s4.id, product_id=p4.id, title=p4.title, quantity=1, price=25000.0))
 
-        item4 = models.SaleItem(
-            sale_id=s4.id,
-            product_id=p4.id,
-            title=p4.title,
-            quantity=1,
-            price=25000.0
-        )
-        db.add(item4)
+        # Sale 4b: Only product 5 (removed/inactive listing + stock > 0)
+        s4b = models.Sale(total_amount=30000.0, payment_method="card", status="completed")
+        db.add(s4b)
+        db.flush()
+        created_sale_ids.append(s4b.id)
+        db.add(models.SaleItem(sale_id=s4b.id, product_id=p5.id, title=p5.title, quantity=1, price=30000.0))
 
-        # Sale 5: Multi-item sale (p1: eligible, p2: no listing, p3: stock>0, p4: archived)
-        s5 = models.Sale(
-            total_amount=50000.0,
-            payment_method="card",
-            status="completed"
-        )
+        # Sale 5: Multi-item sale (p1: active stock 0, p2: no listing, p3: active stock 5, p4: archived stock 0)
+        s5 = models.Sale(total_amount=50000.0, payment_method="card", status="completed")
         db.add(s5)
         db.flush()
-
+        created_sale_ids.append(s5.id)
         db.add(models.SaleItem(sale_id=s5.id, product_id=p1.id, title=p1.title, quantity=1, price=15000.0))
         db.add(models.SaleItem(sale_id=s5.id, product_id=p2.id, title=p2.title, quantity=1, price=2000.0))
         db.add(models.SaleItem(sale_id=s5.id, product_id=p3.id, title=p3.title, quantity=1, price=8000.0))
         db.add(models.SaleItem(sale_id=s5.id, product_id=p4.id, title=p4.title, quantity=1, price=25000.0))
 
-        # Historical Sale (Sale 6 equivalent): Completed earlier
-        s6 = models.Sale(
-            total_amount=15000.0,
-            payment_method="card",
-            status="completed"
-        )
+        # Sale 6: Malformed URL sale
+        s6 = models.Sale(total_amount=1000.0, payment_method="cash", status="completed")
         db.add(s6)
         db.flush()
-        db.add(models.SaleItem(sale_id=s6.id, product_id=p1.id, title=p1.title, quantity=1, price=15000.0))
+        created_sale_ids.append(s6.id)
+        db.add(models.SaleItem(sale_id=s6.id, product_id=p6.id, title=p6.title, quantity=1, price=1000.0))
 
         db.commit()
 
@@ -230,23 +272,32 @@ def setup_stage04d_data():
             "p2_id": p2.id,
             "p3_id": p3.id,
             "p4_id": p4.id,
+            "p5_id": p5.id,
+            "p6_id": p6.id,
+            "p7_id": p7.id,
             "s1_id": s1.id,
             "s2_id": s2.id,
             "s3_id": s3.id,
             "s4_id": s4.id,
+            "s4b_id": s4b.id,
             "s5_id": s5.id,
             "s6_id": s6.id,
             "listing1_url": listing1.external_url,
-            "listing1_id": listing1.external_item_id
+            "listing1_id": listing1.external_item_id,
+            "listing3_id": listing3.external_item_id,
+            "listing4_id": listing4.external_item_id,
+            "listing5_id": listing5.external_item_id,
+            "listing6_id": listing6.external_item_id,
+            "created_sale_ids": created_sale_ids,
+            "created_product_ids": created_product_ids
         }
 
     finally:
-        # Cleanup test entities
         try:
-            db.query(models.SaleItem).filter(models.SaleItem.sale_id.in_([s1.id, s2.id, s3.id, s4.id, s5.id, s6.id])).delete(synchronize_session=False)
-            db.query(models.Sale).filter(models.Sale.id.in_([s1.id, s2.id, s3.id, s4.id, s5.id, s6.id])).delete(synchronize_session=False)
-            db.query(models.ProductExternalListing).filter(models.ProductExternalListing.product_id.in_([p1.id, p2.id, p3.id, p4.id])).delete(synchronize_session=False)
-            db.query(models.Product).filter(models.Product.id.in_([p1.id, p2.id, p3.id, p4.id])).delete(synchronize_session=False)
+            db.query(models.SaleItem).filter(models.SaleItem.sale_id.in_(created_sale_ids)).delete(synchronize_session=False)
+            db.query(models.Sale).filter(models.Sale.id.in_(created_sale_ids)).delete(synchronize_session=False)
+            db.query(models.ProductExternalListing).filter(models.ProductExternalListing.product_id.in_(created_product_ids)).delete(synchronize_session=False)
+            db.query(models.Product).filter(models.Product.id.in_(created_product_ids)).delete(synchronize_session=False)
             db.commit()
         except Exception:
             db.rollback()
@@ -254,8 +305,8 @@ def setup_stage04d_data():
             db.close()
 
 
-def test_01_active_listing_zero_stock_returns_candidate(setup_stage04d_data):
-    """Section 12.1: Sold product with active Avito listing + remaining stock 0 -> candidate returned."""
+def test_01_active_listing_stock_zero_shows(setup_stage04d_data):
+    """Section 10.1: active listing + stock 0 -> show."""
     s1_id = setup_stage04d_data["s1_id"]
     p1_id = setup_stage04d_data["p1_id"]
     listing1_id = setup_stage04d_data["listing1_id"]
@@ -269,14 +320,75 @@ def test_01_active_listing_zero_stock_returns_candidate(setup_stage04d_data):
     assert len(data["items"]) == 1
     item = data["items"][0]
     assert item["product_id"] == p1_id
-    assert item["remaining_stock"] == 0
-    assert item["needs_manual_avito_removal"] is True
-    assert item["listing_id"] == listing1_id
+    assert item["avito_item_id"] == listing1_id
+    assert item["can_open_avito"] is True
     assert item["listing_url"] == listing1_url
+    assert item["remaining_stock"] == 0
+    assert item["remote_status"] == "active"
 
 
-def test_02_product_with_no_avito_listing_omitted(setup_stage04d_data):
-    """Section 12.2: Sold product with no Avito listing -> no candidate."""
+def test_02_active_listing_stock_greater_than_zero_shows(setup_stage04d_data):
+    """Section 10.2: active listing + stock >0 -> show."""
+    s3_id = setup_stage04d_data["s3_id"]
+    p3_id = setup_stage04d_data["p3_id"]
+    listing3_id = setup_stage04d_data["listing3_id"]
+
+    resp = client.get(f"/api/sales/{s3_id}/avito-handoff")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["sale_id"] == s3_id
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["product_id"] == p3_id
+    assert item["avito_item_id"] == listing3_id
+    assert item["can_open_avito"] is True
+    assert item["remaining_stock"] == 5
+    assert item["remote_status"] == "active"
+
+
+def test_03_removed_inactive_listing_stock_zero_shows(setup_stage04d_data):
+    """Section 10.3: removed/inactive listing + stock 0 -> show."""
+    s4_id = setup_stage04d_data["s4_id"]
+    p4_id = setup_stage04d_data["p4_id"]
+    listing4_id = setup_stage04d_data["listing4_id"]
+
+    resp = client.get(f"/api/sales/{s4_id}/avito-handoff")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["sale_id"] == s4_id
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["product_id"] == p4_id
+    assert item["avito_item_id"] == listing4_id
+    assert item["can_open_avito"] is True
+    assert item["remaining_stock"] == 0
+    assert item["remote_status"] == "archived"
+
+
+def test_04_removed_inactive_listing_stock_greater_than_zero_shows(setup_stage04d_data):
+    """Section 10.4: removed/inactive listing + stock >0 -> show."""
+    s4b_id = setup_stage04d_data["s4b_id"]
+    p5_id = setup_stage04d_data["p5_id"]
+    listing5_id = setup_stage04d_data["listing5_id"]
+
+    resp = client.get(f"/api/sales/{s4b_id}/avito-handoff")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["sale_id"] == s4b_id
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["product_id"] == p5_id
+    assert item["avito_item_id"] == listing5_id
+    assert item["can_open_avito"] is True
+    assert item["remaining_stock"] == 4
+    assert item["remote_status"] == "removed"
+
+
+def test_05_no_avito_reference_hides(setup_stage04d_data):
+    """Section 10.5: no Avito reference -> hide."""
     s2_id = setup_stage04d_data["s2_id"]
 
     resp = client.get(f"/api/sales/{s2_id}/avito-handoff")
@@ -287,74 +399,195 @@ def test_02_product_with_no_avito_listing_omitted(setup_stage04d_data):
     assert len(data["items"]) == 0
 
 
-def test_03_remaining_stock_greater_than_zero_omitted(setup_stage04d_data):
-    """Section 12.3: Remaining stock > 0 -> no removal candidate under default rule."""
-    s3_id = setup_stage04d_data["s3_id"]
+def test_06_and_07_new_sale_persists_immutable_avito_snapshot(setup_stage04d_data):
+    """
+    Section 10.6 & 10.7:
+    New sale persists immutable Avito item snapshot and URL snapshot when available.
+    """
+    db = SessionLocal()
+    p7_id = setup_stage04d_data["p7_id"]
+    try:
+        new_sale, _ = sale_service.execute_canonical_sale(
+            db=db,
+            items_data=[{"product_id": p7_id, "quantity": 1, "price": 12000.0, "title": "Планшет"}],
+            payment_method="cash",
+            customer_id=None,
+            cashier_name="Кассир Тест"
+        )
+        setup_stage04d_data["created_sale_ids"].append(new_sale.id)
 
-    resp = client.get(f"/api/sales/{s3_id}/avito-handoff")
+        # Inspect persisted SaleItem snapshot in DB
+        sale_item = db.query(models.SaleItem).filter(models.SaleItem.sale_id == new_sale.id).first()
+        assert sale_item is not None
+        assert sale_item.avito_item_id == "9000000007"
+        assert sale_item.avito_listing_url == "https://www.avito.ru/ekaterinburg/planshety/test_tab_9000000007"
+
+        # Verify handoff endpoint returns it with source_of_linkage == "sale_snapshot"
+        resp = client.get(f"/api/sales/{new_sale.id}/avito-handoff")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["items"]) == 1
+        assert data["items"][0]["avito_item_id"] == "9000000007"
+        assert data["items"][0]["listing_url"] == "https://www.avito.ru/ekaterinburg/planshety/test_tab_9000000007"
+        assert data["items"][0]["source_of_linkage"] == "sale_snapshot"
+        assert data["items"][0]["can_open_avito"] is True
+
+    finally:
+        db.close()
+
+
+def test_08_product_listing_edited_after_sale_receipt_still_uses_snapshot(setup_stage04d_data):
+    """
+    Section 10.8:
+    product/listing edited after sale -> receipt still uses sale snapshot.
+    """
+    db = SessionLocal()
+    p7_id = setup_stage04d_data["p7_id"]
+    try:
+        # Create a sale with snapshot
+        sale, _ = sale_service.execute_canonical_sale(
+            db=db,
+            items_data=[{"product_id": p7_id, "quantity": 1, "price": 12000.0, "title": "Планшет До Редактирования"}],
+            payment_method="card",
+            cashier_name="Кассир Тест"
+        )
+        setup_stage04d_data["created_sale_ids"].append(sale.id)
+
+        # Now edit/archive the product listing in catalog AFTER the sale
+        listing = db.query(models.ProductExternalListing).filter(models.ProductExternalListing.product_id == p7_id).first()
+        assert listing is not None
+        listing.external_item_id = "CHANGED_ITEM_ID_9999"
+        listing.external_url = "https://www.avito.ru/changed_url_9999"
+        listing.remote_status = "closed"
+        db.commit()
+
+        # Receipt must STILL return original snapshot values!
+        resp = client.get(f"/api/sales/{sale.id}/avito-handoff")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["items"]) == 1
+        item = data["items"][0]
+        assert item["avito_item_id"] == "9000000007"
+        assert item["listing_url"] == "https://www.avito.ru/ekaterinburg/planshety/test_tab_9000000007"
+        assert item["source_of_linkage"] == "sale_snapshot"
+
+    finally:
+        db.close()
+
+
+def test_09_legacy_sale_without_snapshot_uses_current_product_mapping(setup_stage04d_data):
+    """
+    Section 10.9:
+    legacy sale without snapshot -> current exact product mapping fallback works.
+    """
+    s1_id = setup_stage04d_data["s1_id"]
+    listing1_id = setup_stage04d_data["listing1_id"]
+
+    resp = client.get(f"/api/sales/{s1_id}/avito-handoff")
     assert resp.status_code == 200
     data = resp.json()
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["avito_item_id"] == listing1_id
+    assert item["source_of_linkage"] == "current_product_mapping"
 
-    assert data["sale_id"] == s3_id
-    assert len(data["items"]) == 0
 
-
-def test_04_inactive_or_removed_listing_omitted(setup_stage04d_data):
-    """Section 12.4: Inactive/removed listing -> no candidate."""
+def test_10_legacy_sale_with_removed_listing_still_returned(setup_stage04d_data):
+    """
+    Section 10.10:
+    legacy sale with removed listing -> still returned.
+    """
     s4_id = setup_stage04d_data["s4_id"]
+    listing4_id = setup_stage04d_data["listing4_id"]
 
     resp = client.get(f"/api/sales/{s4_id}/avito-handoff")
     assert resp.status_code == 200
     data = resp.json()
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["avito_item_id"] == listing4_id
+    assert item["remote_status"] == "archived"
+    assert item["can_open_avito"] is True
 
-    assert data["sale_id"] == s4_id
-    assert len(data["items"]) == 0
 
-
-def test_05_multi_item_sale_filters_only_eligible_products(setup_stage04d_data):
-    """Section 12.5: Multi-item sale -> only eligible products returned."""
+def test_11_multiple_items_each_resolved_independently(setup_stage04d_data):
+    """
+    Section 10.11:
+    multiple items -> each resolved independently.
+    Sale 5 contains:
+    - p1: active, stock 0 -> eligible
+    - p2: no Avito listing -> omitted
+    - p3: active, stock 5 -> eligible
+    - p4: archived, stock 0 -> eligible
+    Expected: exactly 3 items returned, each with its own independent IDs and URLs.
+    """
     s5_id = setup_stage04d_data["s5_id"]
     p1_id = setup_stage04d_data["p1_id"]
+    p3_id = setup_stage04d_data["p3_id"]
+    p4_id = setup_stage04d_data["p4_id"]
 
     resp = client.get(f"/api/sales/{s5_id}/avito-handoff")
     assert resp.status_code == 200
     data = resp.json()
 
     assert data["sale_id"] == s5_id
-    assert len(data["items"]) == 1
-    assert data["items"][0]["product_id"] == p1_id
-    assert data["items"][0]["needs_manual_avito_removal"] is True
+    assert len(data["items"]) == 3
+    ret_product_ids = {it["product_id"] for it in data["items"]}
+    assert ret_product_ids == {p1_id, p3_id, p4_id}
+
+    for it in data["items"]:
+        assert it["can_open_avito"] is True
+        assert it["avito_item_id"] is not None
+        assert "avito.ru" in it["listing_url"]
 
 
-def test_06_historical_sale_lookup_works(setup_stage04d_data):
-    """Section 12.6: Historical sale lookup works."""
+def test_12_malformed_url_item_id_returned_but_unsafe_url_not_launchable(setup_stage04d_data):
+    """
+    Section 10.12:
+    malformed URL -> item ID returned but unsafe URL not launchable.
+    Product 6 has external_item_id="9000000006", but external_url is "http://unsafe-phishing.example.com/...".
+    Server must return the avito_item_id, but can_open_avito must be False and listing_url must be blocked/empty.
+    """
     s6_id = setup_stage04d_data["s6_id"]
-    p1_id = setup_stage04d_data["p1_id"]
-    listing1_id = setup_stage04d_data["listing1_id"]
+    p6_id = setup_stage04d_data["p6_id"]
 
     resp = client.get(f"/api/sales/{s6_id}/avito-handoff")
     assert resp.status_code == 200
     data = resp.json()
 
-    assert data["sale_id"] == s6_id
     assert len(data["items"]) == 1
-    assert data["items"][0]["product_id"] == p1_id
-    assert data["items"][0]["remaining_stock"] == 0
-    assert data["items"][0]["listing_id"] == listing1_id
-    assert "avito.ru" in data["items"][0]["listing_url"]
+    item = data["items"][0]
+    assert item["product_id"] == p6_id
+    assert item["avito_item_id"] == "9000000006"
+    assert item["can_open_avito"] is False
+    assert "unsafe-phishing" not in item["listing_url"]
 
 
-def test_07_unknown_sale_returns_404():
-    """Section 12.7: Unknown sale -> 404."""
+def test_13_unknown_sale_returns_404():
+    """Section 10.13: unknown sale -> 404."""
     resp = client.get("/api/sales/999999/avito-handoff")
     assert resp.status_code == 404
 
 
-def test_12_to_15_read_only_invariants(setup_stage04d_data):
+def test_14_repeated_fetch_is_read_only(setup_stage04d_data):
+    """Section 10.14: repeated fetch is read-only."""
+    s1_id = setup_stage04d_data["s1_id"]
+    res1 = client.get(f"/api/sales/{s1_id}/avito-handoff").json()
+    res2 = client.get(f"/api/sales/{s1_id}/avito-handoff").json()
+    res3 = client.get(f"/api/sales/{s1_id}/avito-handoff").json()
+    assert res1 == res2 == res3
+
+
+def test_15_no_sale_stock_or_listing_mutation(setup_stage04d_data, monkeypatch):
     """
-    Sections 12.12, 12.13, 12.14, 12.15:
-    Handoff fetch does NOT alter sale count, stock, stock movements, or external listing row/status.
+    Section 10.15:
+    no sale/stock/listing mutation and no Avito API call occurs.
     """
+    def fail_call(*args, **kwargs):
+        raise RuntimeError("Avito network call attempted!")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_call)
+
     db = SessionLocal()
     try:
         sales_before = db.query(models.Sale).count()
@@ -394,36 +627,3 @@ def test_12_to_15_read_only_invariants(setup_stage04d_data):
 
     finally:
         db.close()
-
-
-def test_16_no_avito_api_call_occurs(setup_stage04d_data, monkeypatch):
-    """Section 12.16: No Avito API call occurs."""
-    # Poison any potential network call
-    def fail_call(*args, **kwargs):
-        raise RuntimeError("Avito network call attempted!")
-
-    monkeypatch.setattr("urllib.request.urlopen", fail_call)
-    
-    s1_id = setup_stage04d_data["s1_id"]
-    resp = client.get(f"/api/sales/{s1_id}/avito-handoff")
-    assert resp.status_code == 200
-
-
-def test_17_repeated_fetch_is_read_only(setup_stage04d_data):
-    """Section 12.17: Repeated fetch is safe and read-only."""
-    s1_id = setup_stage04d_data["s1_id"]
-    res1 = client.get(f"/api/sales/{s1_id}/avito-handoff").json()
-    res2 = client.get(f"/api/sales/{s1_id}/avito-handoff").json()
-    res3 = client.get(f"/api/sales/{s1_id}/avito-handoff").json()
-    assert res1 == res2 == res3
-
-
-def test_18_canonical_listing_url_returned_unchanged(setup_stage04d_data):
-    """Section 12.18: Canonical listing URL returned unchanged."""
-    s1_id = setup_stage04d_data["s1_id"]
-    listing1_url = setup_stage04d_data["listing1_url"]
-
-    resp = client.get(f"/api/sales/{s1_id}/avito-handoff")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["items"][0]["listing_url"] == listing1_url

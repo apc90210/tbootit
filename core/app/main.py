@@ -58,7 +58,11 @@ def migrate_db(target_engine=None):
             ("source_type", "VARCHAR"),
             ("last_imported_at", "DATETIME"),
             ("barcode", "VARCHAR"),
-            ("canonical_category_id", "INTEGER")
+            ("canonical_category_id", "INTEGER"),
+            ("reference_model_id", "INTEGER REFERENCES product_reference_models(id)"),
+            ("reference_match_method", "VARCHAR"),
+            ("reference_match_confidence", "FLOAT"),
+            ("reference_enriched_at", "DATETIME")
         ]
         
         for col_name, col_type in updates:
@@ -71,6 +75,12 @@ def migrate_db(target_engine=None):
         # Ensure index for barcode
         try:
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_products_barcode ON products(barcode) WHERE barcode IS NOT NULL AND barcode != '';"))
+        except Exception as e:
+            print(f"Index creation warning: {e}")
+
+        # Ensure index for reference_model_id
+        try:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_reference_model_id ON products(reference_model_id);"))
         except Exception as e:
             print(f"Index creation warning: {e}")
 
@@ -109,6 +119,27 @@ def migrate_db(target_engine=None):
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sales_client_checkout_id ON sales(client_checkout_id) WHERE client_checkout_id IS NOT NULL;"))
         except Exception as e:
             print(f"Index creation error on ix_sales_client_checkout_id: {e}")
+
+        # Migrate sale_items table for Stage 04D R2 (immutable Avito snapshots)
+        try:
+            res_sale_items = conn.execute(text("PRAGMA table_info(sale_items);")).fetchall()
+            sale_items_columns = [row[1] for row in res_sale_items]
+            sale_items_updates = [
+                ("avito_item_id", "VARCHAR"),
+                ("avito_listing_url", "VARCHAR"),
+            ]
+            for col_name, col_type in sale_items_updates:
+                if col_name not in sale_items_columns:
+                    try:
+                        conn.execute(text(f"ALTER TABLE sale_items ADD COLUMN {col_name} {col_type};"))
+                    except Exception as e:
+                        print(f"Migration error on sale_items.{col_name}: {e}")
+            try:
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_items_avito_item_id ON sale_items(avito_item_id) WHERE avito_item_id IS NOT NULL;"))
+            except Exception as e:
+                print(f"Index creation error on ix_sale_items_avito_item_id: {e}")
+        except Exception as e:
+            print(f"Migration error on sale_items: {e}")
 
         # Migrate checkout_idempotency table for Stage 04B
         try:
@@ -389,5 +420,7 @@ app.include_router(avito_categories_router.product_router)
 app.include_router(avito_post_sale_router.router)
 from app.routers import reservations as reservations_router
 app.include_router(reservations_router.router, prefix="/api/reservation-requests", tags=["reservations"])
+from app.routers import product_reference as product_reference_router
+app.include_router(product_reference_router.router)
 
 

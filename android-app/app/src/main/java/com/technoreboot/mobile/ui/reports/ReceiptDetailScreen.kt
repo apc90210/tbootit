@@ -187,7 +187,7 @@ fun ReceiptDetailScreen(
         if (privateKey != null) {
             val avitoResult = apiClient.getAvitoHandoff(saleId, session.credentialId, privateKey)
             if (avitoResult is ApiResult.Success) {
-                avitoHandoffItems = avitoResult.data.items.filter { it.needsManualAvitoRemoval }
+                avitoHandoffItems = avitoResult.data.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() || it.needsManualAvitoRemoval }
             } else {
                 avitoHandoffItems = emptyList()
             }
@@ -248,7 +248,7 @@ fun ReceiptDetailScreen(
                             coroutineScope.launch {
                                 val avitoResult = apiClient.getAvitoHandoff(saleId, session.credentialId, privateKey)
                                 if (avitoResult is ApiResult.Success) {
-                                    avitoHandoffItems = avitoResult.data.items.filter { it.needsManualAvitoRemoval }
+                                    avitoHandoffItems = avitoResult.data.items.filter { it.canOpenAvito || it.avitoItemId.isNotBlank() || it.needsManualAvitoRemoval }
                                 } else {
                                     avitoHandoffItems = emptyList()
                                 }
