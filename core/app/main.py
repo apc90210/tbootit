@@ -231,6 +231,25 @@ def migrate_db(target_engine=None):
         except Exception as e:
             print(f"Migration error on sales status normalization: {e}")
 
+        # Migrate product_reference_models table for Stage 05A
+        try:
+            res_ref = conn.execute(text("PRAGMA table_info(product_reference_models);")).fetchall()
+            if res_ref:
+                ref_columns = [row[1] for row in res_ref]
+                ref_updates = [
+                    ("verification_state", "VARCHAR DEFAULT 'verified'"),
+                    ("source_urls_json", "TEXT"),
+                    ("confidence", "FLOAT")
+                ]
+                for col_name, col_type in ref_updates:
+                    if col_name not in ref_columns:
+                        try:
+                            conn.execute(text(f"ALTER TABLE product_reference_models ADD COLUMN {col_name} {col_type};"))
+                        except Exception as e:
+                            print(f"Migration error on product_reference_models: {e}")
+        except Exception as e:
+            print(f"Migration error on product_reference_models: {e}")
+
         # Migrate repair_orders table for Stage 05A
         res_repairs = conn.execute(text("PRAGMA table_info(repair_orders);")).fetchall()
         repairs_columns = [row[1] for row in res_repairs]
@@ -422,5 +441,7 @@ from app.routers import reservations as reservations_router
 app.include_router(reservations_router.router, prefix="/api/reservation-requests", tags=["reservations"])
 from app.routers import product_reference as product_reference_router
 app.include_router(product_reference_router.router)
+app.include_router(product_reference_router.public_router)
+app.include_router(product_reference_router.public_router_plural)
 
 

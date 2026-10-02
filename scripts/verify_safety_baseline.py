@@ -68,7 +68,8 @@ def capture_baseline(out_file=r"C:\tbootit\data\safety_baseline.json"):
         "repair_orders_hash": hashlib.sha256(json.dumps(repairs_data, sort_keys=True, default=str).encode()).hexdigest(),
         "reservation_requests_count": len(reservations_data),
         "reservation_requests_hash": hashlib.sha256(json.dumps(reservations_data, sort_keys=True, default=str).encode()).hexdigest(),
-        "products_data": products_data
+        "products_data": products_data,
+        "repairs_data": repairs_data
     }
 
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
@@ -155,12 +156,28 @@ def compare_against_baseline(baseline_file=r"C:\tbootit\data\safety_baseline.jso
         for d in diffs[:10]:
             print("  ", d)
 
-    all_passed = (p_match and ph_match and s_match and r_match and res_match)
+    if not r_match and "repairs_data" in base:
+        base_r_map = {r["id"]: r for r in base["repairs_data"]}
+        r_diffs = []
+        for cr in current_repairs:
+            br = base_r_map.get(cr["id"])
+            if not br:
+                r_diffs.append(f"Repair order #{cr['id']} not in baseline")
+                continue
+            for k in cr:
+                if str(cr[k]) != str(br.get(k)):
+                    r_diffs.append(f"Repair order #{cr['id']} field '{k}' changed from '{br.get(k)}' to '{cr[k]}'")
+        print(f"Repair order differences ({len(r_diffs)}):")
+        for d in r_diffs[:10]:
+            print("  ", d)
+
+    all_passed = (p_match and ph_match and s_match and si_match and r_match and res_match)
     print(f"Overall business integrity: {'PASSED (Zero unwanted modifications)' if all_passed else 'FAILED'}")
     return {
         "products_match": p_match,
         "photos_match": ph_match,
         "sales_match": s_match,
+        "sale_items_match": si_match,
         "repairs_match": r_match,
         "reservations_match": res_match,
         "all_passed": all_passed
@@ -168,7 +185,8 @@ def compare_against_baseline(baseline_file=r"C:\tbootit\data\safety_baseline.jso
 
 if __name__ == "__main__":
     import sys
+    target_f = sys.argv[2] if len(sys.argv) > 2 else r"C:\tbootit\data\safety_baseline.json"
     if "--compare" in sys.argv:
-        compare_against_baseline()
+        compare_against_baseline(target_f)
     else:
-        capture_baseline()
+        capture_baseline(target_f)

@@ -617,6 +617,9 @@ class ProductReferenceModel(Base):
     active = Column(Boolean, default=True, nullable=False)
     source = Column(String, default="manual", nullable=False)
     source_note = Column(Text, nullable=True)
+    verification_state = Column(String, default="verified", nullable=True)
+    source_urls_json = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

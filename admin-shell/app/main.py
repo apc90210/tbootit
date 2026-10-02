@@ -2830,3 +2830,117 @@ async def api_mobile_app_update_apk(request: Request, version_code: int = Query(
     )
 
 
+# =====================================================================
+# STAGE 05A: MOBILE PRODUCT REFERENCE SEARCH & QUICK INTAKE
+# =====================================================================
+
+@app.get("/api/mobile/product-reference/search")
+@app.get("/api/mobile/product-references/search")
+async def api_mobile_product_reference_search(
+    request: Request,
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=50),
+    active_only: bool = Query(True),
+):
+    """
+    Search reference catalog for mobile intake.
+    Protected by TRMOBILE1 PoP authentication.
+    """
+    ctx = await _get_mobile_auth(request)
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/product-reference/search"
+    params = {"q": q, "limit": limit, "active_only": active_only}
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+@app.post("/api/mobile/product-reference/ai-assist")
+@app.post("/api/mobile/product-references/ai-assist")
+async def api_mobile_product_reference_ai_assist(request: Request):
+    """
+    Server-side AI assistant fallback for identifying unknown models.
+    Protected by TRMOBILE1 PoP authentication with body SHA-256 binding.
+    """
+    ctx = await _get_mobile_auth(request)
+
+    try:
+        body_bytes = await request.body()
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON body: {str(e)}")
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+        "Content-Type": "application/json",
+    }
+    url = f"{CORE_API_URL}/api/product-reference/ai-assist"
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+@app.post("/api/mobile/products/quick-intake")
+async def api_mobile_products_quick_intake(request: Request):
+    """
+    Mobile Quick Product Intake endpoint.
+    Protected by TRMOBILE1 PoP authentication with body SHA-256 binding.
+    Forwarded to Core API.
+    """
+    ctx = await _get_mobile_auth(request)
+
+    try:
+        body_bytes = await request.body()
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON body: {str(e)}")
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+        "Content-Type": "application/json",
+    }
+    url = f"{CORE_API_URL}/api/products/quick-intake"
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=20.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code in (400, 404, 409, 422):
+                err_detail = "Ошибка при создании товара"
+                try:
+                    err_json = resp.json()
+                    err_detail = err_json.get("detail", err_detail)
+                except Exception:
+                    err_detail = resp.text or err_detail
+                raise HTTPException(status_code=resp.status_code, detail=err_detail)
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+

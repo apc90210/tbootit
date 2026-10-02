@@ -6,6 +6,11 @@ import com.technoreboot.mobile.model.PosProduct
 import com.technoreboot.mobile.model.SaleReceipt
 import com.technoreboot.mobile.model.SalesReport
 import com.technoreboot.mobile.model.UpdateManifest
+import com.technoreboot.mobile.model.ProductReferenceCandidate
+import com.technoreboot.mobile.model.ProductReferenceSearchResponse
+import com.technoreboot.mobile.model.AiAssistResponse
+import com.technoreboot.mobile.model.QuickIntakeRequest
+import com.technoreboot.mobile.model.QuickIntakeResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -621,6 +626,165 @@ class MobileApiClient(
 
         executeRequest(httpRequest) { json ->
             SaleReceipt.fromJson(json)
+        }
+    }
+
+    /**
+     * Searches reference catalog for matching models via GET /api/mobile/product-reference/search?q=...
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun searchReferenceModels(
+        query: String,
+        credentialId: String,
+        privateKey: PrivateKey,
+        limit: Int = 10
+    ): ApiResult<ProductReferenceSearchResponse> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(code = err.code, message = err.message, isNetworkError = err.isNetworkError)
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val encodedQuery = java.net.URLEncoder.encode(trimmed, "UTF-8").replace("+", "%20")
+        val canonicalPath = "/api/mobile/product-reference/search?limit=$limit&q=$encodedQuery"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(code = 500, message = "Ошибка формирования подписи: ${e.message}")
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            ProductReferenceSearchResponse.fromJson(json)
+        }
+    }
+
+    /**
+     * Fallback to server-side AI model identification via POST /api/mobile/product-reference/ai-assist
+     * protected by TRMOBILE1 PoP authentication with body SHA-256 binding.
+     */
+    suspend fun requestAiAssist(
+        query: String,
+        ocrText: String? = null,
+        categoryHint: String? = null,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<AiAssistResponse> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(code = err.code, message = err.message, isNetworkError = err.isNetworkError)
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "POST"
+        val canonicalPath = "/api/mobile/product-reference/ai-assist"
+
+        val jsonPayload = JSONObject().apply {
+            put("query", query.trim())
+            if (!ocrText.isNullOrBlank()) put("ocr_text", ocrText.trim())
+            if (!categoryHint.isNullOrBlank()) put("category_hint", categoryHint.trim())
+        }
+        val bodyBytes = jsonPayload.toString().toByteArray(Charsets.UTF_8)
+        val bodyHash = RequestBinding.computeBodySha256(bodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(code = 500, message = "Ошибка формирования подписи: ${e.message}")
+        }
+
+        val requestBody = bodyBytes.toRequestBody(JSON_MEDIA_TYPE)
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .post(requestBody)
+            .build()
+
+        executeRequest(request) { json ->
+            AiAssistResponse.fromJson(json)
+        }
+    }
+
+    /**
+     * Submits a newly accepted product card via POST /api/mobile/products/quick-intake
+     * protected by TRMOBILE1 PoP authentication with body SHA-256 binding.
+     */
+    suspend fun quickIntakeProduct(
+        request: QuickIntakeRequest,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<QuickIntakeResponse> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(code = err.code, message = err.message, isNetworkError = err.isNetworkError)
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "POST"
+        val canonicalPath = "/api/mobile/products/quick-intake"
+
+        val jsonPayload = request.toJson()
+        val bodyBytes = jsonPayload.toString().toByteArray(Charsets.UTF_8)
+        val bodyHash = RequestBinding.computeBodySha256(bodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(code = 500, message = "Ошибка формирования подписи: ${e.message}")
+        }
+
+        val requestBody = bodyBytes.toRequestBody(JSON_MEDIA_TYPE)
+        val httpRequest = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .post(requestBody)
+            .build()
+
+        executeRequest(httpRequest) { json ->
+            QuickIntakeResponse.fromJson(json)
         }
     }
 

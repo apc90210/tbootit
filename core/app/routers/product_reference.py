@@ -30,8 +30,11 @@ from app import models, schemas
 from app.config import settings
 from app.services.product_reference_matcher import (
     match_product,
+    find_reference_candidates,
     normalize_for_matching,
+    extract_tokens,
     generate_stable_key,
+    MatchCandidate,
 )
 from app.services.product_reference_enricher import (
     enrich_product_from_reference,
@@ -43,6 +46,7 @@ from app.services.product_reference_json_service import (
 from app.services.product_reference_learn import (
     save_product_as_reference_model,
 )
+from app.services.ai import get_ai_provider
 
 def verify_owner_access(request: Request):
     """Verify owner authorization via header and token."""
@@ -61,6 +65,16 @@ router = APIRouter(
     prefix="/api/product-reference",
     tags=["Product Reference Catalog"],
     dependencies=[Depends(verify_owner_access)]
+)
+
+public_router = APIRouter(
+    prefix="/api/product-reference",
+    tags=["Product Reference Catalog (Search & Intake)"],
+)
+
+public_router_plural = APIRouter(
+    prefix="/api/product-references",
+    tags=["Product Reference Catalog (Search & Intake)"],
 )
 
 
@@ -498,4 +512,185 @@ def learn_from_product(
         return res
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@public_router.get("/search", response_model=schemas.ProductReferenceSearchResponse)
+@public_router_plural.get("/search", response_model=schemas.ProductReferenceSearchResponse)
+def search_reference_models(
+    q: str = Query(..., min_length=1, description="Search query (model name, OCR text, alias)"),
+    limit: int = Query(10, ge=1, le=50),
+    active_only: bool = Query(True),
+    db: Session = Depends(get_db)
+):
+    """
+    Search reference catalog for matching models using 3-tier deterministic matcher.
+    Per Section 7 of TR_Stage05A:
+    - Returns ranked candidates with confidence.
+    - High confidence (>=0.90) may preselect.
+    - Medium confidence shows choices.
+    - Low confidence does not silently select.
+    """
+    candidates = find_reference_candidates(db=db, title=q, active_only=active_only)
+    matched_ids = {c.reference_model_id for c in candidates}
+
+    # If query is a model name / code / alias substring (e.g. "P1102w", "M2040", etc.)
+    # and was not caught because brand was omitted from the query:
+    q_norm = normalize_for_matching(q)
+    if len(q_norm) >= 2:
+        alias_matches = (
+            db.query(models.ProductReferenceAlias)
+            .join(models.ProductReferenceModel)
+            .filter(
+                models.ProductReferenceAlias.active == True,
+                or_(
+                    func.lower(models.ProductReferenceAlias.normalized_alias).like(f"%{q_norm}%"),
+                    func.lower(models.ProductReferenceAlias.alias).like(f"%{q_norm}%")
+                )
+            )
+            .all()
+        )
+        for al in alias_matches:
+            if al.reference_model_id not in matched_ids:
+                ref = al.reference_model
+                if active_only and not ref.active:
+                    continue
+                exact_tok = q_norm in extract_tokens(al.normalized_alias or al.alias)
+                conf = 0.90 if exact_tok else 0.80
+                candidates.append(MatchCandidate(
+                    reference_model_id=ref.id,
+                    canonical_name=ref.canonical_name,
+                    brand=ref.brand,
+                    model=ref.model,
+                    tier="tier1_alias_query_match",
+                    confidence=conf,
+                    matched_term=al.alias,
+                    score=85.0 + len(q_norm),
+                    specificity=len(q_norm)
+                ))
+                matched_ids.add(ref.id)
+
+        model_matches = (
+            db.query(models.ProductReferenceModel)
+            .filter(
+                models.ProductReferenceModel.active == True if active_only else True,
+                or_(
+                    func.lower(models.ProductReferenceModel.model).like(f"%{q_norm}%"),
+                    func.lower(models.ProductReferenceModel.canonical_name).like(f"%{q_norm}%")
+                )
+            )
+            .all()
+        )
+        for ref in model_matches:
+            if ref.id not in matched_ids:
+                exact_tok = q_norm in extract_tokens(ref.model)
+                conf = 0.88 if exact_tok else 0.75
+                candidates.append(MatchCandidate(
+                    reference_model_id=ref.id,
+                    canonical_name=ref.canonical_name,
+                    brand=ref.brand,
+                    model=ref.model,
+                    tier="tier2_model_query_match",
+                    confidence=conf,
+                    matched_term=ref.model,
+                    score=80.0 + len(q_norm),
+                    specificity=len(q_norm)
+                ))
+                matched_ids.add(ref.id)
+
+    candidates.sort(key=lambda c: (c.confidence, c.score), reverse=True)
+
+    results: List[schemas.ProductReferenceSearchItem] = []
+    for cand in candidates[:limit]:
+        ref = db.query(models.ProductReferenceModel).filter(models.ProductReferenceModel.id == cand.reference_model_id).first()
+        if not ref:
+            continue
+
+        # Count prior products in store
+        prior_q = db.query(models.Product).filter(models.Product.reference_model_id == ref.id)
+        prior_count = prior_q.count()
+        prior_sample = None
+        if prior_count > 0:
+            latest_p = prior_q.order_by(models.Product.id.desc()).first()
+            if latest_p:
+                prior_sample = {
+                    "id": latest_p.id,
+                    "title": latest_p.title,
+                    "sale_price": latest_p.sale_price,
+                    "condition": latest_p.condition
+                }
+
+        specs_dict = {}
+        if ref.specifications_json:
+            try:
+                specs_dict = json.loads(ref.specifications_json)
+            except Exception:
+                specs_dict = {}
+
+        desc_preview = None
+        if ref.site_description:
+            desc_preview = ref.site_description[:250] + "..." if len(ref.site_description) > 250 else ref.site_description
+
+        cat_name = ref.default_category.name if ref.default_category else None
+
+        results.append(schemas.ProductReferenceSearchItem(
+            reference_model_id=ref.id,
+            canonical_name=ref.canonical_name,
+            brand=ref.brand,
+            model=ref.model,
+            device_type=ref.device_type,
+            category_id=ref.default_category_id,
+            category_name=cat_name,
+            confidence=cand.confidence,
+            tier=cand.tier,
+            matched_string=cand.matched_term,
+            description_preview=desc_preview,
+            specifications=specs_dict,
+            verification_state=getattr(ref, "verification_state", "verified") or "verified",
+            prior_products_count=prior_count,
+            prior_product_sample=prior_sample
+        ))
+
+    return schemas.ProductReferenceSearchResponse(
+        query=q,
+        total_candidates=len(results),
+        candidates=results
+    )
+
+
+@public_router.post("/ai-assist", response_model=schemas.AiAssistResponse)
+@public_router_plural.post("/ai-assist", response_model=schemas.AiAssistResponse)
+async def ai_assist_model(
+    payload: schemas.AiAssistRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Server-side AI assistant fallback for identifying unknown models and extracting structured specs.
+    Per Section 9, 10, 12, 13:
+    - Credentials server-side only;
+    - Returns STRICT structured JSON candidate;
+    - Returns graceful fallback when AI is disabled.
+    """
+    provider = get_ai_provider()
+    result = await provider.identify_model(
+        query=payload.query,
+        ocr_text=payload.ocr_text,
+        category_hint=payload.category_hint
+    )
+
+    return schemas.AiAssistResponse(
+        status=result.status,
+        manufacturer=result.manufacturer,
+        model=result.model,
+        canonical_name=result.canonical_name,
+        category=result.category,
+        device_type=result.device_type,
+        likely_aliases=result.likely_aliases,
+        proposed_structured_specs=result.proposed_structured_specs,
+        proposed_reusable_description=result.proposed_reusable_description,
+        confidence=result.confidence,
+        missing_uncertain_fields=result.missing_uncertain_fields,
+        source_provenance=result.source_provenance,
+        source_urls=result.source_urls,
+        message=result.message
+    )
 

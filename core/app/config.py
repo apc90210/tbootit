@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     backup_root: str = "./data/backups"
     api_token: str = "dev-token"
 
+    # AI Provider Settings (Stage 05A - Foundation)
+    ai_enabled: bool = False
+    ai_provider_type: str = "disabled"  # disabled, cloud_ru, yandex, openai_compatible
+    ai_api_base_url: str = ""
+    ai_api_key: str = ""
+    ai_model_name: str = ""
+    ai_timeout_seconds: int = 30
+    ai_web_search_enabled: bool = False
+    ai_web_search_api_key: str = ""
+
     @model_validator(mode="after")
     def check_production_safety(self):
         if self.app_env in ("prod", "production"):
