@@ -27,8 +27,49 @@ def test_mfp_wins_over_printer_keyword():
     assert res.category_name == "МФУ"
     assert res.category_slug == "mfu"
 
-    res2 = classify_product(title="Лазерное мфу 3 в 1 xerox b405 под восстановление")
-    assert res2.category_name == "МФУ"
+
+def test_restoration_absolute_priority_cases():
+    # 1. Lowercase
+    res_lower = classify_product(title="ноутбук hp под восстановление")
+    assert res_lower.category_name == "Техника под восстановление"
+    assert res_lower.category_slug == "pod-vosstanovlenie"
+    assert res_lower.reason == "explicit_restoration_marker"
+
+    # 2. Uppercase
+    res_upper = classify_product(title="МФУ CANON ПОД ВОССТАНОВЛЕНИЕ")
+    assert res_upper.category_name == "Техника под восстановление"
+    assert res_upper.category_slug == "pod-vosstanovlenie"
+
+    # 3. Mixed case
+    res_mixed = classify_product(title="Монитор Samsung Под восстановление")
+    assert res_mixed.category_name == "Техника под восстановление"
+    assert res_mixed.category_slug == "pod-vosstanovlenie"
+
+    # 4. Components
+    res_ssd = classify_product(title="SSD 1TB под восстановление")
+    assert res_ssd.category_name == "Техника под восстановление"
+    assert res_ssd.category_slug == "pod-vosstanovlenie"
+
+    # 5. Product 421 exact title
+    res_p421 = classify_product(title="Лазерное мфу 3 в 1 xerox b405 под восстановление")
+    assert res_p421.category_name == "Техника под восстановление"
+    assert res_p421.category_slug == "pod-vosstanovlenie"
+
+    # 6. Restoration beats existing valid category
+    res_override = classify_product(
+        title="Ноутбук Dell под восстановление",
+        existing_category_name="Ноутбуки",
+        allow_override_valid_category=False,
+    )
+    assert res_override.category_name == "Техника под восстановление"
+    assert res_override.category_slug == "pod-vosstanovlenie"
+
+    # 7. In description
+    res_desc = classify_product(
+        title="Pantum p3300dn",
+        description="Принтер лазерный, отдаю под восстановление или на запчасти"
+    )
+    assert res_desc.category_name == "Техника под восстановление"
 
 
 def test_laptop_thinkpad():

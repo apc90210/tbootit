@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
 CANONICAL_CATEGORIES: Dict[str, Dict[str, str]] = {
+    "Техника под восстановление": {"name": "Техника под восстановление", "slug": "pod-vosstanovlenie"},
     "МФУ": {"name": "МФУ", "slug": "mfu"},
     "Ноутбуки": {"name": "Ноутбуки", "slug": "noutbuki"},
     "Мониторы": {"name": "Мониторы", "slug": "monitory"},
@@ -30,7 +31,13 @@ CANONICAL_CATEGORIES: Dict[str, Dict[str, str]] = {
 CANONICAL_NAMES = set(CANONICAL_CATEGORIES.keys())
 SPECIFIC_CANONICAL_NAMES = CANONICAL_NAMES - {"Без категории"}
 
-# Priority 1: MFP
+# Absolute Priority 1: Restoration (MUST evaluate before all other categories and overrides existing category)
+RE_RESTORATION = re.compile(
+    r"\bпод\s+восстановлени[еяюемх]\b",
+    re.IGNORECASE
+)
+
+# Priority 2: MFP
 RE_MFP = re.compile(
     r"\b(мфу|mfp|многофункциональн\w*|multifunction\w*|multi-function\w*|all-in-one printer|aio printer)\b"
     r"|\b3\s*[-в/]\s*1\b"
@@ -128,19 +135,6 @@ def classify_product(
     If product has an existing specific valid canonical category and allow_override_valid_category is False,
     the existing category is preserved with 'explicit' confidence.
     """
-    # 0. Check existing valid canonical category
-    if existing_category_name and not allow_override_valid_category:
-        clean_cat = existing_category_name.strip()
-        if clean_cat in SPECIFIC_CANONICAL_NAMES:
-            canon = CANONICAL_CATEGORIES[clean_cat]
-            return ClassificationResult(
-                category_name=canon["name"],
-                category_slug=canon["slug"],
-                reason="existing_valid_category",
-                confidence="explicit",
-                rule_name="existing_valid_category",
-            )
-
     # Prepare normalized combined text
     parts = [title or "", site_title or "", model or "", description or "", brand or ""]
     combined = " ".join(filter(None, parts))
@@ -156,7 +150,33 @@ def classify_product(
             rule_name="fallback",
         )
 
-    # Priority 1: МФУ (Multi-function printer wins over standard printer)
+    # Absolute Priority 1: Restoration marker ('под восстановление')
+    # Overrides all other categories, including existing valid categories.
+    m_rest = RE_RESTORATION.search(norm)
+    if m_rest:
+        canon = CANONICAL_CATEGORIES["Техника под восстановление"]
+        return ClassificationResult(
+            category_name=canon["name"],
+            category_slug=canon["slug"],
+            reason="explicit_restoration_marker",
+            confidence="explicit",
+            rule_name="rule_0_restoration",
+        )
+
+    # 0. Check existing valid canonical category (if not a restoration item)
+    if existing_category_name and not allow_override_valid_category:
+        clean_cat = existing_category_name.strip()
+        if clean_cat in SPECIFIC_CANONICAL_NAMES:
+            canon = CANONICAL_CATEGORIES[clean_cat]
+            return ClassificationResult(
+                category_name=canon["name"],
+                category_slug=canon["slug"],
+                reason="existing_valid_category",
+                confidence="explicit",
+                rule_name="existing_valid_category",
+            )
+
+    # Priority 2: МФУ (Multi-function printer wins over standard printer)
     m = RE_MFP.search(norm)
     if m:
         canon = CANONICAL_CATEGORIES["МФУ"]

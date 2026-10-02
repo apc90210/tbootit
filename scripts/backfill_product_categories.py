@@ -44,6 +44,7 @@ CANONICAL_ORDER = [
     "МФУ",
     "Мониторы",
     "Комплектующие",
+    "Техника под восстановление",
     "Без категории",
 ]
 
@@ -169,9 +170,11 @@ def run_backfill(mode: str):
     print(f"To change: {to_change}")
     print(f"Unknown / fallback: {unknown_fallback}")
 
-    print("\n--- First 50 examples of changes (old -> new + reason) ---")
-    for i, ex in enumerate(examples, 1):
-        print(f"{i:2d}. ID={ex['id']:3d} | '{ex['title']}' | {ex['old_category']} -> {ex['new_category']} | reason: {ex['reason']}")
+    # Restoration products breakdown
+    restoration_changes = [ch for ch in changes_to_apply if ch[3] == "Техника под восстановление"]
+    print(f"\n--- Restoration Products Breakdown ({len(restoration_changes)} items) ---")
+    for pid, new_cat_id, old_cat_name, new_cat_name, reason in restoration_changes:
+        print(f"  ID={pid:3d} | old: {old_cat_name} -> new: {new_cat_name} | reason: {reason}")
 
     if is_apply:
         print("\nApplying changes to local canonical DB...")
