@@ -18,7 +18,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import com.technoreboot.mobile.data.ReceiptPrintCache
+import com.technoreboot.mobile.print.ReceiptPrintHelper
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -70,11 +73,59 @@ fun PosTerminalScreen(
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var isScannerVisible by remember { mutableStateOf(true) }
 
+    val context = LocalContext.current
     var isCheckingOut by remember { mutableStateOf(false) }
     var showCheckoutDialog by remember { mutableStateOf(false) }
     var selectedPaymentMethod by remember { mutableStateOf("cash") }
     var checkoutErrorMessage by remember { mutableStateOf<String?>(null) }
     var completedSaleReceipt by remember { mutableStateOf<SaleReceipt?>(null) }
+    var isPrintingReceipt by remember { mutableStateOf(false) }
+    var printErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun handlePrintReceipt(receipt: SaleReceipt) {
+        val key = keystoreManager.getPrivateKey()
+        if (key == null) {
+            printErrorMessage = "Аппаратный ключ не найден в защищённом хранилище"
+            return
+        }
+
+        coroutineScope.launch {
+            isPrintingReceipt = true
+            printErrorMessage = null
+
+            val targetFile = ReceiptPrintCache.getReceiptPdfFile(context, receipt.saleId)
+            val downloadResult = apiClient.downloadReceiptPrintPdf(
+                saleId = receipt.saleId,
+                credentialId = session.credentialId,
+                privateKey = key,
+                destinationFile = targetFile
+            ).let { result ->
+                if (result is ApiResult.Error && targetFile.exists() && targetFile.length() > 0L) {
+                    ApiResult.Success(targetFile)
+                } else {
+                    result
+                }
+            }
+
+            isPrintingReceipt = false
+
+            when (downloadResult) {
+                is ApiResult.Success -> {
+                    val printResult = ReceiptPrintHelper.printPdf(
+                        context = context,
+                        pdfFile = downloadResult.data,
+                        jobName = "Чек № ${receipt.receiptNumber}"
+                    )
+                    if (printResult.isFailure) {
+                        printErrorMessage = "Не удалось отправить на печать: ${printResult.exceptionOrNull()?.message ?: "неизвестная ошибка"}"
+                    }
+                }
+                is ApiResult.Error -> {
+                    printErrorMessage = downloadResult.message
+                }
+            }
+        }
+    }
 
     fun showFeedback(msg: String, isError: Boolean) {
         notification = PosNotification(message = msg, isError = isError)
@@ -810,31 +861,99 @@ fun PosTerminalScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val saleId = receipt.saleId
-                        completedSaleReceipt = null
-                        onOpenReceipt(saleId)
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ReceiptLong,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Открыть чек")
+                    if (printErrorMessage != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = printErrorMessage ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = { handlePrintReceipt(receipt) },
+                        enabled = !isPrintingReceipt,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isPrintingReceipt) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Подготовка печати...")
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Print,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (printErrorMessage != null) "Повторить печать" else "Печать чека")
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val saleId = receipt.saleId
+                            completedSaleReceipt = null
+                            printErrorMessage = null
+                            onOpenReceipt(saleId)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Открыть чек")
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                ReceiptPrintHelper.openPrintSettings(context)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Настройки печати", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        TextButton(
+                            onClick = {
+                                completedSaleReceipt = null
+                                printErrorMessage = null
+                            }
+                        ) {
+                            Text("Новая продажа", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = { completedSaleReceipt = null },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Новая продажа")
-                }
-            }
+            dismissButton = null
         )
     }
 }

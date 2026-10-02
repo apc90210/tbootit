@@ -16,11 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.technoreboot.mobile.data.CachedReceipt
 import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.data.ReceiptCacheRepository
+import com.technoreboot.mobile.data.ReceiptPrintCache
+import com.technoreboot.mobile.print.ReceiptPrintHelper
 import com.technoreboot.mobile.model.SaleReceipt
 import com.technoreboot.mobile.model.SaleReceiptItem
 import com.technoreboot.mobile.network.ApiResult
@@ -63,6 +66,54 @@ fun ReceiptDetailScreen(
 
     val coroutineScope = rememberCoroutineScope()
     var uiState by remember { mutableStateOf<ReceiptDetailUiState>(ReceiptDetailUiState.Loading) }
+    val context = LocalContext.current
+    var isPrinting by remember { mutableStateOf(false) }
+    var printError by remember { mutableStateOf<String?>(null) }
+
+    fun printReceipt() {
+        if (privateKey == null) {
+            printError = "Аппаратный ключ не найден в защищённом хранилище"
+            return
+        }
+
+        coroutineScope.launch {
+            isPrinting = true
+            printError = null
+
+            val targetFile = ReceiptPrintCache.getReceiptPdfFile(context, saleId)
+            val downloadResult = apiClient.downloadReceiptPrintPdf(
+                saleId = saleId,
+                credentialId = session.credentialId,
+                privateKey = privateKey,
+                destinationFile = targetFile
+            ).let { result ->
+                if (result is ApiResult.Error && targetFile.exists() && targetFile.length() > 0L) {
+                    ApiResult.Success(targetFile)
+                } else {
+                    result
+                }
+            }
+
+            isPrinting = false
+
+            when (downloadResult) {
+                is ApiResult.Success -> {
+                    val receiptNumber = (uiState as? ReceiptDetailUiState.Success)?.receipt?.receiptNumber ?: saleId.toString()
+                    val printResult = ReceiptPrintHelper.printPdf(
+                        context = context,
+                        pdfFile = downloadResult.data,
+                        jobName = "Чек № $receiptNumber"
+                    )
+                    if (printResult.isFailure) {
+                        printError = "Не удалось отправить на печать: ${printResult.exceptionOrNull()?.message ?: "неизвестная ошибка"}"
+                    }
+                }
+                is ApiResult.Error -> {
+                    printError = downloadResult.message
+                }
+            }
+        }
+    }
 
     fun fetchFromNetwork(cachedReceipt: CachedReceipt? = null) {
         if (privateKey == null) {
@@ -150,7 +201,33 @@ fun ReceiptDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { printReceipt() },
+                        enabled = !isPrinting && uiState is ReceiptDetailUiState.Success
+                    ) {
+                        if (isPrinting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Print,
+                                contentDescription = "Печать чека"
+                            )
+                        }
+                    }
                     IconButton(onClick = {
+                        ReceiptPrintHelper.openPrintSettings(context)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Настройки печати"
+                        )
+                    }
+                    IconButton(onClick = {
+                        ReceiptPrintCache.deleteReceiptPdf(context, saleId)
                         val currentCached = (uiState as? ReceiptDetailUiState.Success)?.let {
                             cacheRepository.get(saleId)
                         }
@@ -326,7 +403,11 @@ fun ReceiptDetailScreen(
                         isFromCache = state.isFromCache,
                         isRefreshing = state.isRefreshing,
                         cachedAt = state.cachedAt,
-                        refreshError = state.refreshError
+                        refreshError = state.refreshError,
+                        onPrintClicked = { printReceipt() },
+                        onSettingsClicked = { ReceiptPrintHelper.openPrintSettings(context) },
+                        isPrinting = isPrinting,
+                        printError = printError
                     )
                 }
             }
@@ -340,7 +421,11 @@ fun ReceiptDetailContent(
     isFromCache: Boolean,
     isRefreshing: Boolean,
     cachedAt: Long?,
-    refreshError: String?
+    refreshError: String?,
+    onPrintClicked: () -> Unit = {},
+    onSettingsClicked: () -> Unit = {},
+    isPrinting: Boolean = false,
+    printError: String? = null
 ) {
     LazyColumn(
         modifier = Modifier
@@ -595,6 +680,73 @@ fun ReceiptDetailContent(
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                }
+            }
+        }
+
+        // Actions Card: Print Receipt & Print Settings
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (printError != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = printError,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = onPrintClicked,
+                        enabled = !isPrinting,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isPrinting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Подготовка печати...")
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Print,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (printError != null) "Повторить печать" else "Печать чека")
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onSettingsClicked,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Настройки печати")
                     }
                 }
             }

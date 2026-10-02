@@ -17,6 +17,7 @@ import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
 import com.technoreboot.mobile.data.PosCartRepository
 import com.technoreboot.mobile.data.ReceiptCacheRepository
+import com.technoreboot.mobile.data.ReceiptPrintCache
 import com.technoreboot.mobile.ui.pos.PosTerminalScreen
 import com.technoreboot.mobile.ui.reports.ReceiptDetailScreen
 import com.technoreboot.mobile.ui.reports.SalesReportScreen
@@ -177,6 +178,7 @@ fun MobileApp(
                     onBackClicked = { currentScreen = AppScreen.MAIN },
                     onServerUrlChanged = { newUrl ->
                         receiptCacheRepository.clearAll()
+                        ReceiptPrintCache.clearAll(context)
                         cartRepository.clearCart()
                         sessionRepository.clearSession()
                         keystoreManager.deleteKey()
@@ -204,6 +206,7 @@ fun MobileApp(
                         },
                         onRevokedDismissed = {
                             receiptCacheRepository.clearAll()
+                            ReceiptPrintCache.clearAll(context)
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
                             currentSession = null
@@ -264,6 +267,7 @@ fun MobileApp(
                         hasUpdateBadge = hasUpdateBadge,
                         onRevokedDismissed = {
                             receiptCacheRepository.clearAll()
+                            ReceiptPrintCache.clearAll(context)
                             cartRepository.clearCart()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
@@ -273,6 +277,7 @@ fun MobileApp(
                         },
                         onDisconnectClicked = {
                             receiptCacheRepository.clearAll()
+                            ReceiptPrintCache.clearAll(context)
                             cartRepository.clearCart()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
@@ -298,6 +303,7 @@ fun MobileApp(
 
                                 try {
                                     receiptCacheRepository.clearAll()
+                                    ReceiptPrintCache.clearAll(context)
                                     // 1. Generate hardware-isolated EC P-256 keypair in Android Keystore
                                     keystoreManager.generateKeyPair()
                                     val pubKeyPem = keystoreManager.getPublicKeyPem()
