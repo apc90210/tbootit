@@ -37,12 +37,25 @@
         "e2050S",
         "e2050s"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Монитор",
+        "Диагональ": "20\" (50.8 см)",
+        "Разрешение экрана": "1600x900",
+        "Тип матрицы": "TN",
+        "Соотношение сторон": "16:9",
+        "Частота обновления": "60 Гц",
+        "Время отклика": "5 мс",
+        "Яркость": "200 кд/м²",
+        "Контрастность": "1000:1 (статическая)",
+        "Видеовходы": "VGA (D-Sub)",
+        "Крепление VESA": "75x75 мм",
+        "Встроенные динамики": "Нет"
+      },
       "site_title": "Монитор AOC e2050S",
-      "site_description": null,
+      "site_description": "Монитор с диагональю 20\" (50.8 см) и разрешением 1600x900 (матрица TN) с частотой обновления 60 Гц и видеовходами VGA (D-Sub).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #223"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #223 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "apc|back-ups-650",
@@ -315,12 +328,23 @@
         "Brother 2040H",
         "HL-2040"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "20 стр/мин",
+        "Разрешение печати": "2400 x 600 dpi (HQ1200)",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "10.0 сек",
+        "Интерфейсы": "USB 2.0, IEEE 1284 (Parallel)",
+        "Объем памяти": "8 МБ"
+      },
       "site_title": "Принтер Brother HL-2040",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 20 стр/мин и интерфейсами USB 2.0, IEEE 1284 (Parallel).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #126"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #126 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "brother|mfc-8880dn",
@@ -338,12 +362,27 @@
         "MFC-8880DN",
         "mfc-8880dn"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "30 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "1200 x 2400 dpi",
+        "Автоподатчик (ADF)": "Да (двусторонний DADF, 50 листов)",
+        "Факс": "Да (33.6 Кбит/с)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Интерфейсы": "USB 2.0, Ethernet (10/100Base-TX), IEEE 1284",
+        "Объем памяти": "64 МБ"
+      },
       "site_title": "МФУ Brother MFC-8880DN",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 30 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #14, #145, #171"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #14, #145, #171 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|pixma-mp272",
@@ -359,12 +398,24 @@
         "canon pixma mp272",
         "MP272"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Струйная (FINE)",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "8.4 стр/мин (ESAT)",
+        "Скорость печати (A4, цветная)": "4.8 стр/мин (ESAT)",
+        "Разрешение печати": "4800 x 1200 dpi",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "1200 x 2400 dpi (CIS)",
+        "Интерфейсы": "USB 2.0"
+      },
       "site_title": "МФУ Canon PIXMA MP272",
-      "site_description": null,
+      "site_description": "Цветное струйное мфу формата a4 со скоростью печати до 8.4 стр/мин (ESAT) и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #230"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #230 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-lbp2900b",
@@ -382,12 +433,23 @@
         "LBP2900B",
         "lbp2900b"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "12 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (AIR 2400 x 600 dpi)",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "9.3 сек",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "2 МБ"
+      },
       "site_title": "Принтер Canon i-SENSYS LBP2900B",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 12 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #335"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #335 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-lbp6030b",
@@ -405,12 +467,24 @@
         "LBP6030B",
         "lbp6030b"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "18 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (AIR 2400 x 600 dpi)",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "7.8 сек",
+        "Максимальная нагрузка": "5 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "32 МБ"
+      },
       "site_title": "Принтер Canon i-SENSYS LBP6030B",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 18 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #11"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #11 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-mf446",
@@ -426,12 +500,28 @@
         "Canon MF 446",
         "MF 446"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "38 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (двусторонний DADF, 50 листов)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Wi-Fi": "Да",
+        "Максимальная нагрузка": "80 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet, Wi-Fi",
+        "Объем памяти": "1 ГБ"
+      },
       "site_title": "МФУ Canon i-SENSYS MF446",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 38 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet, Wi-Fi с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #2"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #2 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-mf446x",
@@ -448,12 +538,28 @@
         "MF446x",
         "mf446x"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "38 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (однопроходный двусторонний DADF, 50 листов)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Wi-Fi": "Да",
+        "Максимальная нагрузка": "80 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet, Wi-Fi",
+        "Объем памяти": "1 ГБ"
+      },
       "site_title": "МФУ Canon i-SENSYS MF446x",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 38 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet, Wi-Fi с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #170"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #170 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-mf4550d",
@@ -470,12 +576,27 @@
         "MF4550d",
         "mf4550d"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "25 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (AIR 1200 x 600 dpi)",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (35 листов)",
+        "Факс": "Да (33.6 Кбит/с)",
+        "Максимальная нагрузка": "10 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "64 МБ"
+      },
       "site_title": "МФУ Canon i-SENSYS MF4550d",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 25 стр/мин с автоматической двусторонней печатью и интерфейсами USB 2.0 с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #122"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #122 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-mf4730",
@@ -493,12 +614,25 @@
         "MF4730",
         "mf4730"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "23 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (AIR 1200 x 600 dpi)",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Максимальная нагрузка": "10 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "128 МБ"
+      },
       "site_title": "МФУ Canon i-SENSYS MF4730",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 23 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #137"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #137 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|i-sensys-mf5940dn",
@@ -515,12 +649,27 @@
         "MF5940dn",
         "mf5940dn"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "33 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (AIR 1200 x 600 dpi)",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (двусторонний DADF, 50 листов)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Максимальная нагрузка": "50 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Ethernet (10/100Base-TX)",
+        "Объем памяти": "256 МБ"
+      },
       "site_title": "МФУ Canon i-SENSYS MF5940dn",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 33 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #112"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #112 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "canon|imagerunner-1024i",
@@ -538,12 +687,26 @@
         "IR 1024i",
         "ir 1024i"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "24 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi (UFRII LT)",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (двусторонний DADF, 50 листов)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Интерфейсы": "USB 2.0, Ethernet (10/100Base-TX)",
+        "Объем памяти": "128 МБ"
+      },
       "site_title": "МФУ Canon imageRUNNER 1024i",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 24 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #213"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #213 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "chieftec|apc-700c",
@@ -645,12 +808,24 @@
         "M2140",
         "m2140"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Струйная (PrecisionCore)",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "20 стр/мин",
+        "Разрешение печати": "1200 x 2400 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "1200 x 2400 dpi",
+        "Интерфейсы": "USB 2.0",
+        "Особенности": "Встроенная СНПЧ (EcoTank)"
+      },
       "site_title": "МФУ Epson EcoTank M2140",
-      "site_description": null,
+      "site_description": "Монохромное струйное мфу формата a4 со скоростью печати до 20 стр/мин с автоматической двусторонней печатью и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #311, #377"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #311, #377 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "epson|stylus-photo-r2280",
@@ -691,12 +866,28 @@
         "WF-M5799",
         "WF-5799"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Струйная (PrecisionCore)",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "24 стр/мин",
+        "Разрешение печати": "1200 x 2400 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "1200 x 2400 dpi",
+        "Автоподатчик (ADF)": "Да (двусторонний DADF, 50 листов)",
+        "Факс": "Да",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Wi-Fi": "Да",
+        "Максимальная нагрузка": "45 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet, Wi-Fi, Wi-Fi Direct"
+      },
       "site_title": "МФУ Epson WorkForce Pro WF-M5799",
-      "site_description": null,
+      "site_description": "Монохромное струйное мфу формата a4 со скоростью печати до 24 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet, Wi-Fi с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #81, #318, #329"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #81, #318, #329 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|15-af000ur",
@@ -731,12 +922,25 @@
         "HP 24fw",
         "24fw"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Монитор",
+        "Диагональ": "23.8\" (60.45 см)",
+        "Разрешение экрана": "1920x1080 (FullHD)",
+        "Тип матрицы": "IPS",
+        "Соотношение сторон": "16:9",
+        "Частота обновления": "75 Гц (FreeSync)",
+        "Время отклика": "5 мс (GtG)",
+        "Яркость": "300 кд/м²",
+        "Контрастность": "1000:1 (статическая)",
+        "Видеовходы": "HDMI 1.4, VGA (D-Sub)",
+        "Встроенные динамики": "Да (встроенная аудиосистема)",
+        "Крепление VESA": "Нет"
+      },
       "site_title": "Монитор HP 24fw",
-      "site_description": null,
+      "site_description": "Монитор с диагональю 23.8\" (60.45 см) и разрешением 1920x1080 (FullHD) (матрица IPS) с частотой обновления 75 Гц (FreeSync) и видеовходами HDMI 1.4, VGA (D-Sub).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #67"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #67 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|3600-48-poe-v2-si-jg307c",
@@ -796,12 +1000,25 @@
         "HP CP1515n",
         "cp1515n"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "12 стр/мин",
+        "Скорость печати (A4, цветная)": "8 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (ImageREt 3600)",
+        "Двусторонняя печать": "Ручная",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Максимальная нагрузка": "30 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Ethernet (RJ-45)",
+        "Объем памяти": "96 МБ"
+      },
       "site_title": "Принтер HP Color LaserJet CP1515n",
-      "site_description": null,
+      "site_description": "Цветной лазерный принтер формата a4 со скоростью печати до 12 стр/мин и интерфейсами Ethernet.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #369"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #369 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|color-laserjet-pro-m252n",
@@ -818,12 +1035,26 @@
         "HP M252n",
         "m252n"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "18 стр/мин",
+        "Скорость печати (A4, цветная)": "18 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (ImageREt 3600)",
+        "Двусторонняя печать": "Ручная",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Время выхода первого отпечатка": "11.5 сек",
+        "Максимальная нагрузка": "30 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Fast Ethernet (10/100Base-TX)",
+        "Объем памяти": "128 МБ"
+      },
       "site_title": "Принтер HP Color LaserJet Pro M252n",
-      "site_description": null,
+      "site_description": "Цветной лазерный принтер формата a4 со скоростью печати до 18 стр/мин и интерфейсами Ethernet.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #3"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #3 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|compaq-pro-6300",
@@ -1065,12 +1296,27 @@
         "LaserJet 3030",
         "HP 3030"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "14 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (50 листов)",
+        "Факс": "Да (33.6 Кбит/с)",
+        "Максимальная нагрузка": "7 000 стр/мес",
+        "Интерфейсы": "USB 2.0, IEEE 1284 (Parallel)",
+        "Объем памяти": "32 МБ"
+      },
       "site_title": "МФУ HP LaserJet 3030",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 14 стр/мин и интерфейсами USB 2.0, IEEE 1284 (Parallel) с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #396, #408"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #396, #408 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-3052",
@@ -1144,12 +1390,26 @@
         "ho m608",
         "m608"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "61 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Ручная (автомат в опции)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Время выхода первого отпечатка": "5.4 сек",
+        "Максимальная нагрузка": "275 000 стр/мес",
+        "Рекомендуемая нагрузка": "5 000 - 25 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet (10/100/1000Base-TX)",
+        "Объем памяти": "512 МБ"
+      },
       "site_title": "Принтер HP LaserJet Enterprise M608",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 61 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #60, #204"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #60, #204 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-enterprise-mfp-m527",
@@ -1168,12 +1428,28 @@
         "HP M527",
         "m527"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "43 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (однопроходный двусторонний DADF, 100 листов)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Максимальная нагрузка": "150 000 стр/мес",
+        "Рекомендуемая нагрузка": "2 000 - 7 500 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet (10/100/1000Base-TX)",
+        "Объем памяти": "1.25 ГБ"
+      },
       "site_title": "МФУ HP LaserJet Enterprise MFP M527",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 43 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #400, #417"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #400, #417 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-enterprise-p3015",
@@ -1192,12 +1468,25 @@
         "HP P3015",
         "p3015"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "40 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "7.5 сек",
+        "Максимальная нагрузка": "100 000 стр/мес",
+        "Рекомендуемая нагрузка": "1 500 - 5 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "128 МБ"
+      },
       "site_title": "Принтер HP LaserJet Enterprise P3015",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 40 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #214, #224"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #214, #224 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-m1005-mfp",
@@ -1216,12 +1505,25 @@
         "HP M1005",
         "m1005"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "14 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (FastRes 1200)",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "1200 x 1200 dpi",
+        "Максимальная нагрузка": "5 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "32 МБ"
+      },
       "site_title": "МФУ HP LaserJet M1005 MFP",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 14 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #342, #366"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #342, #366 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-p1102w",
@@ -1267,12 +1569,24 @@
         "HP P1505",
         "p1505"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "23 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (FastRes 1200)",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "6.5 сек",
+        "Максимальная нагрузка": "8 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "2 МБ"
+      },
       "site_title": "Принтер HP LaserJet P1505",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 23 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #245"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #245 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-p2035",
@@ -1291,12 +1605,25 @@
         "HP P2035",
         "p2035"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "30 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (FastRes 1200)",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "8.0 сек",
+        "Максимальная нагрузка": "25 000 стр/мес",
+        "Рекомендуемая нагрузка": "500 - 2 500 стр/мес",
+        "Интерфейсы": "USB 2.0, IEEE 1284-B",
+        "Объем памяти": "16 МБ"
+      },
       "site_title": "Принтер HP LaserJet P2035",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 30 стр/мин и интерфейсами USB 2.0, IEEE 1284-B.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #276, #310"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #276, #310 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-p2055",
@@ -1341,12 +1668,25 @@
         "HP M401a",
         "m401a"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "33 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Ручная",
+        "Время выхода первого отпечатка": "8.0 сек",
+        "Максимальная нагрузка": "50 000 стр/мес",
+        "Рекомендуемая нагрузка": "750 - 3 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "128 МБ"
+      },
       "site_title": "Принтер HP LaserJet Pro 400 M401a",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 33 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #106, #216"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #106, #216 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-pro-m1132-mfp",
@@ -1366,12 +1706,25 @@
         "HP M1132",
         "m1132"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "18 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (FastRes 1200)",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "1200 x 1200 dpi",
+        "Максимальная нагрузка": "8 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "8 МБ"
+      },
       "site_title": "МФУ HP LaserJet Pro M1132 MFP",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 18 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #350, #352"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #350, #352 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-pro-m1214nfh",
@@ -1391,12 +1744,28 @@
         "HP M1214",
         "m1214n"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "18 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (FastRes 1200)",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "1200 x 1200 dpi",
+        "Автоподатчик (ADF)": "Да (35 листов)",
+        "Факс": "Да (33.6 Кбит/с, телефонная трубка)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Максимальная нагрузка": "8 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Fast Ethernet (10/100Base-TX)",
+        "Объем памяти": "64 МБ"
+      },
       "site_title": "МФУ HP LaserJet Pro M1214nfh",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 18 стр/мин и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #8, #173, #326"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #8, #173, #326 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-pro-m203dw",
@@ -1415,12 +1784,27 @@
         "HP M203dw",
         "m203dw"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "28 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Wi-Fi": "Да",
+        "Время выхода первого отпечатка": "6.7 сек",
+        "Максимальная нагрузка": "30 000 стр/мес",
+        "Рекомендуемая нагрузка": "250 - 2 500 стр/мес",
+        "Интерфейсы": "USB 2.0, Ethernet (RJ-45), Wi-Fi (802.11b/g/n)",
+        "Объем памяти": "256 МБ"
+      },
       "site_title": "Принтер HP LaserJet Pro M203dw",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 28 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet, Wi-Fi.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #344, #368"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #344, #368 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-pro-mfp-m125r",
@@ -1439,12 +1823,25 @@
         "HP M125r",
         "m125r"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "20 стр/мин",
+        "Разрешение печати": "600 x 600 dpi",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "1200 x 1200 dpi",
+        "Максимальная нагрузка": "8 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "128 МБ"
+      },
       "site_title": "МФУ HP LaserJet Pro MFP M125r",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 20 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #351, #385"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #351, #385 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|laserjet-pro-mfp-m132a",
@@ -1833,12 +2230,28 @@
         "M6026cdn",
         "m6026cdn"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "26 стр/мин",
+        "Скорость печати (A4, цветная)": "26 стр/мин",
+        "Разрешение печати": "600 x 600 dpi (MultiBit)",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (двусторонний, 50 листов)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Максимальная нагрузка": "65 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet (10/100/1000Base-TX)",
+        "Объем памяти": "1024 МБ"
+      },
       "site_title": "МФУ Kyocera ECOSYS M6026cdn",
-      "site_description": null,
+      "site_description": "Цветное лазерное мфу формата a4 со скоростью печати до 26 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #50"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #50 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "kyocera|ecosys-p2040dn",
@@ -1912,12 +2325,25 @@
         "ECOSYS P2135dn",
         "p2135dn"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "35 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Время выхода первого отпечатка": "8.0 сек",
+        "Максимальная нагрузка": "50 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Ethernet (10/100Base-TX)",
+        "Объем памяти": "256 МБ"
+      },
       "site_title": "Принтер Kyocera ECOSYS P2135dn",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 35 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #186"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #186 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "kyocera|ecosys-p6235cdn",
@@ -1934,12 +2360,26 @@
         "ECOSYS P6235",
         "P6235"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "35 стр/мин",
+        "Скорость печати (A4, цветная)": "35 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Время выхода первого отпечатка": "6.5 сек",
+        "Максимальная нагрузка": "100 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet (10/100/1000Base-TX)",
+        "Объем памяти": "1024 МБ"
+      },
       "site_title": "Принтер Kyocera ECOSYS P6235cdn",
-      "site_description": null,
+      "site_description": "Цветной лазерный принтер формата a4 со скоростью печати до 35 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #87"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #87 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "kyocera|fs-1040",
@@ -1982,12 +2422,28 @@
         "FS-1125MFP",
         "fs-1125mfp"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "25 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (40 листов)",
+        "Факс": "Да (33.6 Кбит/с)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Максимальная нагрузка": "20 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Fast Ethernet (10/100Base-TX)",
+        "Объем памяти": "64 МБ"
+      },
       "site_title": "МФУ Kyocera FS-1125MFP",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 25 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #358"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #358 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "kyocera|fs-4100dn",
@@ -2005,12 +2461,25 @@
         "FS-4100dn",
         "fs-4100dn"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "45 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Время выхода первого отпечатка": "9.0 сек",
+        "Максимальная нагрузка": "200 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet (10/100/1000Base-TX)",
+        "Объем памяти": "256 МБ"
+      },
       "site_title": "Принтер Kyocera FS-4100dn",
-      "site_description": null,
+      "site_description": "Монохромный лазерный принтер формата a4 со скоростью печати до 45 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #398, #416"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #398, #416 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "kyocera|fs-4200dn",
@@ -2400,12 +2869,25 @@
         "Samsung C32F391FWI",
         "c32f391fwi"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Монитор",
+        "Диагональ": "31.5\" (80.1 см)",
+        "Разрешение экрана": "1920x1080 (FullHD)",
+        "Тип матрицы": "VA (изогнутый 1800R)",
+        "Соотношение сторон": "16:9",
+        "Частота обновления": "60 Гц",
+        "Время отклика": "4 мс (GtG)",
+        "Яркость": "250 кд/м²",
+        "Контрастность": "3000:1 (статическая)",
+        "Видеовходы": "HDMI, DisplayPort",
+        "Крепление VESA": "75x75 мм",
+        "Встроенные динамики": "Нет"
+      },
       "site_title": "Монитор Samsung C32F391FWI",
-      "site_description": null,
+      "site_description": "Монитор с диагональю 31.5\" (80.1 см) и разрешением 1920x1080 (FullHD) (матрица VA (изогнутый 1800R)) с частотой обновления 60 Гц и видеовходами HDMI, DisplayPort.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #117"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #117 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "samsung|np300v5a",
@@ -2469,12 +2951,25 @@
         "samsung s22d300",
         "S22D300"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Монитор",
+        "Диагональ": "21.5\" (54.6 см)",
+        "Разрешение экрана": "1920x1080 (FullHD)",
+        "Тип матрицы": "TN",
+        "Соотношение сторон": "16:9",
+        "Частота обновления": "60 Гц",
+        "Время отклика": "5 мс",
+        "Яркость": "200 кд/м²",
+        "Контрастность": "600:1 (статическая)",
+        "Видеовходы": "VGA (D-Sub), HDMI",
+        "Крепление VESA": "Нет",
+        "Встроенные динамики": "Нет"
+      },
       "site_title": "Монитор Samsung S22D300",
-      "site_description": null,
+      "site_description": "Монитор с диагональю 21.5\" (54.6 см) и разрешением 1920x1080 (FullHD) (матрица TN) с частотой обновления 60 Гц и видеовходами VGA (D-Sub), HDMI.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #158"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #158 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "samsung|scx-3200",
@@ -2520,12 +3015,25 @@
         "Samsung 3400",
         "SCX-3400"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "20 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Ручная",
+        "Сканер": "Планшетный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Максимальная нагрузка": "10 000 стр/мес",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "64 МБ"
+      },
       "site_title": "МФУ Samsung SCX-3400",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 20 стр/мин и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #55, #401, #418"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #55, #401, #418 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "samsung|scx-3405w",
@@ -2648,12 +3156,25 @@
         "Samsung e2320",
         "E2320"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Монитор",
+        "Диагональ": "23\" (58.4 см)",
+        "Разрешение экрана": "1920x1080 (FullHD)",
+        "Тип матрицы": "TN",
+        "Соотношение сторон": "16:9",
+        "Частота обновления": "60 Гц",
+        "Время отклика": "5 мс",
+        "Яркость": "300 кд/м²",
+        "Контрастность": "1000:1 (статическая)",
+        "Видеовходы": "VGA (D-Sub), DVI-D",
+        "Крепление VESA": "75x75 мм",
+        "Встроенные динамики": "Нет"
+      },
       "site_title": "Монитор Samsung SyncMaster E2320",
-      "site_description": null,
+      "site_description": "Монитор с диагональю 23\" (58.4 см) и разрешением 1920x1080 (FullHD) (матрица TN) с частотой обновления 60 Гц и видеовходами VGA (D-Sub), DVI-D.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #147"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #147 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "seagate|st2000dm008",
@@ -2844,12 +3365,29 @@
         "WorkCentre 3335",
         "Xerox 3335"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ",
+        "Технология печати": "Лазерная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "33 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая",
+        "Сканер": "Планшетный / протяжный",
+        "Разрешение сканера": "600 x 600 dpi",
+        "Автоподатчик (ADF)": "Да (50 листов)",
+        "Факс": "Да (33.6 Кбит/с)",
+        "Сетевой интерфейс (Ethernet)": "Да",
+        "Wi-Fi": "Да",
+        "Максимальная нагрузка": "50 000 стр/мес",
+        "Интерфейсы": "USB 2.0, Gigabit Ethernet, Wi-Fi",
+        "Объем памяти": "1.5 ГБ"
+      },
       "site_title": "МФУ Xerox WorkCentre 3335",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 33 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet, Wi-Fi с автоподатчиком оригиналов (ADF).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #239, #317"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #239, #317 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     },
     {
       "stable_key": "zebra|cc600",
@@ -2886,12 +3424,21 @@
         "zebra zd220",
         "ZD220"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер этикеток",
+        "Технология печати": "Термотрансферная / прямая термопечать",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "Ширина рулона до 104 мм",
+        "Скорость печати": "102 мм/сек (4 ips)",
+        "Разрешение печати": "203 dpi",
+        "Интерфейсы": "USB 2.0",
+        "Объем памяти": "128 МБ SDRAM, 256 МБ Flash"
+      },
       "site_title": "Принтер Zebra ZD220",
-      "site_description": null,
+      "site_description": "Монохромный термопринтер формата ширина рулона до 104 мм и интерфейсами USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #72"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #72 | Verified external enrichment 2026-10-02 (1 Tier A/B sources)"
     }
   ]
 }
