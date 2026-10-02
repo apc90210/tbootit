@@ -154,6 +154,30 @@ class CoreClient:
             except Exception as e:
                 return {"error": True, "details": str(e)}
 
+    async def get_sale_receipt_data(self, sale_id: int):
+        """Get canonical receipt presentation data model from Core API."""
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/sales/{sale_id}/receipt/data", timeout=10.0)
+                if response.status_code == 200:
+                    return response.json()
+                elif response.status_code == 404:
+                    return {"error": "Not Found", "status_code": 404}
+                return {"error": True, "status_code": response.status_code}
+            except Exception as e:
+                return {"error": True, "details": str(e)}
+
+    async def get_sale_receipt_print(self, sale_id: int):
+        """Get canonical printable PDF receipt bytes from Core API."""
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.get(f"{self.base_url}/api/sales/{sale_id}/receipt/print", timeout=15.0)
+                if response.status_code == 200:
+                    return response.content
+                return None
+            except Exception:
+                return None
+
     async def get_sales(self, params: dict = None):
         """Get list of sales from Core API."""
         async with httpx.AsyncClient(trust_env=False) as client:

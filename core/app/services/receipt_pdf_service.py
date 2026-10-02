@@ -1,14 +1,14 @@
 """
 Canonical receipt PDF rendering service for Technoreboot.
 
-Reuses the exact canonical presentation and business text from
-inventory-sales-module/app/templates/sale_receipt_preview.html.
+Consumes the single canonical ReceiptDocumentData presentation model from
+core.app.services.receipt_presentation.
 Produces deterministic, print-ready PDF documents using ReportLab and DejaVu Sans fonts.
 """
 
 import io
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
@@ -23,16 +23,11 @@ from reportlab.platypus import (
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Payment method labels mapping
-PAYMENT_METHODS_LABELS = {
-    "cash": "Наличные",
-    "card": "Банковская карта",
-    "card_terminal": "Банковская карта",
-    "sbp": "СБП (Система быстрых платежей)",
-    "transfer": "Безналичный перевод",
-    "other": "Другое",
-    "unspecified": "Не указано",
-}
+from app.services.receipt_presentation import (
+    ReceiptDocumentData,
+    build_receipt_document_data,
+    PAYMENT_METHODS_LABELS,
+)
 
 _FONTS_REGISTERED = False
 
@@ -44,9 +39,7 @@ def _register_fonts():
 
     candidate_dirs = [
         os.path.join(os.path.dirname(__file__), "..", "static", "fonts"),
-        os.path.join(os.path.dirname(__file__), "..", "..", "admin-shell", "app", "static", "fonts"),
         os.path.abspath("core/app/static/fonts"),
-        os.path.abspath("admin-shell/app/static/fonts"),
         "/app/app/static/fonts",
         "C:/Windows/Fonts",
     ]
@@ -81,19 +74,20 @@ def _get_font_names():
 
 
 def generate_sale_receipt_pdf(
-    sale: Dict[str, Any],
-    org_settings: Optional[Dict[str, Any]] = None,
+    sale: Union[ReceiptDocumentData, Dict[str, Any], Any],
+    org_settings: Optional[Union[Dict[str, Any], Any]] = None,
 ) -> bytes:
     """
-    Generate a deterministic, print-ready PDF receipt for the given sale.
-    sale: dictionary representing the sale snapshot (from core DB or schema)
-    org_settings: dictionary of organization settings
+    Generate a deterministic, print-ready PDF receipt.
+    Accepts either a canonical ReceiptDocumentData instance or raw sale/org dicts.
     """
     _register_fonts()
     font_norm, font_bold = _get_font_names()
 
-    if org_settings is None:
-        org_settings = {}
+    if isinstance(sale, ReceiptDocumentData):
+        receipt = sale
+    else:
+        receipt = build_receipt_document_data(sale, org_settings)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -137,24 +131,8 @@ def generate_sale_receipt_pdf(
         alignment=1,
         textColor=colors.HexColor("#555555"),
     )
-    style_banner_cancelled = ParagraphStyle(
-        "BannerCancel",
-        fontName=font_bold,
-        fontSize=10,
-        leading=14,
-        alignment=1,
-        textColor=colors.white,
-    )
-    style_banner_superseded = ParagraphStyle(
-        "BannerSuperseded",
-        fontName=font_bold,
-        fontSize=10,
-        leading=14,
-        alignment=1,
-        textColor=colors.white,
-    )
-    style_banner_reissued = ParagraphStyle(
-        "BannerReissued",
+    style_banner = ParagraphStyle(
+        "Banner",
         fontName=font_bold,
         fontSize=10,
         leading=14,
@@ -246,63 +224,24 @@ def generate_sale_receipt_pdf(
     elements = []
 
     # 1. Organization Header
-    org_name = org_settings.get("organization_name") or "Организация не задана"
-    inn = org_settings.get("inn") or "—"
-    address = org_settings.get("address") or "—"
-    phone = org_settings.get("phone") or "—"
-
-    elements.append(Paragraph(f"<b>{org_name}</b>", style_org_title))
-    elements.append(Paragraph(f"ИНН: {inn}<br/>Адрес: {address}<br/>Телефон: {phone}", style_org_details))
+    elements.append(Paragraph(f"<b>{receipt.organization_name}</b>", style_org_title))
+    elements.append(
+        Paragraph(
+            f"ИНН: {receipt.inn}<br/>Адрес: {receipt.address}<br/>Телефон: {receipt.phone}",
+            style_org_details,
+        )
+    )
     elements.append(Spacer(1, 10))
 
     # 2. Status Banners (Cancelled / Superseded / Reissued)
-    status = (sale.get("status") or "completed").lower()
-    sale_id = sale.get("id") or sale.get("sale_id") or 0
-    created_at_raw = str(sale.get("created_at") or "")
-    created_date = created_at_raw[:10] if len(created_at_raw) >= 10 else "—"
-
-    if status in ["canceled", "cancelled"]:
-        cancel_date = str(sale.get("cancelled_at") or "")[:10]
-        banner_text = f"АРХИВНЫЙ ЧЕК — ПРОДАЖА №{sale_id} ОТМЕНЕНА ({cancel_date})"
+    if receipt.status_banner_text and receipt.status_banner_bg_color:
         banner_table = Table(
-            [[Paragraph(banner_text, style_banner_cancelled)]],
+            [[Paragraph(receipt.status_banner_text, style_banner)]],
             colWidths=[content_width],
         )
         banner_table.setStyle(
             TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#dc3545")),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ])
-        )
-        elements.append(banner_table)
-        elements.append(Spacer(1, 6))
-    elif status == "superseded":
-        sup_id = sale.get("superseded_by_sale_id") or sale.get("replaced_by_sale_id") or ""
-        banner_text = f"АРХИВНЫЙ ЧЕК — ПРОДАЖА №{sale_id} ЗАМЕНЕНА (ПОВТОРНАЯ ПРОДАЖА №{sup_id})"
-        banner_table = Table(
-            [[Paragraph(banner_text, style_banner_superseded)]],
-            colWidths=[content_width],
-        )
-        banner_table.setStyle(
-            TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#6c757d")),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ])
-        )
-        elements.append(banner_table)
-        elements.append(Spacer(1, 6))
-    elif status == "reissued":
-        src_id = sale.get("source_sale_id") or sale.get("original_sale_id") or ""
-        banner_text = f"ПОВТОРНО ОФОРМЛЕННАЯ ПРОДАЖА (НА ОСНОВЕ ПРОДАЖИ №{src_id})"
-        banner_table = Table(
-            [[Paragraph(banner_text, style_banner_reissued)]],
-            colWidths=[content_width],
-        )
-        banner_table.setStyle(
-            TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#007bff")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(receipt.status_banner_bg_color)),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
             ])
@@ -310,11 +249,10 @@ def generate_sale_receipt_pdf(
         elements.append(banner_table)
         elements.append(Spacer(1, 6))
 
-    # 3. Document Title
-    elements.append(Paragraph(f"Товарный чек № {sale_id} от {created_date}", style_title))
-    rev_count = sale.get("revision_count") or 0
-    if rev_count > 0:
-        elements.append(Paragraph(f"Продажа скорректирована — ревизия №{rev_count}", style_revision))
+    # 3. Document Title & Revision Notice
+    elements.append(Paragraph(receipt.receipt_title, style_title))
+    if receipt.revision_notice:
+        elements.append(Paragraph(receipt.revision_notice, style_revision))
     elements.append(Spacer(1, 8))
 
     # 4. Items Table
@@ -333,29 +271,16 @@ def generate_sale_receipt_pdf(
         ]
     ]
 
-    items = sale.get("items") or []
-    if items:
-        for idx, item in enumerate(items, start=1):
-            if isinstance(item, dict):
-                title = item.get("title") or f"Товар #{item.get('product_id')}"
-                code = str(item.get("sku") or item.get("barcode") or item.get("product_id") or "")
-                qty = item.get("quantity") or 1
-                price = float(item.get("price") or item.get("unit_price") or 0.0)
-            else:
-                title = getattr(item, "title", "") or f"Товар #{getattr(item, 'product_id', '')}"
-                code = str(getattr(item, "sku", None) or getattr(item, "barcode", None) or getattr(item, "product_id", ""))
-                qty = getattr(item, "quantity", 1) or 1
-                price = float(getattr(item, "price", None) or getattr(item, "unit_price", 0.0) or 0.0)
-            
-            line_sum = price * qty
+    if receipt.items:
+        for item in receipt.items:
             table_rows.append([
-                Paragraph(str(idx), style_cell),
-                Paragraph(title, style_cell),
-                Paragraph(code, style_cell),
-                Paragraph("шт", style_cell),
-                Paragraph(str(qty), style_cell_r),
-                Paragraph(f"{price:.2f}", style_cell_r),
-                Paragraph(f"{line_sum:.2f}", style_cell_r),
+                Paragraph(str(item.idx), style_cell),
+                Paragraph(item.title, style_cell),
+                Paragraph(item.code, style_cell),
+                Paragraph(item.unit, style_cell),
+                Paragraph(str(item.quantity), style_cell_r),
+                Paragraph(item.price_formatted, style_cell_r),
+                Paragraph(item.line_total_formatted, style_cell_r),
             ])
     else:
         table_rows.append([
@@ -382,14 +307,10 @@ def generate_sale_receipt_pdf(
     elements.append(Spacer(1, 10))
 
     # 5. Summary Table
-    total_amt = float(sale.get("total_amount") or 0.0)
-    raw_pm = str(sale.get("payment_method") or "unspecified").strip().lower()
-    pm_label = PAYMENT_METHODS_LABELS.get(raw_pm, sale.get("payment_label") or raw_pm)
-
     summary_rows = [
-        [Paragraph("Итого:", style_summary_lbl), Paragraph(f"{total_amt:.2f}", style_summary_val)],
-        [Paragraph("Предоплата:", style_summary_lbl), Paragraph("0.00", style_summary_val)],
-        [Paragraph("К оплате:", style_summary_lbl), Paragraph(f"{total_amt:.2f}", style_summary_val)],
+        [Paragraph("Итого:", style_summary_lbl), Paragraph(receipt.total_amount_formatted, style_summary_val)],
+        [Paragraph("Предоплата:", style_summary_lbl), Paragraph(receipt.prepayment_formatted, style_summary_val)],
+        [Paragraph("К оплате:", style_summary_lbl), Paragraph(receipt.to_pay_formatted, style_summary_val)],
     ]
     summary_table = Table(
         summary_rows,
@@ -404,34 +325,27 @@ def generate_sale_receipt_pdf(
     elements.append(summary_table)
 
     meta_text = (
-        f"Всего наименований: <b>{len(items)}</b><br/>"
-        f"Сумма: <b>{total_amt:.2f} ₽</b><br/>"
-        f"Способ поступления денег: <b>{pm_label}</b>"
+        f"Всего наименований: <b>{receipt.total_items_count}</b><br/>"
+        f"Сумма: <b>{receipt.total_amount_formatted} ₽</b><br/>"
+        f"Способ поступления денег: <b>{receipt.payment_method_label}</b>"
     )
     elements.append(Spacer(1, 6))
     elements.append(Paragraph(meta_text, style_summary_meta))
     elements.append(Spacer(1, 14))
 
     # 6. Signatures (KeepTogether to prevent breaking across pages)
-    cashier = (
-        sale.get("cashier_name")
-        or org_settings.get("default_cashier_name")
-        or "Продавец"
-    )
-    customer = org_settings.get("default_customer_label") or "Частное лицо"
-
     sig_col_w = (content_width - 30) / 2
     sig_rows = [
         [
-            Paragraph("Отпустил:", style_sig_lbl),
-            Paragraph("Покупатель:", style_sig_lbl),
+            Paragraph(receipt.seller_signature_title, style_sig_lbl),
+            Paragraph(receipt.buyer_signature_title, style_sig_lbl),
         ],
         [
             Paragraph("_____________________________", style_sig_lbl),
-            Paragraph(f"<b>{customer}</b>", style_sig_lbl),
+            Paragraph(f"<b>{receipt.buyer_signature_actor}</b>", style_sig_lbl),
         ],
         [
-            Paragraph(f"({cashier})", style_sig_actor),
+            Paragraph(receipt.seller_signature_actor, style_sig_actor),
             Paragraph("", style_sig_lbl),
         ],
     ]
@@ -444,38 +358,26 @@ def generate_sale_receipt_pdf(
     )
 
     # 7. Warranty Terms Box
-    warranty_enabled = bool(sale.get("warranty_enabled", True))
-    warranty_days = sale.get("warranty_days") or 30
-
     warranty_elements = [
-        Paragraph("Гарантийные условия", style_warranty_title),
+        Paragraph(receipt.warranty_title, style_warranty_title),
         Spacer(1, 4),
     ]
 
-    if warranty_enabled:
-        warranty_text_body = (
-            org_settings.get("warranty_text")
-            or "При обнаружении неисправности в течение гарантийного срока производится бесплатный ремонт или обмен."
-        )
-        # In desktop template: org_settings.warranty_text.split('\n')[1:]|join('\n')
-        lines = warranty_text_body.split("\n")
-        joined_terms = "<br/>".join(l.strip() for l in lines if l.strip())
-        w_html = (
-            f"На все Б/У товары предоставляется гарантия <b>{warranty_days} дней</b>.<br/>"
-            f"{joined_terms}"
-        )
+    if receipt.warranty_enabled:
+        body_html = receipt.warranty_body_text.replace("\n", "<br/>")
+        if body_html:
+            w_html = f"<b>{receipt.warranty_headline}</b><br/>{body_html}"
+        else:
+            w_html = f"<b>{receipt.warranty_headline}</b>"
         warranty_elements.append(Paragraph(w_html, style_warranty_body))
     else:
-        no_w_text = (
-            org_settings.get("no_warranty_text")
-            or "Товар продаётся без гарантии, в том состоянии, в котором есть.<br/>Покупатель внимательно осмотрел товар при покупке."
-        )
-        warranty_elements.append(Paragraph(no_w_text.replace("\n", "<br/>"), style_warranty_no))
+        no_w_text = receipt.warranty_body_text.replace("\n", "<br/>")
+        warranty_elements.append(Paragraph(no_w_text, style_warranty_no))
 
     warranty_elements.append(Spacer(1, 8))
     buyer_sign_html = (
-        "Подпись покупателя:<br/>"
-        "С условиями ознакомился и согласен: ____________________________________"
+        f"{receipt.buyer_acknowledgement_title}<br/>"
+        f"{receipt.buyer_acknowledgement_prompt} ____________________________________"
     )
     warranty_elements.append(Paragraph(buyer_sign_html, style_warranty_body))
 

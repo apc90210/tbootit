@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Request, Query, Form
+from fastapi import APIRouter, Request, Query, Form, Response, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.core_client import core_client
@@ -294,7 +294,7 @@ async def sale_avito_dismiss_endpoint(request: Request, sale_id: int):
 
 @router.get("/sales/{sale_id}/receipt", response_class=HTMLResponse)
 async def sale_receipt(request: Request, sale_id: int):
-    """Sale warranty and product receipt preview."""
+    """Sale warranty and product receipt preview using canonical presentation model."""
     sale = await core_client.get_sale(sale_id)
 
     if sale and isinstance(sale, dict) and "error" in sale:
@@ -315,17 +315,41 @@ async def sale_receipt(request: Request, sale_id: int):
         from app.defaults import get_effective_settings
         response = await core_client.get_organization_settings()
         org_settings = get_effective_settings(response if not response.get("error") else {})
-    except Exception as e:
+    except Exception:
         from app.defaults import get_effective_settings
         org_settings = get_effective_settings({})
-    
+
+    from app.services.receipt_presentation import build_receipt_document_data
+    receipt_data = build_receipt_document_data(sale, org_settings)
+
     return templates.TemplateResponse(
         request=request,
         name="sale_receipt_preview.html",
         context={
-            "sale": sale,
+            "receipt": receipt_data,
+            "receipt_items": receipt_data.items,
+            "sale": receipt_data,
+            "org_settings": receipt_data,
             "payment_methods": PAYMENT_METHODS,
-            "org_settings": org_settings,
+        },
+    )
+
+
+@router.get("/sales/{sale_id}/receipt/print")
+async def sale_receipt_print(sale_id: int):
+    """
+    Desktop Print Action: streams the canonical PDF receipt from Core.
+    Guarantees zero layout drift between desktop and Android printing.
+    """
+    pdf_bytes = await core_client.get_sale_receipt_print(sale_id)
+    if not pdf_bytes:
+        raise HTTPException(status_code=404, detail="Sale receipt PDF not found")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="receipt_{sale_id}.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
         },
     )
 

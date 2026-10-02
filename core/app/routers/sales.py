@@ -158,6 +158,21 @@ def get_sale_receipt(sale_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/{sale_id}/receipt/data", response_model=schemas.ReceiptDocumentData)
+def get_sale_receipt_data(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Canonical presentation model for sale receipt.
+    Single source of truth for both desktop preview and PDF print rendering.
+    Strictly read-only: does not alter sale, stock, or create stock movements.
+    """
+    db_sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not db_sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    org_settings = db.query(models.OrganizationSettings).first()
+    from app.services.receipt_presentation import build_receipt_document_data
+    return build_receipt_document_data(db_sale, org_settings)
+
+
 @router.get("/{sale_id}/receipt/print", response_class=Response)
 def print_sale_receipt(sale_id: int, db: Session = Depends(get_db)):
     """
@@ -169,65 +184,10 @@ def print_sale_receipt(sale_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Sale not found")
 
     org_settings = db.query(models.OrganizationSettings).first()
-    org_dict = {}
-    if org_settings:
-        org_dict = {
-            "organization_name": org_settings.organization_name,
-            "inn": org_settings.inn,
-            "address": org_settings.address,
-            "phone": org_settings.phone,
-            "default_cashier_name": org_settings.default_cashier_name,
-            "default_customer_label": org_settings.default_customer_label,
-            "warranty_text": org_settings.warranty_text,
-            "no_warranty_text": org_settings.no_warranty_text,
-        }
-
-    items = []
-    for item in db_sale.items:
-        sku = None
-        barcode = None
-        if item.product_id:
-            prod = db.query(models.Product).filter(models.Product.id == item.product_id).first()
-            if prod:
-                sku = prod.sku
-                barcode = prod.barcode
-        unit_price = float(item.price) if item.price is not None else 0.0
-        qty = int(item.quantity) if item.quantity is not None else 0
-        items.append({
-            "id": item.id,
-            "product_id": item.product_id,
-            "title": item.title or (f"Товар #{item.product_id}" if item.product_id else "Позиция"),
-            "sku": sku,
-            "barcode": barcode,
-            "quantity": qty,
-            "price": unit_price,
-            "unit_price": unit_price,
-        })
-
-    sale_dict = {
-        "id": db_sale.id,
-        "sale_id": db_sale.id,
-        "receipt_number": f"REC-{db_sale.id:06d}",
-        "status": db_sale.status or "completed",
-        "created_at": db_sale.created_at.isoformat() if db_sale.created_at else "",
-        "cancelled_at": db_sale.cancelled_at.isoformat() if db_sale.cancelled_at else None,
-        "superseded_by_sale_id": db_sale.superseded_by_sale_id,
-        "source_sale_id": db_sale.source_sale_id,
-        "revision_count": db_sale.revision_count or 0,
-        "total_amount": float(db_sale.total_amount) if db_sale.total_amount is not None else 0.0,
-        "payment_method": db_sale.payment_method or "unspecified",
-        "cashier_name": (
-            org_settings.default_cashier_name
-            if (org_settings and org_settings.default_cashier_name)
-            else "Продавец"
-        ),
-        "warranty_enabled": db_sale.warranty_enabled,
-        "warranty_days": db_sale.warranty_days,
-        "items": items,
-    }
-
+    from app.services.receipt_presentation import build_receipt_document_data
     from app.services.receipt_pdf_service import generate_sale_receipt_pdf
-    pdf_bytes = generate_sale_receipt_pdf(sale_dict, org_dict)
+    receipt_data = build_receipt_document_data(db_sale, org_settings)
+    pdf_bytes = generate_sale_receipt_pdf(receipt_data)
 
     return Response(
         content=pdf_bytes,
