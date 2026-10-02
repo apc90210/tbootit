@@ -21,7 +21,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple, Set
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from app import models
@@ -134,6 +134,9 @@ def has_token_boundary_phrase(phrase: str, text: str) -> bool:
     p_norm = normalize_for_matching(phrase)
     t_norm = normalize_for_matching(text)
     if not p_norm or not t_norm:
+        return False
+    # Fast-path rejection before expensive regex
+    if p_norm not in t_norm:
         return False
     # Use word boundaries around escaped phrase
     pattern = r"(?<![a-z0-9\u0400-\u04ff])" + re.escape(p_norm) + r"(?![a-z0-9\u0400-\u04ff])"
@@ -262,6 +265,7 @@ def find_reference_candidates(
     brand_hint: Optional[str] = None,
     model_hint: Optional[str] = None,
     active_only: bool = True,
+    cached_models: Optional[List[models.ProductReferenceModel]] = None,
 ) -> List[MatchCandidate]:
     """
     Search reference models and aliases for potential matches across all 3 tiers.
@@ -273,11 +277,14 @@ def find_reference_candidates(
     tokens = extract_tokens(title_norm)
     token_set = set(tokens)
 
-    # Fetch active reference models with their aliases
-    q = db.query(models.ProductReferenceModel)
-    if active_only:
-        q = q.filter(models.ProductReferenceModel.active == True)
-    ref_models = q.all()
+    # Fetch active reference models with their aliases (or use pre-cached)
+    if cached_models is not None:
+        ref_models = cached_models
+    else:
+        q = db.query(models.ProductReferenceModel).options(joinedload(models.ProductReferenceModel.aliases))
+        if active_only:
+            q = q.filter(models.ProductReferenceModel.active == True)
+        ref_models = q.all()
 
     candidates: List[MatchCandidate] = []
     seen_model_ids: Set[int] = set()
@@ -420,6 +427,7 @@ def match_product(
     description: Optional[str] = None,
     existing_category_name: Optional[str] = None,
     active_only: bool = True,
+    cached_models: Optional[List[models.ProductReferenceModel]] = None,
 ) -> MatchResult:
     """
     Main entry point for deterministic product matching against reference catalog.
@@ -457,6 +465,7 @@ def match_product(
         brand_hint=brand,
         model_hint=model,
         active_only=active_only,
+        cached_models=cached_models,
     )
 
     if not candidates:

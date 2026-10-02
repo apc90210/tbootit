@@ -1,0 +1,2390 @@
+[
+  {
+    "proposed_canonical_name": "HP LaserJet Pro 400 M401a",
+    "brand": "HP",
+    "model": "LaserJet Pro 400 M401a",
+    "category": "Принтеры",
+    "source_product_ids": [
+      106,
+      216
+    ],
+    "source_titles": [
+      "Лазерный принтер HP LaserJet m401a",
+      "Лазерный Принтер HP M401a"
+    ],
+    "aliases": [
+      "HP LaserJet Pro 400 M401a",
+      "HP LaserJet m401a",
+      "HP M401a",
+      "LaserJet M401a",
+      "m401a",
+      "Лазерный принтер HP LaserJet m401a",
+      "Лазерный Принтер HP M401a"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Enterprise P3015",
+    "brand": "HP",
+    "model": "LaserJet Enterprise P3015",
+    "category": "Принтеры",
+    "source_product_ids": [
+      214,
+      224
+    ],
+    "source_titles": [
+      "Лазерный Принтер HP P3015/ Гарантия",
+      "Принтер Лазерный HP p3015/ гарантия"
+    ],
+    "aliases": [
+      "HP LaserJet Enterprise P3015",
+      "HP LaserJet P3015",
+      "HP P3015",
+      "LaserJet P3015",
+      "p3015",
+      "Лазерный Принтер HP P3015/ Гарантия",
+      "Принтер Лазерный HP p3015/ гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet P2035",
+    "brand": "HP",
+    "model": "LaserJet P2035",
+    "category": "Принтеры",
+    "source_product_ids": [
+      276,
+      310
+    ],
+    "source_titles": [
+      "Лазерный принтер HP LaserJet p2035. Гарантия",
+      "Лазерный принтер hp laserjet p2035"
+    ],
+    "aliases": [
+      "HP LaserJet P2035",
+      "HP P2035",
+      "LaserJet P2035",
+      "LaserJet p2035",
+      "p2035",
+      "Лазерный принтер HP LaserJet p2035. Гарантия",
+      "Лазерный принтер hp laserjet p2035"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Pro M203dw",
+    "brand": "HP",
+    "model": "LaserJet Pro M203dw",
+    "category": "Принтеры",
+    "source_product_ids": [
+      344,
+      368
+    ],
+    "source_titles": [
+      "Лазерный принтер HP LaserJet m203dw",
+      "Лазерный принтер HP LaserJet m203dw. Гарантия"
+    ],
+    "aliases": [
+      "HP LaserJet Pro M203dw",
+      "HP LaserJet m203dw",
+      "HP M203dw",
+      "LaserJet M203dw",
+      "m203dw",
+      "Лазерный принтер HP LaserJet m203dw",
+      "Лазерный принтер HP LaserJet m203dw. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet P1505",
+    "brand": "HP",
+    "model": "LaserJet P1505",
+    "category": "Принтеры",
+    "source_product_ids": [
+      245
+    ],
+    "source_titles": [
+      "Лазерный принтер hp laserjet p1505, б/у"
+    ],
+    "aliases": [
+      "HP LaserJet P1505",
+      "HP P1505",
+      "LaserJet P1505",
+      "LaserJet p1505",
+      "p1505",
+      "Лазерный принтер hp laserjet p1505, б/у"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Enterprise M608",
+    "brand": "HP",
+    "model": "LaserJet Enterprise M608",
+    "category": "Принтеры",
+    "source_product_ids": [
+      60,
+      204
+    ],
+    "source_titles": [
+      "Принтер ho m608. На запчасти",
+      "Лазерный Принтер HP M608 на запчасти"
+    ],
+    "aliases": [
+      "HP LaserJet Enterprise M608",
+      "HP LaserJet M608",
+      "HP M608",
+      "ho m608",
+      "m608",
+      "Принтер ho m608. На запчасти",
+      "Лазерный Принтер HP M608 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP Color LaserJet CP1515n",
+    "brand": "HP",
+    "model": "Color LaserJet CP1515n",
+    "category": "Принтеры",
+    "source_product_ids": [
+      369
+    ],
+    "source_titles": [
+      "Лазерный цветной принтер HP Color LaserJet cp1515n"
+    ],
+    "aliases": [
+      "HP Color LaserJet CP1515n",
+      "HP Color LaserJet cp1515n",
+      "Color LaserJet cp1515n",
+      "HP CP1515n",
+      "cp1515n",
+      "Лазерный цветной принтер HP Color LaserJet cp1515n"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP Color LaserJet Pro M252n",
+    "brand": "HP",
+    "model": "Color LaserJet Pro M252n",
+    "category": "Принтеры",
+    "source_product_ids": [
+      3
+    ],
+    "source_titles": [
+      "Лазерный цветной принтер hp m252n на запчасти"
+    ],
+    "aliases": [
+      "HP Color LaserJet Pro M252n",
+      "hp m252n",
+      "HP M252n",
+      "m252n",
+      "Лазерный цветной принтер hp m252n на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS LBP6030B",
+    "brand": "Canon",
+    "model": "i-SENSYS LBP6030B",
+    "category": "Принтеры",
+    "source_product_ids": [
+      11
+    ],
+    "source_titles": [
+      "Лазерный принтер Canon i-sensys LBP6030B"
+    ],
+    "aliases": [
+      "Canon i-SENSYS LBP6030B",
+      "Canon LBP6030B",
+      "LBP6030B",
+      "i-sensys LBP6030B",
+      "lbp6030b",
+      "Лазерный принтер Canon i-sensys LBP6030B"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS LBP2900B",
+    "brand": "Canon",
+    "model": "i-SENSYS LBP2900B",
+    "category": "Принтеры",
+    "source_product_ids": [
+      335
+    ],
+    "source_titles": [
+      "Лазерный принтер canon lbp2900b, б/у"
+    ],
+    "aliases": [
+      "Canon i-SENSYS LBP2900B",
+      "Canon LBP2900B",
+      "canon lbp2900b",
+      "LBP2900B",
+      "lbp2900b",
+      "Лазерный принтер canon lbp2900b, б/у"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Kyocera FS-4100dn",
+    "brand": "Kyocera",
+    "model": "FS-4100dn",
+    "category": "Принтеры",
+    "source_product_ids": [
+      398,
+      416
+    ],
+    "source_titles": [
+      "Лазерный принтер Kyocera fs-4100dn. Гарантия",
+      "Лазерный принтер Kyocera fs-4100dn"
+    ],
+    "aliases": [
+      "Kyocera FS-4100dn",
+      "Kyocera fs-4100dn",
+      "FS-4100dn",
+      "fs-4100dn",
+      "Лазерный принтер Kyocera fs-4100dn. Гарантия",
+      "Лазерный принтер Kyocera fs-4100dn"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Kyocera ECOSYS P2135dn",
+    "brand": "Kyocera",
+    "model": "ECOSYS P2135dn",
+    "category": "Принтеры",
+    "source_product_ids": [
+      186
+    ],
+    "source_titles": [
+      "Лазерный принтер Kyocera p2135dn. Гарантия"
+    ],
+    "aliases": [
+      "Kyocera ECOSYS P2135dn",
+      "Kyocera p2135dn",
+      "ECOSYS P2135dn",
+      "p2135dn",
+      "Лазерный принтер Kyocera p2135dn. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Kyocera ECOSYS P6235cdn",
+    "brand": "Kyocera",
+    "model": "ECOSYS P6235cdn",
+    "category": "Принтеры",
+    "source_product_ids": [
+      87
+    ],
+    "source_titles": [
+      "Лазерный Принтер На запчасти Kyocera P6235"
+    ],
+    "aliases": [
+      "Kyocera ECOSYS P6235cdn",
+      "Kyocera P6235",
+      "ECOSYS P6235",
+      "P6235",
+      "Лазерный Принтер На запчасти Kyocera P6235"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Zebra ZD220",
+    "brand": "Zebra",
+    "model": "ZD220",
+    "category": "Принтеры",
+    "source_product_ids": [
+      72
+    ],
+    "source_titles": [
+      "Термопринтер этикеток zebra zd220"
+    ],
+    "aliases": [
+      "Zebra ZD220",
+      "zebra zd220",
+      "ZD220",
+      "Термопринтер этикеток zebra zd220"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "TSC Alpha-3R",
+    "brand": "TSC",
+    "model": "Alpha-3R",
+    "category": "Принтеры",
+    "source_product_ids": [
+      91
+    ],
+    "source_titles": [
+      "Мобильный термопринтер TSC Alpha-3RW"
+    ],
+    "aliases": [
+      "TSC Alpha-3R",
+      "TSC Alpha-3RW",
+      "Alpha-3RW",
+      "Мобильный термопринтер TSC Alpha-3RW"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Bixolon SPP-L310",
+    "brand": "Bixolon",
+    "model": "SPP-L310",
+    "category": "Принтеры",
+    "source_product_ids": [
+      116
+    ],
+    "source_titles": [
+      "Мобильный принтер Bixolon ssp- L310"
+    ],
+    "aliases": [
+      "Bixolon SPP-L310",
+      "Bixolon ssp- L310",
+      "SPP-L310",
+      "Мобильный принтер Bixolon ssp- L310"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "OKI C3400",
+    "brand": "OKI",
+    "model": "C3400",
+    "category": "Принтеры",
+    "source_product_ids": [
+      120
+    ],
+    "source_titles": [
+      "Лазерный цветной принтер oki c3400 на запчасти"
+    ],
+    "aliases": [
+      "OKI C3400",
+      "oki c3400",
+      "C3400",
+      "Лазерный цветной принтер oki c3400 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "OKI C510dn",
+    "brand": "OKI",
+    "model": "C510dn",
+    "category": "Принтеры",
+    "source_product_ids": [
+      121
+    ],
+    "source_titles": [
+      "Лазерный цветной принтер Oki c510dn на запчасти"
+    ],
+    "aliases": [
+      "OKI C510dn",
+      "Oki c510dn",
+      "C510dn",
+      "Лазерный цветной принтер Oki c510dn на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Brother HL-2040",
+    "brand": "Brother",
+    "model": "HL-2040",
+    "category": "Принтеры",
+    "source_product_ids": [
+      126
+    ],
+    "source_titles": [
+      "Лазерный принтер Brother 2040H"
+    ],
+    "aliases": [
+      "Brother HL-2040",
+      "Brother 2040H",
+      "HL-2040",
+      "Лазерный принтер Brother 2040H"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Epson Stylus Photo R2280",
+    "brand": "Epson",
+    "model": "Stylus Photo R2280",
+    "category": "Принтеры",
+    "source_product_ids": [
+      394
+    ],
+    "source_titles": [
+      "струйный принтер epson r2280"
+    ],
+    "aliases": [
+      "Epson Stylus Photo R2280",
+      "epson r2280",
+      "R2280",
+      "струйный принтер epson r2280"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Pro M1214nfh",
+    "brand": "HP",
+    "model": "LaserJet Pro M1214nfh",
+    "category": "МФУ",
+    "source_product_ids": [
+      8,
+      173,
+      326
+    ],
+    "source_titles": [
+      "Мфу Лазерное 3-1 HP M1214N/Сеть / Гарантия",
+      "Лазерное мфу 3-1 HP M1214N / Гарантия 30 дней",
+      "Лазерное мфу 3 в 1 HP LaserJet M1214nfh"
+    ],
+    "aliases": [
+      "HP LaserJet Pro M1214nfh",
+      "HP LaserJet M1214nfh",
+      "HP M1214N",
+      "LaserJet M1214nfh",
+      "HP M1214",
+      "m1214n",
+      "Мфу Лазерное 3-1 HP M1214N/Сеть / Гарантия",
+      "Лазерное мфу 3-1 HP M1214N / Гарантия 30 дней"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 3 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Pro M1132 MFP",
+    "brand": "HP",
+    "model": "LaserJet Pro M1132 MFP",
+    "category": "МФУ",
+    "source_product_ids": [
+      350,
+      352
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Hp LaserJet M1132",
+      "Лазерное мфу 3 в 1 Hp LaserJet M1132. Гарантия"
+    ],
+    "aliases": [
+      "HP LaserJet Pro M1132 MFP",
+      "Hp LaserJet M1132",
+      "HP LaserJet M1132",
+      "HP M1132",
+      "LaserJet M1132",
+      "m1132",
+      "Лазерное мфу 3 в 1 Hp LaserJet M1132",
+      "Лазерное мфу 3 в 1 Hp LaserJet M1132. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet M1005 MFP",
+    "brand": "HP",
+    "model": "LaserJet M1005 MFP",
+    "category": "МФУ",
+    "source_product_ids": [
+      342,
+      366
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 HP LaserJet M1005",
+      "Лазерное мфу 3 в 1 HP LaserJet M1005. Гарантия"
+    ],
+    "aliases": [
+      "HP LaserJet M1005 MFP",
+      "HP LaserJet M1005",
+      "HP M1005",
+      "LaserJet M1005",
+      "m1005",
+      "Лазерное мфу 3 в 1 HP LaserJet M1005",
+      "Лазерное мфу 3 в 1 HP LaserJet M1005. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Pro MFP M125r",
+    "brand": "HP",
+    "model": "LaserJet Pro MFP M125r",
+    "category": "МФУ",
+    "source_product_ids": [
+      351,
+      385
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 HP LaserJet m125r. Гарантия",
+      "Лазерное мфу 3 в 1 HP LaserJet m125r"
+    ],
+    "aliases": [
+      "HP LaserJet Pro MFP M125r",
+      "HP LaserJet m125r",
+      "HP M125r",
+      "LaserJet m125r",
+      "m125r",
+      "Лазерное мфу 3 в 1 HP LaserJet m125r. Гарантия",
+      "Лазерное мфу 3 в 1 HP LaserJet m125r"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Pro MFP M132a",
+    "brand": "HP",
+    "model": "LaserJet Pro MFP M132a",
+    "category": "МФУ",
+    "source_product_ids": [
+      330
+    ],
+    "source_titles": [
+      "Мфу Лазерное 3-1 HP M132A"
+    ],
+    "aliases": [
+      "HP LaserJet Pro MFP M132a",
+      "HP M132A",
+      "HP M132a",
+      "LaserJet M132a",
+      "m132a",
+      "Мфу Лазерное 3-1 HP M132A"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet 3030",
+    "brand": "HP",
+    "model": "LaserJet 3030",
+    "category": "МФУ",
+    "source_product_ids": [
+      396,
+      408
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 HP LaserJet 3030. Гарантия",
+      "Лазерное мфу 3 в 1 HP LaserJet 3030"
+    ],
+    "aliases": [
+      "HP LaserJet 3030",
+      "HP 3030",
+      "LaserJet 3030",
+      "Лазерное мфу 3 в 1 HP LaserJet 3030. Гарантия",
+      "Лазерное мфу 3 в 1 HP LaserJet 3030"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP LaserJet Enterprise MFP M527",
+    "brand": "HP",
+    "model": "LaserJet Enterprise MFP M527",
+    "category": "МФУ",
+    "source_product_ids": [
+      400,
+      417
+    ],
+    "source_titles": [
+      "Лазерное Мфу 3 в 1 HP enterprise MFP M527/ Дуплекс",
+      "Мфу Лазерное HP M527/Дуплекс / Сеть /Гарантия"
+    ],
+    "aliases": [
+      "HP LaserJet Enterprise MFP M527",
+      "HP enterprise MFP M527",
+      "HP M527",
+      "MFP M527",
+      "m527",
+      "Лазерное Мфу 3 в 1 HP enterprise MFP M527/ Дуплекс",
+      "Мфу Лазерное HP M527/Дуплекс / Сеть /Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP Photosmart 5515",
+    "brand": "HP",
+    "model": "Photosmart 5515",
+    "category": "МФУ",
+    "source_product_ids": [
+      104
+    ],
+    "source_titles": [
+      "Струйное Мфу HP 5515 / сканер"
+    ],
+    "aliases": [
+      "HP Photosmart 5515",
+      "HP 5515",
+      "Photosmart 5515",
+      "Струйное Мфу HP 5515 / сканер"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Brother MFC-8880DN",
+    "brand": "Brother",
+    "model": "MFC-8880DN",
+    "category": "МФУ",
+    "source_product_ids": [
+      14,
+      145,
+      171
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Brother MFC-8880DN.Сеть/Дуплекс",
+      "Лазерное мфу 3 в 1 Brother MFC-8880DN на запчасти",
+      "Лазерное мфу 3 в 1 Brother MFC-8880DN A4. Гарантия"
+    ],
+    "aliases": [
+      "Brother MFC-8880DN",
+      "MFC-8880DN",
+      "mfc-8880dn",
+      "Лазерное мфу 3 в 1 Brother MFC-8880DN.Сеть/Дуплекс",
+      "Лазерное мфу 3 в 1 Brother MFC-8880DN на запчасти",
+      "Лазерное мфу 3 в 1 Brother MFC-8880DN A4. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 3 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS MF4730",
+    "brand": "Canon",
+    "model": "i-SENSYS MF4730",
+    "category": "МФУ",
+    "source_product_ids": [
+      137
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Canon mf4730"
+    ],
+    "aliases": [
+      "Canon i-SENSYS MF4730",
+      "Canon mf4730",
+      "Canon MF4730",
+      "MF4730",
+      "mf4730",
+      "Лазерное мфу 3 в 1 Canon mf4730"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS MF4550d",
+    "brand": "Canon",
+    "model": "i-SENSYS MF4550d",
+    "category": "МФУ",
+    "source_product_ids": [
+      122
+    ],
+    "source_titles": [
+      "Лазерное мфу Canon i-sensys MF4550d. на запчасти"
+    ],
+    "aliases": [
+      "Canon i-SENSYS MF4550d",
+      "Canon MF4550d",
+      "MF4550d",
+      "mf4550d",
+      "Лазерное мфу Canon i-sensys MF4550d. на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS MF446",
+    "brand": "Canon",
+    "model": "i-SENSYS MF446",
+    "category": "МФУ",
+    "source_product_ids": [
+      2
+    ],
+    "source_titles": [
+      "Лазерное мфу Canon MF 446/ Wi fi / Сеть / Гаратини"
+    ],
+    "aliases": [
+      "Canon i-SENSYS MF446",
+      "Canon MF 446",
+      "MF 446",
+      "Лазерное мфу Canon MF 446/ Wi fi / Сеть / Гаратини"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS MF446x",
+    "brand": "Canon",
+    "model": "i-SENSYS MF446x",
+    "category": "МФУ",
+    "source_product_ids": [
+      170
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Canon mf446X"
+    ],
+    "aliases": [
+      "Canon i-SENSYS MF446x",
+      "Canon mf446X",
+      "MF446x",
+      "mf446x",
+      "Лазерное мфу 3 в 1 Canon mf446X"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon imageRUNNER 1024i",
+    "brand": "Canon",
+    "model": "imageRUNNER 1024i",
+    "category": "МФУ",
+    "source_product_ids": [
+      213
+    ],
+    "source_titles": [
+      "Лазерное Мфу Canon IR 1024i/ Дуплекс / Сеть"
+    ],
+    "aliases": [
+      "Canon imageRUNNER 1024i",
+      "Canon IR 1024i",
+      "IR 1024i",
+      "Canon 1024i",
+      "ir 1024i",
+      "Лазерное Мфу Canon IR 1024i/ Дуплекс / Сеть"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon i-SENSYS MF5940dn",
+    "brand": "Canon",
+    "model": "i-SENSYS MF5940dn",
+    "category": "МФУ",
+    "source_product_ids": [
+      112
+    ],
+    "source_titles": [
+      "Мфу лазерное под восстановление canon mf5940dn"
+    ],
+    "aliases": [
+      "Canon i-SENSYS MF5940dn",
+      "canon mf5940dn",
+      "MF5940dn",
+      "mf5940dn",
+      "Мфу лазерное под восстановление canon mf5940dn"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Canon PIXMA MP272",
+    "brand": "Canon",
+    "model": "PIXMA MP272",
+    "category": "МФУ",
+    "source_product_ids": [
+      230
+    ],
+    "source_titles": [
+      "Струйное мфу canon pixma mp272 на запчасти"
+    ],
+    "aliases": [
+      "Canon PIXMA MP272",
+      "canon pixma mp272",
+      "MP272",
+      "Струйное мфу canon pixma mp272 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Kyocera ECOSYS M6026cdn",
+    "brand": "Kyocera",
+    "model": "ECOSYS M6026cdn",
+    "category": "МФУ",
+    "source_product_ids": [
+      50
+    ],
+    "source_titles": [
+      "Лазерное цветное мфу Kyocera m6026cdn"
+    ],
+    "aliases": [
+      "Kyocera ECOSYS M6026cdn",
+      "Kyocera m6026cdn",
+      "M6026cdn",
+      "m6026cdn",
+      "Лазерное цветное мфу Kyocera m6026cdn"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Kyocera FS-1125MFP",
+    "brand": "Kyocera",
+    "model": "FS-1125MFP",
+    "category": "МФУ",
+    "source_product_ids": [
+      358
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Kyocera FS-1125MFP на запчасти"
+    ],
+    "aliases": [
+      "Kyocera FS-1125MFP",
+      "FS-1125MFP",
+      "fs-1125mfp",
+      "Лазерное мфу 3 в 1 Kyocera FS-1125MFP на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lexmark MX421ade",
+    "brand": "Lexmark",
+    "model": "MX421ade",
+    "category": "МФУ",
+    "source_product_ids": [
+      123
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Lexmark MX421ade на запчасти"
+    ],
+    "aliases": [
+      "Lexmark MX421ade",
+      "MX421ade",
+      "mx421ade",
+      "Лазерное мфу 3 в 1 Lexmark MX421ade на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Pantum BM5100ADN",
+    "brand": "Pantum",
+    "model": "BM5100ADN",
+    "category": "МФУ",
+    "source_product_ids": [
+      124
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Pantum BM5100ADN на запчасти"
+    ],
+    "aliases": [
+      "Pantum BM5100ADN",
+      "BM5100ADN",
+      "bm5100adn",
+      "Лазерное мфу 3 в 1 Pantum BM5100ADN на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Pantum BM5100FDN",
+    "brand": "Pantum",
+    "model": "BM5100FDN",
+    "category": "МФУ",
+    "source_product_ids": [
+      125
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Pantum BM5100FDN на запчасти"
+    ],
+    "aliases": [
+      "Pantum BM5100FDN",
+      "BM5100FDN",
+      "bm5100fdn",
+      "Лазерное мфу 3 в 1 Pantum BM5100FDN на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Samsung SCX-4833FD",
+    "brand": "Samsung",
+    "model": "SCX-4833FD",
+    "category": "МФУ",
+    "source_product_ids": [
+      192
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 samsung scx-4833fd у.ц"
+    ],
+    "aliases": [
+      "Samsung SCX-4833FD",
+      "samsung scx-4833fd",
+      "SCX-4833FD",
+      "scx-4833fd",
+      "Лазерное мфу 3 в 1 samsung scx-4833fd у.ц"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Samsung SCX-3400",
+    "brand": "Samsung",
+    "model": "SCX-3400",
+    "category": "МФУ",
+    "source_product_ids": [
+      55,
+      401,
+      418
+    ],
+    "source_titles": [
+      "Связка Gigabyte Ga- A55M - DS2+ A4-3400",
+      "Лазерное Мфу 3 в 1 Samsung 3400 /Новый Картридж",
+      "Мфу Лазерное 3-1 Samsung 3400 / Новый картридж"
+    ],
+    "aliases": [
+      "Samsung SCX-3400",
+      "Samsung 3400",
+      "SCX-3400",
+      "Связка Gigabyte Ga- A55M - DS2+ A4-3400",
+      "Лазерное Мфу 3 в 1 Samsung 3400 /Новый Картридж",
+      "Мфу Лазерное 3-1 Samsung 3400 / Новый картридж"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 3 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Xerox WorkCentre 3335",
+    "brand": "Xerox",
+    "model": "WorkCentre 3335",
+    "category": "МФУ",
+    "source_product_ids": [
+      239,
+      317
+    ],
+    "source_titles": [
+      "Лазерное мфу 3 в 1 Xerox WorkCentre 3335. WiFi",
+      "Мфу Wi Fi Лазерное 3 в 1 Xerox 3335 /Дуплекс/Сеть"
+    ],
+    "aliases": [
+      "Xerox WorkCentre 3335",
+      "Xerox 3335",
+      "WorkCentre 3335",
+      "Лазерное мфу 3 в 1 Xerox WorkCentre 3335. WiFi",
+      "Мфу Wi Fi Лазерное 3 в 1 Xerox 3335 /Дуплекс/Сеть"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Xerox DocuCentre SC2020",
+    "brand": "Xerox",
+    "model": "DocuCentre SC2020",
+    "category": "МФУ",
+    "source_product_ids": [
+      148
+    ],
+    "source_titles": [
+      "Лазерный цветной мфу a3 xerox sc2020"
+    ],
+    "aliases": [
+      "Xerox DocuCentre SC2020",
+      "xerox sc2020",
+      "DocuCentre SC2020",
+      "SC2020",
+      "sc2020",
+      "Лазерный цветной мфу a3 xerox sc2020"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Epson WorkForce Pro WF-M5799",
+    "brand": "Epson",
+    "model": "WorkForce Pro WF-M5799",
+    "category": "МФУ",
+    "source_product_ids": [
+      81,
+      318,
+      329
+    ],
+    "source_titles": [
+      "Мфу струеное epson WF-5799/ под восстановление",
+      "Струйное мфу Epson WF-M5799 wifi/сеть. Гарантия",
+      "Мфу Струйный Epson MF5799 WiFi"
+    ],
+    "aliases": [
+      "Epson WorkForce Pro WF-M5799",
+      "Epson WF-M5799",
+      "Epson MF5799",
+      "WF-M5799",
+      "WF-5799",
+      "Мфу струеное epson WF-5799/ под восстановление",
+      "Струйное мфу Epson WF-M5799 wifi/сеть. Гарантия",
+      "Мфу Струйный Epson MF5799 WiFi"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 3 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Epson EcoTank M2140",
+    "brand": "Epson",
+    "model": "EcoTank M2140",
+    "category": "МФУ",
+    "source_product_ids": [
+      311,
+      377
+    ],
+    "source_titles": [
+      "Струйное мфу под восстановление Epson m2140",
+      "Мфу Струйное Epson M2140 / Под восстановление"
+    ],
+    "aliases": [
+      "Epson EcoTank M2140",
+      "Epson M2140",
+      "Epson m2140",
+      "M2140",
+      "m2140",
+      "Струйное мфу под восстановление Epson m2140",
+      "Мфу Струйное Epson M2140 / Под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP 24fw",
+    "brand": "HP",
+    "model": "24fw",
+    "category": "Мониторы",
+    "source_product_ids": [
+      67
+    ],
+    "source_titles": [
+      "Монитор HP 24 дюйма 24fw IPS"
+    ],
+    "aliases": [
+      "HP 24fw",
+      "24fw",
+      "Монитор HP 24 дюйма 24fw IPS"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Samsung S22D300",
+    "brand": "Samsung",
+    "model": "S22D300",
+    "category": "Мониторы",
+    "source_product_ids": [
+      158
+    ],
+    "source_titles": [
+      "Монитор Samsung s22d300 22 дюйма"
+    ],
+    "aliases": [
+      "Samsung S22D300",
+      "samsung s22d300",
+      "S22D300",
+      "Монитор Samsung s22d300 22 дюйма"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Samsung C32F391FWI",
+    "brand": "Samsung",
+    "model": "C32F391FWI",
+    "category": "Мониторы",
+    "source_product_ids": [
+      117
+    ],
+    "source_titles": [
+      "Монитор Samsung на запчасти c32f391fwi"
+    ],
+    "aliases": [
+      "Samsung C32F391FWI",
+      "c32f391fwi",
+      "Монитор Samsung на запчасти c32f391fwi"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Samsung SyncMaster E2320",
+    "brand": "Samsung",
+    "model": "SyncMaster E2320",
+    "category": "Мониторы",
+    "source_product_ids": [
+      147
+    ],
+    "source_titles": [
+      "Монитор Samsung e2320 23д. Гарантия"
+    ],
+    "aliases": [
+      "Samsung SyncMaster E2320",
+      "Samsung e2320",
+      "E2320",
+      "Монитор Samsung e2320 23д. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "AOC e2050S",
+    "brand": "AOC",
+    "model": "e2050S",
+    "category": "Мониторы",
+    "source_product_ids": [
+      223
+    ],
+    "source_titles": [
+      "Монитор AOC e2050S / 20 дюймов"
+    ],
+    "aliases": [
+      "AOC e2050S",
+      "e2050S",
+      "e2050s",
+      "Монитор AOC e2050S / 20 дюймов"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "NEC V260",
+    "brand": "NEC",
+    "model": "V260",
+    "category": "Мониторы",
+    "source_product_ids": [
+      49,
+      312
+    ],
+    "source_titles": [
+      "Проектор NEC V260"
+    ],
+    "aliases": [
+      "NEC V260",
+      "V260",
+      "Проектор NEC V260"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP 15-af000ur",
+    "brand": "HP",
+    "model": "15-af000ur",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      24
+    ],
+    "source_titles": [
+      "Ноутбук HP 15-af000ur E1-6015/4GB/500GB"
+    ],
+    "aliases": [
+      "HP 15-af000ur",
+      "15-af000ur",
+      "Ноутбук HP 15-af000ur E1-6015/4GB/500GB"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP 630",
+    "brand": "HP",
+    "model": "630",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      30
+    ],
+    "source_titles": [
+      "Ноутбук HP 630 на запчасти"
+    ],
+    "aliases": [
+      "HP 630",
+      "Ноутбук HP 630",
+      "Ноутбук HP 630 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP EliteBook 840 G3",
+    "brand": "HP",
+    "model": "EliteBook 840 G3",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      33
+    ],
+    "source_titles": [
+      "Ноутбук HP EliteBook 840 G3 i5-6200U/Без озу и HDD"
+    ],
+    "aliases": [
+      "HP EliteBook 840 G3",
+      "EliteBook 840 G3",
+      "Ноутбук HP EliteBook 840 G3 i5-6200U/Без озу и HDD"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP ProBook 440 G6",
+    "brand": "HP",
+    "model": "ProBook 440 G6",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      34
+    ],
+    "source_titles": [
+      "Ноутбук HP ProBook 440 G6 7QK98ES#ACB на запчасти"
+    ],
+    "aliases": [
+      "HP ProBook 440 G6",
+      "ProBook 440 G6",
+      "Ноутбук HP ProBook 440 G6 7QK98ES#ACB на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP EliteBook 820 G3",
+    "brand": "HP",
+    "model": "EliteBook 820 G3",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      36
+    ],
+    "source_titles": [
+      "Ноутбук HP EliteBook 820 G3 i5-6300U/Без озу и HDD"
+    ],
+    "aliases": [
+      "HP EliteBook 820 G3",
+      "EliteBook 820 G3",
+      "Ноутбук HP EliteBook 820 G3 i5-6300U/Без озу и HDD"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP ProBook 440 G4",
+    "brand": "HP",
+    "model": "ProBook 440 G4",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      414
+    ],
+    "source_titles": [
+      "Ноутбук HP probook 440 g4 на запчасти"
+    ],
+    "aliases": [
+      "HP ProBook 440 G4",
+      "ProBook 440 G4",
+      "Ноутбук HP probook 440 g4 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP ProBook 4730s",
+    "brand": "HP",
+    "model": "ProBook 4730s",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      52
+    ],
+    "source_titles": [
+      "Ноутбук HP 4730s Core i5-2430M/8GB/ 250GB SSD"
+    ],
+    "aliases": [
+      "HP ProBook 4730s",
+      "HP 4730s",
+      "4730s",
+      "Ноутбук HP 4730s Core i5-2430M/8GB/ 250GB SSD"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Aspire 7739",
+    "brand": "Acer",
+    "model": "Aspire 7739",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      51
+    ],
+    "source_titles": [
+      "Ноутбук Acer 7739 aic70 на запчасти"
+    ],
+    "aliases": [
+      "Acer Aspire 7739",
+      "Acer 7739",
+      "7739",
+      "Ноутбук Acer 7739 aic70 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Aspire 5750",
+    "brand": "Acer",
+    "model": "Aspire 5750",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      338
+    ],
+    "source_titles": [
+      "Ноутбук Acer aspire 5750 на запчасти"
+    ],
+    "aliases": [
+      "Acer Aspire 5750",
+      "Aspire 5750",
+      "5750",
+      "Ноутбук Acer aspire 5750 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Aspire 5690",
+    "brand": "Acer",
+    "model": "Aspire 5690",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      31
+    ],
+    "source_titles": [
+      "Ноутбук Acer aspire 5690 под восстановление"
+    ],
+    "aliases": [
+      "Acer Aspire 5690",
+      "Aspire 5690",
+      "5690",
+      "Ноутбук Acer aspire 5690 под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Extensa 5620G",
+    "brand": "Acer",
+    "model": "Extensa 5620G",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      139
+    ],
+    "source_titles": [
+      "Acer 5620G Под восстановление"
+    ],
+    "aliases": [
+      "Acer Extensa 5620G",
+      "Acer 5620G",
+      "5620G",
+      "Acer 5620G Под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo IdeaPad G50-70",
+    "brand": "Lenovo",
+    "model": "IdeaPad G50-70",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      53
+    ],
+    "source_titles": [
+      "Ноутбук Lenovo g50-70 на запчасти"
+    ],
+    "aliases": [
+      "Lenovo IdeaPad G50-70",
+      "Lenovo g50-70",
+      "G50-70",
+      "Ноутбук Lenovo g50-70 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo IdeaPad G580",
+    "brand": "Lenovo",
+    "model": "IdeaPad G580",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      327
+    ],
+    "source_titles": [
+      "Ноутбук Lenovo g580 Celeron/4gb/250gb hdd"
+    ],
+    "aliases": [
+      "Lenovo IdeaPad G580",
+      "Lenovo g580",
+      "G580",
+      "Ноутбук Lenovo g580 Celeron/4gb/250gb hdd"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo B50-30",
+    "brand": "Lenovo",
+    "model": "B50-30",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      340,
+      346,
+      372
+    ],
+    "source_titles": [
+      "Ноутбук Lenovo b50-30 на запчасти",
+      "Ноутбук Lenovo B50 / Celeron/ 8gb/ 320 hdd",
+      "Ноутбук Lenovo B50-30/Celeron N2830/8gb/320hdd"
+    ],
+    "aliases": [
+      "Lenovo B50-30",
+      "Lenovo b50-30",
+      "Lenovo B50",
+      "B50-30",
+      "Ноутбук Lenovo b50-30 на запчасти",
+      "Ноутбук Lenovo B50 / Celeron/ 8gb/ 320 hdd",
+      "Ноутбук Lenovo B50-30/Celeron N2830/8gb/320hdd"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 3 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Toshiba Satellite L850-E8S",
+    "brand": "Toshiba",
+    "model": "Satellite L850-E8S",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      59
+    ],
+    "source_titles": [
+      "Ноутбук Toshiba satellite l850-e8s на запчасти"
+    ],
+    "aliases": [
+      "Toshiba Satellite L850-E8S",
+      "Toshiba satellite l850-e8s",
+      "L850-E8S",
+      "Ноутбук Toshiba satellite l850-e8s на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Toshiba Satellite Pro L300",
+    "brand": "Toshiba",
+    "model": "Satellite Pro L300",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      100
+    ],
+    "source_titles": [
+      "Ноутбук Toshiba satellite pro l300 на запчасти"
+    ],
+    "aliases": [
+      "Toshiba Satellite Pro L300",
+      "Toshiba satellite pro l300",
+      "Satellite Pro L300",
+      "Ноутбук Toshiba satellite pro l300 на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Huawei MateBook B3-510",
+    "brand": "Huawei",
+    "model": "MateBook B3-510",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      419
+    ],
+    "source_titles": [
+      "Ноутбук На запчасти Huawei matebook B3-510 BBz-wbi"
+    ],
+    "aliases": [
+      "Huawei MateBook B3-510",
+      "Huawei matebook B3-510",
+      "MateBook B3-510",
+      "Ноутбук На запчасти Huawei matebook B3-510 BBz-wbi"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Krez Ninja TM1102B32",
+    "brand": "Krez",
+    "model": "Ninja TM1102B32",
+    "category": "Ноутбуки",
+    "source_product_ids": [
+      78,
+      220
+    ],
+    "source_titles": [
+      "11.6\" krez Ninja TM1102B32, Atom x5,RAM2 гб,32гб",
+      "Нетбуки KRez tn 1102 b32 под восстановление"
+    ],
+    "aliases": [
+      "Krez Ninja TM1102B32",
+      "krez Ninja TM1102B32",
+      "KRez tn 1102 b32",
+      "TM1102B32",
+      "11.6\" krez Ninja TM1102B32, Atom x5,RAM2 гб,32гб",
+      "Нетбуки KRez tn 1102 b32 под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Extensa X2610G",
+    "brand": "Acer",
+    "model": "Extensa X2610G",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      37
+    ],
+    "source_titles": [
+      "Системный блок Acer extends x2610G / 4 gb / 320 hd"
+    ],
+    "aliases": [
+      "Acer Extensa X2610G",
+      "Acer extends x2610G",
+      "Extensa X2610G",
+      "X2610G",
+      "Системный блок Acer extends x2610G / 4 gb / 320 hd"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Veriton X2640G",
+    "brand": "Acer",
+    "model": "Veriton X2640G",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      183
+    ],
+    "source_titles": [
+      "Системный Блок acer Veriton x2640g под сборку"
+    ],
+    "aliases": [
+      "Acer Veriton X2640G",
+      "acer Veriton x2640g",
+      "Veriton X2640G",
+      "X2640G",
+      "Системный Блок acer Veriton x2640g под сборку"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Acer Aspire Z5761",
+    "brand": "Acer",
+    "model": "Aspire Z5761",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      339
+    ],
+    "source_titles": [
+      "Моноблок Acer z5761 на запчасти или под ремонт"
+    ],
+    "aliases": [
+      "Acer Aspire Z5761",
+      "Acer z5761",
+      "Z5761",
+      "Моноблок Acer z5761 на запчасти или под ремонт"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo ThinkCentre M72e",
+    "brand": "Lenovo",
+    "model": "ThinkCentre M72e",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      65
+    ],
+    "source_titles": [
+      "Lenovo M72E Неттоп/ Pentium/4gb/250hdd"
+    ],
+    "aliases": [
+      "Lenovo ThinkCentre M72e",
+      "Lenovo M72E",
+      "M72e",
+      "Lenovo M72E Неттоп/ Pentium/4gb/250hdd"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo IdeaCentre C340",
+    "brand": "Lenovo",
+    "model": "IdeaCentre C340",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      44
+    ],
+    "source_titles": [
+      "Моноблок Lenovo C340 i5-3470/8gb/128gbSSD/gt615"
+    ],
+    "aliases": [
+      "Lenovo IdeaCentre C340",
+      "Lenovo C340",
+      "C340",
+      "Моноблок Lenovo C340 i5-3470/8gb/128gbSSD/gt615"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo ThinkCentre M715s",
+    "brand": "Lenovo",
+    "model": "ThinkCentre M715s",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      321,
+      361
+    ],
+    "source_titles": [
+      "Системный блок lenovo 715s a8-8670e/8gb/240gb ssd",
+      "Системный блок lenovo 715s A8-8670E под сборку"
+    ],
+    "aliases": [
+      "Lenovo ThinkCentre M715s",
+      "lenovo 715s",
+      "M715s",
+      "715s",
+      "Системный блок lenovo 715s a8-8670e/8gb/240gb ssd",
+      "Системный блок lenovo 715s A8-8670E под сборку"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo ThinkCentre M72z",
+    "brand": "Lenovo",
+    "model": "ThinkCentre M72z",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      409
+    ],
+    "source_titles": [
+      "Моноблок Lenovo m72z на запчасти"
+    ],
+    "aliases": [
+      "Lenovo ThinkCentre M72z",
+      "Lenovo m72z",
+      "M72z",
+      "Моноблок Lenovo m72z на запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Lenovo ThinkCentre S40-40",
+    "brand": "Lenovo",
+    "model": "ThinkCentre S40-40",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      128
+    ],
+    "source_titles": [
+      "Моноблок Lenovo S40-40 Пож восстановление"
+    ],
+    "aliases": [
+      "Lenovo ThinkCentre S40-40",
+      "Lenovo S40-40",
+      "S40-40",
+      "Моноблок Lenovo S40-40 Пож восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP Compaq Pro 6300",
+    "brand": "HP",
+    "model": "Compaq Pro 6300",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      129
+    ],
+    "source_titles": [
+      "Моноблок HP Pro 6300 под восстановление"
+    ],
+    "aliases": [
+      "HP Compaq Pro 6300",
+      "HP Pro 6300",
+      "Pro 6300",
+      "Моноблок HP Pro 6300 под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP Compaq Pro 7320",
+    "brand": "HP",
+    "model": "Compaq Pro 7320",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      130
+    ],
+    "source_titles": [
+      "Моноблок HP 7320 Под восстановление"
+    ],
+    "aliases": [
+      "HP Compaq Pro 7320",
+      "HP 7320",
+      "7320",
+      "Моноблок HP 7320 Под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP Pavilion 200",
+    "brand": "HP",
+    "model": "Pavilion 200",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      135
+    ],
+    "source_titles": [
+      "Моноблок HP Pavilion 200 PC / Под восстановление"
+    ],
+    "aliases": [
+      "HP Pavilion 200",
+      "HP Pavilion 200 PC",
+      "Pavilion 200",
+      "Моноблок HP Pavilion 200 PC / Под восстановление"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Aquarius Pro P30T 42",
+    "brand": "Aquarius",
+    "model": "Pro P30T 42",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      136
+    ],
+    "source_titles": [
+      "Aquarius моноблок Pro P30T 42 На запчасти"
+    ],
+    "aliases": [
+      "Aquarius Pro P30T 42",
+      "Aquarius моноблок Pro P30T 42",
+      "Pro P30T 42",
+      "Aquarius моноблок Pro P30T 42 На запчасти"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Zebra CC600",
+    "brand": "Zebra",
+    "model": "CC600",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      47,
+      205
+    ],
+    "source_titles": [
+      "Информационный киоск Zebra CC600",
+      "Zebra cc600"
+    ],
+    "aliases": [
+      "Zebra CC600",
+      "Zebra cc600",
+      "CC600",
+      "Информационный киоск Zebra CC600"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Bluebird VF550",
+    "brand": "Bluebird",
+    "model": "VF550",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      101,
+      201,
+      206
+    ],
+    "source_titles": [
+      "Тсд bluebird vf550",
+      "Тсд bluebird f550"
+    ],
+    "aliases": [
+      "Bluebird VF550",
+      "bluebird vf550",
+      "bluebird f550",
+      "VF550",
+      "Тсд bluebird vf550",
+      "Тсд bluebird f550"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 3 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Bluebird EF501",
+    "brand": "Bluebird",
+    "model": "EF501",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      9
+    ],
+    "source_titles": [
+      "Тсд bluebird ef501r"
+    ],
+    "aliases": [
+      "Bluebird EF501",
+      "bluebird ef501r",
+      "Bluebird 501",
+      "EF501",
+      "Тсд bluebird ef501r"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Cisco Catalyst WS-C2960-24",
+    "brand": "Cisco",
+    "model": "Catalyst WS-C2960-24",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      99
+    ],
+    "source_titles": [
+      "Коммутатор Cisco Ws-C2960 24 порта"
+    ],
+    "aliases": [
+      "Cisco Catalyst WS-C2960-24",
+      "Cisco Ws-C2960 24",
+      "WS-C2960-24",
+      "Коммутатор Cisco Ws-C2960 24 порта"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "3Com Baseline Switch 2250 Plus",
+    "brand": "3Com",
+    "model": "Baseline Switch 2250 Plus",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      83
+    ],
+    "source_titles": [
+      "Коммутатор 3Com Baseline Switch 2250 Plus"
+    ],
+    "aliases": [
+      "3Com Baseline Switch 2250 Plus",
+      "Baseline Switch 2250 Plus",
+      "Коммутатор 3Com Baseline Switch 2250 Plus"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "HP 3600-48-PoE+ v2 SI (JG307C)",
+    "brand": "HP",
+    "model": "3600-48-PoE+ v2 SI (JG307C)",
+    "category": "Компьютеры",
+    "source_product_ids": [
+      93
+    ],
+    "source_titles": [
+      "Коммутатор HP 3600-48-PoE+ v2 SI JG307C 48x10/100"
+    ],
+    "aliases": [
+      "HP 3600-48-PoE+ v2 SI JG307C",
+      "HP JG307C",
+      "JG307C",
+      "HP 3600-48-PoE+ v2 SI (JG307C)",
+      "Коммутатор HP 3600-48-PoE+ v2 SI JG307C 48x10/100"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "CyberPower BR700ELCD",
+    "brand": "CyberPower",
+    "model": "BR700ELCD",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      96
+    ],
+    "source_titles": [
+      "Ибп CyberPower BR700elcd 420Вт живая батарея"
+    ],
+    "aliases": [
+      "CyberPower BR700ELCD",
+      "CyberPower BR700elcd",
+      "BR700ELCD",
+      "Ибп CyberPower BR700elcd 420Вт живая батарея"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "CyberPower BR700E",
+    "brand": "CyberPower",
+    "model": "BR700E",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      98
+    ],
+    "source_titles": [
+      "Ибп CyberPower BR700e живая батарея"
+    ],
+    "aliases": [
+      "CyberPower BR700E",
+      "CyberPower BR700e",
+      "BR700E",
+      "Ибп CyberPower BR700e живая батарея"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "APC Back-UPS 650",
+    "brand": "APC",
+    "model": "Back-UPS 650",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      97
+    ],
+    "source_titles": [
+      "Ибп APC back ups 650. Живая батарея"
+    ],
+    "aliases": [
+      "APC Back-UPS 650",
+      "APC back ups 650",
+      "Back-UPS 650",
+      "Ибп APC back ups 650. Живая батарея"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Chieftec APC-700C",
+    "brand": "Chieftec",
+    "model": "APC-700C",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      48
+    ],
+    "source_titles": [
+      "Блок питания Chieftec APC-700C"
+    ],
+    "aliases": [
+      "Chieftec APC-700C",
+      "APC-700C",
+      "Блок питания Chieftec APC-700C"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Intel Pentium G4500",
+    "brand": "Intel",
+    "model": "Pentium G4500",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      19,
+      353
+    ],
+    "source_titles": [
+      "Процессор Intel Pentium G4500",
+      "Процессор Pentium g4500 lga1151. Гарантия"
+    ],
+    "aliases": [
+      "Intel Pentium G4500",
+      "Pentium G4500",
+      "Pentium g4500",
+      "G4500",
+      "Процессор Intel Pentium G4500",
+      "Процессор Pentium g4500 lga1151. Гарантия"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Intel Xeon E3-1220",
+    "brand": "Intel",
+    "model": "Xeon E3-1220",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      21
+    ],
+    "source_titles": [
+      "Процессор Intel Xeon E3-1220"
+    ],
+    "aliases": [
+      "Intel Xeon E3-1220",
+      "Xeon E3-1220",
+      "Процессор Intel Xeon E3-1220"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Intel Xeon E3-1220 v5",
+    "brand": "Intel",
+    "model": "Xeon E3-1220 v5",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      73
+    ],
+    "source_titles": [
+      "Процессор Intel Xeon E3-1220 v5"
+    ],
+    "aliases": [
+      "Intel Xeon E3-1220 v5",
+      "Xeon E3-1220 v5",
+      "Xeon E3 1220 v5",
+      "Процессор Intel Xeon E3-1220 v5"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "Intel Xeon E3-1220 v6",
+    "brand": "Intel",
+    "model": "Xeon E3-1220 v6",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      75
+    ],
+    "source_titles": [
+      "Процессор Intel Xeon E3-1220 v6"
+    ],
+    "aliases": [
+      "Intel Xeon E3-1220 v6",
+      "Xeon E3-1220 v6",
+      "Xeon E3 1220 v6",
+      "Процессор Intel Xeon E3-1220 v6"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 1 local product(s)",
+    "confidence": 1.0
+  },
+  {
+    "proposed_canonical_name": "MSI A55M-P33",
+    "brand": "MSI",
+    "model": "A55M-P33",
+    "category": "Комплектующие",
+    "source_product_ids": [
+      62,
+      354
+    ],
+    "source_titles": [
+      "Материнская плата MSI A55M-P33. Гарантия",
+      "Материнская плата MSI A55M-P33. Авито доставка"
+    ],
+    "aliases": [
+      "MSI A55M-P33",
+      "A55M-P33",
+      "Материнская плата MSI A55M-P33. Гарантия",
+      "Материнская плата MSI A55M-P33. Авито доставка"
+    ],
+    "specifications": {},
+    "conflicts": [],
+    "decision": "auto_create",
+    "reason": "Identity verified from 2 local product(s)",
+    "confidence": 1.0
+  }
+]
