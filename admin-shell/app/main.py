@@ -2273,6 +2273,71 @@ async def api_mobile_sale_receipt(request: Request, sale_id: int):
     return receipt
 
 
+async def _fetch_canonical_sale_receipt_print(sale_id: int) -> bytes:
+    """
+    Fetch canonical sale receipt print document (PDF) strictly from Core HTTP API.
+    Reuses existing Core calculation without parallel business logic.
+    Does NOT access Core DB directly.
+    Returns 404 on sale not found, and 502/503/504 on Core failure or timeout.
+    """
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/sales/{sale_id}/receipt/print"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return resp.content
+            elif resp.status_code == 404:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Sale {sale_id} not found",
+                )
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API service unavailable (upstream status {resp.status_code})",
+                )
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Core API returned error status {resp.status_code}",
+                )
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Core API request timed out",
+        )
+    except (httpx.ConnectError, httpx.RequestError) as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core API connection failed: {str(e)}",
+        )
+
+
+@app.get("/api/mobile/sales/{sale_id}/receipt/print")
+async def api_mobile_sale_receipt_print(request: Request, sale_id: int):
+    """
+    Mobile Sale Receipt Print document endpoint protected by TRMOBILE1 PoP.
+    Strictly enforces TRMOBILE1 PoP authentication.
+    Path tampering (sale_id changed) causes signature verification failure.
+    Returns application/pdf print document.
+    """
+    ctx = await _get_mobile_auth(request)
+    pdf_bytes = await _fetch_canonical_sale_receipt_print(sale_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="receipt_{sale_id}.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
+
+
 # =====================================================================
 # STAGE 04A: MOBILE POS BARCODE LOOKUP API
 # =====================================================================

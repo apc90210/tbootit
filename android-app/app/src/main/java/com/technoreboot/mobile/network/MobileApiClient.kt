@@ -306,6 +306,129 @@ class MobileApiClient(
     }
 
     /**
+     * Downloads the canonical receipt PDF for printing via /api/mobile/sales/{saleId}/receipt/print
+     * protected by TRMOBILE1 PoP authentication.
+     * Streams directly to destinationFile in private cache.
+     */
+    suspend fun downloadReceiptPrintPdf(
+        saleId: Int,
+        credentialId: String,
+        privateKey: PrivateKey,
+        destinationFile: File
+    ): ApiResult<File> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            val msg = if (err.code == 403) {
+                if (err.message.contains("устройств", ignoreCase = true) || err.message.contains("device", ignoreCase = true)) {
+                    "Доступ этого устройства отозван"
+                } else {
+                    "Доступ отозван"
+                }
+            } else {
+                err.message
+            }
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = msg,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/sales/$saleId/receipt/print"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        try {
+            destinationFile.parentFile?.mkdirs()
+            val tempFile = File(destinationFile.parentFile, "${destinationFile.name}.tmp")
+            if (tempFile.exists()) tempFile.delete()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val bodyStr = response.body?.string().orEmpty()
+                    val userMessage = try {
+                        val errJson = JSONObject(bodyStr)
+                        val detail = errJson.optString("detail", "")
+                        if (response.code == 403) {
+                            if (detail.contains("устройств", ignoreCase = true) || detail.contains("device", ignoreCase = true)) {
+                                "Доступ этого устройства отозван"
+                            } else {
+                                "Доступ отозван"
+                            }
+                        } else {
+                            detail.ifBlank { "Ошибка скачивания чека (${response.code})" }
+                        }
+                    } catch (_: Exception) {
+                        when (response.code) {
+                            404 -> "Чек не найден на сервере"
+                            401 -> "Ошибка авторизации (PoP)"
+                            403 -> "Доступ запрещён"
+                            else -> "Ошибка скачивания чека (${response.code})"
+                        }
+                    }
+                    return@withContext ApiResult.Error(response.code, userMessage)
+                }
+
+                val responseBody = response.body ?: return@withContext ApiResult.Error(500, "Пустой ответ сервера")
+                responseBody.byteStream().use { inputStream ->
+                    tempFile.outputStream().use { outputStream ->
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                        }
+                        outputStream.flush()
+                    }
+                }
+
+                if (destinationFile.exists()) {
+                    destinationFile.delete()
+                }
+                if (!tempFile.renameTo(destinationFile)) {
+                    tempFile.copyTo(destinationFile, overwrite = true)
+                    tempFile.delete()
+                }
+
+                ApiResult.Success(destinationFile)
+            }
+        } catch (e: SSLException) {
+            ApiResult.Error(0, "Ошибка безопасности TLS: сертификат сервера не подтверждён", isNetworkError = true)
+        } catch (e: IOException) {
+            ApiResult.Error(0, "Ошибка сети при скачивании чека: ${e.message ?: "соединение разорвано"}", isNetworkError = true)
+        } catch (e: Exception) {
+            ApiResult.Error(0, "Ошибка при скачивании чека: ${e.message ?: "неизвестная ошибка"}")
+        }
+    }
+
+    /**
      * Looks up product by barcode via /api/mobile/products/by-barcode/{barcode}
      * protected by TRMOBILE1 PoP authentication.
      */
