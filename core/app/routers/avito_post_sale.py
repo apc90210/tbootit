@@ -41,25 +41,18 @@ def _is_safe_avito_url(url: Optional[str]) -> bool:
         return False
 
 
-def _canonical_avito_url(listing_url: Optional[str], avito_listing_id: Optional[str]) -> Optional[str]:
+def _canonical_avito_url(listing_url: Optional[str], avito_listing_id: Optional[str] = None) -> Optional[str]:
     """
-    Preferred source order per Stage 04D R2:
+    Preferred source order per Stage 04D R2B:
     1. Immutable snapshot / stored listing URL if it is a valid HTTPS Avito URL;
-    2. Fallback to existing project URL builder https://www.avito.ru/{avito_listing_id} when listing_url is absent;
+    2. Otherwise None. Do NOT synthesize https://www.avito.ru/{id} unless a proven tested resolver exists.
     If listing_url is provided but unsafe/malformed (e.g. non-HTTPS, non-Avito domain, or invalid path),
     do NOT return the unsafe URL and return None.
     """
-    if listing_url:
-        if _is_safe_avito_url(listing_url):
-            return listing_url.strip()
-        return None
-
-    if avito_listing_id:
-        clean_id = str(avito_listing_id).strip()
-        if clean_id and not any(c in clean_id for c in "/?#&\\ \t\r\n"):
-            return f"https://www.avito.ru/{clean_id}"
-
+    if listing_url and _is_safe_avito_url(listing_url):
+        return listing_url.strip()
     return None
+
 
 
 def _enrich_task(task: models.AvitoPostSaleTask, db: Session) -> Dict[str, Any]:
@@ -215,7 +208,7 @@ def get_sale_avito_handoff(sale_id: int, db: Session = Depends(get_db)):
             avito_item_id = str(item.avito_item_id).strip()
             source_of_linkage = "sale_snapshot"
             raw_url = getattr(item, "avito_listing_url", None)
-            listing_url = _canonical_avito_url(raw_url, avito_item_id)
+            listing_url = _canonical_avito_url(raw_url)
 
             # Informational status from product listing if still present
             if item.product_id:
@@ -224,8 +217,11 @@ def get_sale_avito_handoff(sale_id: int, db: Session = Depends(get_db)):
                     models.ProductExternalListing.marketplace == "avito",
                     models.ProductExternalListing.external_item_id == avito_item_id
                 ).first()
-                if ext and ext.remote_status:
-                    remote_status = ext.remote_status
+                if ext:
+                    if ext.remote_status:
+                        remote_status = ext.remote_status
+                    if not listing_url and ext.external_url:
+                        listing_url = _canonical_avito_url(ext.external_url)
 
         # 2. Fallback to current canonical product mapping for legacy receipts
         elif item.product_id and prod:
@@ -242,14 +238,15 @@ def get_sale_avito_handoff(sale_id: int, db: Session = Depends(get_db)):
                 avito_item_id = str(ext.external_item_id).strip()
                 source_of_linkage = "current_product_mapping"
                 remote_status = ext.remote_status or "active"
-                listing_url = _canonical_avito_url(ext.external_url, avito_item_id)
+                listing_url = _canonical_avito_url(ext.external_url)
             elif prod.sku and str(prod.sku).startswith("AVITO-"):
                 candidate_id = str(prod.sku)[len("AVITO-"):].strip()
                 if candidate_id:
                     avito_item_id = candidate_id
                     source_of_linkage = "current_product_mapping"
                     remote_status = "active"
-                    listing_url = _canonical_avito_url(None, candidate_id)
+                    listing_url = None
+
 
         # If no reliable Avito item reference determined, omit action
         if not avito_item_id:

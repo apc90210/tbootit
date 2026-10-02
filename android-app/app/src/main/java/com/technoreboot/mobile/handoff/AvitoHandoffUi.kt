@@ -90,7 +90,14 @@ fun AvitoHandoffCard(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Снять с Авито")
                         }
+                    } else {
+                        Text(
+                            text = "Ссылка на объявление недоступна",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
                     }
+
                 }
             }
         }

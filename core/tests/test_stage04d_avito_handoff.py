@@ -213,6 +213,45 @@ def setup_stage04d_data():
         )
         db.add(listing7)
 
+        # Product 8: External listing with MISSING/NULL external_url (ID-only)
+        p8 = models.Product(
+            title="Тестовый Товар С Авито Без URL",
+            sku="SKU-STAGE04D-08",
+            barcode="4600000004088",
+            sale_price=5000.0,
+            quantity=2,
+            status="in_stock",
+            storage_location="store"
+        )
+        db.add(p8)
+        db.flush()
+        created_product_ids.append(p8.id)
+
+        listing8 = models.ProductExternalListing(
+            product_id=p8.id,
+            marketplace="avito",
+            external_account_key="acc1",
+            external_item_id="9000000008",
+            external_url=None,
+            remote_status="active",
+            sync_state="synced"
+        )
+        db.add(listing8)
+
+        # Product 9: No external listing row, but has AVITO-<id> SKU convention
+        p9 = models.Product(
+            title="Тестовый Товар С Артикулом AVITO В SKU",
+            sku="AVITO-9000000009",
+            barcode="4600000004099",
+            sale_price=7500.0,
+            quantity=1,
+            status="in_stock",
+            storage_location="store"
+        )
+        db.add(p9)
+        db.flush()
+        created_product_ids.append(p9.id)
+
         # Sale 1: Only product 1 (active listing + stock 0)
         s1 = models.Sale(total_amount=15000.0, payment_method="cash", status="completed")
         db.add(s1)
@@ -265,6 +304,29 @@ def setup_stage04d_data():
         created_sale_ids.append(s6.id)
         db.add(models.SaleItem(sale_id=s6.id, product_id=p6.id, title=p6.title, quantity=1, price=1000.0))
 
+        # Sale 7: Legacy mapping ID + missing external_url (ID-only)
+        s7 = models.Sale(total_amount=5000.0, payment_method="cash", status="completed")
+        db.add(s7)
+        db.flush()
+        created_sale_ids.append(s7.id)
+        db.add(models.SaleItem(sale_id=s7.id, product_id=p8.id, title=p8.title, quantity=1, price=5000.0))
+
+        # Sale 8: Legacy ID via AVITO-<id> SKU + no listing
+        s8 = models.Sale(total_amount=7500.0, payment_method="card", status="completed")
+        db.add(s8)
+        db.flush()
+        created_sale_ids.append(s8.id)
+        db.add(models.SaleItem(sale_id=s8.id, product_id=p9.id, title=p9.title, quantity=1, price=7500.0))
+
+        # Sale 9: Multi-item mixed sale (p1: clickable, p8: ID-only, p2: non-Avito)
+        s9 = models.Sale(total_amount=22000.0, payment_method="card", status="completed")
+        db.add(s9)
+        db.flush()
+        created_sale_ids.append(s9.id)
+        db.add(models.SaleItem(sale_id=s9.id, product_id=p1.id, title=p1.title, quantity=1, price=15000.0))
+        db.add(models.SaleItem(sale_id=s9.id, product_id=p8.id, title=p8.title, quantity=1, price=5000.0))
+        db.add(models.SaleItem(sale_id=s9.id, product_id=p2.id, title=p2.title, quantity=1, price=2000.0))
+
         db.commit()
 
         yield {
@@ -275,6 +337,8 @@ def setup_stage04d_data():
             "p5_id": p5.id,
             "p6_id": p6.id,
             "p7_id": p7.id,
+            "p8_id": p8.id,
+            "p9_id": p9.id,
             "s1_id": s1.id,
             "s2_id": s2.id,
             "s3_id": s3.id,
@@ -282,15 +346,20 @@ def setup_stage04d_data():
             "s4b_id": s4b.id,
             "s5_id": s5.id,
             "s6_id": s6.id,
+            "s7_id": s7.id,
+            "s8_id": s8.id,
+            "s9_id": s9.id,
             "listing1_url": listing1.external_url,
             "listing1_id": listing1.external_item_id,
             "listing3_id": listing3.external_item_id,
             "listing4_id": listing4.external_item_id,
             "listing5_id": listing5.external_item_id,
             "listing6_id": listing6.external_item_id,
+            "listing8_id": listing8.external_item_id,
             "created_sale_ids": created_sale_ids,
             "created_product_ids": created_product_ids
         }
+
 
     finally:
         try:
@@ -627,3 +696,128 @@ def test_15_no_sale_stock_or_listing_mutation(setup_stage04d_data, monkeypatch):
 
     finally:
         db.close()
+
+
+def test_16_snapshot_id_with_no_url_article_visible_not_clickable(setup_stage04d_data):
+    """
+    Stage 04D R2B (1 & 2):
+    Snapshot ID + no URL -> article visible, can_open_avito = False, listing_url = "".
+    """
+    db = SessionLocal()
+    p1_id = setup_stage04d_data["p1_id"]
+    try:
+        # Create sale item directly with snapshot item ID but NO URL
+        s_custom = models.Sale(total_amount=5000.0, payment_method="cash", status="completed")
+        db.add(s_custom)
+        db.flush()
+        setup_stage04d_data["created_sale_ids"].append(s_custom.id)
+
+        db.add(models.SaleItem(
+            sale_id=s_custom.id,
+            product_id=p1_id,
+            title="Товар Со Снапшотом Без URL",
+            quantity=1,
+            price=5000.0,
+            avito_item_id="999888777",
+            avito_listing_url=None
+        ))
+        db.commit()
+
+        resp = client.get(f"/api/sales/{s_custom.id}/avito-handoff")
+        assert resp.status_code == 200
+        data = resp.json()
+
+        assert len(data["items"]) == 1
+        item = data["items"][0]
+        assert item["avito_item_id"] == "999888777"
+        assert item["can_open_avito"] is False
+        assert item["listing_url"] == "" or item["listing_url"] is None
+        assert item["source_of_linkage"] == "sale_snapshot"
+
+    finally:
+        db.close()
+
+
+def test_17_legacy_mapping_missing_external_url_article_visible_not_clickable(setup_stage04d_data):
+    """
+    Stage 04D R2B (3 & 4):
+    Legacy mapping ID + missing external_url -> article visible, not clickable.
+    Product 8 has external_item_id="9000000008", but external_url is NULL.
+    """
+    s7_id = setup_stage04d_data["s7_id"]
+    p8_id = setup_stage04d_data["p8_id"]
+
+    resp = client.get(f"/api/sales/{s7_id}/avito-handoff")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["product_id"] == p8_id
+    assert item["avito_item_id"] == "9000000008"
+    assert item["can_open_avito"] is False
+    assert item["listing_url"] == "" or item["listing_url"] is None
+    assert item["source_of_linkage"] == "current_product_mapping"
+
+
+def test_18_no_synthetic_url_fallback_remains(setup_stage04d_data):
+    """
+    Stage 04D R2B (10):
+    No synthetic https://www.avito.ru/{id} fallback remains.
+    Sale 8 has product 9 with SKU "AVITO-9000000009" and no external listing.
+    The response MUST return avito_item_id="9000000009", can_open_avito=False,
+    and MUST NOT synthesize "https://www.avito.ru/9000000009".
+    """
+    s8_id = setup_stage04d_data["s8_id"]
+    p9_id = setup_stage04d_data["p9_id"]
+
+    resp = client.get(f"/api/sales/{s8_id}/avito-handoff")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["product_id"] == p9_id
+    assert item["avito_item_id"] == "9000000009"
+    assert item["can_open_avito"] is False
+    assert item["listing_url"] != "https://www.avito.ru/9000000009"
+    assert item["listing_url"] == "" or item["listing_url"] is None
+
+
+def test_19_multi_item_mixed_clickable_id_only_non_avito(setup_stage04d_data):
+    """
+    Stage 04D R2B (9):
+    Multi-item mixed case:
+    - p1: clickable (active, valid URL)
+    - p8: ID-only (active, external_url is NULL)
+    - p2: non-Avito (no listing, standard SKU)
+    Expected: exactly 2 items returned.
+    - p1: can_open_avito=True, valid URL
+    - p8: can_open_avito=False, empty URL, avito_item_id="9000000008"
+    - p2: omitted
+    """
+    s9_id = setup_stage04d_data["s9_id"]
+    p1_id = setup_stage04d_data["p1_id"]
+    p8_id = setup_stage04d_data["p8_id"]
+
+    resp = client.get(f"/api/sales/{s9_id}/avito-handoff")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data["items"]) == 2
+    items_by_pid = {it["product_id"]: it for it in data["items"]}
+    assert p1_id in items_by_pid
+    assert p8_id in items_by_pid
+
+    # p1 is clickable
+    item1 = items_by_pid[p1_id]
+    assert item1["can_open_avito"] is True
+    assert item1["avito_item_id"] == "9000000001"
+    assert item1["listing_url"] == "https://www.avito.ru/ekaterinburg/orgtehnika/test_mfu_9000000001"
+
+    # p8 is ID-only
+    item8 = items_by_pid[p8_id]
+    assert item8["can_open_avito"] is False
+    assert item8["avito_item_id"] == "9000000008"
+    assert item8["listing_url"] == "" or item8["listing_url"] is None
+
