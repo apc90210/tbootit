@@ -414,6 +414,77 @@ def find_reference_candidates(
                         candidates.append(cand)
                         seen_model_ids.add(ref.id)
 
+        # -------------------------------------------------------------
+        # Candidate Search Fallback: Query matches alias or model token/substring
+        # (Unified canonical candidate search logic for search & intake)
+        # -------------------------------------------------------------
+        if ref.id not in seen_model_ids and len(title_norm) >= 2:
+            # A. Check aliases
+            best_alias_query: Optional[Tuple[str, float, float]] = None
+            for alias_obj in ref.aliases:
+                if active_only and not alias_obj.active:
+                    continue
+                a_norm = alias_obj.normalized_alias or normalize_for_matching(alias_obj.alias)
+                if not a_norm:
+                    continue
+                a_tokens = extract_tokens(a_norm)
+                if title_norm in a_tokens or has_token_boundary_phrase(title_norm, a_norm):
+                    # Exact token match in alias
+                    conf = 0.90
+                    score = 85.0 + len(title_norm)
+                    if best_alias_query is None or conf > best_alias_query[1]:
+                        best_alias_query = (alias_obj.alias, conf, score)
+                elif title_norm in a_norm:
+                    # Substring match in alias
+                    conf = 0.80
+                    score = 75.0 + len(title_norm)
+                    if best_alias_query is None or conf > best_alias_query[1]:
+                        best_alias_query = (alias_obj.alias, conf, score)
+
+            if best_alias_query:
+                candidates.append(MatchCandidate(
+                    reference_model_id=ref.id,
+                    canonical_name=ref.canonical_name,
+                    brand=ref.brand,
+                    model=ref.model,
+                    tier="tier1_alias_query_match",
+                    confidence=best_alias_query[1],
+                    matched_term=best_alias_query[0],
+                    score=best_alias_query[2],
+                    specificity=len(title_norm)
+                ))
+                seen_model_ids.add(ref.id)
+                continue
+
+            # B. Check model / canonical name tokens and substring
+            m_tokens = extract_tokens(ref_m_norm)
+            if title_norm in m_tokens or has_token_boundary_phrase(title_norm, ref_m_norm):
+                candidates.append(MatchCandidate(
+                    reference_model_id=ref.id,
+                    canonical_name=ref.canonical_name,
+                    brand=ref.brand,
+                    model=ref.model,
+                    tier="tier2_model_query_match",
+                    confidence=0.88,
+                    matched_term=ref.model,
+                    score=80.0 + len(title_norm),
+                    specificity=len(title_norm)
+                ))
+                seen_model_ids.add(ref.id)
+            elif title_norm in ref_m_norm or title_norm in ref_canon_norm:
+                candidates.append(MatchCandidate(
+                    reference_model_id=ref.id,
+                    canonical_name=ref.canonical_name,
+                    brand=ref.brand,
+                    model=ref.model,
+                    tier="tier2_model_query_match",
+                    confidence=0.75,
+                    matched_term=ref.model,
+                    score=70.0 + len(title_norm),
+                    specificity=len(title_norm)
+                ))
+                seen_model_ids.add(ref.id)
+
     # Sort candidates by score descending
     candidates.sort(key=lambda c: (c.confidence, c.specificity, c.score), reverse=True)
     return candidates

@@ -578,35 +578,21 @@ def quick_intake_product(
     if payload.quantity < 1:
         raise HTTPException(status_code=400, detail="Количество должно быть не менее 1")
 
-    ref: Optional[models.ProductReferenceModel] = None
+    ref_by_id: Optional[models.ProductReferenceModel] = None
     if payload.reference_model_id:
-        ref = db.query(models.ProductReferenceModel).filter(
+        ref_by_id = db.query(models.ProductReferenceModel).filter(
             models.ProductReferenceModel.id == payload.reference_model_id
         ).first()
 
     # Title resolution
     title = (payload.title or "").strip()
     if not title:
-        if ref:
-            title = ref.canonical_name
+        if ref_by_id:
+            title = ref_by_id.canonical_name
         elif payload.brand or payload.model:
             title = f"{payload.brand or ''} {payload.model or ''}".strip()
         else:
             title = "Товар без названия"
-
-    # Category resolution
-    cat_id = payload.category_id
-    if not cat_id and ref and ref.default_category_id:
-        cat_id = ref.default_category_id
-    if not cat_id:
-        cat_res = classify_product(title=title, description=ref.site_description if ref else None)
-        if cat_res and cat_res.category_slug:
-            matched_cat = db.query(models.Category).filter(models.Category.slug == cat_res.category_slug).first()
-            if matched_cat:
-                cat_id = matched_cat.id
-    if not cat_id:
-        def_cat = db.query(models.Category).first()
-        cat_id = def_cat.id if def_cat else None
 
     # SKU resolution
     sku = (payload.sku or "").strip()
@@ -627,35 +613,77 @@ def quick_intake_product(
         if existing_bc:
             raise HTTPException(status_code=409, detail=f"Товар со штрихкодом '{barcode}' уже существует")
 
-    brand = (payload.brand or (ref.brand if ref else None) or "").strip() or None
-    model = (payload.model or (ref.model if ref else None) or "").strip() or None
-
-    site_title = ref.site_title if ref and ref.site_title else title
-    site_description = ref.site_description if ref else None
-
+    # Product creation without separate manual prefill
+    # Pipeline: Android -> Core Product -> canonical matcher -> canonical Core Safe Enricher -> canonical Product
     db_product = models.Product(
         sku=sku,
         barcode=barcode,
         title=title,
-        category_id=cat_id,
-        brand=brand,
-        model=model,
+        category_id=payload.category_id,
+        brand=(payload.brand or "").strip() or None,
+        model=(payload.model or "").strip() or None,
         condition=payload.condition,
         notes=payload.notes,  # Item-specific notes strictly isolated on product
         sale_price=payload.sale_price,
         purchase_price=payload.purchase_price or 0.0,
         quantity=payload.quantity,
         status="in_stock",
-        reference_model_id=ref.id if ref else None,
-        reference_match_method="mobile_quick_intake" if ref else None,
-        reference_match_confidence=1.0 if ref else None,
-        reference_enriched_at=datetime.utcnow() if ref else None,
-        site_title=site_title,
-        site_description=site_description,
         source_origin="mobile_quick_intake",
     )
     db.add(db_product)
     db.flush()
+
+    # 1. Canonical Core Matcher
+    from app.services.product_reference_matcher import match_product
+    from app.services.product_reference_enricher import enrich_product_from_reference
+
+    m_res = match_product(
+        db=db,
+        title=db_product.title,
+        brand=db_product.brand,
+        model=db_product.model,
+        description=db_product.description,
+        active_only=True
+    )
+
+    ref_to_enrich: Optional[models.ProductReferenceModel] = None
+    match_method: str = "canonical_match"
+    match_conf: float = 1.0
+
+    if ref_by_id:
+        ref_to_enrich = ref_by_id
+        if m_res.matched and m_res.reference_model and m_res.reference_model.id == ref_by_id.id:
+            match_method = m_res.method or "canonical_match"
+            match_conf = m_res.confidence or 1.0
+        else:
+            match_method = "manual_selection"
+            match_conf = 1.0
+    elif m_res.matched and m_res.reference_model:
+        ref_to_enrich = m_res.reference_model
+        match_method = m_res.method or "canonical_match"
+        match_conf = m_res.confidence or 1.0
+
+    # 2. Canonical Core Safe Enricher (safe merge, provenance, preserving manual product values)
+    if ref_to_enrich:
+        enrich_product_from_reference(
+            db=db,
+            product=db_product,
+            reference=ref_to_enrich,
+            method=match_method,
+            confidence=match_conf,
+            apply=True
+        )
+
+    # Category fallback if still missing after enrichment
+    if not db_product.category_id:
+        cat_res = classify_product(title=db_product.title, description=db_product.site_description)
+        if cat_res and cat_res.category_slug:
+            matched_cat = db.query(models.Category).filter(models.Category.slug == cat_res.category_slug).first()
+            if matched_cat:
+                db_product.category_id = matched_cat.id
+    if not db_product.category_id:
+        def_cat = db.query(models.Category).first()
+        db_product.category_id = def_cat.id if def_cat else None
 
     # Handle photos
     photos_created = 0
@@ -724,7 +752,7 @@ def quick_intake_product(
             "price": payload.sale_price,
             "qty": payload.quantity,
             "notes": payload.notes,
-            "reference_model_id": ref.id if ref else None
+            "reference_model_id": db_product.reference_model_id
         }
     )
 
@@ -740,7 +768,7 @@ def quick_intake_product(
         condition=db_product.condition,
         notes=db_product.notes,
         reference_model_id=db_product.reference_model_id,
-        canonical_name=ref.canonical_name if ref else None,
+        canonical_name=ref_to_enrich.canonical_name if ref_to_enrich else None,
         category_id=db_product.category_id,
         photos_count=photos_created,
         main_photo_url=main_photo_url,
