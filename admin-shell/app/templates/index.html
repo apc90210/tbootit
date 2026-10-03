@@ -74,6 +74,7 @@
         <a href="/help/user-manual.pdf" class="nav-item" data-path="manual" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">📘 Инструкция</a>
         {% if is_owner %}
         <a href="/inventory/reservations" class="nav-item" data-path="reservations" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Заявки на резерв</a>
+        <a href="/reference/catalog" class="nav-item" data-path="reference-catalog" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Справочник моделей</a>
         <a href="/system/operations" class="nav-item" data-path="operations" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease; margin-left: auto;">Операции</a>
         <a href="/backups" class="nav-item" data-path="backups" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Резервные копии</a>
         <a href="/certificates" class="nav-item" data-path="certificates" style="color: #cbd5e1; text-decoration: none; padding: 6px 11px; border-radius: 4px; font-weight: 500; transition: all 0.15s ease;">Доступ (mTLS)</a>
@@ -107,6 +108,8 @@
             } else if (href === '/inventory/settings/organization' && (p.indexOf('/inventory/settings') === 0 || p.indexOf('/settings') === 0)) {
                 isActive = true;
             } else if (href === '/inventory/reservations' && p.indexOf('/inventory/reservations') === 0) {
+                isActive = true;
+            } else if (href === '/reference/catalog' && p.indexOf('/reference') === 0) {
                 isActive = true;
             } else if (href === '/system/operations' && p.indexOf('/system/operations') === 0) {
                 isActive = true;

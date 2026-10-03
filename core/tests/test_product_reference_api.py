@@ -297,3 +297,271 @@ def test_learn_from_product_api(db_session):
     assert prod.reference_model_id == data["id"]
     assert prod.reference_match_method in ("confirmed_product", "learned_from_product")
 
+
+def test_owner_model_meta():
+    """Ensure /meta returns brands, device_types, and categories for OWNER."""
+    resp = client.get("/api/product-reference/meta", headers=OWNER_HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "brands" in data
+    assert "device_types" in data
+    assert "categories" in data
+    assert isinstance(data["brands"], list)
+    assert isinstance(data["categories"], list)
+
+
+def test_owner_alias_patch_deactivate(db_session):
+    """Test OWNER can update alias active status and priority with audit logging."""
+    ref = db_session.query(ProductReferenceModel).filter_by(stable_key="test|alias-patch-model").first()
+    if not ref:
+        ref = ProductReferenceModel(
+            stable_key="test|alias-patch-model",
+            canonical_name="Test Alias Patch Model",
+            brand="TestBrand",
+            model="PatchModel",
+            device_type="printer"
+        )
+        db_session.add(ref)
+        db_session.commit()
+        db_session.refresh(ref)
+
+    alias = ProductReferenceAlias(
+        reference_model_id=ref.id,
+        alias="Test Alias To Toggle",
+        normalized_alias="test alias to toggle",
+        priority=100,
+        active=True
+    )
+    db_session.add(alias)
+    db_session.commit()
+    db_session.refresh(alias)
+
+    # 1. Deactivate alias
+    patch_resp = client.patch(
+        f"/api/product-reference/models/{ref.id}/aliases/{alias.id}",
+        json={"active": False, "priority": 50},
+        headers=OWNER_HEADERS
+    )
+    assert patch_resp.status_code == 200
+    res_data = patch_resp.json()
+    assert res_data["active"] is False
+    assert res_data["priority"] == 50
+
+    # 2. Reactivate alias
+    patch_resp2 = client.patch(
+        f"/api/product-reference/models/{ref.id}/aliases/{alias.id}",
+        json={"active": True},
+        headers=OWNER_HEADERS
+    )
+    assert patch_resp2.status_code == 200
+    assert patch_resp2.json()["active"] is True
+
+    # 3. Clean up
+    db_session.delete(alias)
+    db_session.delete(ref)
+    db_session.commit()
+
+
+def test_owner_linked_products_read_only(db_session):
+    """Test GET /models/{id}/products returns product instances and protects instance data."""
+    ref = db_session.query(ProductReferenceModel).filter_by(stable_key="test|linked-model-01").first()
+    if not ref:
+        ref = ProductReferenceModel(
+            stable_key="test|linked-model-01",
+            canonical_name="Test Linked Model 01",
+            brand="TestBrand",
+            model="Linked 01",
+            device_type="printer"
+        )
+        db_session.add(ref)
+        db_session.commit()
+        db_session.refresh(ref)
+
+    # Create product linked to ref
+    p = Product(
+        title="Тестовый связанный экземпляр",
+        sku="TEST-LINKED-PROD-01",
+        reference_model_id=ref.id,
+        reference_match_method="test_fixture",
+        reference_match_confidence=1.0,
+        sale_price=15000,
+        status="in_stock"
+    )
+    db_session.add(p)
+    db_session.commit()
+    db_session.refresh(p)
+
+    resp = client.get(f"/api/product-reference/models/{ref.id}/products", headers=OWNER_HEADERS)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert any(item["id"] == p.id for item in items)
+    matched_item = next(item for item in items if item["id"] == p.id)
+    assert matched_item["title"] == "Тестовый связанный экземпляр"
+    assert matched_item["sale_price"] == 15000.0
+
+    # Clean up
+    db_session.delete(p)
+    db_session.delete(ref)
+    db_session.commit()
+
+
+def test_owner_product_link_and_unlink(db_session):
+    """Test linking a product to a reference model and unlinking (rejecting) with audit logging."""
+    ref = db_session.query(ProductReferenceModel).filter_by(stable_key="test|link-unlink-model").first()
+    if not ref:
+        ref = ProductReferenceModel(
+            stable_key="test|link-unlink-model",
+            canonical_name="Test Link Unlink Model",
+            brand="TestBrand",
+            model="LinkUnlink 01",
+            device_type="printer"
+        )
+        db_session.add(ref)
+        db_session.commit()
+        db_session.refresh(ref)
+
+    prod = Product(
+        title="Свободный товар для проверки привязки",
+        sku="TEST-FREE-PROD-01",
+        sale_price=8000
+    )
+    db_session.add(prod)
+    db_session.commit()
+    db_session.refresh(prod)
+    assert prod.reference_model_id is None
+
+    # 1. Link product
+    link_resp = client.post(
+        f"/api/product-reference/products/{prod.id}/link",
+        json={"reference_model_id": ref.id, "apply_enrichment": False},
+        headers=OWNER_HEADERS
+    )
+    assert link_resp.status_code == 200
+    assert link_resp.json()["success"] is True
+    assert link_resp.json()["reference_model_id"] == ref.id
+
+    db_session.refresh(prod)
+    assert prod.reference_model_id == ref.id
+    assert prod.reference_match_method == "manual_owner"
+    assert prod.reference_match_confidence == 1.0
+
+    # 2. Unlink product (reject match)
+    unlink_resp = client.post(
+        f"/api/product-reference/products/{prod.id}/unlink?reason=rejected_by_owner",
+        headers=OWNER_HEADERS
+    )
+    assert unlink_resp.status_code == 200
+    assert unlink_resp.json()["success"] is True
+
+    db_session.refresh(prod)
+    assert prod.reference_model_id is None
+    assert prod.reference_match_method == "rejected_by_owner"
+
+    # Clean up
+    db_session.delete(prod)
+    db_session.delete(ref)
+    db_session.commit()
+
+
+def test_owner_product_enrich_apply(db_session):
+    """Test re-running canonical Safe Enrichment for a linked product."""
+    ref = ProductReferenceModel(
+        stable_key="test-brand|enrich-apply-model",
+        canonical_name="Test Brand Enrich Model",
+        brand="TestBrand",
+        model="Enrich Model",
+        device_type="printer",
+        specifications_json=json.dumps({"Скорость": "20 стр/мин", "Формат": "A4"}, ensure_ascii=False)
+    )
+    db_session.add(ref)
+    db_session.flush()
+
+    prod = Product(
+        title="Принтер Test Brand Enrich Model б/у",
+        sku="TEST-ENRICH-APPLY-01",
+        reference_model_id=ref.id,
+        reference_match_method="manual_owner",
+        reference_match_confidence=1.0,
+        sale_price=9500
+    )
+    db_session.add(prod)
+    db_session.commit()
+
+    resp = client.post(f"/api/product-reference/products/{prod.id}/enrich-apply", headers=OWNER_HEADERS)
+    assert resp.status_code == 200
+    res_data = resp.json()
+    assert res_data["applied"] is True
+    assert "fields_filled" in res_data
+
+    # Clean up
+    db_session.delete(prod)
+    db_session.delete(ref)
+    db_session.commit()
+
+
+def test_owner_review_queue_and_conflict_resolution(db_session):
+    """Test GET /review-queue and POST /conflicts/resolve."""
+    # 1. Review queue endpoint
+    q_resp = client.get("/api/product-reference/review-queue", headers=OWNER_HEADERS)
+    assert q_resp.status_code == 200
+    q_data = q_resp.json()
+    assert "unresolved_products" in q_data
+    assert "conflicts" in q_data
+    assert "summary" in q_data
+    assert "total_products" in q_data["summary"]
+
+    # 2. Conflict resolution
+    # Create a test reference model with a conflict
+    ref = ProductReferenceModel(
+        stable_key="test-conflict|model-xyz",
+        canonical_name="Test Conflict Model XYZ",
+        brand="TestBrand",
+        model="XYZ",
+        specifications_json=json.dumps({"duplex": "Manual"}, ensure_ascii=False)
+    )
+    db_session.add(ref)
+    db_session.commit()
+
+    resolve_payload = {
+        "stable_key": "test-conflict|model-xyz",
+        "field": "duplex",
+        "resolved_value": "Automatic Duplex",
+        "note": "Owner manually confirmed duplex option"
+    }
+    r_resp = client.post("/api/product-reference/conflicts/resolve", json=resolve_payload, headers=OWNER_HEADERS)
+    assert r_resp.status_code == 200
+    r_data = r_resp.json()
+    assert r_data["success"] is True
+    assert r_data["resolved_value"] == "Automatic Duplex"
+
+    db_session.refresh(ref)
+    specs = json.loads(ref.specifications_json)
+    assert specs["duplex"] == "Automatic Duplex"
+    assert "Owner manually confirmed duplex option" in ref.source_note
+
+    # Clean up
+    db_session.delete(ref)
+    db_session.commit()
+
+
+def test_non_owner_forbidden_from_new_endpoints():
+    """Ensure non-owners are strictly rejected (403) from all owner mutation endpoints."""
+    endpoints = [
+        ("GET", "/api/product-reference/meta", None),
+        ("GET", "/api/product-reference/review-queue", None),
+        ("POST", "/api/product-reference/products/1/link", {"reference_model_id": 1}),
+        ("POST", "/api/product-reference/products/1/unlink", None),
+        ("POST", "/api/product-reference/products/1/enrich-apply", None),
+        ("POST", "/api/product-reference/conflicts/resolve", {"stable_key": "x", "field": "f", "resolved_value": "v"}),
+        ("PATCH", "/api/product-reference/models/1/aliases/1", {"active": False}),
+    ]
+    for method, path, json_data in endpoints:
+        if method == "GET":
+            resp = client.get(path, headers=NON_OWNER_HEADERS)
+        elif method == "POST":
+            resp = client.post(path, json=json_data, headers=NON_OWNER_HEADERS)
+        elif method == "PATCH":
+            resp = client.patch(path, json=json_data, headers=NON_OWNER_HEADERS)
+        assert resp.status_code == 403, f"Expected 403 for {method} {path}, got {resp.status_code}"
+
+

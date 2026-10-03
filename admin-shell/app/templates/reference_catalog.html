@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Техноребут — Справочник моделей и Review Queue</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --info: #0284c7;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            margin: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
+        nav.main-nav {
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 18px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            font-size: 0.92rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        nav.main-nav a {
+            color: #cbd5e1;
+            text-decoration: none;
+            padding: 6px 11px;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        nav.main-nav a:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.08);
+        }
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+        /* Dashboard KPI Cards */
+        .dashboard {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .kpi-card {
+            padding: 16px 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            flex: 1;
+            min-width: 160px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            border-top: 3px solid var(--primary);
+        }
+        .kpi-card h3 {
+            margin: 0 0 6px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi-card p {
+            margin: 0;
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .kpi-card small {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* Tabs */
+        .tabs-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 2px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -4px;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tab-btn:hover {
+            color: var(--primary);
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        .tab-count-badge {
+            background: #fee2e2;
+            color: #b91c1c;
+            border-radius: 10px;
+            padding: 1px 7px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        /* Section Cards */
+        .section-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 22px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .section-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 18px;
+            background: #f1f5f9;
+            padding: 12px 16px;
+            border-radius: 8px;
+        }
+        .filter-bar input, .filter-bar select {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.88rem;
+            background: #fff;
+        }
+        .filter-bar input[type="text"] {
+            min-width: 220px;
+            flex: 1;
+        }
+
+        /* Tables */
+        table.data-table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.88rem;
+        }
+        table.data-table th, table.data-table td {
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        table.data-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+        table.data-table tr:hover {
+            background: #f8fafc;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border-radius: 12px;
+        }
+        .badge-verified { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-review { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-conflict { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-info { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+        .badge-neutral { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+        /* Buttons */
+        .btn {
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+        }
+        .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary-hover); }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: #fff; color: #334155; border-color: #cbd5e1; }
+        .btn-secondary:hover { background: #f1f5f9; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { background: #15803d; }
+        .btn-danger { background: #fff; color: var(--danger); border-color: #fca5a5; }
+        .btn-danger:hover { background: #fee2e2; }
+        .btn-sm { padding: 4px 8px; font-size: 0.78rem; }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 900px;
+            width: 92%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 1px solid #cbd5e1;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .modal-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        /* Form elements */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .form-group label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.88rem;
+            font-family: inherit;
+        }
+        .form-group textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        /* Subsections in details */
+        .detail-subcard {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .detail-subcard-title {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Specs table */
+        .specs-kv-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+        .specs-kv-table th, .specs-kv-table td {
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+        }
+        .specs-kv-table th { background: #f1f5f9; }
+
+        /* Notification toast */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #0f172a;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 12px 18px;
+            position: fixed;
+            z-index: 1100;
+            right: 20px;
+            bottom: 20px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: visibility 0.2s, opacity 0.2s linear;
+            opacity: 0;
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <nav class="main-nav">
+        <a href="/" style="color: #fff; text-decoration: none; font-weight: 700; font-size: 1.05rem; margin-right: 8px; display: inline-flex; align-items: center; gap: 6px;">
+            <span style="background: #2563eb; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.5px;">TR</span>
+            Техноребут
+        </a>
+        <a href="/" class="nav-item" data-path="dashboard">Панель управления</a>
+        <a href="/inventory/products" class="nav-item" data-path="products">Товары</a>
+        <a href="/products/json" class="nav-item" data-path="products-json">JSON импорт / экспорт</a>
+        <a href="/inventory/sales" class="nav-item" data-path="sales">Продажи</a>
+        <a href="/inventory/cart" class="nav-item" data-path="cart">Корзина</a>
+        <a href="/inventory/reports/sales" class="nav-item" data-path="reports">Отчёты</a>
+        <a href="/repairs/repairs" class="nav-item" data-path="repairs">Ремонты</a>
+        <a href="/avito/extension" class="nav-item" data-path="avito">Расширение Avito</a>
+        <a href="/android" class="nav-item" data-path="android">Android-приложение</a>
+        <a href="/inventory/settings/organization" class="nav-item" data-path="settings">Настройки</a>
+        <a href="/help/user-manual.pdf" class="nav-item" data-path="manual">📘 Инструкция</a>
+        {% if is_owner %}
+        <a href="/inventory/reservations" class="nav-item" data-path="reservations">Заявки на резерв</a>
+        <a href="/reference/catalog" class="nav-item" data-path="reference-catalog" style="background: #2563eb; color: #fff; font-weight: 600;">Справочник моделей</a>
+        <a href="/system/operations" class="nav-item" data-path="operations" style="margin-left: auto;">Операции</a>
+        <a href="/backups" class="nav-item" data-path="backups">Резервные копии</a>
+        <a href="/certificates" class="nav-item" data-path="certificates">Доступ (mTLS)</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <!-- Dashboard Summary Header -->
+        <div class="dashboard">
+            <div class="kpi-card">
+                <h3>Всего моделей</h3>
+                <p id="kpi-total-models">-</p>
+                <small>В Core Reference Catalog</small>
+            </div>
+            <div class="kpi-card" style="border-top-color: var(--success);">
+                <h3>Верифицировано</h3>
+                <p id="kpi-verified-models" style="color: var(--success);">-</p>
+                <small>С полными спецификациями</small>
+            </div>
+            <div class="kpi-card" style="border-top-color: var(--warning);">
+                <h3>Неполные спеки</h3>
+                <p id="kpi-incomplete-models" style="color: var(--warning);">-</p>
+                <small>&lt; 5 характеристик</small>
+            </div>
+            <div class="kpi-card" style="border-top-color: var(--info);">
+                <h3>Связано товаров</h3>
+                <p id="kpi-linked-products" style="color: var(--info);">-</p>
+                <small id="kpi-linked-pct">- % склада</small>
+            </div>
+            <div class="kpi-card" style="border-top-color: var(--danger);">
+                <h3>Требуют проверки</h3>
+                <p id="kpi-review-queue" style="color: var(--danger);">-</p>
+                <small id="kpi-conflicts-sub">Конфликты & неразрешённые</small>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchTab('models-tab', this)">
+                📋 Справочник моделей
+            </button>
+            <button class="tab-btn" onclick="switchTab('review-tab', this)">
+                ⚠️ Требуют проверки
+                <span class="tab-count-badge" id="tab-review-badge" style="display: none;">0</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('create-tab', this)">
+                ➕ Новая модель
+            </button>
+            <button class="tab-btn" onclick="switchTab('import-export-tab', this)">
+                💾 Экспорт / Импорт JSON
+            </button>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 1: Models Catalog -->
+        <!-- ============================================================== -->
+        <div id="models-tab" class="tab-content">
+            <div class="section-card">
+                <div class="filter-bar">
+                    <input type="text" id="filter-search" placeholder="Поиск по модели, каноническому имени, синонимам..." onkeyup="if(event.key==='Enter') loadModels(0);">
+                    <select id="filter-brand" onchange="loadModels(0)">
+                        <option value="">Все бренды</option>
+                    </select>
+                    <select id="filter-category" onchange="loadModels(0)">
+                        <option value="">Все категории</option>
+                    </select>
+                    <select id="filter-status" onchange="loadModels(0)">
+                        <option value="">Все статусы</option>
+                        <option value="verified">Верифицированные</option>
+                        <option value="needs_review">Требуют проверки</option>
+                        <option value="conflict">С конфликтами</option>
+                    </select>
+                    <select id="filter-specs" onchange="loadModels(0)">
+                        <option value="">Все спецификации</option>
+                        <option value="incomplete">Неполные (&lt; 5 спек)</option>
+                        <option value="complete">Полные (&ge; 5 спек)</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="loadModels(0)">🔍 Найти</button>
+                    <button class="btn btn-secondary btn-sm" onclick="resetFilters()">Сбросить</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">ID</th>
+                                <th>Каноническое название</th>
+                                <th>Бренд / Модель</th>
+                                <th>Категория / Тип</th>
+                                <th style="text-align: center;">Синонимы</th>
+                                <th style="text-align: center;">Спецификации</th>
+                                <th style="text-align: center;">Верификация</th>
+                                <th style="text-align: center;">Связано</th>
+                                <th style="text-align: center;">Конфликт</th>
+                                <th style="width: 110px; text-align: center;">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="models-tbody">
+                            <tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">Загрузка моделей...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination">
+                    <span id="pagination-info">Показано 0 из 0</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary btn-sm" id="btn-prev-page" onclick="changePage(-1)" disabled>← Назад</button>
+                        <button class="btn btn-secondary btn-sm" id="btn-next-page" onclick="changePage(1)" disabled>Вперёд →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 2: Review Queue & Conflicts -->
+        <!-- ============================================================== -->
+        <div id="review-tab" class="tab-content" style="display: none;">
+            <!-- External Enrichment Conflicts -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title">⚠️ Спецификационные конфликты (External Conflicts)</h2>
+                    <span class="badge badge-conflict" id="conflicts-count-badge">0 конфликтов</span>
+                </div>
+                <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: -6px; margin-bottom: 16px;">
+                    Разногласия между проверенными внешними источниками и модификациями устройств. Для каждого конфликта указаны сравниваемые источники и точное поле.
+                </p>
+                <div id="conflicts-container">
+                    <p style="text-align: center; color: var(--text-muted); padding: 20px;">Загрузка конфликтов...</p>
+                </div>
+            </div>
+
+            <!-- Unresolved / Low Confidence Products -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title">❓ Товары, требующие подтверждения модели</h2>
+                    <span class="badge badge-review" id="unresolved-count-badge">0 товаров</span>
+                </div>
+                <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: -6px; margin-bottom: 16px;">
+                    Экземпляры товаров со склада без установленной связи со справочником моделей. Кандидаты ранжированы каноническим Core Matcher.
+                </p>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">ID</th>
+                                <th>Товар на складе</th>
+                                <th>Категория / Цена</th>
+                                <th>Рекомендованные кандидаты Core Matcher</th>
+                                <th style="width: 220px; text-align: center;">Действия владельца</th>
+                            </tr>
+                        </thead>
+                        <tbody id="review-tbody">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Загрузка очереди проверки...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 3: Create Reference Model -->
+        <!-- ============================================================== -->
+        <div id="create-tab" class="tab-content" style="display: none;">
+            <div class="section-card" style="max-width: 800px; margin: 0 auto;">
+                <h2 class="section-title" style="margin-bottom: 16px;">➕ Создание новой Reference Model</h2>
+                <form id="create-model-form" onsubmit="handleCreateModel(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Бренд (Brand) *</label>
+                            <input type="text" id="create-brand" required placeholder="например: HP">
+                        </div>
+                        <div class="form-group">
+                            <label>Модель (Model) *</label>
+                            <input type="text" id="create-model" required placeholder="например: LaserJet Pro 400 M401a">
+                        </div>
+                        <div class="form-group">
+                            <label>Каноническое название (Canonical Name)</label>
+                            <input type="text" id="create-canonical" placeholder="HP LaserJet Pro 400 M401a (по умолч. Бренд + Модель)">
+                        </div>
+                        <div class="form-group">
+                            <label>Тип устройства (Device Type)</label>
+                            <input type="text" id="create-device-type" placeholder="printer, mfp, laptop, monitor...">
+                        </div>
+                        <div class="form-group">
+                            <label>Категория по умолчанию</label>
+                            <select id="create-category"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Статус верификации</label>
+                            <select id="create-verification">
+                                <option value="verified">Verified (Проверено)</option>
+                                <option value="needs_review">Needs Review (Требует проверки)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label>Первичные синонимы (через запятую)</label>
+                        <input type="text" id="create-aliases" placeholder="LaserJet M401a, M401a, HP M401">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label>Спецификации (JSON или оставьте пустым)</label>
+                        <textarea id="create-specs" placeholder='{"technology": "лазерная", "color_mode": "монохромная", "max_format": "A4"}'></textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>Источник / Заметка о происхождении</label>
+                        <input type="text" id="create-source-note" placeholder="manual_owner_creation">
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="switchTab('models-tab', document.querySelector('.tab-btn'))">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Создать Reference Model</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB 4: Export / Import JSON -->
+        <!-- ============================================================== -->
+        <div id="import-export-tab" class="tab-content" style="display: none;">
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="section-card">
+                    <h2 class="section-title" style="margin-bottom: 12px;">📤 Экспорт Reference Catalog</h2>
+                    <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+                        Выгрузка эталонного справочника моделей в канонический формат JSON для резервного копирования или переноса.
+                    </p>
+                    <a href="/admin-api/product-reference/export" class="btn btn-primary" download="reference_catalog.json">
+                        💾 Скачать справочник (JSON)
+                    </a>
+                </div>
+
+                <div class="section-card">
+                    <h2 class="section-title" style="margin-bottom: 12px;">📥 Импорт Reference Catalog</h2>
+                    <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+                        Загрузка пакета моделей из JSON. Поддерживается тестовый прогон (Dry Run).
+                    </p>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>JSON текст</label>
+                        <textarea id="import-json-text" placeholder='{"version": 1, "models": [...]}' style="min-height: 120px; font-family: monospace; font-size: 0.8rem;"></textarea>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <label style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" id="import-dry-run" checked> Режим проверки (Dry Run)
+                        </label>
+                        <button class="btn btn-secondary" onclick="handleImportJson()">Импортировать</button>
+                    </div>
+                    <pre id="import-result" style="margin-top: 14px; background: #f1f5f9; padding: 10px; border-radius: 6px; font-size: 0.78rem; display: none;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL: Reference Model Details Card -->
+    <!-- ============================================================== -->
+    <div id="model-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title" id="modal-model-title">Карточка Reference Model</h2>
+                    <small id="modal-model-subtitle" style="color: var(--text-muted); font-family: monospace;"></small>
+                </div>
+                <button class="modal-close" onclick="closeModelModal()">&times;</button>
+            </div>
+
+            <!-- Identity Form -->
+            <div class="detail-subcard">
+                <div class="detail-subcard-title">
+                    <span>1. Канонические реквизиты модели</span>
+                    <span id="modal-verification-badge"></span>
+                </div>
+                <form id="model-edit-form" onsubmit="handleSaveModelIdentity(event)">
+                    <input type="hidden" id="edit-model-id">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Каноническое название *</label>
+                            <input type="text" id="edit-canonical-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Бренд *</label>
+                            <input type="text" id="edit-brand" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Модель *</label>
+                            <input type="text" id="edit-model" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Тип устройства</label>
+                            <input type="text" id="edit-device-type">
+                        </div>
+                        <div class="form-group">
+                            <label>Категория по умолчанию</label>
+                            <select id="edit-category"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Статус верификации</label>
+                            <select id="edit-verification-state">
+                                <option value="verified">Verified (Верифицировано)</option>
+                                <option value="needs_review">Needs Review (В проверке)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>Заголовок для сайта (Site Title)</label>
+                        <input type="text" id="edit-site-title">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>Описание для сайта (Site Description)</label>
+                        <textarea id="edit-site-description"></textarea>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Заметка о происхождении / источнике</label>
+                        <input type="text" id="edit-source-note">
+                    </div>
+
+                    <!-- External Source URLs -->
+                    <div id="modal-source-urls-box" style="margin-bottom: 14px; font-size: 0.85rem;">
+                        <label style="font-weight: 600; color: #475569;">Внешние источники / Datasheets:</label>
+                        <div id="modal-source-urls-list" style="margin-top: 4px;"></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button type="submit" class="btn btn-primary btn-sm">💾 Сохранить реквизиты</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Aliases Section -->
+            <div class="detail-subcard">
+                <div class="detail-subcard-title">
+                    <span>2. Синонимы и поисковые псевдонимы (Aliases)</span>
+                    <span class="badge badge-info" id="modal-aliases-count">0 синонимов</span>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <input type="text" id="new-alias-input" placeholder="Новый синоним (например: HP M401d)" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem;">
+                    <input type="number" id="new-alias-priority" value="100" title="Приоритет (100 = стандарт)" style="width: 70px; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="handleAddAlias()">+ Добавить</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="specs-kv-table" id="modal-aliases-table">
+                        <thead>
+                            <tr>
+                                <th>Алиас</th>
+                                <th>Нормализованный</th>
+                                <th style="width: 70px; text-align: center;">Приоритет</th>
+                                <th style="width: 90px; text-align: center;">Статус</th>
+                                <th style="width: 80px; text-align: center;">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-aliases-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Specifications Section -->
+            <div class="detail-subcard">
+                <div class="detail-subcard-title">
+                    <span>3. Технические характеристики (Specifications)</span>
+                    <span class="badge badge-info" id="modal-specs-count">0 характеристик</span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="specs-kv-table" id="modal-specs-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 35%;">Характеристика</th>
+                                <th style="width: 50%;">Значение</th>
+                                <th style="width: 15%; text-align: center;">Удалить</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-specs-tbody"></tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
+                    <input type="text" id="new-spec-key" placeholder="Новое поле (например: duplex)" style="flex: 1; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem;">
+                    <input type="text" id="new-spec-val" placeholder="Значение (например: автоматический)" style="flex: 1; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="handleAddSpecRow()">+ Добавить строку</button>
+                    <button class="btn btn-primary btn-sm" onclick="handleSaveSpecs()" style="margin-left: auto;">💾 Сохранить характеристики</button>
+                </div>
+            </div>
+
+            <!-- Conflicts Section (if any) -->
+            <div class="detail-subcard" id="modal-conflicts-subcard" style="display: none; border-left: 4px solid var(--danger);">
+                <div class="detail-subcard-title" style="color: var(--danger);">
+                    <span>⚠️ Конфликты внешнего обогащения</span>
+                </div>
+                <div id="modal-conflicts-content"></div>
+            </div>
+
+            <!-- Linked Products Section (STRICT INSTANCE PROTECTION) -->
+            <div class="detail-subcard">
+                <div class="detail-subcard-title">
+                    <span>4. Связанные экземпляры со склада (Linked Product Instances)</span>
+                    <span class="badge badge-neutral" id="modal-linked-count">0 товаров</span>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: -4px; margin-bottom: 10px;">
+                    🛡️ <strong>Защита экземпляров:</strong> Бизнес-поля экземпляров (цена, состояние, серийный номер, фото, остатки) защищены от изменения на уровне модели.
+                </p>
+                <div style="overflow-x: auto;">
+                    <table class="data-table" style="font-size: 0.82rem;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Товар на складе</th>
+                                <th>Цена / Статус</th>
+                                <th>Состояние / Серийный</th>
+                                <th>Метод / Достоверность</th>
+                                <th style="width: 220px; text-align: center;">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-linked-tbody">
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 14px;">Нет связанных товаров</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+                <button class="btn btn-danger btn-sm" onclick="handleDeactivateCurrentModel()">Деактивировать модель</button>
+                <button class="btn btn-secondary" onclick="closeModelModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL: Preview Enrichment -->
+    <!-- ============================================================== -->
+    <div id="preview-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Предпросмотр канонического обогащения</h3>
+                <button class="modal-close" onclick="document.getElementById('preview-modal').style.display='none'">&times;</button>
+            </div>
+            <div id="preview-modal-body" style="font-size: 0.88rem;"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                <button class="btn btn-secondary" onclick="document.getElementById('preview-modal').style.display='none'">Закрыть</button>
+                <button class="btn btn-primary" id="btn-apply-preview" onclick="">Применить обогащение</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast"></div>
+
+    <script>
+        let currentModels = [];
+        let currentOffset = 0;
+        const currentLimit = 30;
+        let totalModelsCount = 0;
+        let categoriesList = [];
+        let activeModelData = null;
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadMeta();
+            await loadSummaryStats();
+            await loadModels(0);
+            await loadReviewQueue();
+        });
+
+        function showToast(msg, isError = false) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.backgroundColor = isError ? '#dc2626' : '#0f172a';
+            t.className = 'show';
+            setTimeout(() => { t.className = t.className.replace('show', ''); }, 3500);
+        }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            if (btn) btn.classList.add('active');
+        }
+
+        async function loadMeta() {
+            try {
+                const res = await fetch('/admin-api/product-reference/meta');
+                if (!res.ok) return;
+                const data = await res.json();
+                categoriesList = data.categories || [];
+
+                // Fill brand dropdown
+                const bSelect = document.getElementById('filter-brand');
+                bSelect.innerHTML = '<option value="">Все бренды</option>';
+                (data.brands || []).forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b;
+                    opt.textContent = b;
+                    bSelect.appendChild(opt);
+                });
+
+                // Fill category dropdowns
+                const cSelect = document.getElementById('filter-category');
+                const createCatSelect = document.getElementById('create-category');
+                const editCatSelect = document.getElementById('edit-category');
+                cSelect.innerHTML = '<option value="">Все категории</option>';
+                createCatSelect.innerHTML = '<option value="">-- Без категории --</option>';
+                editCatSelect.innerHTML = '<option value="">-- Без категории --</option>';
+
+                categoriesList.forEach(c => {
+                    const opt1 = document.createElement('option');
+                    opt1.value = c.id;
+                    opt1.textContent = c.name;
+                    cSelect.appendChild(opt1);
+
+                    const opt2 = document.createElement('option');
+                    opt2.value = c.id;
+                    opt2.textContent = c.name;
+                    createCatSelect.appendChild(opt2);
+
+                    const opt3 = document.createElement('option');
+                    opt3.value = c.id;
+                    opt3.textContent = c.name;
+                    editCatSelect.appendChild(opt3);
+                });
+            } catch (err) {
+                console.error('Failed to load meta:', err);
+            }
+        }
+
+        async function loadSummaryStats() {
+            try {
+                const res = await fetch('/admin-api/product-reference/review-queue?limit=1');
+                if (!res.ok) return;
+                const data = await res.json();
+                const sum = data.summary || {};
+
+                document.getElementById('kpi-total-models').textContent = sum.total_models || '0';
+                document.getElementById('kpi-verified-models').textContent = sum.verified_models || '0';
+                document.getElementById('kpi-incomplete-models').textContent = sum.incomplete_models || '0';
+                document.getElementById('kpi-linked-products').textContent = `${sum.linked_products || 0} / ${sum.total_products || 0}`;
+                document.getElementById('kpi-linked-pct').textContent = `${sum.linked_percentage || 0}% покрытия`;
+
+                const totalReview = (sum.unresolved_products || 0) + (sum.conflicts_count || 0);
+                document.getElementById('kpi-review-queue').textContent = totalReview;
+                document.getElementById('kpi-conflicts-sub').textContent = `${sum.conflicts_count || 0} конфл. / ${sum.unresolved_products || 0} неразр.`;
+
+                const rBadge = document.getElementById('tab-review-badge');
+                if (totalReview > 0) {
+                    rBadge.textContent = totalReview;
+                    rBadge.style.display = 'inline-block';
+                } else {
+                    rBadge.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Failed to load summary stats:', err);
+            }
+        }
+
+        async function loadModels(offset = 0) {
+            currentOffset = offset;
+            const search = document.getElementById('filter-search').value.trim();
+            const brand = document.getElementById('filter-brand').value;
+            const category = document.getElementById('filter-category').value;
+            const status = document.getElementById('filter-status').value;
+            const specsFilter = document.getElementById('filter-specs').value;
+
+            let url = `/admin-api/product-reference/models?limit=${currentLimit}&offset=${currentOffset}`;
+            if (search) url += `&q=${encodeURIComponent(search)}`;
+            if (brand) url += `&brand=${encodeURIComponent(brand)}`;
+            if (category) url += `&category_id=${encodeURIComponent(category)}`;
+            if (status) url += `&status_filter=${encodeURIComponent(status)}`;
+            if (specsFilter === 'incomplete') url += `&incomplete_specs=true`;
+            if (specsFilter === 'complete') url += `&incomplete_specs=false`;
+
+            const tbody = document.getElementById('models-tbody');
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">Загрузка...</td></tr>';
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                currentModels = data.items || [];
+                totalModelsCount = data.total || 0;
+
+                renderModelsTable(currentModels);
+                updatePagination();
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--danger); padding: 20px;">Ошибка загрузки моделей: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderModelsTable(models) {
+            const tbody = document.getElementById('models-tbody');
+            if (!models || models.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">Модели не найдены</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            models.forEach(m => {
+                const tr = document.createElement('tr');
+
+                // Specs badge
+                const sCount = m.specifications_count || 0;
+                const sBadge = sCount >= 5
+                    ? `<span class="badge badge-verified">${sCount} спек</span>`
+                    : `<span class="badge badge-review">${sCount} спек</span>`;
+
+                // Verification badge
+                const vBadge = m.verification_state === 'verified'
+                    ? `<span class="badge badge-verified">Verified</span>`
+                    : `<span class="badge badge-review">Review</span>`;
+
+                // Conflict badge
+                const cBadge = m.has_conflict
+                    ? `<span class="badge badge-conflict">Конфликт</span>`
+                    : `<span class="badge badge-neutral">ОК</span>`;
+
+                tr.innerHTML = `
+                    <td style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted);">${m.id}</td>
+                    <td>
+                        <strong style="color: var(--text-main); font-size: 0.92rem;">${escapeHtml(m.canonical_name)}</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">${escapeHtml(m.stable_key)}</div>
+                    </td>
+                    <td>${escapeHtml(m.brand)} ${escapeHtml(m.model)}</td>
+                    <td>${escapeHtml(m.category_name || m.device_type || '-')}</td>
+                    <td style="text-align: center;"><span class="badge badge-info">${m.aliases_count || 0}</span></td>
+                    <td style="text-align: center;">${sBadge}</td>
+                    <td style="text-align: center;">${vBadge}</td>
+                    <td style="text-align: center;"><span class="badge badge-neutral">${m.linked_products_count || 0}</span></td>
+                    <td style="text-align: center;">${cBadge}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-secondary btn-sm" onclick="openModelDetails(${m.id})">Карточка ↗</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updatePagination() {
+            const start = totalModelsCount === 0 ? 0 : currentOffset + 1;
+            const end = Math.min(currentOffset + currentLimit, totalModelsCount);
+            document.getElementById('pagination-info').textContent = `Показано ${start}–${end} из ${totalModelsCount}`;
+            document.getElementById('btn-prev-page').disabled = currentOffset <= 0;
+            document.getElementById('btn-next-page').disabled = end >= totalModelsCount;
+        }
+
+        function changePage(direction) {
+            const newOffset = currentOffset + (direction * currentLimit);
+            if (newOffset >= 0 && newOffset < totalModelsCount) {
+                loadModels(newOffset);
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-brand').value = '';
+            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-specs').value = '';
+            loadModels(0);
+        }
+
+        // ==============================================================
+        // MODEL DETAILS MODAL
+        // ==============================================================
+        async function openModelDetails(modelId) {
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${modelId}`);
+                if (!res.ok) throw new Error(await res.text());
+                activeModelData = await res.json();
+
+                document.getElementById('modal-model-title').textContent = activeModelData.canonical_name;
+                document.getElementById('modal-model-subtitle').textContent = `ID: ${activeModelData.id} | Key: ${activeModelData.stable_key}`;
+                document.getElementById('edit-model-id').value = activeModelData.id;
+                document.getElementById('edit-canonical-name').value = activeModelData.canonical_name;
+                document.getElementById('edit-brand').value = activeModelData.brand;
+                document.getElementById('edit-model').value = activeModelData.model;
+                document.getElementById('edit-device-type').value = activeModelData.device_type || '';
+                document.getElementById('edit-category').value = activeModelData.default_category_id || '';
+                document.getElementById('edit-verification-state').value = activeModelData.verification_state || 'verified';
+                document.getElementById('edit-site-title').value = activeModelData.site_title || '';
+                document.getElementById('edit-site-description').value = activeModelData.site_description || '';
+                document.getElementById('edit-source-note').value = activeModelData.source_note || '';
+
+                const vBadge = document.getElementById('modal-verification-badge');
+                vBadge.className = activeModelData.verification_state === 'verified' ? 'badge badge-verified' : 'badge badge-review';
+                vBadge.textContent = activeModelData.verification_state === 'verified' ? '✓ Verified' : '⚠ Review';
+
+                // External URLs
+                const urlsBox = document.getElementById('modal-source-urls-box');
+                const urlsList = document.getElementById('modal-source-urls-list');
+                urlsList.innerHTML = '';
+                if (activeModelData.source_urls && activeModelData.source_urls.length > 0) {
+                    urlsBox.style.display = 'block';
+                    activeModelData.source_urls.forEach(u => {
+                        const a = document.createElement('a');
+                        a.href = u;
+                        a.target = '_blank';
+                        a.rel = 'noopener';
+                        a.textContent = u;
+                        a.style.display = 'block';
+                        a.style.color = 'var(--primary)';
+                        a.style.fontSize = '0.8rem';
+                        a.style.marginBottom = '2px';
+                        urlsList.appendChild(a);
+                    });
+                } else {
+                    urlsBox.style.display = 'none';
+                }
+
+                renderModalAliases(activeModelData.aliases || []);
+                renderModalSpecs(activeModelData.specifications || {});
+                renderModalConflicts(activeModelData.conflicts || []);
+                await loadModelLinkedProducts(modelId);
+
+                document.getElementById('model-modal').style.display = 'flex';
+            } catch (err) {
+                showToast(`Ошибка загрузки карточки: ${err.message}`, true);
+            }
+        }
+
+        function closeModelModal() {
+            document.getElementById('model-modal').style.display = 'none';
+            activeModelData = null;
+        }
+
+        async function handleSaveModelIdentity(event) {
+            event.preventDefault();
+            const id = document.getElementById('edit-model-id').value;
+            const payload = {
+                canonical_name: document.getElementById('edit-canonical-name').value.trim(),
+                brand: document.getElementById('edit-brand').value.trim(),
+                model: document.getElementById('edit-model').value.trim(),
+                device_type: document.getElementById('edit-device-type').value.trim() || null,
+                default_category_id: parseInt(document.getElementById('edit-category').value) || null,
+                verification_state: document.getElementById('edit-verification-state').value,
+                site_title: document.getElementById('edit-site-title').value.trim() || null,
+                site_description: document.getElementById('edit-site-description').value.trim() || null,
+                source_note: document.getElementById('edit-source-note').value.trim() || null,
+            };
+
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Реквизиты модели успешно обновлены');
+                await loadModels(currentOffset);
+                await loadSummaryStats();
+            } catch (err) {
+                showToast(`Ошибка сохранения: ${err.message}`, true);
+            }
+        }
+
+        function renderModalAliases(aliases) {
+            const tbody = document.getElementById('modal-aliases-tbody');
+            tbody.innerHTML = '';
+            document.getElementById('modal-aliases-count').textContent = `${aliases.length} синонимов`;
+
+            if (aliases.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Нет синонимов</td></tr>';
+                return;
+            }
+
+            aliases.forEach(a => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${escapeHtml(a.alias)}</strong></td>
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">${escapeHtml(a.normalized_alias || '')}</td>
+                    <td style="text-align: center;">${a.priority || 100}</td>
+                    <td style="text-align: center;">
+                        <span class="badge ${a.active ? 'badge-verified' : 'badge-neutral'}" style="cursor: pointer;" onclick="toggleAliasActive(${a.id}, ${!a.active})">
+                            ${a.active ? 'Активен' : 'Отключён'}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-danger btn-sm" onclick="handleDeleteAlias(${a.id})">✕</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function handleAddAlias() {
+            const alias = document.getElementById('new-alias-input').value.trim();
+            const priority = parseInt(document.getElementById('new-alias-priority').value) || 100;
+            if (!alias || !activeModelData) return;
+
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${activeModelData.id}/aliases`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ alias, priority })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                document.getElementById('new-alias-input').value = '';
+                showToast(`Синоним "${alias}" добавлен`);
+                await openModelDetails(activeModelData.id);
+            } catch (err) {
+                showToast(`Ошибка добавления синонима: ${err.message}`, true);
+            }
+        }
+
+        async function toggleAliasActive(aliasId, newActive) {
+            if (!activeModelData) return;
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${activeModelData.id}/aliases/${aliasId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: newActive })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Статус синонима обновлён: ${newActive ? 'Активен' : 'Отключён'}`);
+                await openModelDetails(activeModelData.id);
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        async function handleDeleteAlias(aliasId) {
+            if (!confirm('Удалить этот синоним?')) return;
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${activeModelData.id}/aliases/${aliasId}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Синоним удалён');
+                await openModelDetails(activeModelData.id);
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        function renderModalSpecs(specs) {
+            const tbody = document.getElementById('modal-specs-tbody');
+            tbody.innerHTML = '';
+            const keys = Object.keys(specs);
+            document.getElementById('modal-specs-count').textContent = `${keys.length} характеристик`;
+
+            if (keys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Нет спецификаций</td></tr>';
+                return;
+            }
+
+            keys.forEach(k => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${escapeHtml(k)}</strong></td>
+                    <td>
+                        <input type="text" class="spec-val-input" data-key="${escapeHtml(k)}" value="${escapeHtml(String(specs[k]))}" style="width: 95%; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();">✕</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleAddSpecRow() {
+            const k = document.getElementById('new-spec-key').value.trim();
+            const v = document.getElementById('new-spec-val').value.trim();
+            if (!k) return;
+
+            const tbody = document.getElementById('modal-specs-tbody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${escapeHtml(k)}</strong></td>
+                <td>
+                    <input type="text" class="spec-val-input" data-key="${escapeHtml(k)}" value="${escapeHtml(v)}" style="width: 95%; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">
+                </td>
+                <td style="text-align: center;">
+                    <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();">✕</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            document.getElementById('new-spec-key').value = '';
+            document.getElementById('new-spec-val').value = '';
+        }
+
+        async function handleSaveSpecs() {
+            if (!activeModelData) return;
+            const inputs = document.querySelectorAll('#modal-specs-tbody .spec-val-input');
+            const newSpecs = {};
+            inputs.forEach(inp => {
+                const k = inp.getAttribute('data-key');
+                if (k) newSpecs[k] = inp.value.trim();
+            });
+
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${activeModelData.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ specifications: newSpecs })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Спецификации модели сохранены');
+                await openModelDetails(activeModelData.id);
+                await loadModels(currentOffset);
+                await loadSummaryStats();
+            } catch (err) {
+                showToast(`Ошибка сохранения спецификаций: ${err.message}`, true);
+            }
+        }
+
+        function renderModalConflicts(conflicts) {
+            const box = document.getElementById('modal-conflicts-subcard');
+            const cont = document.getElementById('modal-conflicts-content');
+            cont.innerHTML = '';
+            if (!conflicts || conflicts.length === 0) {
+                box.style.display = 'none';
+                return;
+            }
+            box.style.display = 'block';
+            conflicts.forEach(c => {
+                const isResolved = c.status === 'resolved_manual_owner';
+                const div = document.createElement('div');
+                div.style.marginBottom = '12px';
+                div.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 4px;">Поле: <code>${escapeHtml(c.field)}</code> [Статус: ${escapeHtml(c.status)}]</div>
+                    <div style="font-size: 0.82rem; color: #475569; margin-bottom: 6px;">${escapeHtml(c.note || '')}</div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="conflict-res-${activeModelData.id}-${escapeHtml(c.field)}" placeholder="Утверждённое значение..." value="${escapeHtml(c.resolved_value || '')}" style="flex: 1; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem;">
+                        <button class="btn btn-primary btn-sm" onclick="handleResolveConflict('${escapeHtml(c.stable_key)}', '${escapeHtml(c.field)}')">
+                            ${isResolved ? 'Переопределить' : 'Разрешить конфликт'}
+                        </button>
+                    </div>
+                `;
+                cont.appendChild(div);
+            });
+        }
+
+        async function loadModelLinkedProducts(modelId) {
+            const tbody = document.getElementById('modal-linked-tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 10px;">Загрузка связанных товаров...</td></tr>';
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${modelId}/products`);
+                if (!res.ok) throw new Error(await res.text());
+                const prods = await res.json();
+                document.getElementById('modal-linked-count').textContent = `${prods.length} товаров`;
+
+                if (prods.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 14px;">Нет связанных товаров на складе</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                prods.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-family: monospace; font-size: 0.78rem;">#${p.id}</td>
+                        <td>
+                            <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(p.title)}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(p.category_name || '')}</div>
+                        </td>
+                        <td>
+                            <strong style="color: var(--text-main);">${p.sale_price ? p.sale_price.toLocaleString('ru-RU') + ' ₽' : '—'}</strong>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(p.status || '')}</div>
+                        </td>
+                        <td>
+                            <div>${escapeHtml(p.condition || 'б/у')}</div>
+                            <small style="color: var(--text-muted); font-family: monospace;">${escapeHtml(p.serial_number || 'б/н')}</small>
+                        </td>
+                        <td>
+                            <span class="badge badge-info">${escapeHtml(p.reference_match_method || 'manual')}</span>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">${p.reference_confidence ? Math.round(p.reference_confidence * 100) + '%' : ''}</div>
+                        </td>
+                        <td style="text-align: center; white-space: nowrap;">
+                            <button class="btn btn-secondary btn-sm" onclick="previewEnrichment(${p.id})">Превью</button>
+                            <button class="btn btn-primary btn-sm" onclick="applyEnrichment(${p.id})">Обогатить</button>
+                            <button class="btn btn-danger btn-sm" onclick="unlinkProduct(${p.id})">Отвязать</button>
+                            <a href="/inventory/products/${p.id}" target="_blank" class="btn btn-secondary btn-sm" title="Открыть в товарах">↗</a>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger);">Ошибка: ${err.message}</td></tr>`;
+            }
+        }
+
+        async function handleDeactivateCurrentModel() {
+            if (!activeModelData) return;
+            if (!confirm(`Деактивировать модель "${activeModelData.canonical_name}"?`)) return;
+
+            try {
+                const res = await fetch(`/admin-api/product-reference/models/${activeModelData.id}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Модель деактивирована');
+                closeModelModal();
+                await loadModels(currentOffset);
+                await loadSummaryStats();
+            } catch (err) {
+                showToast(`Ошибка деактивации: ${err.message}`, true);
+            }
+        }
+
+        // ==============================================================
+        // TAB 2: REVIEW QUEUE & CONFLICTS
+        // ==============================================================
+        async function loadReviewQueue() {
+            try {
+                const res = await fetch('/admin-api/product-reference/review-queue?limit=100');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+
+                renderConflictsSection(data.conflicts || []);
+                renderUnresolvedSection(data.unresolved_products || []);
+            } catch (err) {
+                console.error('Failed to load review queue:', err);
+            }
+        }
+
+        function renderConflictsSection(conflicts) {
+            const cont = document.getElementById('conflicts-container');
+            document.getElementById('conflicts-count-badge').textContent = `${conflicts.length} конфликтов`;
+
+            if (conflicts.length === 0) {
+                cont.innerHTML = '<p style="text-align: center; color: var(--success); padding: 15px;">✓ Все конфликты спецификаций разрешены</p>';
+                return;
+            }
+
+            cont.innerHTML = '';
+            conflicts.forEach(c => {
+                const isResolved = c.status === 'resolved_manual_owner';
+                const card = document.createElement('div');
+                card.style.background = '#fef2f2';
+                card.style.border = '1px solid #fecaca';
+                card.style.borderRadius = '6px';
+                card.style.padding = '14px 18px';
+                card.style.marginBottom = '14px';
+
+                let sourcesHtml = '';
+                if (c.sources_compared && c.sources_compared.length > 0) {
+                    sourcesHtml = '<table class="specs-kv-table" style="background:#fff; margin-top:8px;"><thead><tr><th>Источник</th><th>Модификация</th><th>Значение</th></tr></thead><tbody>';
+                    c.sources_compared.forEach(s => {
+                        const val = s[c.field] || s.duplex || s.ethernet || s.adf || JSON.stringify(s);
+                        sourcesHtml += `<tr><td>${escapeHtml(s.source || '')}</td><td>${escapeHtml(s.variant || '')}</td><td><strong>${escapeHtml(String(val))}</strong></td></tr>`;
+                    });
+                    sourcesHtml += '</tbody></table>';
+                }
+
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; font-size: 1rem; color: #991b1b;">${escapeHtml(c.canonical_name)} (поле: <code>${escapeHtml(c.field)}</code>)</h4>
+                        <span class="badge ${isResolved ? 'badge-verified' : 'badge-conflict'}">${isResolved ? 'Разрешён вручную' : 'Конфликт источников'}</span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: #475569; margin-bottom: 8px;">${escapeHtml(c.note || '')}</div>
+                    ${sourcesHtml}
+                    <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px;">
+                        <input type="text" id="queue-conflict-val-${c.stable_key}" placeholder="Разрешённое значение для ${escapeHtml(c.field)}" value="${escapeHtml(c.resolved_value || '')}" style="flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                        <input type="text" id="queue-conflict-note-${c.stable_key}" placeholder="Заметка о решении" value="${escapeHtml(c.resolved_note || '')}" style="flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;">
+                        <button class="btn btn-primary btn-sm" onclick="handleResolveQueueConflict('${escapeHtml(c.stable_key)}', '${escapeHtml(c.field)}')">
+                            ${isResolved ? 'Обновить решение' : 'Утвердить решение'}
+                        </button>
+                    </div>
+                `;
+                cont.appendChild(card);
+            });
+        }
+
+        async function handleResolveConflict(stableKey, field) {
+            const inp = document.getElementById(`conflict-res-${activeModelData.id}-${field}`);
+            const val = inp ? inp.value.trim() : '';
+            if (!val) {
+                alert('Введите значение для разрешения конфликта');
+                return;
+            }
+            try {
+                const res = await fetch('/admin-api/product-reference/conflicts/resolve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stable_key: stableKey, field: field, resolved_value: val, note: 'Разрешено в карточке модели' })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Конфликт по полю "${field}" разрешён`);
+                await openModelDetails(activeModelData.id);
+                await loadReviewQueue();
+                await loadSummaryStats();
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        async function handleResolveQueueConflict(stableKey, field) {
+            const valInp = document.getElementById(`queue-conflict-val-${stableKey}`);
+            const noteInp = document.getElementById(`queue-conflict-note-${stableKey}`);
+            const val = valInp ? valInp.value.trim() : '';
+            const note = noteInp ? noteInp.value.trim() : '';
+            if (!val) {
+                alert('Укажите разрешённое значение');
+                return;
+            }
+            try {
+                const res = await fetch('/admin-api/product-reference/conflicts/resolve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stable_key: stableKey, field: field, resolved_value: val, note: note })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Конфликт для ${stableKey} разрешён`);
+                await loadReviewQueue();
+                await loadSummaryStats();
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        function renderUnresolvedSection(products) {
+            const tbody = document.getElementById('review-tbody');
+            document.getElementById('unresolved-count-badge').textContent = `${products.length} товаров`;
+
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--success); padding: 20px;">✓ Все товары со склада привязаны к моделям</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            products.forEach(p => {
+                const tr = document.createElement('tr');
+                let candHtml = '';
+                if (p.candidates && p.candidates.length > 0) {
+                    candHtml = '<div style="display: flex; flex-direction: column; gap: 4px;">';
+                    p.candidates.forEach(c => {
+                        const pct = Math.round(c.confidence * 100);
+                        candHtml += `
+                            <div style="font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${escapeHtml(c.canonical_name)}</strong>
+                                    <span style="color: var(--text-muted); font-size: 0.72rem;"> (${c.tier})</span>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <span class="badge ${pct >= 85 ? 'badge-verified' : 'badge-review'}">${pct}%</span>
+                                    <button class="btn btn-primary btn-sm" style="padding: 2px 6px; font-size: 0.72rem;" onclick="linkProductToRef(${p.product_id}, ${c.reference_model_id}, true)">Выбрать</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    candHtml += '</div>';
+                } else {
+                    candHtml = '<span style="color: var(--text-muted); font-size: 0.8rem;">Нет совпадений Core Matcher</span>';
+                }
+
+                tr.innerHTML = `
+                    <td style="font-family: monospace; font-size: 0.8rem;">#${p.product_id}</td>
+                    <td>
+                        <strong style="color: var(--text-main); font-size: 0.9rem;">${escapeHtml(p.title)}</strong>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(p.brand || '')} ${escapeHtml(p.model || '')}</div>
+                    </td>
+                    <td>
+                        <div>${p.sale_price ? p.sale_price.toLocaleString('ru-RU') + ' ₽' : '—'}</div>
+                        <small style="color: var(--text-muted);">${escapeHtml(p.category_name || '')}</small>
+                    </td>
+                    <td>${candHtml}</td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <button class="btn btn-secondary btn-sm" onclick="previewEnrichment(${p.product_id})">Предпросмотр</button>
+                            <button class="btn btn-secondary btn-sm" onclick="handleLearnFromProduct(${p.product_id})">Создать модель</button>
+                            <button class="btn btn-danger btn-sm" onclick="unlinkProduct(${p.product_id}, 'rejected_no_reference')">Отклонить</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ==============================================================
+        // PRODUCT ENRICHMENT CONTROLS
+        // ==============================================================
+        async function previewEnrichment(productId) {
+            try {
+                const res = await fetch(`/admin-api/product-reference/enrich-preview/${productId}`, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+
+                const body = document.getElementById('preview-modal-body');
+                if (!data.matched) {
+                    body.innerHTML = `
+                        <div style="color: var(--warning); padding: 10px; background: #fffbeb; border-radius: 6px;">
+                            <strong>Модель не сопоставлена:</strong> ${escapeHtml(data.reason || 'Низкая достоверность')}
+                        </div>
+                    `;
+                    document.getElementById('btn-apply-preview').style.display = 'none';
+                } else {
+                    let fieldsHtml = '<ul>';
+                    const ff = data.fields_filled || {};
+                    Object.keys(ff).forEach(k => {
+                        fieldsHtml += `<li><strong>${escapeHtml(k)}:</strong> ${escapeHtml(JSON.stringify(ff[k]))}</li>`;
+                    });
+                    fieldsHtml += '</ul>';
+
+                    body.innerHTML = `
+                        <p><strong>Товар:</strong> ${escapeHtml(data.title)} (#${data.product_id})</p>
+                        <p><strong>Сопоставленная модель:</strong> ${escapeHtml(data.canonical_name)} (#${data.reference_model_id})</p>
+                        <p><strong>Метод / Достоверность:</strong> ${escapeHtml(data.method || '')} (${Math.round(data.confidence * 100)}%)</p>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 10px 0;">
+                        <p style="font-weight: 600;">Поля для безопасного обогащения:</p>
+                        ${fieldsHtml}
+                    `;
+                    const btn = document.getElementById('btn-apply-preview');
+                    btn.style.display = 'inline-block';
+                    btn.onclick = () => { applyEnrichment(productId); document.getElementById('preview-modal').style.display = 'none'; };
+                }
+                document.getElementById('preview-modal').style.display = 'flex';
+            } catch (err) {
+                showToast(`Ошибка превью: ${err.message}`, true);
+            }
+        }
+
+        async function applyEnrichment(productId) {
+            try {
+                const res = await fetch(`/admin-api/product-reference/products/${productId}/enrich-apply`, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Каноническое обогащение для товара #${productId} успешно применено`);
+                if (activeModelData) await loadModelLinkedProducts(activeModelData.id);
+                await loadReviewQueue();
+            } catch (err) {
+                showToast(`Ошибка обогащения: ${err.message}`, true);
+            }
+        }
+
+        async function linkProductToRef(productId, refId, applyEnrich = true) {
+            try {
+                const res = await fetch(`/admin-api/product-reference/products/${productId}/link`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reference_model_id: refId, apply_enrichment: applyEnrich })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Товар #${productId} привязан к модели #${refId}`);
+                await loadReviewQueue();
+                await loadSummaryStats();
+                await loadModels(currentOffset);
+            } catch (err) {
+                showToast(`Ошибка привязки: ${err.message}`, true);
+            }
+        }
+
+        async function unlinkProduct(productId, reason = 'rejected_by_owner') {
+            if (!confirm(`Отвязать товар #${productId} от модели?`)) return;
+            try {
+                const res = await fetch(`/admin-api/product-reference/products/${productId}/unlink?reason=${encodeURIComponent(reason)}`, {
+                    method: 'POST'
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Товар #${productId} отвязан`);
+                if (activeModelData) await loadModelLinkedProducts(activeModelData.id);
+                await loadReviewQueue();
+                await loadSummaryStats();
+                await loadModels(currentOffset);
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        async function handleLearnFromProduct(productId) {
+            if (!confirm(`Создать новую Reference Model на основе подтверждённого товара #${productId}?`)) return;
+            try {
+                const res = await fetch(`/admin-api/product-reference/learn-from-product/${productId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                showToast(`Создана модель #${data.id} (${data.canonical_name})`);
+                await loadReviewQueue();
+                await loadSummaryStats();
+                await loadModels(0);
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        // ==============================================================
+        // TAB 3: CREATE MODEL
+        // ==============================================================
+        async function handleCreateModel(event) {
+            event.preventDefault();
+            const brand = document.getElementById('create-brand').value.trim();
+            const model = document.getElementById('create-model').value.trim();
+            const canonical = document.getElementById('create-canonical').value.trim() || `${brand} ${model}`;
+            const deviceType = document.getElementById('create-device-type').value.trim() || null;
+            const categoryId = parseInt(document.getElementById('create-category').value) || null;
+            const verification = document.getElementById('create-verification').value;
+            const note = document.getElementById('create-source-note').value.trim() || 'manual_owner';
+
+            const rawAliases = document.getElementById('create-aliases').value.trim();
+            const aliases = rawAliases ? rawAliases.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+            let specs = null;
+            const specsStr = document.getElementById('create-specs').value.trim();
+            if (specsStr) {
+                try {
+                    specs = JSON.parse(specsStr);
+                } catch (e) {
+                    alert('Ошибка парсинга JSON спецификаций');
+                    return;
+                }
+            }
+
+            const payload = {
+                brand: brand,
+                model: model,
+                canonical_name: canonical,
+                device_type: deviceType,
+                default_category_id: categoryId,
+                verification_state: verification,
+                source: 'manual',
+                source_note: note,
+                aliases: aliases,
+                specifications: specs
+            };
+
+            try {
+                const res = await fetch('/admin-api/product-reference/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const created = await res.json();
+                showToast(`Модель "${created.canonical_name}" успешно создана!`);
+                document.getElementById('create-model-form').reset();
+                switchTab('models-tab', document.querySelector('.tab-btn'));
+                await loadModels(0);
+                await loadSummaryStats();
+            } catch (err) {
+                showToast(`Ошибка создания модели: ${err.message}`, true);
+            }
+        }
+
+        // ==============================================================
+        // TAB 4: IMPORT JSON
+        // ==============================================================
+        async function handleImportJson() {
+            const text = document.getElementById('import-json-text').value.trim();
+            const dryRun = document.getElementById('import-dry-run').checked;
+            const resPre = document.getElementById('import-result');
+            if (!text) {
+                alert('Вставьте JSON для импорта');
+                return;
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                alert('Невалидный JSON: ' + e.message);
+                return;
+            }
+
+            resPre.style.display = 'block';
+            resPre.textContent = 'Выполняется импорт...';
+
+            try {
+                const res = await fetch(`/admin-api/product-reference/import?dry_run=${dryRun}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(parsed)
+                });
+                const result = await res.json();
+                resPre.textContent = JSON.stringify(result, null, 2);
+                if (res.ok) {
+                    showToast(dryRun ? 'Проверка пакета выполнена успешно' : 'Импорт каталога успешно применён');
+                    if (!dryRun) {
+                        await loadModels(0);
+                        await loadSummaryStats();
+                    }
+                } else {
+                    showToast('Ошибка при импорте', true);
+                }
+            } catch (err) {
+                resPre.textContent = 'Ошибка запроса: ' + err.message;
+                showToast(`Ошибка: ${err.message}`, true);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>

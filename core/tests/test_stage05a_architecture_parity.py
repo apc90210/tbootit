@@ -20,10 +20,15 @@ from app.services.product_reference_matcher import find_reference_candidates, ma
 @pytest.fixture
 def seed_test_reference_model(db_session):
     """Seed a known printer reference model with aliases for parity tests."""
-    cat = db_session.query(models.Category).filter_by(slug="printery").first()
+    cat = db_session.query(models.Category).filter(
+        (models.Category.slug == "printery") | (models.Category.name == "Принтеры")
+    ).first()
     if not cat:
         cat = models.Category(name="Принтеры", slug="printery")
         db_session.add(cat)
+        db_session.commit()
+    elif not cat.slug:
+        cat.slug = "printery"
         db_session.commit()
 
     existing = db_session.query(models.ProductReferenceModel).filter_by(stable_key="hp_laserjet_p1102w").first()

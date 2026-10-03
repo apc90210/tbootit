@@ -891,6 +891,7 @@ async def _proxy_request(request: Request, target_base_url: str, path: str, pref
 
     headers = dict(request.headers)
     headers.pop("host", None)
+    headers.pop("content-length", None)
     headers.pop("x-client-role", None)
     headers.pop("x-auth-role", None)
     headers.pop("x-role", None)
@@ -936,6 +937,27 @@ async def reservations_page(request: Request):
         "request": request,
         "is_owner": True,
     })
+
+
+@app.get("/reference/catalog", response_class=HTMLResponse)
+async def reference_catalog_page(request: Request):
+    """Product Reference Catalog Management & Review Queue (OWNER only)."""
+    _require_owner(request)
+    return templates.TemplateResponse("reference_catalog.html", {
+        "request": request,
+        "is_owner": True,
+        "core_url": CORE_API_URL,
+    })
+
+
+@app.api_route("/admin-api/product-reference", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/admin-api/product-reference/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/admin-api/product-reference/{subpath:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_product_reference(request: Request, subpath: str = ""):
+    """Proxy reference catalog API requests to Core API (OWNER only)."""
+    _require_owner(request)
+    clean_subpath = f"api/product-reference/{subpath}".rstrip('/') if not subpath else f"api/product-reference/{subpath}"
+    return await _proxy_request(request, CORE_API_URL, clean_subpath, "/admin-api/product-reference")
 
 
 @app.api_route("/inventory", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

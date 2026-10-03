@@ -192,11 +192,23 @@ class ProductReferenceModelUpdate(BaseModel):
     source_urls_json: Optional[str] = None
     confidence: Optional[float] = None
 
+class ProductReferenceAliasUpdate(BaseModel):
+    alias: Optional[str] = None
+    priority: Optional[int] = None
+    active: Optional[bool] = None
+
 class ProductReferenceModel(ProductReferenceModelBase):
     id: int
     stable_key: str
     aliases: List[ProductReferenceAlias] = []
     specifications: Optional[Dict[str, Any]] = None
+    linked_products_count: Optional[int] = 0
+    specifications_count: Optional[int] = 0
+    aliases_count: Optional[int] = 0
+    category_name: Optional[str] = None
+    has_conflict: Optional[bool] = False
+    source_urls: Optional[List[str]] = []
+    conflicts: Optional[List[Dict[str, Any]]] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     class Config:
@@ -311,6 +323,50 @@ class ProductReferenceLearnRequest(BaseModel):
     canonical_name: Optional[str] = None
     custom_aliases: Optional[List[str]] = None
     raw_alias: Optional[str] = None
+
+class ProductReferenceLinkRequest(BaseModel):
+    reference_model_id: int
+    apply_enrichment: bool = False
+
+class ProductReferenceLinkedProductItem(BaseModel):
+    id: int
+    title: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    sale_price: Optional[float] = None
+    status: Optional[str] = None
+    condition: Optional[str] = None
+    serial_number: Optional[str] = None
+    primary_photo_url: Optional[str] = None
+    reference_match_method: Optional[str] = None
+    reference_confidence: Optional[float] = None
+    reference_matched_at: Optional[datetime] = None
+
+class ProductReferenceReviewQueueItem(BaseModel):
+    product_id: int
+    title: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    sale_price: Optional[float] = None
+    status: Optional[str] = None
+    candidates: List[Dict[str, Any]] = []
+
+class ProductReferenceConflictItem(BaseModel):
+    stable_key: str
+    canonical_name: str
+    status: str
+    field: str
+    note: Optional[str] = None
+    sources_compared: List[Dict[str, Any]] = []
+
+class ProductReferenceReviewQueueResponse(BaseModel):
+    unresolved_products: List[ProductReferenceReviewQueueItem] = []
+    conflicts: List[ProductReferenceConflictItem] = []
+    summary: Dict[str, Any] = {}
 
 # Customer Schemas
 class CustomerBase(BaseModel):
