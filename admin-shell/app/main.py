@@ -2370,6 +2370,82 @@ async def api_mobile_product_by_barcode(request: Request, barcode: str):
 
 
 # =====================================================================
+# STAGE 05B: MOBILE POS PRODUCT SEARCH (BY NAME, SKU, BARCODE)
+# =====================================================================
+
+@app.get("/api/mobile/products/search")
+async def api_mobile_products_search(
+    request: Request,
+    q: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """
+    Search canonical inventory products for Mobile POS by name, SKU, or barcode.
+    Protected by TRMOBILE1 PoP authentication.
+    Queries Core /api/products/ with status=in_stock, returning standard POS product structure.
+    """
+    ctx = await _get_mobile_auth(request)
+
+    clean_q = (q or "").strip()
+    if not clean_q:
+        return {"items": [], "total": 0}
+
+    headers = {
+        "x-api-token": os.getenv("CORE_API_TOKEN", ""),
+    }
+    url = f"{CORE_API_URL}/api/products/"
+    params = {
+        "q": clean_q,
+        "status": "in_stock",
+        "limit": limit,
+    }
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                raw_items = raw_data.get("items", []) if isinstance(raw_data, dict) else raw_data
+                pos_items = []
+                for raw_prod in raw_items:
+                    prod_id = int(raw_prod.get("id"))
+                    title = raw_prod.get("title") or f"Товар #{prod_id}"
+                    bc = raw_prod.get("barcode") or ""
+                    sku = raw_prod.get("sku") or ""
+                    sale_price = float(raw_prod.get("sale_price") if raw_prod.get("sale_price") is not None else (raw_prod.get("price") or 0.0))
+                    available_stock = int(raw_prod.get("quantity") or 0)
+                    status_val = raw_prod.get("status") or "unknown"
+                    storage_location = raw_prod.get("storage_location") or ""
+                    main_photo_url = raw_prod.get("main_photo_url")
+                    is_sellable = (status_val in ["in_stock", "available"]) and (available_stock > 0)
+                    pos_items.append({
+                        "product_id": prod_id,
+                        "barcode": bc,
+                        "sku": sku,
+                        "title": title,
+                        "default_sale_price": sale_price,
+                        "available_stock": available_stock,
+                        "status": status_val,
+                        "is_sellable": is_sellable,
+                        "storage_location": storage_location,
+                        "main_photo_url": main_photo_url,
+                        "currency": "RUB",
+                    })
+                return {
+                    "items": pos_items,
+                    "total": raw_data.get("total", len(pos_items)) if isinstance(raw_data, dict) else len(pos_items)
+                }
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+# =====================================================================
 # STAGE 04B: MOBILE POS CANONICAL CHECKOUT API
 # =====================================================================
 
