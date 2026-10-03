@@ -1268,8 +1268,12 @@ def delete_product(product_id: int, request: Request, db: Session = Depends(get_
 
 @router.get("/by-barcode/{barcode}", response_model=schemas.Product)
 def get_product_by_barcode(barcode: str, db: Session = Depends(get_db)):
-    barcode_clean = barcode.strip()
-    product = db.query(models.Product).filter(models.Product.barcode == barcode_clean).first()
+    barcode_clean = (barcode or "").strip()
+    if not barcode_clean:
+        raise HTTPException(status_code=404, detail="Штрихкод не может быть пустым.")
+    product = db.query(models.Product).filter(
+        func.lower(func.trim(models.Product.barcode)) == barcode_clean.lower()
+    ).first()
     if not product:
         raise HTTPException(status_code=404, detail=f"Товар с таким штрихкодом не найден ({barcode_clean}).")
     return product

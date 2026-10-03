@@ -564,6 +564,77 @@ class MobileApiClient(
     }
 
     /**
+     * Searches inventory products for Mobile POS by name, SKU, or barcode via GET /api/mobile/products/search?q=...&limit=...
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun searchPosProducts(
+        query: String,
+        credentialId: String,
+        privateKey: PrivateKey,
+        limit: Int = 20
+    ): ApiResult<List<PosProduct>> = withContext(Dispatchers.IO) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            return@withContext ApiResult.Success(emptyList())
+        }
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Доступ этого устройства отозван" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val encodedQuery = java.net.URLEncoder.encode(trimmed, "UTF-8")
+        val canonicalPath = "/api/mobile/products/search?limit=$limit&q=$encodedQuery"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            val itemsArr = json.optJSONArray("items")
+            val list = mutableListOf<PosProduct>()
+            if (itemsArr != null) {
+                for (i in 0 until itemsArr.length()) {
+                    val itemObj = itemsArr.optJSONObject(i)
+                    if (itemObj != null) {
+                        list.add(PosProduct.fromJson(itemObj))
+                    }
+                }
+            }
+            list
+        }
+    }
+
+    /**
      * Executes canonical POS checkout via POST /api/mobile/sales/checkout
      * protected by TRMOBILE1 PoP authentication with request body SHA-256 binding.
      */

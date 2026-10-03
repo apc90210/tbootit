@@ -38,6 +38,7 @@ import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.data.PosCartRepository
 import com.technoreboot.mobile.model.CANONICAL_PAYMENT_METHODS
 import com.technoreboot.mobile.model.PosCartLine
+import com.technoreboot.mobile.model.PosProduct
 import com.technoreboot.mobile.model.PosCheckoutItem
 import com.technoreboot.mobile.model.PosCheckoutRequest
 import com.technoreboot.mobile.model.SaleReceipt
@@ -68,6 +69,9 @@ fun PosTerminalScreen(
     val cartState by cartRepository.cartState.collectAsState()
 
     var manualBarcodeText by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<PosProduct>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+    var isSearchResultsVisible by remember { mutableStateOf(false) }
     var isLookingUp by remember { mutableStateOf(false) }
     var notification by remember { mutableStateOf<PosNotification?>(null) }
     var lineToEditPrice by remember { mutableStateOf<PosCartLine?>(null) }
@@ -176,6 +180,56 @@ fun PosTerminalScreen(
                 }
             }
             isLookingUp = false
+        }
+    }
+
+    fun handleSearch(queryRaw: String) {
+        val cleanQuery = queryRaw.trim()
+        if (cleanQuery.isEmpty()) {
+            searchResults = emptyList()
+            isSearchResultsVisible = false
+            return
+        }
+
+        coroutineScope.launch {
+            isSearching = true
+            val privateKey = keystoreManager.getPrivateKey()
+            if (privateKey == null) {
+                showFeedback("Аппаратный ключ не найден в защищённом хранилище", isError = true)
+                isSearching = false
+                return@launch
+            }
+
+            when (val result = apiClient.searchPosProducts(cleanQuery, session.credentialId, privateKey, limit = 20)) {
+                is ApiResult.Success -> {
+                    searchResults = result.data
+                    isSearchResultsVisible = true
+                    if (result.data.isEmpty()) {
+                        showFeedback("Товары не найдены по запросу: \"$cleanQuery\"", isError = true)
+                    }
+                }
+                is ApiResult.Error -> {
+                    showFeedback("Ошибка поиска: ${result.message}", isError = true)
+                }
+            }
+            isSearching = false
+        }
+    }
+
+    fun handleAddProductFromSearch(product: PosProduct) {
+        when (val addRes = cartRepository.addProduct(product)) {
+            is AddToCartResult.Added -> {
+                showFeedback("Добавлен: ${product.title}", isError = false)
+            }
+            is AddToCartResult.Incremented -> {
+                showFeedback("Количество увеличено: ${product.title} (x${addRes.line.quantity})", isError = false)
+            }
+            is AddToCartResult.MaxStockReached -> {
+                showFeedback("Достигнут максимум остатка на складе (${addRes.availableStock} шт.)", isError = true)
+            }
+            is AddToCartResult.NotSellable -> {
+                showFeedback(addRes.reason, isError = true)
+            }
         }
     }
 
@@ -320,7 +374,7 @@ fun PosTerminalScreen(
                 )
             }
 
-            // Manual Barcode Input Row
+            // Product Search Row (Name, SKU, or Barcode)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -329,23 +383,33 @@ fun PosTerminalScreen(
             ) {
                 OutlinedTextField(
                     value = manualBarcodeText,
-                    onValueChange = { manualBarcodeText = it },
-                    label = { Text("Штрихкод вручную") },
-                    placeholder = { Text("Например 200000000101") },
+                    onValueChange = {
+                        manualBarcodeText = it
+                        if (it.isBlank()) {
+                            searchResults = emptyList()
+                            isSearchResultsVisible = false
+                        }
+                    },
+                    label = { Text("Поиск: название, SKU или штрихкод") },
+                    placeholder = { Text("Например LaserJet или 200000000230") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Ascii,
+                        keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Search
                     ),
                     keyboardActions = KeyboardActions(
                         onSearch = {
                             focusManager.clearFocus()
-                            handleLookup(manualBarcodeText)
+                            handleSearch(manualBarcodeText)
                         }
                     ),
                     trailingIcon = {
                         if (manualBarcodeText.isNotEmpty()) {
-                            IconButton(onClick = { manualBarcodeText = "" }) {
+                            IconButton(onClick = {
+                                manualBarcodeText = ""
+                                searchResults = emptyList()
+                                isSearchResultsVisible = false
+                            }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Очистить")
                             }
                         }
@@ -358,12 +422,12 @@ fun PosTerminalScreen(
                 Button(
                     onClick = {
                         focusManager.clearFocus()
-                        handleLookup(manualBarcodeText)
+                        handleSearch(manualBarcodeText)
                     },
-                    enabled = manualBarcodeText.isNotBlank() && !isLookingUp,
+                    enabled = manualBarcodeText.isNotBlank() && !isSearching && !isLookingUp,
                     modifier = Modifier.height(56.dp)
                 ) {
-                    if (isLookingUp) {
+                    if (isSearching || isLookingUp) {
                         CircularProgressIndicator(
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
@@ -371,6 +435,125 @@ fun PosTerminalScreen(
                         )
                     } else {
                         Icon(Icons.Default.Search, contentDescription = "Найти")
+                    }
+                }
+            }
+
+            // Search Results Section
+            AnimatedVisibility(visible = isSearchResultsVisible && searchResults.isNotEmpty()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Найдено товаров: ${searchResults.size}",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(
+                                onClick = { isSearchResultsVisible = false },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text("Скрыть", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            searchResults.take(8).forEach { prod ->
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    ),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = prod.title,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            val idInfo = buildString {
+                                                if (prod.sku.isNotBlank()) append("SKU: ${prod.sku}")
+                                                if (prod.barcode.isNotBlank()) {
+                                                    if (isNotEmpty()) append(" • ")
+                                                    append("ШК: ${prod.barcode}")
+                                                }
+                                                if (prod.storageLocation.isNotBlank()) {
+                                                    if (isNotEmpty()) append(" • ")
+                                                    append(prod.storageLocation)
+                                                }
+                                            }
+                                            if (idInfo.isNotBlank()) {
+                                                Text(
+                                                    text = idInfo,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = ReportFormatters.formatAmount(prod.defaultSalePrice),
+                                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(
+                                                    text = if (prod.isSellable) "В наличии: ${prod.availableStock} шт." else "Недоступен (${prod.status})",
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        color = if (prod.isSellable) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        FilledTonalButton(
+                                            onClick = { handleAddProductFromSearch(prod) },
+                                            enabled = prod.isSellable,
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.AddShoppingCart,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("В корзину", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
