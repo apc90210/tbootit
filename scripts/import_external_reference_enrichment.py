@@ -123,6 +123,58 @@ def build_neutral_site_description(canonical_name: str, device_type: str, specs:
 
         parts.append(" ".join(m_parts))
 
+    elif device_type == "laptop":
+        diag = specs.get("Диагональ экрана", specs.get("screen_diagonal", ""))
+        res = specs.get("Разрешение экрана", specs.get("screen_resolution", ""))
+        cpu = specs.get("Линейка процессора", specs.get("cpu_series", "")) or specs.get("Модель процессора", specs.get("cpu_model", ""))
+        ram = specs.get("Тип оперативной памяти", specs.get("ram_type", ""))
+        gpu = specs.get("Видеокарта", specs.get("graphics", ""))
+
+        l_parts = ["Ноутбук"]
+        if diag:
+            l_parts.append(f"с диагональю экрана {diag}")
+        if res:
+            l_parts.append(f"и разрешением {res}")
+        if cpu:
+            l_parts.append(f"на базе процессора {cpu}")
+        if ram:
+            l_parts.append(f"(память {ram})")
+        if gpu:
+            l_parts.append(f"с видеокартой {gpu}")
+        parts.append(" ".join(l_parts))
+
+    elif device_type == "computer":
+        ff = specs.get("Форм-фактор", specs.get("form_factor", ""))
+        chipset = specs.get("Чипсет", specs.get("chipset", ""))
+        socket = specs.get("Поддерживаемые процессоры", specs.get("supported_processors", specs.get("Сокет", "")))
+        ram = specs.get("Тип оперативной памяти", specs.get("ram_type", ""))
+
+        c_parts = [f"Компьютер ({ff})" if ff else "Компьютер"]
+        if chipset:
+            c_parts.append(f"на чипсете {chipset}")
+        if socket:
+            c_parts.append(f"с поддержкой {socket}")
+        if ram:
+            c_parts.append(f"и памятью {ram}")
+        parts.append(" ".join(c_parts))
+
+    elif device_type == "component":
+        socket = specs.get("Сокет", specs.get("socket", ""))
+        cores = specs.get("Количество ядер", specs.get("cores", ""))
+        freq = specs.get("Базовая частота", specs.get("base_frequency", ""))
+        tdp = specs.get("Тепловыделение (TDP)", specs.get("tdp", ""))
+
+        cp_parts = ["Процессор" if socket or cores else "Комплектующее"]
+        if socket:
+            cp_parts.append(f"сокета {socket}")
+        if cores:
+            cp_parts.append(f"({cores} ядер)")
+        if freq:
+            cp_parts.append(f"с базовой частотой {freq}")
+        if tdp:
+            cp_parts.append(f"и тепловыделением {tdp}")
+        parts.append(" ".join(cp_parts))
+
     if not parts:
         return f"{canonical_name} — проверенные технические характеристики производителя."
 

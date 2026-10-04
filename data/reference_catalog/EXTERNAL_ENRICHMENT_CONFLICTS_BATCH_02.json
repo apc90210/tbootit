@@ -1,0 +1,59 @@
+[
+  {
+    "stable_key": "hp|probook-440-g6",
+    "canonical_name": "HP ProBook 440 G6",
+    "status": "resolved_variant_isolated",
+    "field": "graphics",
+    "note": "Base HP ProBook 440 G6 is verified with integrated Intel UHD Graphics 620. Variants with discrete NVIDIA GeForce MX130 / MX250 maintain separate sub-model tags and are not merged into base model.",
+    "sources_compared": [
+      {
+        "source": "HP ProBook 440 G6 QuickSpecs",
+        "variant": "Base Intel",
+        "graphics": "Intel UHD Graphics 620"
+      },
+      {
+        "source": "HP ProBook 440 G6 QuickSpecs",
+        "variant": "Optional Discrete",
+        "graphics": "NVIDIA GeForce MX130 / MX250"
+      }
+    ]
+  },
+  {
+    "stable_key": "lenovo|ideapad-g580",
+    "canonical_name": "Lenovo IdeaPad G580",
+    "status": "resolved_variant_isolated",
+    "field": "graphics",
+    "note": "Lenovo IdeaPad G580 is manufactured with both integrated Intel HD Graphics and discrete NVIDIA GeForce GT 610M/630M. Base reference entry defaults to Intel integrated HD Graphics.",
+    "sources_compared": [
+      {
+        "source": "Lenovo IdeaPad G580 PSREF",
+        "variant": "G580 Intel",
+        "graphics": "Intel HD Graphics 3000 / 4000"
+      },
+      {
+        "source": "Lenovo IdeaPad G580 PSREF",
+        "variant": "G580 Discrete",
+        "graphics": "NVIDIA GeForce GT 610M / GT 630M"
+      }
+    ]
+  },
+  {
+    "stable_key": "intel|xeon-e3-1220",
+    "canonical_name": "Intel Xeon E3-1220",
+    "status": "resolved_variant_isolated",
+    "field": "pcie_version",
+    "note": "Intel Xeon E3-1220 (Sandy Bridge) features PCIe 2.0 (16 lanes), whereas Xeon E3-1220 v2 (Ivy Bridge) features PCIe 3.0. Maintained as discrete references to prevent stepping confusion.",
+    "sources_compared": [
+      {
+        "source": "Intel ARK Xeon E3-1220 Specifications",
+        "revision": "v1 (Sandy Bridge)",
+        "pcie": "PCIe 2.0"
+      },
+      {
+        "source": "Intel ARK Xeon E3-1220 v2 Specifications",
+        "revision": "v2 (Ivy Bridge)",
+        "pcie": "PCIe 3.0"
+      }
+    ]
+  }
+]
