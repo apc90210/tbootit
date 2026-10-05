@@ -89,7 +89,8 @@ fun QuickIntakeScreen(
 
     fun launchCamera() {
         try {
-            val photoFile = File.createTempFile("intake_cam_", ".jpg", context.cacheDir)
+            val photosDir = File(context.cacheDir, "intake_photos").apply { mkdirs() }
+            val photoFile = File.createTempFile("intake_cam_", ".jpg", photosDir)
             val uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
@@ -98,6 +99,7 @@ fun QuickIntakeScreen(
             tempCameraUri = uri
             takePictureLauncher.launch(uri)
         } catch (e: Exception) {
+            android.util.Log.e("QuickIntake", "Failed to launch camera: ${e.message}", e)
             pickImageLauncher.launch("image/*")
         }
     }
