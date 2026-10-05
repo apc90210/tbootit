@@ -27,7 +27,7 @@ def test_product_reference_auth_guard():
 def test_reference_model_crud_and_aliases(db_session):
     """Test full CRUD lifecycle for reference models and aliases."""
     # Ensure category exists
-    cat = db_session.query(Category).filter_by(id=10).first()
+    cat = db_session.query(Category).filter((Category.id == 10) | (Category.name == "Принтеры")).first()
     if not cat:
         cat = Category(id=10, name="Принтеры")
         db_session.add(cat)
@@ -38,7 +38,7 @@ def test_reference_model_crud_and_aliases(db_session):
         "brand": "Pantum",
         "model": "P2500W",
         "canonical_name": "Pantum P2500W",
-        "default_category_id": 10,
+        "default_category_id": cat.id,
         "device_type": "Принтер",
         "specifications": {
             "Тип печати": "Лазерный",
