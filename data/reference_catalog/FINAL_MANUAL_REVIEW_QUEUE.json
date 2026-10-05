@@ -1,0 +1,1901 @@
+{
+  "generated_at": "2026-10-05T09:00:00Z",
+  "description": "WEB-07F Exhaustive Manual Review Queue capturing remaining models and unlinked inventory with explicit non-automation causes",
+  "summary": {
+    "unresolved_reference_models_count": 2,
+    "hardware_variant_conflicts_count": 3,
+    "unlinked_warehouse_products_count": 204,
+    "total_review_items": 209
+  },
+  "unresolved_models": [
+    {
+      "stable_key": "epson|stylus-photo-r2280",
+      "canonical_name": "Epson Stylus Photo R2280",
+      "brand": "Epson",
+      "model": "Stylus Photo R2280",
+      "device_type": "printer",
+      "default_category_id": 5,
+      "linked_products": [
+        {
+          "product_id": 394,
+          "title": "струйный принтер epson r2280",
+          "status": "sold"
+        }
+      ],
+      "review_cause": "identity_ambiguity",
+      "explanation": "В официальной линейке Epson A3+ отсутствует модель R2280 (существуют R2880, R2400, R2000, R200/R220). Заголовок товара #394 содержит вероятную опечатку. Требуется физическая верификация заводского шильдика."
+    },
+    {
+      "stable_key": "chieftec|apc-700c",
+      "canonical_name": "Chieftec APC-700C",
+      "brand": "Chieftec",
+      "model": "APC-700C",
+      "device_type": "component",
+      "default_category_id": 7,
+      "linked_products": [],
+      "review_cause": "insufficient_official_source",
+      "explanation": "Нестандартный префикс APC в номенклатуре Chieftec (стандартные серии: GPS, GPC, CTG, APB). Связанные товары на складе отсутствуют (0 товаров). Модель сохранена в каталоге, но изолирована от автоматического обогащения."
+    }
+  ],
+  "hardware_variant_conflicts": [
+    {
+      "stable_key": "hp|probook-440-g6",
+      "canonical_name": "HP ProBook 440 G6",
+      "review_cause": "variant_revision_conflict",
+      "field": "graphics",
+      "resolution": "В эталон внесена базовая подтверждённая видеокарта Intel UHD Graphics 620. Опциональная дискретная графика NVIDIA GeForce MX130 / MX250 изолирована как модификация комплектации."
+    },
+    {
+      "stable_key": "lenovo|ideapad-g580",
+      "canonical_name": "Lenovo IdeaPad G580",
+      "review_cause": "variant_revision_conflict",
+      "field": "graphics",
+      "resolution": "В эталон внесена базовая встроенная видеокарта Intel HD Graphics 3000 / 4000. Модификации с дискретными чипами NVIDIA GeForce GT 610M / 630M изолированы."
+    },
+    {
+      "stable_key": "intel|xeon-e3-1220",
+      "canonical_name": "Intel Xeon E3-1220",
+      "review_cause": "variant_revision_conflict",
+      "field": "pcie_version",
+      "resolution": "Первая ревизия Sandy Bridge поддерживает PCIe 2.0 (16 линий). Модификация v2 (Ivy Bridge) поддерживает PCIe 3.0 и выделена как отдельная ревизия."
+    }
+  ],
+  "unlinked_warehouse_inventory": [
+    {
+      "product_id": 4,
+      "title": "Связка Asus H110M- Plus + i3-6100",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 5,
+      "title": "Связка Gigabyte GA-H110M-HD2 + i3-6100",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 6,
+      "title": "Связка Gigabyte Ga-H110m- S2H+i3-6100+ кулер",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 7,
+      "title": "Связка Asus H110M-R + i3-6100 + Кулер",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 13,
+      "title": "Com port",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 15,
+      "title": "Видеристратор tassir донор",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 16,
+      "title": "Точка доступа Cisco CAP-1702i, CAP1602i, eltex",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 17,
+      "title": "Панель для реле на Дин рейку",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 18,
+      "title": "Материнская плата Asus F1A55 + Athlon II X4 641",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 20,
+      "title": "Процессор AMD FX-4100. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 22,
+      "title": "Процессор Intel i5-650. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 23,
+      "title": "Тсд Разных Брендов без батарей",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 25,
+      "title": "Камера наружного видео наблюдения",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 26,
+      "title": "Переходник apple USB-C на VGA",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 27,
+      "title": "Мониторы 10д. Б/У",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 28,
+      "title": "Видеорегистраторы одним лотом в разном состоянии",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 38,
+      "title": "Системный блок Lenovo I5-4670/8gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 41,
+      "title": "Системный блок i7-2600/16gb/250gb ssd/500w",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 45,
+      "title": "Сервер Team Server e5500e",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 46,
+      "title": "Оперативная серверная память samsung ddr3 32gb",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 48,
+      "title": "Блок питания Chieftec APC-700C",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 54,
+      "title": "Процессор AMD A8-8600E. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 56,
+      "title": "Связка Asus F1A55-M LX3 R2.0+ Athlon 2",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 57,
+      "title": "Связка Msi 760GM-P23 + Процессор fx4100",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 58,
+      "title": "Системный блок Lenovo I5-4460/8gb/256gb ssd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 61,
+      "title": "Тсд M3 Sl 20 На запчасти",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 62,
+      "title": "Материнская плата MSI A55M-P33. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 63,
+      "title": "Материнская плата Asus F2A55-M LK",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 64,
+      "title": "Компактный Системный Блок Lenovo / Гарантия",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 66,
+      "title": "Связка Asus F1A75",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 68,
+      "title": "Монитор Samsung 24 дюйма PLS Black",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 69,
+      "title": "Лазерные мфу 3 в 1 разных брендов. Гарантия",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 70,
+      "title": "Маршрутизатор hp JG511B",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 71,
+      "title": "Процессор AMD Athlon 200GE Raven Ridge",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 73,
+      "title": "Процессор Intel Xeon E3-1220 v5",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 74,
+      "title": "Бирп бастион скат 1200M",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 75,
+      "title": "Процессор Intel Xeon E3-1220 v6",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 76,
+      "title": "Лазерные принтеры разных брендов. Гарантия",
+      "category_id": 5,
+      "category_name": "Принтеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 77,
+      "title": "Оптический трансивер HP 8Gb SFP+ FC, AJ716B",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "generic_collective_listing",
+      "owner_instruction": "Сборное или оптовое объявление, включающее несколько разнородных устройств либо партию."
+    },
+    {
+      "product_id": 79,
+      "title": "Материнская плата Asrock h510m на запчасти",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 80,
+      "title": "Ноутбук Sinto Pentium n4200 на запчасти",
+      "category_id": 4,
+      "category_name": "Ноутбуки",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 82,
+      "title": "Системный блок i3-4430/8gb озу/320gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 84,
+      "title": "Системный блок i3-4130/8gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 85,
+      "title": "Коммутатор 3COM baseline 10/100 24 port",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 86,
+      "title": "Системный блок i3-4130/6gb озу/250gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 88,
+      "title": "Лазерный Принтер на запчасти Kyocera P4100/4200",
+      "category_id": 5,
+      "category_name": "Принтеры",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 89,
+      "title": "Лазерный Принтер Kyocera P2040 На запчасти",
+      "category_id": 5,
+      "category_name": "Принтеры",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 90,
+      "title": "Усилитель мощности Cvg audio 24T/Под восстановлени",
+      "category_id": 52,
+      "category_name": "Техника под восстановление",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 92,
+      "title": "Мини USB ProXime KVM Extender CE100R",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 94,
+      "title": "Процессор Intel Xeon E3-1225 v2",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 102,
+      "title": "Видеокамера polyvision pdmip2-V12P/PVC-IP2M",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 103,
+      "title": "Тсд bluebird vf550 на запчасти",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 105,
+      "title": "Системный блок Lenovo am4 a8-8670e/8gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 107,
+      "title": "Газоанализатор Smoke Check CareFusion",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 108,
+      "title": "Офисный Системный Блоки /Разные Бренды",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 111,
+      "title": "Лазерное Lexmark MB2236dw. На запчасти",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 113,
+      "title": "Узел сканирования в сборе HP M428fdn/M428fdw",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 114,
+      "title": "Узел сканирования в сборе HP M426fdn/M426fdw",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 115,
+      "title": "Процессор Intel Celeron G440/530/540/620/840/870",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 118,
+      "title": "Сенсорный pos Терминал EBN xpos72-5b-a16g",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 119,
+      "title": "Рамки металлодетектора detection PD 6500i",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 127,
+      "title": "Монитор LG IPS 24 дюйма",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 131,
+      "title": "Серверный блок питания Dell DH350W",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 132,
+      "title": "Монитор 23/22/20 дюйма",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 133,
+      "title": "Ноутбук Ray Book 8515",
+      "category_id": 4,
+      "category_name": "Ноутбуки",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 134,
+      "title": "Офисные компьютеры Без памяти и накопителя",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 138,
+      "title": "Моноблок Lenovo ideacentre На запчасти",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 140,
+      "title": "Процессор Intel Core i7-950",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 141,
+      "title": "AMD Athlon X4 950 AM4. Гарантия",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 142,
+      "title": "Мониторы разных брендов и дюймов",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 143,
+      "title": "Процессор Intel Core i5 750",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 144,
+      "title": "Монитор Samsung 22 дюйма",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 150,
+      "title": "Ремонт ПК",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 154,
+      "title": "Связка ASRock B85M-Pro + I5-4460",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 156,
+      "title": "Связка Gigabyte Ga-A75M-D2H+ athlon 2",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 157,
+      "title": "Связка ASRock N68-s3 ucc+ athlon 2",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 159,
+      "title": "Системный блок I3-7100/8gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 160,
+      "title": "Системный блок I3-6100/8gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 162,
+      "title": "Усилитель мощности LPa 120/240 mz",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 164,
+      "title": "Компьютерные корпуса",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 165,
+      "title": "Tonk TN1500 тонкий клиент 2gb (озу) /16gb",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 166,
+      "title": "Лазерные принтеры и мфу. Гарантия",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 167,
+      "title": "Лазерные, рабочие мфу 3 в 1 с доставкой",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 169,
+      "title": "Лот на 20 процессоров intel core i3-2100. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 172,
+      "title": "Кулер lga 1155 (4 pin ). Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 174,
+      "title": "Лазерные принтеры hp xerox samsung, canon и др",
+      "category_id": 5,
+      "category_name": "Принтеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 179,
+      "title": "Ибп Бастион rapan-100 исп.V.8",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 180,
+      "title": "Мониторы 17-19 дюймов для видеонаблюдения.Гарантия",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 181,
+      "title": "Акустическая система 2.0 оклик ок -120",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 182,
+      "title": "Новый адаптер Apple A1620 USB to vga",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 184,
+      "title": "Системный блок Acer VM5W1 под модернизацию/пустой",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 185,
+      "title": "Скупка бу техники",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 191,
+      "title": "Процессор i3-3220 LGA1155. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 193,
+      "title": "Системный блок i3-4130/8gb/500gb",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 197,
+      "title": "Трансивер HP AJ716A,8G SFP+",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 198,
+      "title": "Блоки питания разных брендов 200-350w. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 199,
+      "title": "Оперативная память 2GB DDR3 1333mhz/1600mhz",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 200,
+      "title": "Оперативная память DDR2, DDR3, DDR3 ECC REG",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 202,
+      "title": "Офисные Системные Блоки /8gb / 240 HDD/Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 210,
+      "title": "Неттоп ICL Th433 без системны 250hdd/2 gb /atom",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 211,
+      "title": "Неттоп Hp t520/t530 2gb / 8 ssd / без системы",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 212,
+      "title": "Неттоп Без Системы Lenovo M32 Celeron/2 gb /8 sdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 219,
+      "title": "Блоки питания разных брендов 250+600w. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 221,
+      "title": "Жесткий Диск Dell 1 TB",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 227,
+      "title": "Жесткий Диск dell 1 TB",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 229,
+      "title": "Современные Лазерные /Cтруйные мфу/Принтера. Гаран",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 231,
+      "title": "Картридж TK-1120 kyocera FS-1025MFP",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 232,
+      "title": "Новые картриджи TK-1160 для Kyocera P2040",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 233,
+      "title": "Новый картридж TK-3190 для kyocera P3055/3060",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 234,
+      "title": "Новый Картридж TK-1200 для Kyocera M2235",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 235,
+      "title": "Новая туба с тонером 106R01277 для Xerox WC 5016",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 236,
+      "title": "Новые картриджи TN-2375 для Brother dcp-l2300",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 237,
+      "title": "Системный блок i5-2400s/8gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 238,
+      "title": "Системный блок i3-7100/8gb озу/500gb",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 240,
+      "title": "Жесткий Диск Seagate 2 TB",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 242,
+      "title": "Системный блок i5-3330/8gb/240 ssd. Гарантия",
+      "category_id": 4,
+      "category_name": "Ноутбуки",
+      "status": "sold",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 243,
+      "title": "i5-2400",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 244,
+      "title": "i3-2120",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 247,
+      "title": "процессор i3-3320",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 248,
+      "title": "Крышка задняя в сборе Xerox VL B405, WC3615",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 249,
+      "title": "Шарниры Xerox B405 (003k89140, 003k89860 )",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 250,
+      "title": "948k21074",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 251,
+      "title": "Редуктор Xerox VL B405, WC 3615 / 007k18903",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 252,
+      "title": "Крышка передняя Xerox Versalink B405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 253,
+      "title": "Плата управления MCU PWB Xerox B405 / 960k91315",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 254,
+      "title": "Плата питания Xerox B405 (105k32970 )",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 255,
+      "title": "Плата питания Xerox VL B405 / WC3615 / 105k3095",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 257,
+      "title": "Картриджи для принтеров",
+      "category_id": 5,
+      "category_name": "Принтеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 258,
+      "title": "Xerox 106R03583 чёрный (black) VersaLink B400",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 260,
+      "title": "Тонер Xerox 106R03585 черный B400/B405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 261,
+      "title": "Тонер картридж Xerox VersaLink B400/ B405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 262,
+      "title": "Тонер-картридж Xerox VersaLink B400/B405 106R03585",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 263,
+      "title": "Xerox Versalink b405 разбор (зип, запчасти)",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 264,
+      "title": "Фьюзер печка для Xerox VersaLink B400/B405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 270,
+      "title": "106R03585, Тонер-картридж Xerox VersaLink B400/B405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 272,
+      "title": "Картридж для Xerox VersaLink B400 / B405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 274,
+      "title": "Чип Xerox VersaLink B400/B405 (101R00554) drum, 65K (ELP Imaging)",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 279,
+      "title": "Печка Xerox VersaLink B400/ B405 126K36852 OEM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 284,
+      "title": "Чип Xerox VersaLink B400/B405 (101R00554) drum, 65K (ELP Imaging)",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 286,
+      "title": "Тонер картридж для Xerox versalink b400/b405",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 289,
+      "title": "Xerox fuser Versalink B400 B405 печка + вал",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 292,
+      "title": "Versalink",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 301,
+      "title": "Объявление Avito 7753411850",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 302,
+      "title": "Объявление Avito 8055269727",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 303,
+      "title": "Объявление Avito 8119272571",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 304,
+      "title": "Объявление Avito 8160074969",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 305,
+      "title": "Объявление Avito 8256740322",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 306,
+      "title": "Объявление Avito 8302854261",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 307,
+      "title": "Объявление Avito 8394934536",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 308,
+      "title": "Объявление Avito 8481156686",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 313,
+      "title": "Сборка пк i7-2600/16gb ddr3/500w + корпус клиента, б/у",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 314,
+      "title": "Монитор 17д, б/у",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 315,
+      "title": "Ноутбук Lenovo intel b960/6gb/500gb hdd/gt610m",
+      "category_id": 4,
+      "category_name": "Ноутбуки",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 316,
+      "title": "Ноутбук hp intel celeron n3050/4gb/320gb hdd",
+      "category_id": 4,
+      "category_name": "Ноутбуки",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 319,
+      "title": "Лазерные мфу 3 в 1 принтер сканер копир. гарантия",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 320,
+      "title": "Системные блоки для дома и офиса. Гарантия",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 323,
+      "title": "Блок питания 450w , б/у",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 324,
+      "title": "Офисный системный блок Acer /i3-6100/8gb/240 ssd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 332,
+      "title": "Test",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 333,
+      "title": "Сборка пк",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 336,
+      "title": "Оперативная память ddr3 4gb, б/у",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 337,
+      "title": "Системный блок i3-4150/8gb/500gb hdd + монитор 19д ширик, б/у",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 341,
+      "title": "Колонки с bluetooth swen SpS- 615",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 345,
+      "title": "Huawei Ascend Mate 7, 3/32 ГБ, 1 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 347,
+      "title": "Счетчик купюр Magner 35",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 348,
+      "title": "Nokia 7230, 1 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 349,
+      "title": "3 цветника kyocera + m507 на запчасти и p3300dn на запчасти",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "sold",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 354,
+      "title": "Материнская плата MSI A55M-P33. Авито доставка",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 355,
+      "title": "Драм-картридж xerox 006r03389 (cb387a)",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 356,
+      "title": "Драм-картридж xerox 006R03474 (cf359a)",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 357,
+      "title": "Мониторы для Офисов и Видеонаблюдения",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 359,
+      "title": "Процессор Intel Xeon X5660 LGA 1366 6C/12T",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 360,
+      "title": "Кронштейн LCD для мониторов 14-32 дюймов",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 362,
+      "title": "Блок источника резервированного питания бирп-12/2",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 363,
+      "title": "Источник бесперебойного питания скат-1200Б. Б/У",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 364,
+      "title": "Драм-картридж для HP m855 006r03475 (cf364a)",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 370,
+      "title": "Мониторы 17д квадраты. Гарантия",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 371,
+      "title": "Рабочее место Комплект принтер/мфу + пк + монитор",
+      "category_id": 51,
+      "category_name": "МФУ",
+      "status": "in_stock",
+      "review_cause": "generic_collective_listing",
+      "owner_instruction": "Сборное или оптовое объявление, включающее несколько разнородных устройств либо партию."
+    },
+    {
+      "product_id": 373,
+      "title": "Кулеры LGA775. Гарантия",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 374,
+      "title": "Корпусы для компьютера",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 375,
+      "title": "HP LaserJet Enterprise M507 на запчасти",
+      "category_id": 5,
+      "category_name": "Принтеры",
+      "status": "in_stock",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 376,
+      "title": "Системный блок i3-3220/4 гб/HDD 500 гб. Гарантия",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "custom_assembled_pc_non_reference",
+      "owner_instruction": "Уникальная самосборная конфигурация системного блока без фабричной вендорной модели."
+    },
+    {
+      "product_id": 379,
+      "title": "Жёсткий диск 3.5 500gb, б/у",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 381,
+      "title": "жёсткий диск 6тб",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 382,
+      "title": "Процессор g5905, б/у",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 383,
+      "title": "Ноутбук Azerty celeron n5095a/16gb ddr4/256gb ssd",
+      "category_id": 4,
+      "category_name": "Ноутбуки",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 386,
+      "title": "кулер 90мм",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 387,
+      "title": "Диагностика струйного аппарата",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 388,
+      "title": "жесткии диск 1 тб",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 389,
+      "title": "kyocera m3660idn на запчасти",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "sold",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 390,
+      "title": "блок питания 500w б.у",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "accessory_or_part_instead_of_device",
+      "owner_instruction": "Комплектующее, аксессуар или набор запчастей без самостоятельной эталонной модели устройства."
+    },
+    {
+      "product_id": 391,
+      "title": "монитор 24 д (4шт)",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "generic_collective_listing",
+      "owner_instruction": "Сборное или оптовое объявление, включающее несколько разнородных устройств либо партию."
+    },
+    {
+      "product_id": 392,
+      "title": "системный блок 2 шт",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "sold",
+      "review_cause": "generic_collective_listing",
+      "owner_instruction": "Сборное или оптовое объявление, включающее несколько разнородных устройств либо партию."
+    },
+    {
+      "product_id": 393,
+      "title": "Жёсткий диск 3.5 2ТБ, б/у",
+      "category_id": 7,
+      "category_name": "Комплектующие",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 395,
+      "title": "Монитор 17д, б/у",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 402,
+      "title": "Lenovo Системный Блок A8-8670E/8gb/500hdd/Гарантия",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 404,
+      "title": "Монитор 17д, б/у",
+      "category_id": 6,
+      "category_name": "Мониторы",
+      "status": "sold",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 405,
+      "title": "Моноблок Lenovo i5-3330s/8gb/240gb ssd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 406,
+      "title": "Моноблок Lenovo i3-3220/6gb/500gb hdd",
+      "category_id": 50,
+      "category_name": "Компьютеры",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 410,
+      "title": "PAGRAER P50x, 8/256 ГБ, 2 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 411,
+      "title": "BQ 5528L Strike Forward, 2/16 ГБ, 2 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 412,
+      "title": "Xiaomi Redmi 9A, 2/32 ГБ, 2 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 413,
+      "title": "Samsung Galaxy A40, 4/64 ГБ, 2 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    },
+    {
+      "product_id": 420,
+      "title": "Xiaomi Redmi Note 5A, 3/32 ГБ, 2 SIM",
+      "category_id": 48,
+      "category_name": "Без категории",
+      "status": "in_stock",
+      "review_cause": "identity_ambiguity_multi_model",
+      "owner_instruction": "Неоднозначное или мульти-модельное описание в заголовке объявления, требующее ручной проверки шильдика."
+    }
+  ]
+}

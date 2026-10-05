@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "schema_version": "1.0",
   "total_models": 125,
   "models": [
@@ -1303,12 +1303,24 @@
         "Alpha-3RW",
         "Мобильный термопринтер TSC Alpha-3RW"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Мобильный принтер чеков и этикеток",
+        "Технология печати": "Прямая термопечать (Direct Thermal)",
+        "Цветность печати": "Черно-белая",
+        "Ширина печати": "до 72 мм (2.83\")",
+        "Ширина ленты / этикетки": "до 80 мм (3.15\")",
+        "Разрешение печати": "203 dpi (8 точек/мм)",
+        "Скорость печати": "до 102 мм/сек (4 ips)",
+        "Интерфейсы": "USB 2.0, Bluetooth / Wi-Fi",
+        "Класс защиты": "IP54 (с защитным чехлом), устойчивость к падениям с 1.5 м",
+        "Емкость аккумулятора": "Li-ion 2500 мА·ч",
+        "Память": "8 МБ Flash, 4 МБ SDRAM"
+      },
       "site_title": "Принтер TSC Alpha-3R",
-      "site_description": null,
+      "site_description": "Монохромный термопринтер и интерфейсами USB 2.0, Bluetooth / Wi-Fi.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #91"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #91 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "bixolon|spp-l310",
@@ -1324,12 +1336,24 @@
         "SPP-L310",
         "Мобильный принтер Bixolon ssp- L310"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Мобильный принтер этикеток",
+        "Технология печати": "Прямая термопечать (Direct Thermal)",
+        "Цветность печати": "Черно-белая",
+        "Ширина печати": "до 72 мм (2.83\")",
+        "Ширина этикетки": "25 - 80 мм",
+        "Разрешение печати": "203 dpi",
+        "Скорость печати": "до 127 мм/сек (5 ips)",
+        "Интерфейсы": "USB 2.0, Serial, Bluetooth V4.1 Classic & BLE",
+        "Класс защиты": "IP54 (с чехлом), устойчивость к падениям с 1.8 м",
+        "Емкость аккумулятора": "Li-ion 2600 мА·ч",
+        "Память": "128 МБ SDRAM, 256 МБ Flash"
+      },
       "site_title": "Принтер Bixolon SPP-L310",
-      "site_description": null,
+      "site_description": "Монохромный термопринтер и интерфейсами USB 2.0, Serial, Bluetooth V4.1 Classic & BLE.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #116"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #116 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "oki|c3400",
@@ -1345,12 +1369,24 @@
         "C3400",
         "Лазерный цветной принтер oki c3400 на запчасти"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер цветной",
+        "Технология печати": "Светодиодная (Digital LED)",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "20 стр/мин",
+        "Скорость печати (A4, цвет)": "16 стр/мин",
+        "Разрешение печати": "1200 x 600 dpi (технология ProQ2400)",
+        "Интерфейсы": "USB 2.0 Hi-Speed",
+        "Объем памяти": "32 МБ",
+        "Время выхода первой страницы": "10 сек (ч/б), 12 сек (цвет)",
+        "Максимальная нагрузка": "35 000 стр/мес"
+      },
       "site_title": "Принтер OKI C3400",
-      "site_description": null,
+      "site_description": "Цветной принтер формата a4 со скоростью печати до 20 стр/мин и интерфейсами USB 2.0 Hi-Speed.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #120"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #120 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "oki|c510dn",
@@ -1366,12 +1402,25 @@
         "C510dn",
         "Лазерный цветной принтер Oki c510dn на запчасти"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Принтер цветной",
+        "Технология печати": "Светодиодная (Digital LED)",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "30 стр/мин",
+        "Скорость печати (A4, цвет)": "26 стр/мин",
+        "Разрешение печати": "1200 x 600 dpi (технология ProQ2400)",
+        "Двусторонняя печать": "Автоматическая (Duplex)",
+        "Сетевой интерфейс (Ethernet)": "Ethernet 10/100BASE-TX",
+        "Интерфейсы": "Ethernet 10/100, USB 2.0",
+        "Объем памяти": "64 МБ (расширение до 320 МБ)",
+        "Максимальная нагрузка": "45 000 стр/мес"
+      },
       "site_title": "Принтер OKI C510dn",
-      "site_description": null,
+      "site_description": "Цветной принтер формата a4 со скоростью печати до 30 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet 10/100, USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #121"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #121 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "brother|hl-2040",
@@ -1708,12 +1757,26 @@
         "Photosmart 5515",
         "Струйное Мфу HP 5515 / сканер"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ струйное (принтер/сканер/копир)",
+        "Технология печати": "Термальная струйная HP Thermal Inkjet",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "11 стр/мин (ISO)",
+        "Скорость печати (A4, цвет)": "8 стр/мин (ISO)",
+        "Разрешение печати": "до 4800 x 1200 dpi",
+        "Двусторонняя печать": "Автоматическая (Duplex)",
+        "Беспроводная связь": "Wi-Fi 802.11b/g/n",
+        "Мобильная печать": "HP ePrint, Apple AirPrint",
+        "Экран управления": "Цветной сенсорный ЖК-экран 6.0 см TouchSmart",
+        "Интерфейсы": "Wi-Fi, USB 2.0, кардридер SD/MMC",
+        "Картриджи": "HP 178 (черный, голубой, пурпурный, желтый)"
+      },
       "site_title": "МФУ HP Photosmart 5515",
-      "site_description": null,
+      "site_description": "Цветное струйное мфу формата a4 со скоростью печати до 11 стр/мин (ISO) с автоматической двусторонней печатью и интерфейсами Wi-Fi, USB 2.0, кардридер SD/MMC.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #104"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #104 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "brother|mfc-8880dn",
@@ -2097,12 +2160,27 @@
         "mx421ade",
         "Лазерное мфу 3 в 1 Lexmark MX421ade на запчасти"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ (3-в-1: принтер/сканер/копир/факс)",
+        "Технология печати": "Лазерная монохромная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "40 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Автоподатчик (ADF)": "Двусторонний DADF (50 листов)",
+        "Двусторонняя печать": "Автоматическая (Duplex)",
+        "Экран управления": "Цветной сенсорный экран Lexmark e-Task 4.3\" (10.9 см)",
+        "Сетевой интерфейс (Ethernet)": "Gigabit Ethernet 10/100/1000",
+        "Интерфейсы": "Gigabit Ethernet, USB 2.0 Hi-Speed, USB Host",
+        "Объем памяти": "1024 МБ",
+        "Максимальная нагрузка": "100 000 стр/мес",
+        "Модель картриджа": "Lexmark 56F5000 (6k) / 56F5H00 (15k) / 56F5X00 (20k)"
+      },
       "site_title": "МФУ Lexmark MX421ade",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 40 стр/мин с автоматической двусторонней печатью и интерфейсами Gigabit Ethernet, USB 2.0 Hi-Speed, USB Host.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #123"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #123 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "pantum|bm5100adn",
@@ -2154,12 +2232,27 @@
         "bm5100fdn",
         "Лазерное мфу 3 в 1 Pantum BM5100FDN на запчасти"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ (4-в-1: принтер/сканер/копир/факс)",
+        "Технология печати": "Лазерная монохромная",
+        "Цветность печати": "Черно-белая",
+        "Максимальный формат": "A4",
+        "Скорость печати (A4, ч/б)": "40 стр/мин",
+        "Разрешение печати": "1200 x 1200 dpi",
+        "Автоподатчик (ADF)": "Двусторонний DADF (50 листов)",
+        "Двусторонняя печать": "Автоматическая (Duplex)",
+        "Сетевой интерфейс (Ethernet)": "Gigabit Ethernet 10/100/1000",
+        "Интерфейсы": "USB 2.0 Hi-Speed, Gigabit Ethernet, RJ-11 (факс)",
+        "Факс": "Есть (33.6 Кбит/с)",
+        "Объем памяти": "512 МБ",
+        "Максимальная нагрузка": "80 000 стр/мес",
+        "Модель картриджа": "TL-5120 (3k) / TL-5120H (6k) / TL-5120X (15k), барабан DL-5120 (30k)"
+      },
       "site_title": "МФУ Pantum BM5100FDN",
-      "site_description": null,
+      "site_description": "Монохромное лазерное мфу формата a4 со скоростью печати до 40 стр/мин с автоматической двусторонней печатью и интерфейсами USB 2.0 Hi-Speed, Gigabit Ethernet, RJ-11 (факс).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #125"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #125 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "samsung|scx-4833fd",
@@ -2288,12 +2381,27 @@
         "sc2020",
         "Лазерный цветной мфу a3 xerox sc2020"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "МФУ цветное (принтер/сканер/копир)",
+        "Технология печати": "Светодиодная (S-LED) цветная",
+        "Цветность печати": "Цветная",
+        "Максимальный формат": "A3",
+        "Скорость печати (A4, ч/б)": "20 стр/мин",
+        "Скорость печати (A4, цвет)": "20 стр/мин",
+        "Разрешение печати": "1200 x 2400 dpi",
+        "Автоподатчик (ADF)": "Двусторонний DADF (110 листов)",
+        "Двусторонняя печать": "Автоматическая (Duplex)",
+        "Экран управления": "Цветной сенсорный экран 4.3\"",
+        "Сетевой интерфейс (Ethernet)": "Ethernet 10/100BASE-TX",
+        "Интерфейсы": "Ethernet 10/100, USB 2.0",
+        "Объем памяти": "512 МБ",
+        "Плотность бумаги": "60 - 216 г/м²"
+      },
       "site_title": "МФУ Xerox DocuCentre SC2020",
-      "site_description": null,
+      "site_description": "Цветное мфу формата a3 со скоростью печати до 20 стр/мин с автоматической двусторонней печатью и интерфейсами Ethernet 10/100, USB 2.0.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #148"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #148 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "epson|workforce-pro-wf-m5799",
@@ -2553,12 +2661,24 @@
         "V260",
         "Проектор NEC V260"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "DLP-проектор",
+        "Технология проецирования": "DLP (0.55\" DMD)",
+        "Световой поток (яркость)": "2600 ANSI люмен",
+        "Базовое разрешение": "800 x 600 (SVGA)",
+        "Максимальное разрешение": "до 1920 x 1080 (Full HD)",
+        "Контрастность": "2000:1",
+        "Срок службы лампы": "до 5000 часов (Eco-режим)",
+        "Поддержка 3D": "3D Ready (DLP Link 120 Гц)",
+        "Интерфейсы": "HDMI, 2x VGA (D-Sub), Composite, S-Video, RS-232, Audio",
+        "Встроенный динамик": "7 Вт моно",
+        "Вес": "2.5 кг"
+      },
       "site_title": "Проектор NEC V260",
-      "site_description": null,
+      "site_description": "Проектор со световым потоком 2600 ANSI люмен и разрешением 800 x 600 (SVGA).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #49, #312"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #49, #312 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|15-af000ur",
@@ -3601,12 +3721,25 @@
         "CC600",
         "Информационный киоск Zebra CC600"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Информационный микрокиоск",
+        "Диагональ экрана": "5.0\"",
+        "Разрешение экрана": "1280 x 720 (HD)",
+        "Тип сенсора": "Емкостный мультитач (PCAP)",
+        "Операционная система": "Android",
+        "Процессор": "Qualcomm Snapdragon 660, 8 ядер, 2.2 ГГц",
+        "Оперативная память": "4 ГБ RAM",
+        "Встроенная память": "32 ГБ Flash",
+        "Сканер штрихкодов": "Встроенный 1D/2D имидж-сканер SE2100",
+        "Беспроводная связь": "Wi-Fi 802.11ac, Bluetooth 5.0",
+        "Сетевой интерфейс": "Ethernet Gigabit с поддержкой PoE (802.3af)",
+        "Интерфейсы": "USB 2.0 OTG, RJ-45 Gigabit PoE"
+      },
       "site_title": "Информационный киоск Zebra CC600",
-      "site_description": null,
+      "site_description": "Информационный микрокиоск с экраном 5.0\" и сканером Встроенный 1D/2D имидж-сканер SE2100.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #47, #205"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #47, #205 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "bluebird|vf550",
@@ -3624,12 +3757,25 @@
         "Тсд bluebird vf550",
         "Тсд bluebird f550"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Корпоративный терминал сбора данных",
+        "Диагональ экрана": "5.45\"",
+        "Разрешение экрана": "1440 x 720 (HD+)",
+        "Операционная система": "Android",
+        "Процессор": "Восьмиядерный процессор 1.8 ГГц / 2.0 ГГц",
+        "Оперативная память": "2 ГБ / 4 ГБ RAM",
+        "Встроенная память": "16 ГБ / 32 ГБ Flash",
+        "Сканер штрихкодов": "Встроенный 1D/2D Imager",
+        "Связь": "4G LTE, Wi-Fi 802.11ac, Bluetooth 5.0 BLE, NFC, GPS",
+        "Класс защиты": "IP67, падения на бетон с высоты 1.5 м",
+        "Емкость аккумулятора": "Li-ion 3350 мА·ч",
+        "Камера": "13 Мп автофокус со вспышкой"
+      },
       "site_title": "Терминал сбора данных Bluebird VF550",
-      "site_description": null,
+      "site_description": "Терминал сбора данных (ТСД) с экраном 5.45\" и сканером Встроенный 1D/2D Imager.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #101, #201, #206"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #101, #201, #206 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "bluebird|ef501",
@@ -3646,12 +3792,25 @@
         "EF501",
         "Тсд bluebird ef501r"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Терминал сбора данных (ТСД)",
+        "Диагональ экрана": "5.0\"",
+        "Разрешение экрана": "1280 x 720 (HD)",
+        "Защитное стекло": "Corning Gorilla Glass",
+        "Операционная система": "Android",
+        "Процессор": "Восьмиядерный процессор 2.0 ГГц",
+        "Оперативная память": "2 ГБ / 4 ГБ RAM",
+        "Встроенная память": "16 ГБ / 64 ГБ Flash",
+        "Сканер штрихкодов": "Встроенный 1D/2D имидж-сканер",
+        "Связь": "4G LTE, Wi-Fi 802.11ac, Bluetooth, NFC, GPS",
+        "Класс защиты": "IP67 (пылевлагонепроницаемый, падения с 1.5 м)",
+        "Аккумулятор": "Li-ion 3200 мА·ч"
+      },
       "site_title": "Терминал сбора данных Bluebird EF501",
-      "site_description": null,
+      "site_description": "Терминал сбора данных (ТСД) с экраном 5.0\" и сканером Встроенный 1D/2D имидж-сканер.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #9"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #9 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "cisco|catalyst-ws-c2960-24",
@@ -3667,12 +3826,22 @@
         "WS-C2960-24",
         "Коммутатор Cisco Ws-C2960 24 порта"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Управляемый сетевой коммутатор Layer 2",
+        "Количество сетевых портов": "24 порта Fast Ethernet 10/100",
+        "Порты Uplink": "2x 10/100/1000BASE-T или 2x SFP (Dual-Personality)",
+        "Пропускная способность коммутации": "16 Гбит/с",
+        "Скорость пересылки пакетов": "6.5 Mpps",
+        "Размер таблицы MAC-адресов": "8 000 адресов",
+        "Объем оперативной памяти": "64 МБ DRAM, 32 МБ Flash",
+        "Управление": "CLI, SNMP, Web-интерфейс, Cisco Network Assistant",
+        "Форм-фактор": "1U для монтажа в 19\" стойку"
+      },
       "site_title": "Коммутатор Cisco Catalyst WS-C2960-24",
-      "site_description": null,
+      "site_description": "Сетевой коммутатор на 24 порта Fast Ethernet 10/100 с пропускной способностью 16 Гбит/с.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #99"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #99 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "3com|baseline-switch-2250-plus",
@@ -3687,12 +3856,22 @@
         "Baseline Switch 2250 Plus",
         "Коммутатор 3Com Baseline Switch 2250 Plus"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Интеллектуальный управляемый коммутатор (Smart Switch)",
+        "Количество сетевых портов": "48 портов Fast Ethernet 10/100 RJ-45",
+        "Порты Uplink": "2x комбо-порта 10/100/1000BASE-T / SFP",
+        "Пропускная способность коммутации": "13.6 Гбит/с",
+        "Скорость пересылки пакетов": "10.1 Mpps",
+        "Размер таблицы MAC-адресов": "8 000 адресов",
+        "Поддержка VLAN": "до 64 статических VLAN (IEEE 802.1Q)",
+        "Управление": "Веб-интерфейс управления (Web-managed)",
+        "Форм-фактор": "1U для монтажа в 19\" стойку"
+      },
       "site_title": "Коммутатор 3Com Baseline Switch 2250 Plus",
-      "site_description": null,
+      "site_description": "Сетевой коммутатор на 48 портов Fast Ethernet 10/100 RJ-45 с пропускной способностью 13.6 Гбит/с.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #83"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #83 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "hp|3600-48-poe-v2-si-jg307c",
@@ -3709,12 +3888,22 @@
         "HP 3600-48-PoE+ v2 SI (JG307C)",
         "Коммутатор HP 3600-48-PoE+ v2 SI JG307C 48x10/100"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Управляемый коммутатор Layer 3 с PoE+",
+        "Количество сетевых портов": "48 портов Fast Ethernet 10/100 RJ-45",
+        "Поддержка PoE": "PoE+ (IEEE 802.3at / 802.3af), бюджет мощности до 370 Вт",
+        "Порты Uplink": "4x Gigabit SFP комбо-порта (1000 Мбит/с)",
+        "Пропускная способность коммутации": "17.6 Гбит/с",
+        "Скорость пересылки пакетов": "13.1 Mpps",
+        "Размер таблицы MAC-адресов": "32 000 адресов",
+        "Таблица маршрутизации": "до 2 000 записей (IPv4/IPv6)",
+        "Форм-фактор": "1U для монтажа в 19\" стойку"
+      },
       "site_title": "Коммутатор HP 3600-48-PoE+ v2 SI (JG307C)",
-      "site_description": null,
+      "site_description": "Сетевой коммутатор на 48 портов Fast Ethernet 10/100 RJ-45 с пропускной способностью 17.6 Гбит/с.",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #93"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #93 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "cyberpower|br700elcd",
@@ -3730,12 +3919,23 @@
         "BR700ELCD",
         "Ибп CyberPower BR700elcd 420Вт живая батарея"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Линейно-интерактивный ИБП (Line-Interactive UPS)",
+        "Полная выходная мощность": "700 ВА",
+        "Активная выходная мощность": "420 Вт",
+        "Автоматическая стабилизация напряжения (AVR)": "Одноступенчатый Boost",
+        "Выходные разъемы питания": "6x Schuko CEE 7/4 (3 батарейное + 3 защита от всплесков)",
+        "Дисплей": "Многофункциональный ЖК-дисплей (LCD)",
+        "Защита линий связи": "Защита телефонной/сетевой линии RJ11/RJ45",
+        "Интерфейс связи": "USB порт для управления питанием (PowerPanel)",
+        "Энергосберегающая технология": "GreenPower UPS Bypass",
+        "Время автономной работы": "до 10 мин при нагрузке 50%"
+      },
       "site_title": "ИБП CyberPower BR700ELCD",
-      "site_description": null,
+      "site_description": "Источник бесперебойного питания (ИБП) мощностью 700 ВА (420 Вт).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #96"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #96 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "cyberpower|br700e",
@@ -3751,12 +3951,23 @@
         "BR700E",
         "Ибп CyberPower BR700e живая батарея"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Линейно-интерактивный ИБП (Line-Interactive UPS)",
+        "Полная выходная мощность": "700 ВА",
+        "Активная выходная мощность": "420 Вт",
+        "Автоматическая стабилизация напряжения (AVR)": "Одноступенчатый Boost",
+        "Выходные разъемы питания": "6x Schuko CEE 7/4 (3 батарейное + 3 защита от всплесков)",
+        "Индикация состояния": "Светодиодные индикаторы (LED)",
+        "Защита линий связи": "Защита RJ11/RJ45",
+        "Интерфейс связи": "USB порт управления",
+        "Энергосберегающая технология": "GreenPower UPS Bypass",
+        "Время переключения на батарею": "4 мс"
+      },
       "site_title": "ИБП CyberPower BR700E",
-      "site_description": null,
+      "site_description": "Источник бесперебойного питания (ИБП) мощностью 700 ВА (420 Вт).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #98"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #98 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "apc|back-ups-650",
@@ -3772,12 +3983,23 @@
         "Back-UPS 650",
         "Ибп APC back ups 650. Живая батарея"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Резервный / Линейно-интерактивный ИБП",
+        "Полная выходная мощность": "650 ВА",
+        "Активная выходная мощность": "390 - 400 Вт",
+        "Входное напряжение": "230 В (диапазон 160 - 286 В)",
+        "Выходные разъемы питания": "IEC 320 C13 / Schuko (в зависимости от ревизии)",
+        "Защита от импульсных перенапряжений": "Всплески энергии до 320 Дж",
+        "Защита телефонной/модемной линии": "RJ-11 / RJ-45",
+        "Интерфейс связи": "USB / RS-232 для управления PowerChute",
+        "Тип аккумулятора": "Свинцово-кислотный герметичный 12В (RBC17)",
+        "Время типовой работы от батареи": "до 11 мин при нагрузке 50%"
+      },
       "site_title": "ИБП APC Back-UPS 650",
-      "site_description": null,
+      "site_description": "Источник бесперебойного питания (ИБП) мощностью 650 ВА (390 - 400 Вт).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #97"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #97 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     },
     {
       "stable_key": "chieftec|apc-700c",
@@ -3949,12 +4171,25 @@
         "Материнская плата MSI A55M-P33. Гарантия",
         "Материнская плата MSI A55M-P33. Авито доставка"
       ],
-      "specifications": {},
+      "specifications": {
+        "Тип устройства": "Материнская плата",
+        "Сокет": "Socket FM1",
+        "Поддерживаемые процессоры": "AMD A-Series / E2-Series APU (Llano)",
+        "Чипсет": "AMD A55",
+        "Форм-фактор": "Micro-ATX (24.4 см x 21.5 см)",
+        "Тип оперативной памяти": "DDR3 (2 слота DIMM)",
+        "Максимальный объем памяти": "до 16 ГБ (1066/1333/1600/1866 МГц)",
+        "Слоты расширения": "1x PCI Express 2.0 x16, 1x PCIe x1, 1x PCI",
+        "Дисковые интерфейсы": "6x SATA II (3 Гбит/с) с поддержкой RAID 0, 1, 10",
+        "Сетевой интерфейс": "Gigabit Ethernet 10/100/1000 (Realtek RTL8111E)",
+        "Звуковой кодек": "8-канальный HD Audio (Realtek ALC887)",
+        "Видеовыходы": "VGA (D-Sub), DVI-D"
+      },
       "site_title": "Комплектующие MSI A55M-P33",
-      "site_description": null,
+      "site_description": "Материнская плата сокета Socket FM1 на чипсете AMD A55 (Micro-ATX (24.4 см x 21.5 см)).",
       "active": true,
-      "source": "local_existing_products",
-      "source_note": "Derived from local Product #62, #354"
+      "source": "mixed_verified",
+      "source_note": "Derived from local Product #62, #354 | Verified external enrichment 2026-10-05 (1 Tier A/B sources)"
     }
   ]
 }

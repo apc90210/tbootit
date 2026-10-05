@@ -163,17 +163,69 @@ def build_neutral_site_description(canonical_name: str, device_type: str, specs:
         cores = specs.get("Количество ядер", specs.get("cores", ""))
         freq = specs.get("Базовая частота", specs.get("base_frequency", ""))
         tdp = specs.get("Тепловыделение (TDP)", specs.get("tdp", ""))
+        chipset = specs.get("Чипсет", specs.get("chipset", ""))
+        ff = specs.get("Форм-фактор", specs.get("form_factor", ""))
 
-        cp_parts = ["Процессор" if socket or cores else "Комплектующее"]
-        if socket:
-            cp_parts.append(f"сокета {socket}")
-        if cores:
-            cp_parts.append(f"({cores} ядер)")
-        if freq:
-            cp_parts.append(f"с базовой частотой {freq}")
-        if tdp:
-            cp_parts.append(f"и тепловыделением {tdp}")
+        if chipset or ff:
+            cp_parts = ["Материнская плата"]
+            if socket:
+                cp_parts.append(f"сокета {socket}")
+            if chipset:
+                cp_parts.append(f"на чипсете {chipset}")
+            if ff:
+                cp_parts.append(f"({ff})")
+        else:
+            cp_parts = ["Процессор" if socket or cores else "Комплектующее"]
+            if socket:
+                cp_parts.append(f"сокета {socket}")
+            if cores:
+                cp_parts.append(f"({cores} ядер)")
+            if freq:
+                cp_parts.append(f"с базовой частотой {freq}")
+            if tdp:
+                cp_parts.append(f"и тепловыделением {tdp}")
         parts.append(" ".join(cp_parts))
+
+    elif device_type == "ups":
+        p_va = specs.get("Полная выходная мощность", specs.get("power_va", ""))
+        p_w = specs.get("Активная выходная мощность", specs.get("power_w", ""))
+        u_parts = ["Источник бесперебойного питания (ИБП)"]
+        if p_va:
+            u_parts.append(f"мощностью {p_va}")
+        if p_w:
+            u_parts.append(f"({p_w})")
+        parts.append(" ".join(u_parts))
+
+    elif device_type == "network":
+        ports = specs.get("Количество сетевых портов", specs.get("Количество портов", ""))
+        bw = specs.get("Пропускная способность коммутации", "")
+        n_parts = ["Сетевой коммутатор"]
+        if ports:
+            n_parts.append(f"на {ports}")
+        if bw:
+            n_parts.append(f"с пропускной способностью {bw}")
+        parts.append(" ".join(n_parts))
+
+    elif device_type == "projector":
+        lumens = specs.get("Световой поток (яркость)", "")
+        res = specs.get("Базовое разрешение", "")
+        pr_parts = ["Проектор"]
+        if lumens:
+            pr_parts.append(f"со световым потоком {lumens}")
+        if res:
+            pr_parts.append(f"и разрешением {res}")
+        parts.append(" ".join(pr_parts))
+
+    elif device_type in ("kiosk", "terminal"):
+        diag = specs.get("Диагональ экрана", "")
+        scanner = specs.get("Сканер штрихкодов", "")
+        label = "Информационный микрокиоск" if device_type == "kiosk" else "Терминал сбора данных (ТСД)"
+        t_parts = [label]
+        if diag:
+            t_parts.append(f"с экраном {diag}")
+        if scanner:
+            t_parts.append(f"и сканером {scanner}")
+        parts.append(" ".join(t_parts))
 
     if not parts:
         return f"{canonical_name} — проверенные технические характеристики производителя."
