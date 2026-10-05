@@ -116,6 +116,8 @@ def import_reference_models_from_dict(
 
         # Resolve category ID
         default_cat_id = item.get("default_category_id")
+        if default_cat_id and default_cat_id not in cat_map.values():
+            default_cat_id = None
         if not default_cat_id and category_hint:
             cat_key = str(category_hint).strip().casefold()
             default_cat_id = cat_map.get(cat_key)
