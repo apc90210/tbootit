@@ -58,7 +58,11 @@ def migrate_db(target_engine=None):
             ("source_type", "VARCHAR"),
             ("last_imported_at", "DATETIME"),
             ("barcode", "VARCHAR"),
-            ("canonical_category_id", "INTEGER")
+            ("canonical_category_id", "INTEGER"),
+            ("reference_model_id", "INTEGER REFERENCES product_reference_models(id)"),
+            ("reference_match_method", "VARCHAR"),
+            ("reference_match_confidence", "FLOAT"),
+            ("reference_enriched_at", "DATETIME")
         ]
         
         for col_name, col_type in updates:
@@ -71,6 +75,12 @@ def migrate_db(target_engine=None):
         # Ensure index for barcode
         try:
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_products_barcode ON products(barcode) WHERE barcode IS NOT NULL AND barcode != '';"))
+        except Exception as e:
+            print(f"Index creation warning: {e}")
+
+        # Ensure index for reference_model_id
+        try:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_reference_model_id ON products(reference_model_id);"))
         except Exception as e:
             print(f"Index creation warning: {e}")
 
@@ -220,6 +230,25 @@ def migrate_db(target_engine=None):
             """))
         except Exception as e:
             print(f"Migration error on sales status normalization: {e}")
+
+        # Migrate product_reference_models table for Stage 05A
+        try:
+            res_ref = conn.execute(text("PRAGMA table_info(product_reference_models);")).fetchall()
+            if res_ref:
+                ref_columns = [row[1] for row in res_ref]
+                ref_updates = [
+                    ("verification_state", "VARCHAR DEFAULT 'verified'"),
+                    ("source_urls_json", "TEXT"),
+                    ("confidence", "FLOAT")
+                ]
+                for col_name, col_type in ref_updates:
+                    if col_name not in ref_columns:
+                        try:
+                            conn.execute(text(f"ALTER TABLE product_reference_models ADD COLUMN {col_name} {col_type};"))
+                        except Exception as e:
+                            print(f"Migration error on product_reference_models: {e}")
+        except Exception as e:
+            print(f"Migration error on product_reference_models: {e}")
 
         # Migrate repair_orders table for Stage 05A
         res_repairs = conn.execute(text("PRAGMA table_info(repair_orders);")).fetchall()
@@ -408,4 +437,8 @@ app.include_router(integrations_router.router, prefix="/api/integrations", tags=
 app.include_router(avito_categories_router.router)
 app.include_router(avito_categories_router.product_router)
 app.include_router(avito_post_sale_router.router)
+from app.routers import product_reference as product_reference_router
+app.include_router(product_reference_router.router)
+app.include_router(product_reference_router.public_router)
+app.include_router(product_reference_router.public_router_plural)
 

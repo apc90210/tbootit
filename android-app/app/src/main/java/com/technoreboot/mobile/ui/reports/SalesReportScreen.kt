@@ -48,6 +48,7 @@ fun SalesReportScreen(
     onSettingsClicked: () -> Unit = {},
     onSaleClicked: (Int) -> Unit = {},
     onPosClicked: () -> Unit = {},
+    onQuickIntakeClicked: () -> Unit = {},
     hasUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -96,6 +97,13 @@ fun SalesReportScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onQuickIntakeClicked) {
+                        Icon(
+                            imageVector = Icons.Default.AddCircle,
+                            contentDescription = "Приём товара",
+                            tint = Color(0xFF10B981)
+                        )
+                    }
                     IconButton(onClick = onPosClicked) {
                         Icon(
                             imageVector = Icons.Default.QrCodeScanner,

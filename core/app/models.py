@@ -220,6 +220,10 @@ class Product(Base):
     source_origin = Column(String, nullable=True, default="manual")
     source_attributes_json = Column(Text, nullable=True)
     last_imported_at = Column(DateTime(timezone=True), nullable=True)
+    reference_model_id = Column(Integer, ForeignKey("product_reference_models.id"), nullable=True, index=True)
+    reference_match_method = Column(String, nullable=True)
+    reference_match_confidence = Column(Float, nullable=True)
+    reference_enriched_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -230,6 +234,7 @@ class Product(Base):
     avito_attribute_values = relationship("ProductAvitoAttributeValue", back_populates="product", cascade="all, delete-orphan")
     photos = relationship("ProductPhoto", back_populates="product", cascade="all, delete-orphan")
     avito_post_sale_tasks = relationship("AvitoPostSaleTask", back_populates="product", cascade="all, delete-orphan")
+    reference_model = relationship("ProductReferenceModel", back_populates="products")
 
     @property
     def main_photo_url(self):
@@ -577,3 +582,44 @@ class MobilePairingCode(Base):
     used = Column(Boolean, default=False, nullable=False)
     used_at = Column(DateTime(timezone=True), nullable=True)
     device_name = Column(String, nullable=True)
+
+
+class ProductReferenceModel(Base):
+    __tablename__ = "product_reference_models"
+
+    id = Column(Integer, primary_key=True, index=True)
+    stable_key = Column(String, unique=True, index=True, nullable=False)
+    canonical_name = Column(String, index=True, nullable=False)
+    brand = Column(String, index=True, nullable=False)
+    model = Column(String, index=True, nullable=False)
+    device_type = Column(String, nullable=True, index=True)
+    default_category_id = Column(Integer, ForeignKey("categories.id"), nullable=True, index=True)
+    specifications_json = Column(Text, nullable=True)
+    site_title = Column(String, nullable=True)
+    site_description = Column(Text, nullable=True)
+    active = Column(Boolean, default=True, nullable=False)
+    source = Column(String, default="manual", nullable=False)
+    source_note = Column(Text, nullable=True)
+    verification_state = Column(String, default="verified", nullable=True)
+    source_urls_json = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    default_category = relationship("Category")
+    aliases = relationship("ProductReferenceAlias", back_populates="reference_model", cascade="all, delete-orphan")
+    products = relationship("Product", back_populates="reference_model")
+
+
+class ProductReferenceAlias(Base):
+    __tablename__ = "product_reference_aliases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reference_model_id = Column(Integer, ForeignKey("product_reference_models.id"), nullable=False, index=True)
+    alias = Column(String, nullable=False)
+    normalized_alias = Column(String, nullable=False, index=True)
+    priority = Column(Integer, default=100, nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    reference_model = relationship("ProductReferenceModel", back_populates="aliases")

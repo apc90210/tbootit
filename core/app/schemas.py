@@ -133,6 +133,237 @@ class BarcodeBulkGenerateResponse(BaseModel):
     skipped_existing: int
     errors: List[str] = []
 
+# Product Reference Catalog Schemas
+class ProductReferenceAliasBase(BaseModel):
+    alias: str
+    normalized_alias: Optional[str] = None
+    priority: Optional[int] = 100
+    active: Optional[bool] = True
+
+class ProductReferenceAliasCreate(ProductReferenceAliasBase):
+    pass
+
+class ProductReferenceAlias(ProductReferenceAliasBase):
+    id: int
+    reference_model_id: int
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class ProductReferenceModelBase(BaseModel):
+    canonical_name: str
+    brand: str
+    model: str
+    device_type: Optional[str] = None
+    default_category_id: Optional[int] = None
+    specifications_json: Optional[str] = None
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+    active: Optional[bool] = True
+    source: Optional[str] = "manual"
+    source_note: Optional[str] = None
+    verification_state: Optional[str] = "verified"
+    source_urls_json: Optional[str] = None
+    confidence: Optional[float] = None
+
+class ProductReferenceModelCreate(ProductReferenceModelBase):
+    stable_key: Optional[str] = None
+    aliases: Optional[List[str]] = None
+    specifications: Optional[Dict[str, Any]] = None
+
+class ProductReferenceModelUpdate(BaseModel):
+    canonical_name: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    device_type: Optional[str] = None
+    default_category_id: Optional[int] = None
+    specifications_json: Optional[str] = None
+    specifications: Optional[Dict[str, Any]] = None
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+    active: Optional[bool] = None
+    source: Optional[str] = None
+    source_note: Optional[str] = None
+    verification_state: Optional[str] = None
+    source_urls_json: Optional[str] = None
+    confidence: Optional[float] = None
+
+class ProductReferenceAliasUpdate(BaseModel):
+    alias: Optional[str] = None
+    priority: Optional[int] = None
+    active: Optional[bool] = None
+
+class ProductReferenceModel(ProductReferenceModelBase):
+    id: int
+    stable_key: str
+    aliases: List[ProductReferenceAlias] = []
+    specifications: Optional[Dict[str, Any]] = None
+    linked_products_count: Optional[int] = 0
+    specifications_count: Optional[int] = 0
+    aliases_count: Optional[int] = 0
+    category_name: Optional[str] = None
+    has_conflict: Optional[bool] = False
+    source_urls: Optional[List[str]] = []
+    conflicts: Optional[List[Dict[str, Any]]] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class ProductReferenceSearchItem(BaseModel):
+    reference_model_id: int
+    canonical_name: str
+    brand: str
+    model: str
+    device_type: Optional[str] = None
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    confidence: float = 1.0
+    tier: str = "tier1_exact_alias"
+    matched_string: Optional[str] = None
+    description_preview: Optional[str] = None
+    specifications: Optional[Dict[str, Any]] = None
+    verification_state: Optional[str] = "verified"
+    prior_products_count: int = 0
+    prior_product_sample: Optional[Dict[str, Any]] = None
+
+class ProductReferenceSearchResponse(BaseModel):
+    query: str
+    total_candidates: int
+    candidates: List[ProductReferenceSearchItem] = []
+
+class AiAssistRequest(BaseModel):
+    query: str
+    ocr_text: Optional[str] = None
+    category_hint: Optional[str] = None
+
+class AiAssistResponse(BaseModel):
+    status: str
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    canonical_name: Optional[str] = None
+    category: Optional[str] = None
+    device_type: Optional[str] = None
+    likely_aliases: List[str] = []
+    proposed_structured_specs: Dict[str, Any] = {}
+    proposed_reusable_description: Optional[str] = None
+    confidence: float = 0.0
+    missing_uncertain_fields: List[str] = []
+    source_provenance: str = "ai_draft"
+    source_urls: List[str] = []
+    message: Optional[str] = None
+
+class QuickIntakePhotoPayload(BaseModel):
+    filename: str
+    content_base64: str
+
+class QuickIntakeProductCreate(BaseModel):
+    title: Optional[str] = None
+    reference_model_id: Optional[int] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    device_type: Optional[str] = None
+    category_id: Optional[int] = None
+    condition: str = "used"
+    notes: Optional[str] = None
+    sale_price: float
+    purchase_price: Optional[float] = 0.0
+    quantity: int = 1
+    barcode: Optional[str] = None
+    sku: Optional[str] = None
+    photos: List[QuickIntakePhotoPayload] = []
+
+class QuickIntakeProductResponse(BaseModel):
+    id: int
+    sku: str
+    title: str
+    sale_price: float
+    quantity: int
+    condition: Optional[str] = None
+    notes: Optional[str] = None
+    reference_model_id: Optional[int] = None
+    canonical_name: Optional[str] = None
+    category_id: Optional[int] = None
+    photos_count: int = 0
+    main_photo_url: Optional[str] = None
+    status: str = "in_stock"
+    created_at: Optional[datetime] = None
+
+class ProductReferenceMatchPreviewRequest(BaseModel):
+    title: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    description: Optional[str] = None
+    existing_specs: Optional[Dict[str, Any]] = None
+
+class ProductReferenceMatchPreviewResponse(BaseModel):
+    matched: bool
+    reference_model_id: Optional[int] = None
+    canonical_name: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    method: Optional[str] = None
+    confidence: Optional[float] = None
+    status: str = "ok"
+    reason: Optional[str] = None
+    candidates: List[Dict[str, Any]] = []
+    would_fill: Dict[str, Any] = {}
+
+class ProductReferenceListResponse(BaseModel):
+    items: List[ProductReferenceModel]
+    total: int
+    limit: int
+    offset: int
+
+class ProductReferenceLearnRequest(BaseModel):
+    canonical_name: Optional[str] = None
+    custom_aliases: Optional[List[str]] = None
+    raw_alias: Optional[str] = None
+
+class ProductReferenceLinkRequest(BaseModel):
+    reference_model_id: int
+    apply_enrichment: bool = False
+
+class ProductReferenceLinkedProductItem(BaseModel):
+    id: int
+    title: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    sale_price: Optional[float] = None
+    status: Optional[str] = None
+    condition: Optional[str] = None
+    serial_number: Optional[str] = None
+    primary_photo_url: Optional[str] = None
+    reference_match_method: Optional[str] = None
+    reference_confidence: Optional[float] = None
+    reference_matched_at: Optional[datetime] = None
+
+class ProductReferenceReviewQueueItem(BaseModel):
+    product_id: int
+    title: str
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    sale_price: Optional[float] = None
+    status: Optional[str] = None
+    candidates: List[Dict[str, Any]] = []
+
+class ProductReferenceConflictItem(BaseModel):
+    stable_key: str
+    canonical_name: str
+    status: str
+    field: str
+    note: Optional[str] = None
+    sources_compared: List[Dict[str, Any]] = []
+
+class ProductReferenceReviewQueueResponse(BaseModel):
+    unresolved_products: List[ProductReferenceReviewQueueItem] = []
+    conflicts: List[ProductReferenceConflictItem] = []
+    summary: Dict[str, Any] = {}
+
 # Customer Schemas
 class CustomerBase(BaseModel):
     name: str

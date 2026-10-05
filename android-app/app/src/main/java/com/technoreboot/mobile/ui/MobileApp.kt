@@ -29,7 +29,8 @@ enum class AppScreen {
     MAIN,
     SETTINGS,
     RECEIPT_DETAIL,
-    POS_TERMINAL
+    POS_TERMINAL,
+    QUICK_INTAKE
 }
 
 @Composable
@@ -100,6 +101,9 @@ fun MobileApp(
     BackHandler(enabled = true) {
         when {
             currentScreen == AppScreen.POS_TERMINAL -> {
+                currentScreen = AppScreen.MAIN
+            }
+            currentScreen == AppScreen.QUICK_INTAKE -> {
                 currentScreen = AppScreen.MAIN
             }
             currentScreen == AppScreen.RECEIPT_DETAIL -> {
@@ -237,6 +241,19 @@ fun MobileApp(
                     currentScreen = AppScreen.MAIN
                 }
             }
+            AppScreen.QUICK_INTAKE -> {
+                val session = currentSession
+                if (session != null) {
+                    com.technoreboot.mobile.ui.intake.QuickIntakeScreen(
+                        session = session,
+                        keystoreManager = keystoreManager,
+                        apiClient = apiClient,
+                        onBackClicked = { currentScreen = AppScreen.MAIN }
+                    )
+                } else {
+                    currentScreen = AppScreen.MAIN
+                }
+            }
             AppScreen.MAIN -> {
                 val session = currentSession
                 if (session != null) {
@@ -263,6 +280,9 @@ fun MobileApp(
                         },
                         onPosClicked = {
                             currentScreen = AppScreen.POS_TERMINAL
+                        },
+                        onQuickIntakeClicked = {
+                            currentScreen = AppScreen.QUICK_INTAKE
                         },
                         hasUpdateBadge = hasUpdateBadge,
                         onRevokedDismissed = {

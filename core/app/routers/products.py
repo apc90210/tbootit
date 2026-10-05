@@ -8,8 +8,16 @@ from app.routers.customers import log_audit
 from app.services.barcodes import generate_barcode_for_product, generate_missing_barcodes
 from app.services.product_json_service import generate_canonical_sku
 from app.services.avito_schema_service import upsert_avito_category_schema, upsert_product_avito_attributes
+from app.services.product_categorizer import classify_product
+from app import storage
 import json
 import os
+import uuid
+import hashlib
+import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -472,6 +480,21 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
         )
         if avito_cat:
             db_product.avito_category_id = avito_cat.id
+    elif not db_product.category_id:
+        from app.services.product_categorizer import classify_product, CANONICAL_CATEGORIES
+        c_res = classify_product(
+            title=db_product.title,
+            site_title=db_product.site_title,
+            brand=db_product.brand,
+            model=db_product.model,
+            description=db_product.description,
+        )
+        cat = db.query(models.Category).filter(models.Category.name == c_res.category_name).first()
+        if not cat:
+            cat = models.Category(name=c_res.category_name, slug=c_res.category_slug)
+            db.add(cat)
+            db.flush()
+        db_product.category_id = cat.id
 
     # 6. Characteristics
     if chars:
@@ -488,6 +511,30 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
             category_id=db_product.avito_category_id,
             characteristics=chars
         )
+
+    # 7. Reference model auto-enrichment for missing fields
+    try:
+        from app.services.product_reference_matcher import match_product
+        from app.services.product_reference_enricher import enrich_product_from_reference
+        m_res = match_product(
+            db=db,
+            title=db_product.title,
+            brand=db_product.brand,
+            model=db_product.model,
+            description=db_product.description,
+            active_only=True
+        )
+        if m_res.matched and m_res.reference_model:
+            enrich_product_from_reference(
+                db=db,
+                product=db_product,
+                reference=m_res.reference_model,
+                method=m_res.method or "auto_create",
+                confidence=m_res.confidence or 1.0,
+                apply=True
+            )
+    except Exception:
+        pass
 
     db.commit()
     db.refresh(db_product)
@@ -508,6 +555,226 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
 
     db.commit()
     return db_product
+
+
+@router.post("/quick-intake", response_model=schemas.QuickIntakeProductResponse)
+def quick_intake_product(
+    payload: schemas.QuickIntakeProductCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Quick Product Intake endpoint for Mobile and POS operators.
+    Per Section 15, 16, 17 of TR_Stage05A:
+    - Creates product card in Core immediately (status='in_stock').
+    - Pre-fills specifications and description from reference model when linked.
+    - Item-specific notes (features, defects, cartridge state) are stored in product.notes,
+      STRICTLY ISOLATED from the reusable reference model.
+    - Saves uploaded photos to persistent media storage.
+    - Creates initial stock movement and audit trail.
+    """
+    if payload.sale_price < 0:
+        raise HTTPException(status_code=400, detail="Цена продажи должна быть неотрицательной")
+    if payload.quantity < 1:
+        raise HTTPException(status_code=400, detail="Количество должно быть не менее 1")
+
+    ref_by_id: Optional[models.ProductReferenceModel] = None
+    if payload.reference_model_id:
+        ref_by_id = db.query(models.ProductReferenceModel).filter(
+            models.ProductReferenceModel.id == payload.reference_model_id
+        ).first()
+
+    # Title resolution
+    title = (payload.title or "").strip()
+    if not title:
+        if ref_by_id:
+            title = ref_by_id.canonical_name
+        elif payload.brand or payload.model:
+            title = f"{payload.brand or ''} {payload.model or ''}".strip()
+        else:
+            title = "Товар без названия"
+
+    # SKU resolution
+    sku = (payload.sku or "").strip()
+    if not sku:
+        new_sku = generate_canonical_sku()
+        while db.query(models.Product).filter(models.Product.sku == new_sku).first():
+            new_sku = generate_canonical_sku()
+        sku = new_sku
+    else:
+        existing_sku = db.query(models.Product).filter(models.Product.sku == sku).first()
+        if existing_sku:
+            raise HTTPException(status_code=409, detail=f"Товар с артикулом '{sku}' уже существует")
+
+    # Barcode resolution
+    barcode = (payload.barcode or "").strip() or None
+    if barcode:
+        existing_bc = db.query(models.Product).filter(models.Product.barcode == barcode).first()
+        if existing_bc:
+            raise HTTPException(status_code=409, detail=f"Товар со штрихкодом '{barcode}' уже существует")
+
+    # Product creation without separate manual prefill
+    # Pipeline: Android -> Core Product -> canonical matcher -> canonical Core Safe Enricher -> canonical Product
+    db_product = models.Product(
+        sku=sku,
+        barcode=barcode,
+        title=title,
+        category_id=payload.category_id,
+        brand=(payload.brand or "").strip() or None,
+        model=(payload.model or "").strip() or None,
+        condition=payload.condition,
+        notes=payload.notes,  # Item-specific notes strictly isolated on product
+        sale_price=payload.sale_price,
+        purchase_price=payload.purchase_price or 0.0,
+        quantity=payload.quantity,
+        status="in_stock",
+        source_origin="mobile_quick_intake",
+    )
+    db.add(db_product)
+    db.flush()
+
+    # 1. Canonical Core Matcher
+    from app.services.product_reference_matcher import match_product
+    from app.services.product_reference_enricher import enrich_product_from_reference
+
+    m_res = match_product(
+        db=db,
+        title=db_product.title,
+        brand=db_product.brand,
+        model=db_product.model,
+        description=db_product.description,
+        active_only=True
+    )
+
+    ref_to_enrich: Optional[models.ProductReferenceModel] = None
+    match_method: str = "canonical_match"
+    match_conf: float = 1.0
+
+    if ref_by_id:
+        ref_to_enrich = ref_by_id
+        if m_res.matched and m_res.reference_model and m_res.reference_model.id == ref_by_id.id:
+            match_method = m_res.method or "canonical_match"
+            match_conf = m_res.confidence or 1.0
+        else:
+            match_method = "manual_selection"
+            match_conf = 1.0
+    elif m_res.matched and m_res.reference_model:
+        ref_to_enrich = m_res.reference_model
+        match_method = m_res.method or "canonical_match"
+        match_conf = m_res.confidence or 1.0
+
+    # 2. Canonical Core Safe Enricher (safe merge, provenance, preserving manual product values)
+    if ref_to_enrich:
+        enrich_product_from_reference(
+            db=db,
+            product=db_product,
+            reference=ref_to_enrich,
+            method=match_method,
+            confidence=match_conf,
+            apply=True
+        )
+
+    # Category fallback if still missing after enrichment
+    if not db_product.category_id:
+        cat_res = classify_product(title=db_product.title, description=db_product.site_description)
+        if cat_res and cat_res.category_slug:
+            matched_cat = db.query(models.Category).filter(models.Category.slug == cat_res.category_slug).first()
+            if matched_cat:
+                db_product.category_id = matched_cat.id
+    if not db_product.category_id:
+        def_cat = db.query(models.Category).first()
+        db_product.category_id = def_cat.id if def_cat else None
+
+    # Handle photos
+    photos_created = 0
+    main_photo_url = None
+    if payload.photos:
+        target_dir = os.path.join(storage.get_product_photos_dir(), str(db_product.id))
+        os.makedirs(target_dir, exist_ok=True)
+        for idx, p_item in enumerate(payload.photos):
+            try:
+                raw_b64 = p_item.content_base64
+                if "," in raw_b64:
+                    raw_b64 = raw_b64.split(",", 1)[1]
+                img_bytes = base64.b64decode(raw_b64)
+                if not img_bytes:
+                    continue
+                content_hash = hashlib.sha256(img_bytes).hexdigest()
+                ext = os.path.splitext(p_item.filename)[1].lower() or ".jpg"
+                safe_filename = f"{db_product.id}_{idx}_{uuid.uuid4().hex[:8]}{ext}"
+                file_path = os.path.join(target_dir, safe_filename)
+                with open(file_path, "wb") as f:
+                    f.write(img_bytes)
+
+                media_url = f"/media/product_photos/{db_product.id}/{safe_filename}"
+                photo_row = models.ProductPhoto(
+                    product_id=db_product.id,
+                    filename=safe_filename,
+                    storage_path=file_path,
+                    media_url=media_url,
+                    content_hash=content_hash,
+                    sort_order=idx
+                )
+                db.add(photo_row)
+                photos_created += 1
+                if idx == 0:
+                    main_photo_url = media_url
+            except Exception as e:
+                logger.warning("Failed to save intake photo for product %d: %s", db_product.id, e)
+
+    # Initial stock movement
+    mov = models.StockMovement(
+        product_id=db_product.id,
+        movement_type="initial",
+        quantity_delta=payload.quantity,
+        old_quantity=0,
+        new_quantity=payload.quantity,
+        reason="mobile_quick_intake",
+        comment="Поступление через быстрый прием (Mobile Quick Intake)"
+    )
+    db.add(mov)
+
+    log_product_event(
+        db,
+        db_product.id,
+        "quick_intake",
+        comment=f"Быстрый прием товара. Примечание: {payload.notes or '-'}"
+    )
+    log_audit(
+        db,
+        "product",
+        db_product.id,
+        "quick_intake",
+        new_value={
+            "id": db_product.id,
+            "sku": sku,
+            "title": title,
+            "price": payload.sale_price,
+            "qty": payload.quantity,
+            "notes": payload.notes,
+            "reference_model_id": db_product.reference_model_id
+        }
+    )
+
+    db.commit()
+    db.refresh(db_product)
+
+    return schemas.QuickIntakeProductResponse(
+        id=db_product.id,
+        sku=db_product.sku,
+        title=db_product.title,
+        sale_price=db_product.sale_price,
+        quantity=db_product.quantity,
+        condition=db_product.condition,
+        notes=db_product.notes,
+        reference_model_id=db_product.reference_model_id,
+        canonical_name=ref_to_enrich.canonical_name if ref_to_enrich else None,
+        category_id=db_product.category_id,
+        photos_count=photos_created,
+        main_photo_url=main_photo_url,
+        status=db_product.status or "in_stock",
+        created_at=db_product.created_at
+    )
+
 
 @router.get("/{product_id}/details", response_model=schemas.ProductDetails)
 def get_product_details(product_id: int, db: Session = Depends(get_db)):

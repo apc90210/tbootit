@@ -9,10 +9,10 @@ android {
 
     val propVersionCode = project.findProperty("appVersionCode")?.toString()?.toIntOrNull()
         ?: System.getenv("APP_VERSION_CODE")?.toIntOrNull()
-        ?: 21
+        ?: 22
     val propVersionName = project.findProperty("appVersionName")?.toString()
         ?: System.getenv("APP_VERSION_NAME")
-        ?: "1.5.1"
+        ?: "1.6.0"
 
     defaultConfig {
         applicationId = "com.technoreboot.mobile"

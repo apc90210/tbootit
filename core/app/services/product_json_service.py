@@ -416,10 +416,21 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
             product.barcode = str(p.get("barcode")).strip() or None
 
         # Resolve category
-        cat_name = (p.get("category") or "Без категории").strip()
+        cat_name = (p.get("category") or "").strip()
+        if not cat_name or cat_name in ("Без категории", "Другое"):
+            from app.services.product_categorizer import classify_product
+            c_res = classify_product(
+                title=product.title,
+                brand=product.brand,
+                model=product.model,
+                description=product.description,
+            )
+            cat_name = c_res.category_name
+
         cat = db.query(models.Category).filter(models.Category.name == cat_name).first()
         if not cat:
-            cat_slug = cat_name.lower().replace(" ", "-").replace("/", "-")
+            from app.services.product_categorizer import CANONICAL_CATEGORIES
+            cat_slug = CANONICAL_CATEGORIES.get(cat_name, {}).get("slug") or cat_name.lower().replace(" ", "-").replace("/", "-")
             cat = models.Category(name=cat_name, slug=cat_slug)
             db.add(cat)
             db.flush()
@@ -456,6 +467,30 @@ def import_canonical_products(db: Session, payload_data: Any) -> Dict[str, Any]:
                 )
         except Exception:
             pass  # Attributes schema is auxiliary and shouldn't block product creation
+
+        # Auto-enrichment from reference catalog for missing fields
+        try:
+            from app.services.product_reference_matcher import match_product
+            from app.services.product_reference_enricher import enrich_product_from_reference
+            m_res = match_product(
+                db=db,
+                title=product.title,
+                brand=product.brand,
+                model=product.model,
+                description=product.description,
+                active_only=True
+            )
+            if m_res.matched and m_res.reference_model:
+                enrich_product_from_reference(
+                    db=db,
+                    product=product,
+                    reference=m_res.reference_model,
+                    method=m_res.method or "json_import",
+                    confidence=m_res.confidence or 1.0,
+                    apply=True
+                )
+        except Exception:
+            pass
 
         # Event log
         event_comment = f"Успешно {'обновлен' if operation == 'updated' else 'создан'} через канонический JSON импорт"
