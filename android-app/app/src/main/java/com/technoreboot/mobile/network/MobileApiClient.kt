@@ -11,6 +11,12 @@ import com.technoreboot.mobile.model.ProductReferenceSearchResponse
 import com.technoreboot.mobile.model.AiAssistResponse
 import com.technoreboot.mobile.model.QuickIntakeRequest
 import com.technoreboot.mobile.model.QuickIntakeResponse
+import com.technoreboot.mobile.model.CatalogProduct
+import com.technoreboot.mobile.model.CatalogProductDetail
+import com.technoreboot.mobile.model.CatalogFilterOptions
+import com.technoreboot.mobile.model.CatalogProductsResult
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -1275,4 +1281,231 @@ class MobileApiClient(
             ApiResult.Error(0, "Непредвиденная ошибка: ${e.message ?: "неизвестная ошибка"}")
         }
     }
+
+    /**
+     * Lists inventory products for Mobile Catalog via GET /api/mobile/catalog/products
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun getCatalogProducts(
+        credentialId: String,
+        privateKey: PrivateKey,
+        query: String? = null,
+        inStockOnly: Boolean = true,
+        categoryId: Int? = null,
+        brand: String? = null,
+        limit: Int = 20,
+        offset: Int = 0
+    ): ApiResult<CatalogProductsResult> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Доступ этого устройства отозван" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+
+        val queryParams = mutableListOf<Pair<String, String>>()
+        if (!brand.isNullOrBlank()) {
+            queryParams.add("brand" to java.net.URLEncoder.encode(brand.trim(), "UTF-8"))
+        }
+        if (categoryId != null) {
+            queryParams.add("category_id" to categoryId.toString())
+        }
+        queryParams.add("in_stock_only" to inStockOnly.toString())
+        queryParams.add("limit" to limit.toString())
+        queryParams.add("offset" to offset.toString())
+        if (!query.isNullOrBlank()) {
+            queryParams.add("q" to java.net.URLEncoder.encode(query.trim(), "UTF-8"))
+        }
+
+        val canonicalPath = RequestBinding.canonicalizePath("/api/mobile/catalog/products", queryParams)
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            val itemsArr = json.optJSONArray("items")
+            val list = mutableListOf<CatalogProduct>()
+            if (itemsArr != null) {
+                for (i in 0 until itemsArr.length()) {
+                    val itemObj = itemsArr.optJSONObject(i)
+                    if (itemObj != null) {
+                        list.add(CatalogProduct.fromJson(itemObj))
+                    }
+                }
+            }
+            CatalogProductsResult(
+                items = list,
+                total = json.optInt("total", list.size),
+                limit = json.optInt("limit", limit),
+                offset = json.optInt("offset", offset)
+            )
+        }
+    }
+
+    /**
+     * Retrieves detailed product card for Mobile Catalog via GET /api/mobile/catalog/products/{product_id}
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun getCatalogProductDetail(
+        productId: Int,
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<CatalogProductDetail> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Доступ этого устройства отозван" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/catalog/products/$productId"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            CatalogProductDetail.fromJson(json)
+        }
+    }
+
+    /**
+     * Retrieves filter options (categories and brands) for Mobile Catalog via GET /api/mobile/catalog/filter-options
+     * protected by TRMOBILE1 PoP authentication.
+     */
+    suspend fun getCatalogFilterOptions(
+        credentialId: String,
+        privateKey: PrivateKey
+    ): ApiResult<CatalogFilterOptions> = withContext(Dispatchers.IO) {
+        val challengeResult = getChallenge(credentialId)
+        if (challengeResult !is ApiResult.Success) {
+            val err = challengeResult as ApiResult.Error
+            return@withContext ApiResult.Error(
+                code = err.code,
+                message = if (err.code == 403) "Доступ этого устройства отозван" else err.message,
+                isNetworkError = err.isNetworkError
+            )
+        }
+
+        val nonce = challengeResult.data.nonce
+        val method = "GET"
+        val canonicalPath = "/api/mobile/catalog/filter-options"
+        val emptyBodyBytes = ByteArray(0)
+        val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
+
+        val canonicalPayload = RequestBinding.buildCanonicalSigningPayload(
+            credentialId = credentialId,
+            nonceHex = nonce,
+            method = method,
+            canonicalPath = canonicalPath,
+            bodySha256 = bodyHash
+        )
+
+        val signatureBase64 = try {
+            RequestBinding.signPayload(canonicalPayload, privateKey)
+        } catch (e: Exception) {
+            return@withContext ApiResult.Error(
+                code = 500,
+                message = "Ошибка формирования подписи в защищённом хранилище: ${e.message}"
+            )
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl$canonicalPath")
+            .header("X-Mobile-Credential-Id", credentialId)
+            .header("X-Mobile-Nonce", nonce)
+            .header("X-Mobile-Signature", signatureBase64)
+            .get()
+            .build()
+
+        executeRequest(request) { json ->
+            CatalogFilterOptions.fromJson(json)
+        }
+    }
+
+    /**
+     * Resolves and downloads image bitmap using OkHttp.
+     * Supports relative media paths like /api/mobile/media/... or absolute URLs.
+     */
+    suspend fun loadBitmap(rawUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+        val fullUrl = if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+            rawUrl
+        } else {
+            val clean = if (rawUrl.startsWith("/")) rawUrl else "/$rawUrl"
+            "$baseUrl$clean"
+        }
+
+        try {
+            val request = Request.Builder().url(fullUrl).get().build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val stream = response.body?.byteStream() ?: return@withContext null
+                    BitmapFactory.decodeStream(stream)
+                } else {
+                    null
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
+

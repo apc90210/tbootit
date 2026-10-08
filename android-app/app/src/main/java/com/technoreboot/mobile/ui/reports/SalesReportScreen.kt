@@ -49,6 +49,7 @@ fun SalesReportScreen(
     onSaleClicked: (Int) -> Unit = {},
     onPosClicked: () -> Unit = {},
     onQuickIntakeClicked: () -> Unit = {},
+    onCatalogClicked: () -> Unit = {},
     hasUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -97,6 +98,13 @@ fun SalesReportScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onCatalogClicked) {
+                        Icon(
+                            imageVector = Icons.Default.Inventory2,
+                            contentDescription = "Каталог",
+                            tint = Color(0xFF6366F1)
+                        )
+                    }
                     IconButton(onClick = onQuickIntakeClicked) {
                         Icon(
                             imageVector = Icons.Default.AddCircle,
@@ -172,8 +180,53 @@ fun SalesReportScreen(
                 onPeriodSelected = onPeriodSelected,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             )
+
+            // Quick Menu Bar: Catalog & Intake
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onCatalogClicked,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Inventory2,
+                        contentDescription = null,
+                        tint = Color(0xFF6366F1),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Каталог",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+                OutlinedButton(
+                    onClick = onQuickIntakeClicked,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        Icons.Default.AddCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Приём",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
 
             // Content Area
             Box(

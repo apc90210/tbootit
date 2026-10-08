@@ -3041,4 +3041,213 @@ async def api_mobile_products_quick_intake(request: Request):
         raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
 
 
+# =====================================================================
+# STAGE 06A: MOBILE INVENTORY CATALOG (READ-ONLY FACADE)
+# =====================================================================
+
+@app.get("/api/mobile/catalog/products")
+async def api_mobile_catalog_products(
+    request: Request,
+    q: Optional[str] = Query(None),
+    in_stock_only: bool = Query(True),
+    category_id: Optional[int] = Query(None),
+    brand: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+):
+    """
+    Mobile Inventory Catalog listing with stock & filter support.
+    Protected by TRMOBILE1 PoP authentication.
+    """
+    ctx = await _get_mobile_auth(request)
+    headers = {"x-api-token": os.getenv("CORE_API_TOKEN", "")}
+    url = f"{CORE_API_URL}/api/products/"
+    params = {
+        "limit": limit,
+        "offset": offset,
+    }
+    if q and q.strip():
+        params["q"] = q.strip()
+    if in_stock_only:
+        params["status"] = "in_stock"
+    if category_id is not None:
+        params["category_id"] = category_id
+    if brand and brand.strip():
+        params["brand"] = brand.strip()
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                raw_items = raw_data.get("items", []) if isinstance(raw_data, dict) else raw_data
+                catalog_items = []
+                for raw_prod in raw_items:
+                    prod_id = int(raw_prod.get("id"))
+                    title = raw_prod.get("title") or f"Товар #{prod_id}"
+                    bc = raw_prod.get("barcode") or ""
+                    sku = raw_prod.get("sku") or ""
+                    brand_val = raw_prod.get("brand") or ""
+                    model_val = raw_prod.get("model") or ""
+                    cat_id = raw_prod.get("category_id")
+                    sale_price = float(raw_prod.get("sale_price") if raw_prod.get("sale_price") is not None else (raw_prod.get("price") or 0.0))
+                    available_stock = int(raw_prod.get("quantity") or 0)
+                    status_val = raw_prod.get("status") or "unknown"
+                    storage_location = raw_prod.get("storage_location") or ""
+                    condition_val = raw_prod.get("condition") or ""
+                    main_photo_url = raw_prod.get("main_photo_url")
+                    if main_photo_url and main_photo_url.startswith("/media/"):
+                        photo_url = f"/api/mobile{main_photo_url}"
+                    else:
+                        photo_url = main_photo_url
+
+                    is_sellable = (status_val in ["in_stock", "available"]) and (available_stock > 0)
+                    catalog_items.append({
+                        "product_id": prod_id,
+                        "title": title,
+                        "barcode": bc,
+                        "sku": sku,
+                        "brand": brand_val,
+                        "model": model_val,
+                        "category_id": cat_id,
+                        "default_sale_price": sale_price,
+                        "available_stock": available_stock,
+                        "status": status_val,
+                        "is_sellable": is_sellable,
+                        "storage_location": storage_location,
+                        "condition": condition_val,
+                        "main_photo_url": photo_url,
+                        "currency": "RUB",
+                    })
+                return {
+                    "items": catalog_items,
+                    "total": raw_data.get("total", len(catalog_items)) if isinstance(raw_data, dict) else len(catalog_items),
+                    "limit": limit,
+                    "offset": offset,
+                }
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+@app.get("/api/mobile/catalog/products/{product_id}")
+async def api_mobile_catalog_product_details(request: Request, product_id: int):
+    """
+    Mobile Inventory Catalog single product detailed card.
+    Protected by TRMOBILE1 PoP authentication.
+    """
+    ctx = await _get_mobile_auth(request)
+    headers = {"x-api-token": os.getenv("CORE_API_TOKEN", "")}
+    url = f"{CORE_API_URL}/api/products/{product_id}/details"
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                raw_prod = resp.json()
+                prod_id = int(raw_prod.get("id"))
+                title = raw_prod.get("title") or f"Товар #{prod_id}"
+                bc = raw_prod.get("barcode") or ""
+                sku = raw_prod.get("sku") or ""
+                brand_val = raw_prod.get("brand") or ""
+                model_val = raw_prod.get("model") or ""
+                cat_id = raw_prod.get("category_id")
+                cat_name = raw_prod.get("avito_category_name") or ""
+                desc_val = raw_prod.get("description") or ""
+                sale_price = float(raw_prod.get("sale_price") if raw_prod.get("sale_price") is not None else (raw_prod.get("price") or 0.0))
+                available_stock = int(raw_prod.get("available_quantity") if raw_prod.get("available_quantity") is not None else (raw_prod.get("quantity") or 0))
+                status_val = raw_prod.get("status") or "unknown"
+                storage_location = raw_prod.get("storage_location") or ""
+                condition_val = raw_prod.get("condition") or ""
+                characteristics = raw_prod.get("characteristics") or {}
+
+                photos_raw = raw_prod.get("photos") or []
+                photos = []
+                for p in photos_raw:
+                    p_id = p.get("id")
+                    p_fn = p.get("filename") or ""
+                    p_url = p.get("media_url") or ""
+                    if p_url.startswith("/media/"):
+                        p_url = f"/api/mobile{p_url}"
+                    photos.append({
+                        "id": p_id,
+                        "filename": p_fn,
+                        "url": p_url,
+                    })
+
+                is_sellable = (status_val in ["in_stock", "available"]) and (available_stock > 0)
+                return {
+                    "product_id": prod_id,
+                    "title": title,
+                    "barcode": bc,
+                    "sku": sku,
+                    "brand": brand_val,
+                    "model": model_val,
+                    "category_id": cat_id,
+                    "category_name": cat_name,
+                    "description": desc_val,
+                    "default_sale_price": sale_price,
+                    "available_stock": available_stock,
+                    "status": status_val,
+                    "is_sellable": is_sellable,
+                    "storage_location": storage_location,
+                    "condition": condition_val,
+                    "characteristics": characteristics,
+                    "photos": photos,
+                    "currency": "RUB",
+                }
+            elif resp.status_code == 404:
+                raise HTTPException(status_code=404, detail="Товар не найден")
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+@app.get("/api/mobile/catalog/filter-options")
+async def api_mobile_catalog_filter_options(request: Request):
+    """
+    Mobile Inventory Catalog filter options (categories and brands).
+    Protected by TRMOBILE1 PoP authentication.
+    """
+    ctx = await _get_mobile_auth(request)
+    headers = {"x-api-token": os.getenv("CORE_API_TOKEN", "")}
+    url = f"{CORE_API_URL}/api/products/filter-options"
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                return {
+                    "categories": raw_data.get("categories", []),
+                    "brands": raw_data.get("brands", []),
+                }
+            elif resp.status_code in (502, 503, 504):
+                raise HTTPException(status_code=502, detail="Core API service unavailable")
+            else:
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
+
+
+@app.api_route("/api/mobile/media/{path:path}", methods=["GET", "HEAD"])
+async def api_mobile_media_proxy(request: Request, path: str):
+    """
+    Proxy product photos and media for mobile devices without mTLS certificate blockage.
+    """
+    return await _proxy_request(request, CORE_API_URL, f"media/{path}", "/api/mobile/media")
+
+
 

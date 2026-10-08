@@ -30,7 +30,8 @@ enum class AppScreen {
     SETTINGS,
     RECEIPT_DETAIL,
     POS_TERMINAL,
-    QUICK_INTAKE
+    QUICK_INTAKE,
+    CATALOG
 }
 
 @Composable
@@ -104,6 +105,9 @@ fun MobileApp(
                 currentScreen = AppScreen.MAIN
             }
             currentScreen == AppScreen.QUICK_INTAKE -> {
+                currentScreen = AppScreen.MAIN
+            }
+            currentScreen == AppScreen.CATALOG -> {
                 currentScreen = AppScreen.MAIN
             }
             currentScreen == AppScreen.RECEIPT_DETAIL -> {
@@ -254,6 +258,21 @@ fun MobileApp(
                     currentScreen = AppScreen.MAIN
                 }
             }
+            AppScreen.CATALOG -> {
+                val session = currentSession
+                if (session != null) {
+                    com.technoreboot.mobile.ui.catalog.CatalogScreen(
+                        session = session,
+                        keystoreManager = keystoreManager,
+                        apiClient = apiClient,
+                        cartRepository = cartRepository,
+                        onBackClicked = { currentScreen = AppScreen.MAIN },
+                        onOpenPos = { currentScreen = AppScreen.POS_TERMINAL }
+                    )
+                } else {
+                    currentScreen = AppScreen.MAIN
+                }
+            }
             AppScreen.MAIN -> {
                 val session = currentSession
                 if (session != null) {
@@ -283,6 +302,9 @@ fun MobileApp(
                         },
                         onQuickIntakeClicked = {
                             currentScreen = AppScreen.QUICK_INTAKE
+                        },
+                        onCatalogClicked = {
+                            currentScreen = AppScreen.CATALOG
                         },
                         hasUpdateBadge = hasUpdateBadge,
                         onRevokedDismissed = {
