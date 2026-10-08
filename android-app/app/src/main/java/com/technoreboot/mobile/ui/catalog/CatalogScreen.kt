@@ -32,6 +32,7 @@ import com.technoreboot.mobile.model.*
 import com.technoreboot.mobile.network.ApiResult
 import com.technoreboot.mobile.network.MobileApiClient
 import com.technoreboot.mobile.ui.reports.ReportFormatters
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -56,7 +57,10 @@ fun CatalogScreen(
     var selectedBrand by remember { mutableStateOf<String?>(null) }
 
     // Facets state
-    var filterOptions by remember { mutableStateOf<CatalogFilterOptions?>(null) }
+    var categories by remember { mutableStateOf<List<CatalogCategoryFacet>>(emptyList()) }
+    var categoryBrands by remember { mutableStateOf<List<CatalogBrandFacet>>(emptyList()) }
+    var isBrandsLoading by remember { mutableStateOf(false) }
+    var brandJob by remember { mutableStateOf<Job?>(null) }
 
     // Products list state
     var products by remember { mutableStateOf<List<CatalogProduct>>(emptyList()) }
@@ -121,17 +125,49 @@ fun CatalogScreen(
         }
     }
 
-    fun loadFacets() {
+    fun loadCategories() {
         val key = keystoreManager.getPrivateKey() ?: return
         coroutineScope.launch {
-            when (val res = apiClient.getCatalogFilterOptions(session.credentialId, key)) {
+            when (val res = apiClient.getCatalogFilterOptions(
+                credentialId = session.credentialId,
+                privateKey = key,
+                categoryId = null,
+                inStockOnly = inStockOnly
+            )) {
                 is ApiResult.Success -> {
-                    filterOptions = res.data
+                    categories = CategoryOrdering.sortCategories(res.data.categories)
                 }
                 is ApiResult.Error -> {
-                    // Non-critical, filter options fallback
+                    // Non-critical, fallback
                 }
             }
+        }
+    }
+
+    fun loadBrandsForCategory(catId: Int?) {
+        brandJob?.cancel()
+        if (catId == null) {
+            categoryBrands = emptyList()
+            isBrandsLoading = false
+            return
+        }
+        val key = keystoreManager.getPrivateKey() ?: return
+        isBrandsLoading = true
+        brandJob = coroutineScope.launch {
+            when (val res = apiClient.getCatalogFilterOptions(
+                credentialId = session.credentialId,
+                privateKey = key,
+                categoryId = catId,
+                inStockOnly = inStockOnly
+            )) {
+                is ApiResult.Success -> {
+                    categoryBrands = res.data.brands
+                }
+                is ApiResult.Error -> {
+                    categoryBrands = emptyList()
+                }
+            }
+            isBrandsLoading = false
         }
     }
 
@@ -191,15 +227,20 @@ fun CatalogScreen(
         }
     }
 
-    // Initial load
-    LaunchedEffect(Unit) {
-        loadFacets()
-        loadProducts(reset = true)
+    // Reload categories when inStockOnly changes
+    LaunchedEffect(inStockOnly) {
+        loadCategories()
     }
 
-    // Debounced query change
+    // When category changes, reload brands for that category
+    LaunchedEffect(selectedCategoryId, inStockOnly) {
+        loadBrandsForCategory(selectedCategoryId)
+    }
+
+    // Debounced query and filter change for product listing
     LaunchedEffect(searchQuery, inStockOnly, selectedCategoryId, selectedBrand) {
-        delay(350)
+        delay(300)
+        listState.scrollToItem(0)
         loadProducts(reset = true)
     }
 
@@ -347,43 +388,115 @@ fun CatalogScreen(
                 )
             }
 
-            // Category & Brand Facets Row
-            val facets = filterOptions
-            if (facets != null && (facets.categories.isNotEmpty() || facets.brands.isNotEmpty())) {
+            // Category Facets Row (Priority ordered: 1. МФУ, 2. Принтеры, 3. Мониторы, 4. Ноутбуки, 5. Комплектующие, 6. остальные)
+            if (categories.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (selectedCategoryId != null || selectedBrand != null) {
-                        AssistChip(
-                            onClick = {
+                    // System filter "Все" as the first control chip
+                    FilterChip(
+                        selected = selectedCategoryId == null,
+                        onClick = {
+                            if (selectedCategoryId != null) {
                                 selectedCategoryId = null
                                 selectedBrand = null
-                            },
-                            label = { Text("Сбросить фильтры", fontSize = 12.sp) },
-                            leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
-                    }
+                            }
+                        },
+                        label = { Text("Все", fontSize = 12.sp) },
+                        leadingIcon = if (selectedCategoryId == null) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                        } else null
+                    )
 
-                    facets.categories.forEach { cat ->
+                    // Priority ordered category chips
+                    categories.forEach { cat ->
                         val isSel = selectedCategoryId == cat.id
                         FilterChip(
                             selected = isSel,
-                            onClick = { selectedCategoryId = if (isSel) null else cat.id },
-                            label = { Text("${cat.name} (${cat.count})", fontSize = 12.sp) }
+                            onClick = {
+                                if (isSel) {
+                                    // Re-clicking deselects back to "Все"
+                                    selectedCategoryId = null
+                                    selectedBrand = null
+                                } else {
+                                    selectedCategoryId = cat.id
+                                    selectedBrand = null // Always reset brand on category switch
+                                }
+                            },
+                            label = { Text("${cat.name} (${cat.count})", fontSize = 12.sp) },
+                            leadingIcon = if (isSel) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            } else null
                         )
                     }
+                }
+            }
 
-                    facets.brands.forEach { brand ->
-                        val isSel = selectedBrand == brand.value
-                        FilterChip(
-                            selected = isSel,
-                            onClick = { selectedBrand = if (isSel) null else brand.value },
-                            label = { Text("${brand.value} (${brand.count})", fontSize = 12.sp) }
-                        )
+            // Second Horizontal Row: Category-specific Brand Chips (visible ONLY when category is selected)
+            AnimatedVisibility(visible = selectedCategoryId != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                ) {
+                    if (isBrandsLoading && categoryBrands.isEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Загрузка производителей...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else if (categoryBrands.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // First chip in brand row: "Все бренды"
+                            FilterChip(
+                                selected = selectedBrand == null,
+                                onClick = { selectedBrand = null },
+                                label = { Text("Все бренды", fontSize = 12.sp) },
+                                leadingIcon = if (selectedBrand == null) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null
+                            )
+
+                            // Specific brands for selected category
+                            categoryBrands.forEach { brand ->
+                                val isSel = selectedBrand == brand.value
+                                FilterChip(
+                                    selected = isSel,
+                                    onClick = {
+                                        selectedBrand = if (isSel) null else brand.value
+                                    },
+                                    label = { Text("${brand.value} (${brand.count})", fontSize = 12.sp) },
+                                    leadingIcon = if (isSel) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                    } else null
+                                )
+                            }
+                        }
                     }
                 }
             }

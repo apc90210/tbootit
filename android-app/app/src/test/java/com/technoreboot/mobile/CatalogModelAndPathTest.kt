@@ -193,4 +193,71 @@ class CatalogModelAndPathTest {
         val result2 = cartRepository.addProduct(posProduct)
         assertTrue(result2 is AddToCartResult.MaxStockReached)
     }
+
+    @Test
+    fun testPriorityCategoryOrderingComplete() {
+        val rawCategories = listOf(
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 50, name = "Компьютеры", count = 20),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 7, name = "Комплектующие", count = 10),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 4, name = "Ноутбуки", count = 22),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 6, name = "Мониторы", count = 7),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 5, name = "Принтеры", count = 78),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 51, name = "МФУ", count = 84),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 48, name = "Без категории", count = 88)
+        )
+
+        val sorted = com.technoreboot.mobile.model.CategoryOrdering.sortCategories(rawCategories)
+        val sortedNames = sorted.map { it.name }
+
+        // Expected strict order:
+        // 1. МФУ
+        // 2. Принтеры
+        // 3. Мониторы
+        // 4. Ноутбуки
+        // 5. Комплектующие
+        // 6.. remaining alphabetically: "Без категории", "Компьютеры"
+        assertEquals("МФУ", sortedNames[0])
+        assertEquals("Принтеры", sortedNames[1])
+        assertEquals("Мониторы", sortedNames[2])
+        assertEquals("Ноутбуки", sortedNames[3])
+        assertEquals("Комплектующие", sortedNames[4])
+        assertEquals("Без категории", sortedNames[5])
+        assertEquals("Компьютеры", sortedNames[6])
+    }
+
+    @Test
+    fun testPriorityCategoryOrderingWithMissingCategory() {
+        // Test when "Мониторы" is missing from the data
+        val rawCategories = listOf(
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 50, name = "Компьютеры", count = 20),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 7, name = "Комплектующие", count = 10),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 4, name = "Ноутбуки", count = 22),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 5, name = "Принтеры", count = 78),
+            com.technoreboot.mobile.model.CatalogCategoryFacet(id = 51, name = "МФУ", count = 84)
+        )
+
+        val sorted = com.technoreboot.mobile.model.CategoryOrdering.sortCategories(rawCategories)
+        val sortedNames = sorted.map { it.name }
+
+        // Relative order preserved even when Monitory is absent
+        assertEquals("МФУ", sortedNames[0])
+        assertEquals("Принтеры", sortedNames[1])
+        assertEquals("Ноутбуки", sortedNames[2])
+        assertEquals("Комплектующие", sortedNames[3])
+        assertEquals("Компьютеры", sortedNames[4])
+    }
+
+    @Test
+    fun testFilterOptionsCanonicalPathOrdering() {
+        val params = listOf(
+            "category_id" to "51",
+            "in_stock_only" to "true"
+        )
+        val canonicalPath = RequestBinding.canonicalizePath("/api/mobile/catalog/filter-options", params)
+        assertEquals(
+            "/api/mobile/catalog/filter-options?category_id=51&in_stock_only=true",
+            canonicalPath
+        )
+    }
 }
+

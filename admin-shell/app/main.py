@@ -3214,18 +3214,30 @@ async def api_mobile_catalog_product_details(request: Request, product_id: int):
 
 
 @app.get("/api/mobile/catalog/filter-options")
-async def api_mobile_catalog_filter_options(request: Request):
+async def api_mobile_catalog_filter_options(
+    request: Request,
+    category_id: Optional[int] = Query(None),
+    in_stock_only: bool = Query(True)
+):
     """
     Mobile Inventory Catalog filter options (categories and brands).
     Protected by TRMOBILE1 PoP authentication.
+    Supports category-scoped and stock-scoped brand facets.
     """
     ctx = await _get_mobile_auth(request)
     headers = {"x-api-token": os.getenv("CORE_API_TOKEN", "")}
+
+    core_params = {}
+    if category_id is not None:
+        core_params["category_id"] = category_id
+    if in_stock_only:
+        core_params["status"] = "in_stock"
+
     url = f"{CORE_API_URL}/api/products/filter-options"
 
     try:
         async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-            resp = await client.get(url, headers=headers)
+            resp = await client.get(url, params=core_params, headers=headers)
             if resp.status_code == 200:
                 raw_data = resp.json()
                 return {

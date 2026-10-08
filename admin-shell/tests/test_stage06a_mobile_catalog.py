@@ -261,6 +261,30 @@ def test_catalog_filter_options(enrolled_mobile_user):
         assert data["brands"][0]["value"] == "HP"
 
 
+def test_catalog_filter_options_with_category_and_stock(enrolled_mobile_user):
+    """Filter options forwards category_id and status to Core with valid PoP."""
+    cred_id = enrolled_mobile_user["cred_id"]
+    priv = enrolled_mobile_user["priv"]
+    # Alphabetically sorted query params for canonical PoP: category_id < in_stock_only
+    path = "/api/mobile/catalog/filter-options?category_id=51&in_stock_only=true"
+    headers = _get_pop_headers(cred_id, priv, "GET", path)
+
+    mock_facets = {
+        "categories": [{"id": 51, "name": "МФУ", "count": 84}],
+        "brands": [{"value": "HP", "count": 19}, {"value": "Kyocera", "count": 11}]
+    }
+
+    with patch("httpx.AsyncClient.get") as mock_get:
+        mock_get.return_value = httpx.Response(200, json=mock_facets)
+        resp = client.get(path, headers=headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert len(data["brands"]) == 2
+        mock_get.assert_called_once()
+        _, kwargs = mock_get.call_args
+        assert kwargs.get("params") == {"category_id": 51, "status": "in_stock"}
+
+
 def test_catalog_query_tampering_rejected(enrolled_mobile_user):
     """Tampering with query string parameters causes PoP 401/403 failure."""
     cred_id = enrolled_mobile_user["cred_id"]
@@ -272,3 +296,4 @@ def test_catalog_query_tampering_rejected(enrolled_mobile_user):
     tampered_path = "/api/mobile/catalog/products?in_stock_only=false&limit=20"
     resp = client.get(tampered_path, headers=headers)
     assert resp.status_code in (401, 403)
+

@@ -134,6 +134,52 @@ data class CatalogCategoryFacet(
     val count: Int
 )
 
+object CategoryOrdering {
+    /**
+     * Priority order requested by OWNER for Stage06A-R2:
+     * 1. МФУ
+     * 2. Принтеры
+     * 3. Мониторы
+     * 4. Ноутбуки
+     * 5. Комплектующие
+     * 6. Remaining categories in stable alphabetical order
+     */
+    private val PRIORITY_IDS = mapOf(
+        51 to 0, // МФУ
+        5 to 1,  // Принтеры
+        6 to 2,  // Мониторы
+        4 to 3,  // Ноутбуки
+        7 to 4   // Комплектующие
+    )
+
+    private val PRIORITY_NAMES = listOf(
+        "мфу" to 0,
+        "принтер" to 1,
+        "монитор" to 2,
+        "ноутбук" to 3,
+        "комплектующ" to 4
+    )
+
+    fun getPriority(category: CatalogCategoryFacet): Int {
+        PRIORITY_IDS[category.id]?.let { return it }
+
+        val lower = category.name.trim().lowercase()
+        for ((pattern, prio) in PRIORITY_NAMES) {
+            if (lower.startsWith(pattern) || lower == pattern) {
+                return prio
+            }
+        }
+        return 100
+    }
+
+    fun sortCategories(categories: List<CatalogCategoryFacet>): List<CatalogCategoryFacet> {
+        return categories.sortedWith(
+            compareBy<CatalogCategoryFacet> { getPriority(it) }
+                .thenBy { it.name.lowercase() }
+        )
+    }
+}
+
 data class CatalogBrandFacet(
     val value: String,
     val count: Int

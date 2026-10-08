@@ -200,6 +200,9 @@ def get_product_filter_options(
 
     # 1. Categories - calculated without category/brand/model/status/storage/avito/site
     cat_query = base_query
+    if status:
+        cat_query = cat_query.filter(models.Product.status == status)
+
     categories = [{"id": cid, "name": n, "count": c} for cid, n, c in 
                   db.query(models.Category.id, models.Category.name, func.count(models.Product.id))
                   .join(models.Product, models.Category.id == models.Product.category_id)
@@ -211,6 +214,8 @@ def get_product_filter_options(
     q_cat = base_query
     if category_id:
         q_cat = q_cat.filter(models.Product.category_id == category_id)
+    if status:
+        q_cat = q_cat.filter(models.Product.status == status)
 
     # 2. Brands - calculated with category
     brands = [{"value": b, "count": c} for b, c in 

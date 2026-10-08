@@ -1430,10 +1430,13 @@ class MobileApiClient(
     /**
      * Retrieves filter options (categories and brands) for Mobile Catalog via GET /api/mobile/catalog/filter-options
      * protected by TRMOBILE1 PoP authentication.
+     * Supports category-scoped and stock-scoped brand facets.
      */
     suspend fun getCatalogFilterOptions(
         credentialId: String,
-        privateKey: PrivateKey
+        privateKey: PrivateKey,
+        categoryId: Int? = null,
+        inStockOnly: Boolean = true
     ): ApiResult<CatalogFilterOptions> = withContext(Dispatchers.IO) {
         val challengeResult = getChallenge(credentialId)
         if (challengeResult !is ApiResult.Success) {
@@ -1447,7 +1450,14 @@ class MobileApiClient(
 
         val nonce = challengeResult.data.nonce
         val method = "GET"
-        val canonicalPath = "/api/mobile/catalog/filter-options"
+
+        val queryParams = mutableListOf<Pair<String, String>>()
+        if (categoryId != null) {
+            queryParams.add("category_id" to categoryId.toString())
+        }
+        queryParams.add("in_stock_only" to inStockOnly.toString())
+
+        val canonicalPath = RequestBinding.canonicalizePath("/api/mobile/catalog/filter-options", queryParams)
         val emptyBodyBytes = ByteArray(0)
         val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
 
