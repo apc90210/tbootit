@@ -78,10 +78,22 @@ fun CatalogScreen(
 
     // Cart feedback notification
     var notificationMessage by remember { mutableStateOf<String?>(null) }
+    var productsJob by remember { mutableStateOf<Job?>(null) }
+    var isFirstLoad by remember { mutableStateOf(true) }
 
     fun loadProducts(reset: Boolean = false) {
-        val key = keystoreManager.getPrivateKey() ?: return
-        coroutineScope.launch {
+        val key = keystoreManager.getPrivateKey()
+        if (key == null) {
+            isLoadingInitial = false
+            errorMessage = "Ключ авторизации недоступен"
+            return
+        }
+
+        if (reset) {
+            productsJob?.cancel()
+        }
+
+        productsJob = coroutineScope.launch {
             if (reset) {
                 isLoadingInitial = true
                 errorMessage = null
@@ -105,6 +117,9 @@ fun CatalogScreen(
                 is ApiResult.Success -> {
                     if (reset) {
                         products = result.data.items
+                        if (result.data.items.isNotEmpty()) {
+                            try { listState.scrollToItem(0) } catch (_: Exception) {}
+                        }
                     } else {
                         val existingIds = products.map { it.productId }.toSet()
                         val newItems = result.data.items.filter { it.productId !in existingIds }
@@ -239,8 +254,10 @@ fun CatalogScreen(
 
     // Debounced query and filter change for product listing
     LaunchedEffect(searchQuery, inStockOnly, selectedCategoryId, selectedBrand) {
-        delay(300)
-        listState.scrollToItem(0)
+        if (!isFirstLoad) {
+            delay(300)
+        }
+        isFirstLoad = false
         loadProducts(reset = true)
     }
 
