@@ -38,7 +38,7 @@ object ReportFormatters {
             SalesReportPeriod.TODAY -> {
                 if (timePart.length >= 5) timePart.substring(0, 5) else timePart.ifBlank { datePart }
             }
-            SalesReportPeriod.WEEK, SalesReportPeriod.MONTH, SalesReportPeriod.YEAR -> {
+            SalesReportPeriod.WEEK, SalesReportPeriod.MONTH, SalesReportPeriod.YEAR, SalesReportPeriod.CUSTOM -> {
                 if (datePart.contains("-")) {
                     val dParts = datePart.split("-")
                     if (dParts.size == 3) {
@@ -47,5 +47,21 @@ object ReportFormatters {
                 } else datePart
             }
         }
+    }
+
+    /**
+     * Formats receipt count with correct Russian noun declension:
+     * 1 чек, 2 чека, 5 чеков, 21 чек, etc.
+     */
+    fun formatReceiptCount(count: Int): String {
+        val remainder100 = count % 100
+        val remainder10 = count % 10
+        val word = when {
+            remainder100 in 11..19 -> "чеков"
+            remainder10 == 1 -> "чек"
+            remainder10 in 2..4 -> "чека"
+            else -> "чеков"
+        }
+        return "$count $word"
     }
 }

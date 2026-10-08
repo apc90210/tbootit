@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
 from typing import Optional, Tuple, Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 import json
 import os
 import uuid
@@ -2134,8 +2134,63 @@ MOBILE_REPORT_PERIOD_LABELS = {
     "year": "Год",
 }
 
+RUSSIAN_WEEKDAYS = {
+    0: "Понедельник",
+    1: "Вторник",
+    2: "Среда",
+    3: "Четверг",
+    4: "Пятница",
+    5: "Суббота",
+    6: "Воскресенье",
+}
 
-async def _fetch_canonical_sales_report(period: str) -> Dict[str, Any]:
+RUSSIAN_WEEKDAYS_SHORT = {
+    0: "Пн",
+    1: "Вт",
+    2: "Ср",
+    3: "Чт",
+    4: "Пт",
+    5: "Сб",
+    6: "Вс",
+}
+
+RUSSIAN_MONTHS = {
+    1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
+    5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
+    9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
+}
+
+
+def _aggregate_payment_breakdown(sales_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    pm_dict = {}
+    for s in sales_list:
+        raw_pm = s.get("payment_method") or "unspecified"
+        raw_pm = str(raw_pm).strip() if raw_pm else "unspecified"
+        if not raw_pm:
+            raw_pm = "unspecified"
+        pm_label = s.get("payment_label") or s.get("payment_method_label") or raw_pm
+        amount = float(s.get("amount") if "amount" in s else s.get("total_amount", 0.0))
+        if raw_pm not in pm_dict:
+            pm_dict[raw_pm] = {
+                "method": raw_pm,
+                "label": pm_label,
+                "amount": 0.0,
+                "count": 0,
+            }
+        pm_dict[raw_pm]["amount"] += amount
+        pm_dict[raw_pm]["count"] += 1
+    breakdown = list(pm_dict.values())
+    for item in breakdown:
+        item["amount"] = round(item["amount"], 2)
+    breakdown.sort(key=lambda x: x["amount"], reverse=True)
+    return breakdown
+
+
+async def _fetch_canonical_sales_report(
+    period: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Fetch canonical sales report strictly from Core HTTP API.
     Reuses existing Core calculation without parallel business logic.
@@ -2146,9 +2201,14 @@ async def _fetch_canonical_sales_report(period: str) -> Dict[str, Any]:
         "x-api-token": os.getenv("CORE_API_TOKEN", ""),
     }
     url = f"{CORE_API_URL}/api/reports/sales"
+    params = {"period": period}
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
     try:
         async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-            resp = await client.get(url, params={"period": period}, headers=headers)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 return resp.json()
             elif resp.status_code in (502, 503, 504):
@@ -2173,25 +2233,50 @@ async def _fetch_canonical_sales_report(period: str) -> Dict[str, Any]:
         )
 
 
-
 @app.get("/api/mobile/reports/sales")
-async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
+async def api_mobile_reports_sales(
+    request: Request,
+    period: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+):
     """
     Mobile Sales Reports endpoint protected by TRMOBILE1 PoP.
-    Strictly accepts period in ('today', 'week', 'month', 'year').
-    Invalid period -> 400.
+    Accepts period in ('today', 'week', 'month', 'year', 'custom').
+    When date_from/date_to are provided, period defaults to 'custom'.
+    Invalid period without date bounds -> 400.
     Reuses canonical Core calculation without parallel business logic.
+    Includes aggregated 'days' and 'months' breakdown rows for drill-down.
     """
-    if period not in ("today", "week", "month", "year"):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid period. Allowed: today, week, month, year",
-        )
+    if date_from or date_to:
+        if not period:
+            period = "custom"
+        # Validate date format YYYY-MM-DD
+        if date_from:
+            try:
+                date.fromisoformat(date_from)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_from format. Expected YYYY-MM-DD")
+        if date_to:
+            try:
+                date.fromisoformat(date_to)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_to format. Expected YYYY-MM-DD")
+    else:
+        if not period or period not in ("today", "week", "month", "year"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid period. Allowed: today, week, month, year",
+            )
 
     # Enforce TRMOBILE1 Proof of Possession (PoP) authentication
     ctx = await _get_mobile_auth(request)
 
-    canonical = await _fetch_canonical_sales_report(period)
+    canonical = await _fetch_canonical_sales_report(
+        period=period,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
     # Format payment breakdown into compact mobile shape
     payment_methods = []
@@ -2205,7 +2290,8 @@ async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
 
     # Format sales list
     sales_list = []
-    for s in canonical.get("sales", []):
+    raw_sales = canonical.get("sales", [])
+    for s in raw_sales:
         created_at_val = s.get("created_at")
         if isinstance(created_at_val, datetime):
             created_at_str = created_at_val.isoformat()
@@ -2220,17 +2306,99 @@ async def api_mobile_reports_sales(request: Request, period: str = Query(...)):
             "payment_label": s.get("payment_method_label", ""),
         })
 
+    # Build days drill-down rows (days with sales)
+    days_map = {}
+    for s in sales_list:
+        d_key = s["created_at"][:10]
+        if len(d_key) == 10:
+            days_map.setdefault(d_key, []).append(s)
+
+    days_list = []
+    for d_key in sorted(days_map.keys(), reverse=True):
+        d_sales = days_map[d_key]
+        d_amount = round(sum(x["amount"] for x in d_sales), 2)
+        try:
+            parsed_d = date.fromisoformat(d_key)
+            dow = RUSSIAN_WEEKDAYS.get(parsed_d.weekday(), "")
+            dow_short = RUSSIAN_WEEKDAYS_SHORT.get(parsed_d.weekday(), "")
+            d_label = parsed_d.strftime("%d.%m.%Y")
+        except Exception:
+            dow = ""
+            dow_short = ""
+            d_label = d_key
+
+        days_list.append({
+            "date": d_key,
+            "label": d_label,
+            "day_of_week": dow,
+            "day_of_week_short": dow_short,
+            "amount": d_amount,
+            "sales_count": len(d_sales),
+            "payment_methods": _aggregate_payment_breakdown(d_sales),
+        })
+
+    # Build months drill-down rows (months with sales)
+    months_map = {}
+    for s in sales_list:
+        m_key = s["created_at"][:7]
+        if len(m_key) == 7:
+            months_map.setdefault(m_key, []).append(s)
+
+    months_list = []
+    for m_key in sorted(months_map.keys(), reverse=True):
+        m_sales = months_map[m_key]
+        m_amount = round(sum(x["amount"] for x in m_sales), 2)
+        try:
+            y_val, mon_val = int(m_key[:4]), int(m_key[5:7])
+            m_label = f"{RUSSIAN_MONTHS.get(mon_val, m_key)} {y_val}"
+        except Exception:
+            m_label = m_key
+
+        months_list.append({
+            "month_key": m_key,
+            "label": m_label,
+            "amount": m_amount,
+            "sales_count": len(m_sales),
+            "payment_methods": _aggregate_payment_breakdown(m_sales),
+        })
+
+    # Determine display label
+    if period in MOBILE_REPORT_PERIOD_LABELS and not date_from and not date_to:
+        display_label = MOBILE_REPORT_PERIOD_LABELS[period]
+    elif date_from and date_to and date_from == date_to:
+        try:
+            parsed_d = date.fromisoformat(date_from)
+            display_label = parsed_d.strftime("%d.%m.%Y")
+        except Exception:
+            display_label = date_from
+    elif date_from and date_to:
+        # Check if full calendar month
+        try:
+            df = date.fromisoformat(date_from)
+            dt = date.fromisoformat(date_to)
+            if df.day == 1 and df.month == dt.month and df.year == dt.year:
+                display_label = f"{RUSSIAN_MONTHS.get(df.month, '')} {df.year}"
+            else:
+                display_label = f"{df.strftime('%d.%m.%Y')} – {dt.strftime('%d.%m.%Y')}"
+        except Exception:
+            display_label = f"{date_from} – {date_to}"
+    else:
+        display_label = period
+
     return {
         "period": period,
-        "label": MOBILE_REPORT_PERIOD_LABELS.get(period, period),
-        "date_from": str(canonical.get("date_from", "")),
-        "date_to": str(canonical.get("date_to", "")),
+        "label": display_label,
+        "date_from": str(canonical.get("date_from", date_from or "")),
+        "date_to": str(canonical.get("date_to", date_to or "")),
         "currency": "RUB",
         "sales_count": int(canonical.get("sales_count", 0)),
         "revenue_total": float(canonical.get("total_amount", 0.0)),
         "payment_methods": payment_methods,
         "sales": sales_list,
+        "days": days_list,
+        "months": months_list,
     }
+
 
 
 # =====================================================================

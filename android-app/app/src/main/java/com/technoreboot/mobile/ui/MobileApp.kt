@@ -31,7 +31,27 @@ enum class AppScreen {
     RECEIPT_DETAIL,
     POS_TERMINAL,
     QUICK_INTAKE,
-    CATALOG
+    CATALOG,
+    REPORT_MONTH_DAYS,
+    REPORT_DAY_RECEIPTS
+}
+
+private fun getMonthDateRange(monthKey: String): Pair<String, String> {
+    val parts = monthKey.split("-")
+    if (parts.size == 2) {
+        val year = parts[0].toIntOrNull() ?: 2026
+        val month = parts[1].toIntOrNull() ?: 1
+        val lastDay = when (month) {
+            1, 3, 5, 7, 8, 10, 12 -> 31
+            4, 6, 9, 11 -> 30
+            2 -> if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) 29 else 28
+            else -> 31
+        }
+        val from = "%04d-%02d-01".format(year, month)
+        val to = "%04d-%02d-%02d".format(year, month, lastDay)
+        return from to to
+    }
+    return "$monthKey-01" to "$monthKey-28"
 }
 
 @Composable
@@ -53,6 +73,7 @@ fun MobileApp(
     var currentSession by remember { mutableStateOf(sessionRepository.getSession()) }
     var currentScreen by remember { mutableStateOf(AppScreen.MAIN) }
     var selectedSaleId by remember { mutableStateOf<Int?>(null) }
+    var receiptDetailParentScreen by remember { mutableStateOf(AppScreen.MAIN) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var hasUpdateBadge by remember { mutableStateOf(false) }
@@ -60,6 +81,16 @@ fun MobileApp(
     val periodHistory = remember { mutableStateListOf<SalesReportPeriod>() }
     var selectedPeriod by remember { mutableStateOf(SalesReportPeriod.TODAY) }
     var reportUiState by remember { mutableStateOf<SalesReportUiState>(SalesReportUiState.Loading) }
+
+    // Drill-down states and in-memory caches
+    var selectedMonthSummary by remember { mutableStateOf<com.technoreboot.mobile.model.MonthReportSummary?>(null) }
+    var monthDaysUiState by remember { mutableStateOf<SalesReportUiState>(SalesReportUiState.Loading) }
+    val monthDaysCache = remember { mutableMapOf<String, com.technoreboot.mobile.model.SalesReport>() }
+
+    var selectedDaySummary by remember { mutableStateOf<com.technoreboot.mobile.model.DayReportSummary?>(null) }
+    var dayReceiptsUiState by remember { mutableStateOf<SalesReportUiState>(SalesReportUiState.Loading) }
+    var dayReceiptsParentScreen by remember { mutableStateOf(AppScreen.MAIN) }
+    val dayReceiptsCache = remember { mutableMapOf<String, com.technoreboot.mobile.model.SalesReport>() }
 
     fun loadSalesReport(period: SalesReportPeriod) {
         val session = currentSession ?: return
@@ -99,8 +130,124 @@ fun MobileApp(
         }
     }
 
+    fun loadMonthDays(month: com.technoreboot.mobile.model.MonthReportSummary, force: Boolean = false) {
+        selectedMonthSummary = month
+        currentScreen = AppScreen.REPORT_MONTH_DAYS
+        val cached = monthDaysCache[month.monthKey]
+        if (cached != null && !force) {
+            monthDaysUiState = SalesReportUiState.Success(cached)
+            return
+        }
+        val session = currentSession ?: return
+        coroutineScope.launch {
+            monthDaysUiState = SalesReportUiState.Loading
+            val privateKey = keystoreManager.getPrivateKey()
+            if (privateKey == null) {
+                monthDaysUiState = SalesReportUiState.Error("Аппаратный ключ не найден")
+                return@launch
+            }
+            val (dateFrom, dateTo) = getMonthDateRange(month.monthKey)
+            when (val result = apiClient.getSalesReport(
+                period = "custom",
+                credentialId = session.credentialId,
+                privateKey = privateKey,
+                dateFrom = dateFrom,
+                dateTo = dateTo
+            )) {
+                is ApiResult.Success -> {
+                    val report = result.data
+                    monthDaysCache[month.monthKey] = report
+                    if (report.days.isEmpty()) {
+                        monthDaysUiState = SalesReportUiState.Empty(SalesReportPeriod.CUSTOM)
+                    } else {
+                        monthDaysUiState = SalesReportUiState.Success(report)
+                    }
+                }
+                is ApiResult.Error -> {
+                    if (result.code == 403) {
+                        val msg = if (result.message.contains("устройств", ignoreCase = true) || result.message.contains("device", ignoreCase = true)) {
+                            "Доступ этого устройства отозван"
+                        } else {
+                            "Доступ отозван"
+                        }
+                        monthDaysUiState = SalesReportUiState.Revoked(msg)
+                    } else {
+                        monthDaysUiState = SalesReportUiState.Error(
+                            message = result.message,
+                            isNetworkError = result.isNetworkError
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun loadDayReceipts(day: com.technoreboot.mobile.model.DayReportSummary, parent: AppScreen, force: Boolean = false) {
+        selectedDaySummary = day
+        dayReceiptsParentScreen = parent
+        currentScreen = AppScreen.REPORT_DAY_RECEIPTS
+        val cached = dayReceiptsCache[day.date]
+        if (cached != null && !force) {
+            dayReceiptsUiState = SalesReportUiState.Success(cached)
+            return
+        }
+        val session = currentSession ?: return
+        coroutineScope.launch {
+            dayReceiptsUiState = SalesReportUiState.Loading
+            val privateKey = keystoreManager.getPrivateKey()
+            if (privateKey == null) {
+                dayReceiptsUiState = SalesReportUiState.Error("Аппаратный ключ не найден")
+                return@launch
+            }
+            when (val result = apiClient.getSalesReport(
+                period = "custom",
+                credentialId = session.credentialId,
+                privateKey = privateKey,
+                dateFrom = day.date,
+                dateTo = day.date
+            )) {
+                is ApiResult.Success -> {
+                    val report = result.data
+                    dayReceiptsCache[day.date] = report
+                    if (report.sales.isEmpty()) {
+                        dayReceiptsUiState = SalesReportUiState.Empty(SalesReportPeriod.CUSTOM)
+                    } else {
+                        dayReceiptsUiState = SalesReportUiState.Success(report)
+                    }
+                }
+                is ApiResult.Error -> {
+                    if (result.code == 403) {
+                        val msg = if (result.message.contains("устройств", ignoreCase = true) || result.message.contains("device", ignoreCase = true)) {
+                            "Доступ этого устройства отозван"
+                        } else {
+                            "Доступ отозван"
+                        }
+                        dayReceiptsUiState = SalesReportUiState.Revoked(msg)
+                    } else {
+                        dayReceiptsUiState = SalesReportUiState.Error(
+                            message = result.message,
+                            isNetworkError = result.isNetworkError
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     BackHandler(enabled = true) {
         when {
+            currentScreen == AppScreen.RECEIPT_DETAIL -> {
+                selectedSaleId = null
+                currentScreen = receiptDetailParentScreen
+            }
+            currentScreen == AppScreen.REPORT_DAY_RECEIPTS -> {
+                selectedDaySummary = null
+                currentScreen = dayReceiptsParentScreen
+            }
+            currentScreen == AppScreen.REPORT_MONTH_DAYS -> {
+                selectedMonthSummary = null
+                currentScreen = AppScreen.MAIN
+            }
             currentScreen == AppScreen.POS_TERMINAL -> {
                 currentScreen = AppScreen.MAIN
             }
@@ -108,10 +255,6 @@ fun MobileApp(
                 currentScreen = AppScreen.MAIN
             }
             currentScreen == AppScreen.CATALOG -> {
-                currentScreen = AppScreen.MAIN
-            }
-            currentScreen == AppScreen.RECEIPT_DETAIL -> {
-                selectedSaleId = null
                 currentScreen = AppScreen.MAIN
             }
             currentScreen == AppScreen.SETTINGS -> {
@@ -209,7 +352,7 @@ fun MobileApp(
                         apiClient = apiClient,
                         cacheRepository = receiptCacheRepository,
                         onBackClicked = {
-                            currentScreen = AppScreen.MAIN
+                            currentScreen = receiptDetailParentScreen
                             selectedSaleId = null
                         },
                         onRevokedDismissed = {
@@ -217,10 +360,56 @@ fun MobileApp(
                             ReceiptPrintCache.clearAll(context)
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
+                            monthDaysCache.clear()
+                            dayReceiptsCache.clear()
                             currentSession = null
                             selectedSaleId = null
                             currentScreen = AppScreen.MAIN
                             errorMessage = "Доступ отозван на сервере. Пожалуйста, выполните повторное подключение."
+                        }
+                    )
+                } else {
+                    currentScreen = AppScreen.MAIN
+                }
+            }
+            AppScreen.REPORT_MONTH_DAYS -> {
+                val month = selectedMonthSummary
+                if (month != null) {
+                    com.technoreboot.mobile.ui.reports.MonthDaysScreen(
+                        monthSummary = month,
+                        uiState = monthDaysUiState,
+                        onBackClicked = {
+                            currentScreen = AppScreen.MAIN
+                            selectedMonthSummary = null
+                        },
+                        onRefreshClicked = {
+                            loadMonthDays(month, force = true)
+                        },
+                        onDayClicked = { day ->
+                            loadDayReceipts(day, parent = AppScreen.REPORT_MONTH_DAYS)
+                        }
+                    )
+                } else {
+                    currentScreen = AppScreen.MAIN
+                }
+            }
+            AppScreen.REPORT_DAY_RECEIPTS -> {
+                val day = selectedDaySummary
+                if (day != null) {
+                    com.technoreboot.mobile.ui.reports.DayReceiptsScreen(
+                        daySummary = day,
+                        uiState = dayReceiptsUiState,
+                        onBackClicked = {
+                            currentScreen = dayReceiptsParentScreen
+                            selectedDaySummary = null
+                        },
+                        onRefreshClicked = {
+                            loadDayReceipts(day, parent = dayReceiptsParentScreen, force = true)
+                        },
+                        onSaleClicked = { saleId ->
+                            selectedSaleId = saleId
+                            receiptDetailParentScreen = AppScreen.REPORT_DAY_RECEIPTS
+                            currentScreen = AppScreen.RECEIPT_DETAIL
                         }
                     )
                 } else {
@@ -238,6 +427,7 @@ fun MobileApp(
                         onBackClicked = { currentScreen = AppScreen.MAIN },
                         onOpenReceipt = { saleId ->
                             selectedSaleId = saleId
+                            receiptDetailParentScreen = AppScreen.POS_TERMINAL
                             currentScreen = AppScreen.RECEIPT_DETAIL
                         }
                     )
@@ -295,7 +485,14 @@ fun MobileApp(
                         },
                         onSaleClicked = { saleId ->
                             selectedSaleId = saleId
+                            receiptDetailParentScreen = AppScreen.MAIN
                             currentScreen = AppScreen.RECEIPT_DETAIL
+                        },
+                        onDayClicked = { day ->
+                            loadDayReceipts(day, parent = AppScreen.MAIN)
+                        },
+                        onMonthClicked = { month ->
+                            loadMonthDays(month)
                         },
                         onPosClicked = {
                             currentScreen = AppScreen.POS_TERMINAL
@@ -313,6 +510,8 @@ fun MobileApp(
                             cartRepository.clearCart()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
+                            monthDaysCache.clear()
+                            dayReceiptsCache.clear()
                             currentSession = null
                             selectedSaleId = null
                             errorMessage = "Доступ отозван на сервере. Пожалуйста, выполните повторное подключение."
@@ -323,6 +522,8 @@ fun MobileApp(
                             cartRepository.clearCart()
                             sessionRepository.clearSession()
                             keystoreManager.deleteKey()
+                            monthDaysCache.clear()
+                            dayReceiptsCache.clear()
                             currentSession = null
                             selectedSaleId = null
                             periodHistory.clear()

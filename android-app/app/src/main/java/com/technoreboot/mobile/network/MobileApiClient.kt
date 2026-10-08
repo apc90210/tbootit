@@ -188,7 +188,9 @@ class MobileApiClient(
     suspend fun getSalesReport(
         period: String,
         credentialId: String,
-        privateKey: PrivateKey
+        privateKey: PrivateKey,
+        dateFrom: String? = null,
+        dateTo: String? = null,
     ): ApiResult<SalesReport> = withContext(Dispatchers.IO) {
         // Step 1: Obtain one-time challenge nonce
         val challengeResult = getChallenge(credentialId)
@@ -212,7 +214,17 @@ class MobileApiClient(
 
         val nonce = challengeResult.data.nonce
         val method = "GET"
-        val canonicalPath = "/api/mobile/reports/sales?period=$period"
+        val queryParams = mutableListOf<Pair<String, String>>()
+        if (period.isNotBlank()) {
+            queryParams.add("period" to period)
+        }
+        if (!dateFrom.isNullOrBlank()) {
+            queryParams.add("date_from" to dateFrom)
+        }
+        if (!dateTo.isNullOrBlank()) {
+            queryParams.add("date_to" to dateTo)
+        }
+        val canonicalPath = RequestBinding.canonicalizePath("/api/mobile/reports/sales", queryParams)
         val emptyBodyBytes = ByteArray(0)
         val bodyHash = RequestBinding.computeBodySha256(emptyBodyBytes)
 

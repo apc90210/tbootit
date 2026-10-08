@@ -21,10 +21,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.technoreboot.mobile.data.MobileSession
+import com.technoreboot.mobile.model.DayReportSummary
+import com.technoreboot.mobile.model.MonthReportSummary
 import com.technoreboot.mobile.model.PaymentMethodSummary
 import com.technoreboot.mobile.model.SaleListItem
 import com.technoreboot.mobile.model.SalesReport
+import com.technoreboot.mobile.data.MobileSession
 import com.technoreboot.mobile.model.SalesReportPeriod
 
 sealed class SalesReportUiState {
@@ -47,6 +49,8 @@ fun SalesReportScreen(
     onDisconnectClicked: () -> Unit,
     onSettingsClicked: () -> Unit = {},
     onSaleClicked: (Int) -> Unit = {},
+    onDayClicked: (DayReportSummary) -> Unit = {},
+    onMonthClicked: (MonthReportSummary) -> Unit = {},
     onPosClicked: () -> Unit = {},
     onQuickIntakeClicked: () -> Unit = {},
     onCatalogClicked: () -> Unit = {},
@@ -261,7 +265,9 @@ fun SalesReportScreen(
                     is SalesReportUiState.Success -> {
                         SuccessReportView(
                             report = uiState.report,
-                            onSaleClicked = onSaleClicked
+                            onSaleClicked = onSaleClicked,
+                            onDayClicked = onDayClicked,
+                            onMonthClicked = onMonthClicked
                         )
                     }
                 }
@@ -287,7 +293,13 @@ fun PeriodSelectorRow(
                 .padding(4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            SalesReportPeriod.entries.forEach { period ->
+            val selectablePeriods = listOf(
+                SalesReportPeriod.TODAY,
+                SalesReportPeriod.WEEK,
+                SalesReportPeriod.MONTH,
+                SalesReportPeriod.YEAR
+            )
+            selectablePeriods.forEach { period ->
                 val isSelected = period == selectedPeriod
                 Box(
                     modifier = Modifier
@@ -462,6 +474,7 @@ fun EmptyStateView(
                 SalesReportPeriod.WEEK -> "За текущую неделю завершённых продаж нет"
                 SalesReportPeriod.MONTH -> "За текущий месяц завершённых продаж нет"
                 SalesReportPeriod.YEAR -> "За текущий год завершённых продаж нет"
+                SalesReportPeriod.CUSTOM -> "За выбранный период завершённых продаж нет"
             }
             Text(
                 text = subtext,
@@ -482,7 +495,9 @@ fun EmptyStateView(
 @Composable
 fun SuccessReportView(
     report: SalesReport,
-    onSaleClicked: (Int) -> Unit = {}
+    onSaleClicked: (Int) -> Unit = {},
+    onDayClicked: (DayReportSummary) -> Unit = {},
+    onMonthClicked: (MonthReportSummary) -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -497,8 +512,21 @@ fun SuccessReportView(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
+                    val periodTitle = when (report.period) {
+                        SalesReportPeriod.TODAY -> "Выручка за сегодня"
+                        SalesReportPeriod.WEEK -> {
+                            if (report.dateFrom.isNotBlank() && report.dateTo.isNotBlank()) {
+                                "Выручка за неделю (${report.dateFrom} – ${report.dateTo})"
+                            } else {
+                                "Выручка за неделю"
+                            }
+                        }
+                        SalesReportPeriod.MONTH -> "Выручка за месяц (${report.label})"
+                        SalesReportPeriod.YEAR -> "Выручка за год (${report.label})"
+                        SalesReportPeriod.CUSTOM -> "Выручка (${report.label})"
+                    }
                     Text(
-                        text = "Выручка",
+                        text = periodTitle,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -572,56 +600,397 @@ fun SuccessReportView(
             }
         }
 
-        // Sales List Header
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Список продаж",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Всего: ${report.sales.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // Sales List Items
-        if (report.sales.isEmpty()) {
-            item {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
+        // Single-level Drill-Down Content:
+        when (report.period) {
+            SalesReportPeriod.TODAY -> {
+                // Today: Direct receipts list
+                item {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Продаж за период нет",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Список чеков",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Всего: ${report.sales.size}",
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+
+                if (report.sales.isEmpty()) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Продаж за сегодняшний день нет",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(report.sales, key = { it.id }) { sale ->
+                        SaleItemCard(
+                            sale = sale,
+                            period = report.period,
+                            onSaleClicked = onSaleClicked
+                        )
+                    }
+                }
             }
-        } else {
-            items(report.sales, key = { it.id }) { sale ->
-                SaleItemCard(
-                    sale = sale,
-                    period = report.period,
-                    onSaleClicked = onSaleClicked
+
+            SalesReportPeriod.WEEK -> {
+                // Week: Days list with sales
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Дни недели с продажами",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Всего дней: ${report.days.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (report.days.isEmpty()) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "За текущую неделю завершённых продаж нет",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(report.days, key = { it.date }) { day ->
+                        DaySummaryCard(
+                            day = day,
+                            onDayClicked = onDayClicked
+                        )
+                    }
+                }
+            }
+
+            SalesReportPeriod.MONTH -> {
+                // Month: Days of month directly (STRICT: NO WEEKS LEVEL)
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Дни месяца с продажами",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Всего дней: ${report.days.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (report.days.isEmpty()) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "За текущий месяц завершённых продаж нет",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(report.days, key = { it.date }) { day ->
+                        DaySummaryCard(
+                            day = day,
+                            onDayClicked = onDayClicked
+                        )
+                    }
+                }
+            }
+
+            SalesReportPeriod.YEAR -> {
+                // Year: Months of year list
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Месяцы года с продажами",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Всего месяцев: ${report.months.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (report.months.isEmpty()) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "За текущий год завершённых продаж нет",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(report.months, key = { it.monthKey }) { month ->
+                        MonthSummaryCard(
+                            month = month,
+                            onMonthClicked = onMonthClicked
+                        )
+                    }
+                }
+            }
+
+            SalesReportPeriod.CUSTOM -> {
+                // Custom: if days are present, show days; otherwise receipts
+                if (report.days.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Дни периода с продажами",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(report.days, key = { it.date }) { day ->
+                        DaySummaryCard(day = day, onDayClicked = onDayClicked)
+                    }
+                } else {
+                    item {
+                        Text(
+                            text = "Список чеков",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(report.sales, key = { it.id }) { sale ->
+                        SaleItemCard(sale = sale, period = SalesReportPeriod.TODAY, onSaleClicked = onSaleClicked)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DaySummaryCard(
+    day: DayReportSummary,
+    onDayClicked: (DayReportSummary) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = { onDayClicked(day) },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = day.label,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (day.dayOfWeekShort.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = day.dayOfWeekShort,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = ReportFormatters.formatReceiptCount(day.salesCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (day.paymentMethods.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = day.paymentMethods.joinToString(", ") { pm ->
+                            "${pm.label.ifBlank { pm.method }}: ${ReportFormatters.formatAmount(pm.amount)}"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = ReportFormatters.formatAmount(day.amount),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Подробнее",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthSummaryCard(
+    month: MonthReportSummary,
+    onMonthClicked: (MonthReportSummary) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = { onMonthClicked(month) },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = month.label,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = ReportFormatters.formatReceiptCount(month.salesCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (month.paymentMethods.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = month.paymentMethods.joinToString(", ") { pm ->
+                            "${pm.label.ifBlank { pm.method }}: ${ReportFormatters.formatAmount(pm.amount)}"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = ReportFormatters.formatAmount(month.amount),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Подробнее",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

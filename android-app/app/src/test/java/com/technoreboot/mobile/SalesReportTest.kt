@@ -99,7 +99,7 @@ class SalesReportTest {
 
         // Fallback for unknown / invalid period
         assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("quarter"))
-        assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey("custom"))
+        assertEquals(SalesReportPeriod.CUSTOM, SalesReportPeriod.fromApiKey("custom"))
         assertEquals(SalesReportPeriod.TODAY, SalesReportPeriod.fromApiKey(""))
     }
 
@@ -268,7 +268,7 @@ class SalesReportTest {
     @Test
     fun testPeriodSelectorState() {
         val periods = SalesReportPeriod.entries
-        assertEquals(4, periods.size)
+        assertEquals(5, periods.size)
 
         assertEquals("today", SalesReportPeriod.TODAY.apiKey)
         assertEquals("Сегодня", SalesReportPeriod.TODAY.displayName)
@@ -281,6 +281,9 @@ class SalesReportTest {
 
         assertEquals("year", SalesReportPeriod.YEAR.apiKey)
         assertEquals("Год", SalesReportPeriod.YEAR.displayName)
+
+        assertEquals("custom", SalesReportPeriod.CUSTOM.apiKey)
+        assertEquals("Период", SalesReportPeriod.CUSTOM.displayName)
     }
 
     // 11. Month Report Parsing
