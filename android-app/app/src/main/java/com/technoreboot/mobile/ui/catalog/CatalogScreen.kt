@@ -117,9 +117,6 @@ fun CatalogScreen(
                 is ApiResult.Success -> {
                     if (reset) {
                         products = result.data.items
-                        if (result.data.items.isNotEmpty()) {
-                            try { listState.scrollToItem(0) } catch (_: Exception) {}
-                        }
                     } else {
                         val existingIds = products.map { it.productId }.toSet()
                         val newItems = result.data.items.filter { it.productId !in existingIds }
@@ -137,6 +134,12 @@ fun CatalogScreen(
 
             isLoadingInitial = false
             isLoadingMore = false
+
+            if (reset && result is ApiResult.Success && result.data.items.isNotEmpty()) {
+                coroutineScope.launch {
+                    try { listState.scrollToItem(0) } catch (_: Exception) {}
+                }
+            }
         }
     }
 
