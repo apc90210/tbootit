@@ -297,3 +297,34 @@ def test_catalog_query_tampering_rejected(enrolled_mobile_user):
     resp = client.get(tampered_path, headers=headers)
     assert resp.status_code in (401, 403)
 
+
+def test_catalog_filter_options_brand_priority_ordering(enrolled_mobile_user):
+    """Filter options sorts brands according to strict owner priority for MFU (51) and Printers (5)."""
+    cred_id = enrolled_mobile_user["cred_id"]
+    priv = enrolled_mobile_user["priv"]
+    path = "/api/mobile/catalog/filter-options?category_id=51&in_stock_only=true"
+    headers = _get_pop_headers(cred_id, priv, "GET", path)
+
+    mock_facets = {
+        "categories": [{"id": 51, "name": "МФУ", "count": 84}],
+        "brands": [
+            {"value": "Brother", "count": 3},
+            {"value": "Samsung", "count": 8},
+            {"value": "Canon", "count": 6},
+            {"value": "Xerox", "count": 30},
+            {"value": "HP", "count": 15},
+            {"value": "Kyocera", "count": 11},
+            {"value": "Epson", "count": 2},
+        ]
+    }
+
+    with patch("httpx.AsyncClient.get") as mock_get:
+        mock_get.return_value = httpx.Response(200, json=mock_facets)
+        resp = client.get(path, headers=headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        brand_values = [b["value"] for b in data["brands"]]
+        # Expected strict order: 1. HP, 2. Kyocera, 3. Canon, 4. Xerox, 5. Samsung, followed by Brother, Epson
+        assert brand_values == ["HP", "Kyocera", "Canon", "Xerox", "Samsung", "Brother", "Epson"]
+
+

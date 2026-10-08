@@ -179,7 +179,12 @@ fun CatalogScreen(
                 inStockOnly = inStockOnly
             )) {
                 is ApiResult.Success -> {
-                    categoryBrands = res.data.brands
+                    val catName = categories.find { it.id == catId }?.name
+                    categoryBrands = BrandOrdering.sortBrands(
+                        brands = res.data.brands,
+                        categoryId = catId,
+                        categoryName = catName
+                    )
                 }
                 is ApiResult.Error -> {
                     categoryBrands = emptyList()

@@ -180,6 +180,62 @@ object CategoryOrdering {
     }
 }
 
+object BrandOrdering {
+    /**
+     * Priority order requested by OWNER for MFU and Printers:
+     * 1. HP
+     * 2. Kyocera
+     * 3. Canon
+     * 4. Xerox
+     * 5. Samsung
+     * Remaining brands follow in stable alphabetical order.
+     */
+    private val PRINTER_MFU_PRIORITY = listOf(
+        "hp" to 0,
+        "kyocera" to 1,
+        "canon" to 2,
+        "xerox" to 3,
+        "samsung" to 4
+    )
+
+    fun isPrinterOrMfuCategory(categoryId: Int?, categoryName: String? = null): Boolean {
+        if (categoryId == 51 || categoryId == 5) return true
+        if (categoryName != null) {
+            val lower = categoryName.trim().lowercase()
+            if (lower.startsWith("мфу") || lower.startsWith("принтер")) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun getBrandPriority(brandName: String): Int {
+        val lower = brandName.trim().lowercase()
+        for ((pBrand, prio) in PRINTER_MFU_PRIORITY) {
+            if (lower == pBrand || lower.startsWith("$pBrand ") || lower.startsWith("$pBrand/")) {
+                return prio
+            }
+        }
+        return 100
+    }
+
+    fun sortBrands(
+        brands: List<CatalogBrandFacet>,
+        categoryId: Int? = null,
+        categoryName: String? = null
+    ): List<CatalogBrandFacet> {
+        val isTarget = isPrinterOrMfuCategory(categoryId, categoryName)
+        return brands.sortedWith(
+            if (isTarget) {
+                compareBy<CatalogBrandFacet> { getBrandPriority(it.value) }
+                    .thenBy { it.value.lowercase() }
+            } else {
+                compareBy<CatalogBrandFacet> { it.value.lowercase() }
+            }
+        )
+    }
+}
+
 data class CatalogBrandFacet(
     val value: String,
     val count: Int

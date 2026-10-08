@@ -3213,6 +3213,34 @@ async def api_mobile_catalog_product_details(request: Request, product_id: int):
         raise HTTPException(status_code=502, detail=f"Cannot connect to Core API: {str(e)}")
 
 
+PRINTER_MFU_PRIORITY_BRANDS = ["hp", "kyocera", "canon", "xerox", "samsung"]
+
+
+def sort_catalog_brands(brands: list, category_id: Optional[int] = None) -> list:
+    """
+    Sorts catalog brand facets according to OWNER requirements:
+    For MFU (51) and Printers (5):
+      1. HP
+      2. Kyocera
+      3. Canon
+      4. Xerox
+      5. Samsung
+      Remaining brands alphabetically.
+    For other categories / unspecified:
+      Preserves original facet order from Core.
+    """
+    if category_id in (51, 5):
+        prio_map = {b: i for i, b in enumerate(PRINTER_MFU_PRIORITY_BRANDS)}
+        return sorted(
+            brands,
+            key=lambda b: (
+                prio_map.get(str(b.get("value", "")).strip().lower(), 100),
+                str(b.get("value", "")).lower()
+            )
+        )
+    return brands
+
+
 @app.get("/api/mobile/catalog/filter-options")
 async def api_mobile_catalog_filter_options(
     request: Request,
@@ -3222,7 +3250,7 @@ async def api_mobile_catalog_filter_options(
     """
     Mobile Inventory Catalog filter options (categories and brands).
     Protected by TRMOBILE1 PoP authentication.
-    Supports category-scoped and stock-scoped brand facets.
+    Supports category-scoped and stock-scoped brand facets with strict priority ordering.
     """
     ctx = await _get_mobile_auth(request)
     headers = {"x-api-token": os.getenv("CORE_API_TOKEN", "")}
@@ -3240,9 +3268,10 @@ async def api_mobile_catalog_filter_options(
             resp = await client.get(url, params=core_params, headers=headers)
             if resp.status_code == 200:
                 raw_data = resp.json()
+                sorted_brands = sort_catalog_brands(raw_data.get("brands", []), category_id=category_id)
                 return {
                     "categories": raw_data.get("categories", []),
-                    "brands": raw_data.get("brands", []),
+                    "brands": sorted_brands,
                 }
             elif resp.status_code in (502, 503, 504):
                 raise HTTPException(status_code=502, detail="Core API service unavailable")

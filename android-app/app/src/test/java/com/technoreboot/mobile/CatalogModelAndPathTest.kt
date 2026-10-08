@@ -259,5 +259,81 @@ class CatalogModelAndPathTest {
             canonicalPath
         )
     }
+
+    @Test
+    fun testPriorityBrandOrderingForMfu() {
+        val rawBrands = listOf(
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Brother", count = 3),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Samsung", count = 8),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Canon", count = 6),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Xerox", count = 30),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "HP", count = 15),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Kyocera", count = 11),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Epson", count = 2)
+        )
+
+        val sorted = com.technoreboot.mobile.model.BrandOrdering.sortBrands(
+            brands = rawBrands,
+            categoryId = 51,
+            categoryName = "МФУ"
+        )
+        val sortedNames = sorted.map { it.value }
+
+        // Expected strict order: 1. HP, 2. Kyocera, 3. Canon, 4. Xerox, 5. Samsung, followed by Brother, Epson
+        assertEquals("HP", sortedNames[0])
+        assertEquals("Kyocera", sortedNames[1])
+        assertEquals("Canon", sortedNames[2])
+        assertEquals("Xerox", sortedNames[3])
+        assertEquals("Samsung", sortedNames[4])
+        assertEquals("Brother", sortedNames[5])
+        assertEquals("Epson", sortedNames[6])
+    }
+
+    @Test
+    fun testPriorityBrandOrderingForPrinters() {
+        val rawBrands = listOf(
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Zebra", count = 1),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Bixolon", count = 1),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Brother", count = 1),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Canon", count = 1),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "HP", count = 26),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Kyocera", count = 15)
+        )
+
+        val sorted = com.technoreboot.mobile.model.BrandOrdering.sortBrands(
+            brands = rawBrands,
+            categoryId = 5,
+            categoryName = "Принтеры"
+        )
+        val sortedNames = sorted.map { it.value }
+
+        // Expected strict order: HP, Kyocera, Canon, then Bixolon, Brother, Zebra
+        assertEquals("HP", sortedNames[0])
+        assertEquals("Kyocera", sortedNames[1])
+        assertEquals("Canon", sortedNames[2])
+        assertEquals("Bixolon", sortedNames[3])
+        assertEquals("Brother", sortedNames[4])
+        assertEquals("Zebra", sortedNames[5])
+    }
+
+    @Test
+    fun testBrandOrderingForOtherCategoriesAlphabetical() {
+        val rawBrands = listOf(
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Samsung", count = 5),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Dell", count = 8),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "Acer", count = 4),
+            com.technoreboot.mobile.model.CatalogBrandFacet(value = "HP", count = 10)
+        )
+
+        val sorted = com.technoreboot.mobile.model.BrandOrdering.sortBrands(
+            brands = rawBrands,
+            categoryId = 6,
+            categoryName = "Мониторы"
+        )
+        val sortedNames = sorted.map { it.value }
+
+        // Non-target categories sorted in stable alphabetical order
+        assertEquals(listOf("Acer", "Dell", "HP", "Samsung"), sortedNames)
+    }
 }
 
