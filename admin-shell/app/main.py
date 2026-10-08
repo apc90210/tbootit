@@ -3052,6 +3052,7 @@ async def api_mobile_catalog_products(
     in_stock_only: bool = Query(True),
     category_id: Optional[int] = Query(None),
     brand: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
 ):
@@ -3074,6 +3075,8 @@ async def api_mobile_catalog_products(
         params["category_id"] = category_id
     if brand and brand.strip():
         params["brand"] = brand.strip()
+    if sort and sort.strip() in ("price_asc", "price_desc", "created_asc", "created_desc"):
+        params["sort"] = sort.strip()
 
     try:
         async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:

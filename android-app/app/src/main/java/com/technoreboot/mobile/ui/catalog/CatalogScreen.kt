@@ -52,9 +52,9 @@ fun CatalogScreen(
 
     // Filter states
     var searchQuery by remember { mutableStateOf("") }
-    var inStockOnly by remember { mutableStateOf(true) }
     var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
     var selectedBrand by remember { mutableStateOf<String?>(null) }
+    var selectedSort by remember { mutableStateOf<String?>(null) }
 
     // Facets state
     var categories by remember { mutableStateOf<List<CatalogCategoryFacet>>(emptyList()) }
@@ -106,9 +106,10 @@ fun CatalogScreen(
                 credentialId = session.credentialId,
                 privateKey = key,
                 query = searchQuery.ifBlank { null },
-                inStockOnly = inStockOnly,
+                inStockOnly = true,
                 categoryId = selectedCategoryId,
                 brand = selectedBrand,
+                sort = selectedSort,
                 limit = 20,
                 offset = currentOffset
             )
@@ -150,7 +151,7 @@ fun CatalogScreen(
                 credentialId = session.credentialId,
                 privateKey = key,
                 categoryId = null,
-                inStockOnly = inStockOnly
+                inStockOnly = true
             )) {
                 is ApiResult.Success -> {
                     categories = CategoryOrdering.sortCategories(res.data.categories)
@@ -176,7 +177,7 @@ fun CatalogScreen(
                 credentialId = session.credentialId,
                 privateKey = key,
                 categoryId = catId,
-                inStockOnly = inStockOnly
+                inStockOnly = true
             )) {
                 is ApiResult.Success -> {
                     val catName = categories.find { it.id == catId }?.name
@@ -250,18 +251,18 @@ fun CatalogScreen(
         }
     }
 
-    // Reload categories when inStockOnly changes
-    LaunchedEffect(inStockOnly) {
+    // Load categories on initial launch
+    LaunchedEffect(Unit) {
         loadCategories()
     }
 
     // When category changes, reload brands for that category
-    LaunchedEffect(selectedCategoryId, inStockOnly) {
+    LaunchedEffect(selectedCategoryId) {
         loadBrandsForCategory(selectedCategoryId)
     }
 
     // Debounced query and filter change for product listing
-    LaunchedEffect(searchQuery, inStockOnly, selectedCategoryId, selectedBrand) {
+    LaunchedEffect(searchQuery, selectedCategoryId, selectedBrand, selectedSort) {
         if (!isFirstLoad) {
             delay(300)
         }
@@ -388,27 +389,33 @@ fun CatalogScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
-            // Stock filter toggle & facet chips
+            // Price sorting controls: "По возрастанию цены", "По убыванию цены"
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 FilterChip(
-                    selected = inStockOnly,
-                    onClick = { inStockOnly = true },
-                    label = { Text("В наличии") },
-                    leadingIcon = if (inStockOnly) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    selected = selectedSort == "price_asc",
+                    onClick = {
+                        selectedSort = if (selectedSort == "price_asc") null else "price_asc"
+                    },
+                    label = { Text("По возрастанию цены", fontSize = 12.sp) },
+                    leadingIcon = if (selectedSort == "price_asc") {
+                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                     } else null
                 )
                 FilterChip(
-                    selected = !inStockOnly,
-                    onClick = { inStockOnly = false },
-                    label = { Text("Все товары") },
-                    leadingIcon = if (!inStockOnly) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    selected = selectedSort == "price_desc",
+                    onClick = {
+                        selectedSort = if (selectedSort == "price_desc") null else "price_desc"
+                    },
+                    label = { Text("По убыванию цены", fontSize = 12.sp) },
+                    leadingIcon = if (selectedSort == "price_desc") {
+                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                     } else null
                 )
             }
@@ -630,7 +637,7 @@ fun CatalogScreen(
                                     searchQuery = ""
                                     selectedCategoryId = null
                                     selectedBrand = null
-                                    inStockOnly = false
+                                    selectedSort = null
                                 }) {
                                     Text("Сбросить фильтры")
                                 }

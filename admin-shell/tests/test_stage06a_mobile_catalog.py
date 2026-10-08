@@ -328,3 +328,38 @@ def test_catalog_filter_options_brand_priority_ordering(enrolled_mobile_user):
         assert brand_values == ["HP", "Kyocera", "Canon", "Xerox", "Samsung", "Brother", "Epson"]
 
 
+def test_catalog_products_with_sort(enrolled_mobile_user):
+    """Catalog products forwards sort parameter (price_asc / price_desc) to Core API."""
+    cred_id = enrolled_mobile_user["cred_id"]
+    priv = enrolled_mobile_user["priv"]
+    # Sorted query params: in_stock_only < limit < offset < sort
+    path = "/api/mobile/catalog/products?in_stock_only=true&limit=20&offset=0&sort=price_asc"
+    headers = _get_pop_headers(cred_id, priv, "GET", path)
+
+    mock_core_response = {
+        "items": [
+            {"id": 104, "title": "HP Deskjet 5515", "sale_price": 1425.0, "quantity": 1, "status": "in_stock"},
+            {"id": 396, "title": "HP LaserJet 3030", "sale_price": 4500.0, "quantity": 1, "status": "in_stock"},
+        ],
+        "total": 2,
+        "limit": 20,
+        "offset": 0,
+    }
+
+    with patch("httpx.AsyncClient.get") as mock_get:
+        mock_get.return_value = httpx.Response(200, json=mock_core_response)
+        resp = client.get(path, headers=headers)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert len(data["items"]) == 2
+        mock_get.assert_called_once()
+        _, kwargs = mock_get.call_args
+        assert kwargs.get("params") == {
+            "limit": 20,
+            "offset": 0,
+            "status": "in_stock",
+            "sort": "price_asc",
+        }
+
+
+

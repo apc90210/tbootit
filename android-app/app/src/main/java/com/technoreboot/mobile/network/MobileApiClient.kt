@@ -1293,6 +1293,7 @@ class MobileApiClient(
         inStockOnly: Boolean = true,
         categoryId: Int? = null,
         brand: String? = null,
+        sort: String? = null,
         limit: Int = 20,
         offset: Int = 0
     ): ApiResult<CatalogProductsResult> = withContext(Dispatchers.IO) {
@@ -1321,6 +1322,9 @@ class MobileApiClient(
         queryParams.add("offset" to offset.toString())
         if (!query.isNullOrBlank()) {
             queryParams.add("q" to java.net.URLEncoder.encode(query.trim(), "UTF-8"))
+        }
+        if (!sort.isNullOrBlank()) {
+            queryParams.add("sort" to java.net.URLEncoder.encode(sort.trim(), "UTF-8"))
         }
 
         val canonicalPath = RequestBinding.canonicalizePath("/api/mobile/catalog/products", queryParams)

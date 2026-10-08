@@ -335,5 +335,26 @@ class CatalogModelAndPathTest {
         // Non-target categories sorted in stable alphabetical order
         assertEquals(listOf("Acer", "Dell", "HP", "Samsung"), sortedNames)
     }
+
+    @Test
+    fun testCanonicalCatalogPathOrderingWithSort() {
+        val params = listOf(
+            "brand" to URLEncoder.encode("HP", "UTF-8"),
+            "category_id" to "51",
+            "in_stock_only" to "true",
+            "limit" to "20",
+            "offset" to "0",
+            "q" to URLEncoder.encode("LaserJet", "UTF-8"),
+            "sort" to "price_asc"
+        )
+        val canonicalPath = RequestBinding.canonicalizePath("/api/mobile/catalog/products", params)
+
+        // Strict alphabetical order of keys: brand < category_id < in_stock_only < limit < offset < q < sort
+        assertEquals(
+            "/api/mobile/catalog/products?brand=HP&category_id=51&in_stock_only=true&limit=20&offset=0&q=LaserJet&sort=price_asc",
+            canonicalPath
+        )
+    }
 }
+
 
