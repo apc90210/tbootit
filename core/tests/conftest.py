@@ -33,7 +33,9 @@ from app.config import settings
 settings.database_url = TEST_DATABASE_URL
 
 # Re-bind app.database engine and SessionLocal to isolated temporary SQLite DB
+from sqlalchemy import event
 app.database.engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+event.listen(app.database.engine, "connect", app.database.configure_sqlite_connection)
 app.database.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app.database.engine)
 app.database.settings.database_url = TEST_DATABASE_URL
 
